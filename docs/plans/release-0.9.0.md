@@ -30,7 +30,7 @@ From `docs/design/copilot-live-data.md` §8, in the order D9 chose: the edits fi
 
 | # | What | Migration | Depends on | Size |
 |---|---|---|---|---|
-| L4 | **Five edit proposals**: rename or redescribe an objective, check in, record a KPI value, move a task, change an initiative's status (§4.1). Each offered only over what the member may edit. Undo for an edit stores the values from before it was applied (§4.2, D5). The card shows before and after (§4.4). A mid-cycle target change needs a reason: the model writes it from the person's words, or the card asks for it (§4.3, D10). Every change stays a proposal the member applies (D4) | **Migration 2**: `proposed_changes.reverse_payload` | | L |
+| L4 | **Five edit proposals**, built in three changes: **L4a** (the title and description edit, the task move, the initiative status, undo for them, and the mid-cycle reason), **L4b** (KPI value delete, which the KPI value proposal's undo needs) and **L4c** (the check-in and KPI value proposals). Rename or redescribe an objective, check in, record a KPI value, move a task, change an initiative's status (§4.1). Each offered only over what the member may edit. Undo for an edit stores the values from before it was applied (§4.2, D5). The card shows before and after (§4.4). The reason (§4.3, D10) applies to adding an objective or a key result after the cycle started, not to editing a target: the model writes it from the person's words, or the card asks for it. Every change stays a proposal the member applies (D4) | **Migration 2**: `proposed_changes.reverse_payload` | | L |
 | L1 | **Port**: assistant tool-call turns in every driver, the Google tool result, tool-name mapping (§3.5). `chatWithTools` gets its first caller | None | | M |
 | L2 | **The read tools and the loop**: the curated dozen read actions in §3.2 (D2), called as the member, 4 rounds, 6 reads a round, 6,000 characters a result (D7). Results are untrusted text (§3.4). Citations come from what was read (§3.3). The reading status line, "Reading New accounts reach value in their first week", joins 0.8.1's step line. A provider that cannot call tools keeps today's path, and AI off is unchanged | None | L1 | L |
 | L3 | **Record the copilot's reads** in `ai_tool_calls`, beside the agent surface's (§3.6, D6). After a reload, the "Searched, read N" line under an answer is rebuilt from these rows, which closes W2-Q (section 10) | **Migration 1**: `ai_tool_calls.source` admits `copilot` | L2 | S |
@@ -266,7 +266,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 
 | Row | Status | Note |
 |---|---|---|
-| L4 | to do | Design approved 11 November 2026 |
+| L4 | in progress | Design approved 11 November 2026. Split L4a/L4b/L4c; L4a done, uncommitted. Follow-ups from its review: the status words in an edit's preview (`To do`, `Done`, `(empty)`) are stored in English, so a Malay reader sees them untranslated; store the raw values and translate on the card. The reason a person types is saved in the payload but not shown on the applied card |
 | L1 | to do | |
 | L2 | to do | |
 | L3 | to do | |

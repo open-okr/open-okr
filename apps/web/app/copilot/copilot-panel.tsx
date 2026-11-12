@@ -959,8 +959,10 @@ export function CopilotPanel({
             busy={acting !== null}
             acting={acting}
             error={cardErrors[proposal.id] ?? null}
-            onApply={() =>
-              void decide("apply", proposal.id, applyCopilotProposalAction)
+            onApply={(reason) =>
+              void decide("apply", proposal.id, (id) =>
+                applyCopilotProposalAction(id, reason),
+              )
             }
             onDismiss={() =>
               void decide("dismiss", proposal.id, dismissCopilotProposalAction)

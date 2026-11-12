@@ -21,6 +21,7 @@
 import {
   activeOnly,
   aiThreads,
+  goals,
   proposedChanges,
   withContext,
 } from "@openokr/db";
@@ -28,9 +29,15 @@ import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { reversalFor } from "../copilot/proposals.ts";
+import {
+  captureReverse,
+  changedSinceApplied,
+  isEdit,
+  reversalFor,
+} from "../copilot/proposals.ts";
 import { subjectPath } from "../notifications/links.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { policyDecisionInTx } from "../practice/policy.ts";
 import { askingMemberId } from "./copilot.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { callAction } from "./registry.ts";
@@ -50,6 +57,7 @@ async function ownProposal(
       status: proposedChanges.status,
       result: proposedChanges.result,
       undoneAt: proposedChanges.undoneAt,
+      reversePayload: proposedChanges.reversePayload,
       threadId: proposedChanges.threadId,
     })
     .from(proposedChanges)
@@ -111,7 +119,12 @@ function madeHref(
     case "initiatives.create":
       return subjectPath("initiative", id);
     case "tasks.create":
+    case "tasks.move":
       return subjectPath("task", id);
+    case "initiatives.update":
+      return subjectPath("initiative", id);
+    case "goals.update":
+      return subjectPath("goal", id);
     default:
       return null;
   }
@@ -223,6 +236,13 @@ const proposalOutput = z.object({
   /** False when this action has no reverse, so no undo is offered. */
   reversible: z.boolean(),
   /**
+   * True when the workspace asks why anything is added mid-cycle (METHOD.md
+   * §2.9), this proposal adds an objective or key result to a cycle that has
+   * started, and it carries no reason. The card then asks for one (design
+   * §4.3). Decided by the practice policy, never by a threshold copied here.
+   */
+  needsReason: z.boolean(),
+  /**
    * When it was made, as an ISO time. A card is made for the question before
    * it, so this is what places it in its turn (plan 0.8.1 CP3).
    */
@@ -233,6 +253,71 @@ const proposalOutput = z.object({
    */
   href: z.string().nullable(),
 });
+
+/** What `proposed_changes.reverse_payload` holds, read back. */
+const storedReverse = z.object({
+  action: z.string(),
+  payload: z.record(z.string(), z.unknown()),
+  expect: z.record(z.string(), z.unknown()),
+});
+
+/** The two creates that may be refused for want of a reason. */
+const REASON_ACTIONS = new Set(["goals.create", "goals.addKeyResult"]);
+
+/**
+ * Whether the practice would refuse this pending create for want of a reason.
+ *
+ * Asked of the policy itself with the reason left out, so the answer follows
+ * the setting and the cycle's own dates and nothing is copied from
+ * METHOD.md. The level and the reviewer are left out of the question on
+ * purpose: another rule blocking first would hide this one from the card.
+ */
+async function needsReason(
+  tx: OperationTx,
+  workspaceId: string,
+  action: string,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
+  if (!REASON_ACTIONS.has(action) || typeof payload.reason === "string") {
+    return false;
+  }
+  let cycleId: string | null = null;
+  if (action === "goals.create") {
+    cycleId = typeof payload.cycleId === "string" ? payload.cycleId : null;
+  } else if (typeof payload.goalId === "string") {
+    const [goal] = await tx
+      .select({ cycleId: goals.cycleId })
+      .from(goals)
+      .where(
+        activeOnly(
+          goals,
+          eq(goals.workspaceId, workspaceId),
+          eq(goals.id, payload.goalId),
+        ),
+      )
+      .limit(1);
+    cycleId = goal?.cycleId ?? null;
+  }
+  if (cycleId === null) {
+    return false;
+  }
+  const decision = await policyDecisionInTx(
+    tx,
+    workspaceId,
+    action === "goals.create"
+      ? {
+          kind: "objective.create",
+          cycleId,
+          hasReviewer: true,
+          hasReason: false,
+        }
+      : { kind: "keyResult.create", cycleId, hasReason: false },
+  );
+  return (
+    decision.outcome === "block" &&
+    decision.rules.includes("reasons.midCycleAddition")
+  );
+}
 
 /** The proposals in one of the reader's own conversations, newest first. */
 export const readProposals = defineReadAction({
@@ -273,6 +358,7 @@ export const readProposals = defineReadAction({
             status: proposedChanges.status,
             result: proposedChanges.result,
             undoneAt: proposedChanges.undoneAt,
+            reversePayload: proposedChanges.reversePayload,
             createdAt: proposedChanges.createdAt,
           })
           .from(proposedChanges)
@@ -284,9 +370,10 @@ export const readProposals = defineReadAction({
           )
           .orderBy(desc(proposedChanges.createdAt), desc(proposedChanges.id));
 
-        return rows.map((row) => {
+        const proposals = [];
+        for (const row of rows) {
           const payload = row.payload as Record<string, unknown>;
-          return {
+          proposals.push({
             id: row.id,
             action: row.action,
             preview: previewSchema.catch([]).parse(payload.__preview),
@@ -296,15 +383,25 @@ export const readProposals = defineReadAction({
             // Whether an undo is possible at all, answered from the catalogue
             // rather than from hope. Before it is applied there is no result to
             // reverse, so the answer is about the action, not this row.
-            reversible:
-              reversalFor(row.action, row.result ?? { id: "probe" }) !== null,
+            // An edit has no result to reverse from: it can be undone from
+            // the moment it is proposed, and once applied only if the values
+            // from before were kept.
+            reversible: isEdit(row.action)
+              ? row.status === "applied"
+                ? row.reversePayload !== null
+                : true
+              : reversalFor(row.action, row.result ?? { id: "probe" }) !== null,
+            needsReason:
+              row.status === "pending" &&
+              (await needsReason(tx, context.workspaceId, row.action, payload)),
             createdAt: row.createdAt.toISOString(),
             href:
               row.status === "applied" && row.undoneAt === null
                 ? madeHref(row.action, payload, row.result)
                 : null,
-          };
-        });
+          });
+        }
+        return proposals;
       },
     );
   },
@@ -331,7 +428,15 @@ export const applyProposal = defineWriteAction({
   name: "copilot.applyProposal",
   summary:
     "Applies one copilot proposal through the normal Operation pipeline.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({
+    id: z.uuid(),
+    /**
+     * The person's own words for why an objective or key result starts
+     * mid-cycle, typed on the card when the workspace asks for one (design
+     * §4.3). Merged into the payload of those two creates only.
+     */
+    reason: z.string().trim().min(1).max(500).optional(),
+  }),
   output: z.object({
     id: z.uuid(),
     /** What the applied action returned, for the undo and for the link. */
@@ -353,21 +458,39 @@ export const applyProposal = defineWriteAction({
         );
       }
 
+      // The person's typed reason joins the payload of the two creates that
+      // take one, and nothing else: it is theirs, so it replaces a model's.
+      const storedPayload = proposal.payload as Record<string, unknown>;
+      const merged =
+        input.reason !== undefined && REASON_ACTIONS.has(proposal.action)
+          ? { ...storedPayload, reason: input.reason }
+          : storedPayload;
+      const callContext = {
+        pool: context.pool,
+        workspaceId,
+        actor: {
+          kind: actor.kind,
+          userId: context.actor.userId,
+          memberId,
+        },
+        proposalId: input.id,
+      };
+      const actionPayload = withoutPreview(merged);
+
+      // An edit returns only an id, so the values from before are read now,
+      // as the member, just before the action's own transaction (design §4.2).
+      const reverse = await captureReverse(
+        callContext,
+        proposal.action,
+        actionPayload,
+      );
+
       // As the member, with their own access. An action they may not perform is
       // refused here by its own authorisation, and the refusal is the answer.
       const result = (await callAction(
-        {
-          pool: context.pool,
-          workspaceId,
-          actor: {
-            kind: actor.kind,
-            userId: context.actor.userId,
-            memberId,
-          },
-          proposalId: input.id,
-        },
+        callContext,
         proposal.action as never,
-        withoutPreview(proposal.payload as Record<string, unknown>) as never,
+        actionPayload as never,
       )) as Record<string, unknown>;
 
       await tx
@@ -377,6 +500,8 @@ export const applyProposal = defineWriteAction({
           decidedByMemberId: memberId,
           decidedAt: new Date(),
           result,
+          ...(reverse === null ? {} : { reversePayload: reverse }),
+          ...(merged === storedPayload ? {} : { payload: merged }),
         })
         .where(
           and(
@@ -497,10 +622,40 @@ export const undoProposal = defineWriteAction({
         throw new OperationError("forbidden", "That was already undone.");
       }
 
-      const reversal = reversalFor(
-        proposal.action,
-        (proposal.result ?? null) as Record<string, unknown> | null,
-      );
+      // An edit keeps its own reverse, read before it was applied. A create
+      // reverses from what it returned.
+      const kept = storedReverse.safeParse(proposal.reversePayload);
+      const callContext = {
+        pool: context.pool,
+        workspaceId,
+        actor: {
+          kind: actor.kind,
+          userId: context.actor.userId,
+          memberId,
+        },
+      };
+      if (kept.success) {
+        const stale = await changedSinceApplied(
+          callContext,
+          proposal.action,
+          withoutPreview(proposal.payload as Record<string, unknown>),
+          kept.data.expect,
+        );
+        if (stale) {
+          throw new OperationError(
+            "forbidden",
+            "This changed after it was applied, so undoing it would overwrite the later change.",
+          );
+        }
+      }
+      const reversal = kept.success
+        ? { action: kept.data.action, payload: kept.data.payload }
+        : isEdit(proposal.action)
+          ? null
+          : reversalFor(
+              proposal.action,
+              (proposal.result ?? null) as Record<string, unknown> | null,
+            );
       if (!reversal) {
         throw new OperationError(
           "forbidden",
@@ -509,15 +664,7 @@ export const undoProposal = defineWriteAction({
       }
 
       await callAction(
-        {
-          pool: context.pool,
-          workspaceId,
-          actor: {
-            kind: actor.kind,
-            userId: context.actor.userId,
-            memberId,
-          },
-        },
+        callContext,
         reversal.action as never,
         reversal.payload as never,
       );

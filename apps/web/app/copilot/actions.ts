@@ -229,10 +229,19 @@ async function decided(
   }
 }
 
-/** Applies one, as the reader. The proposed action's own access decides. */
-export async function applyCopilotProposalAction(id: string) {
+/**
+ * Applies one, as the reader. The proposed action's own access decides.
+ * `reason` is the person's own words for why it starts mid-cycle, typed on
+ * the card when the workspace asks for one (design §4.3).
+ */
+export async function applyCopilotProposalAction(id: string, reason?: string) {
   const base = await context();
-  return decided(() => callAction(base, "copilot.applyProposal", { id }));
+  return decided(() =>
+    callAction(base, "copilot.applyProposal", {
+      id,
+      ...(reason === undefined ? {} : { reason }),
+    }),
+  );
 }
 
 export async function dismissCopilotProposalAction(id: string) {

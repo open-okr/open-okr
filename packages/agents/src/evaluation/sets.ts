@@ -988,6 +988,87 @@ const PROPOSED_ACTION = {
   why: "You asked for this measure on the activation objective.",
 };
 
+/**
+ * The edits (plan 0.9.0 L4a), each with the numbered list the model picks
+ * from. The model points at a task, an initiative or an objective by number
+ * and writes only the new value.
+ */
+const EDIT_OPTIONS: ProposalRequestContext["options"] = [
+  {
+    action: "tasks.move",
+    label: "Move a task to another status",
+    whatItDoes: "Moves one of the person's tasks to another status.",
+    fields: {
+      type: "object",
+      additionalProperties: false,
+      required: ["taskNumber", "status"],
+      properties: {
+        taskNumber: { type: "integer" },
+        status: { type: "string" },
+      },
+    },
+    choices: {
+      tasks: [
+        "Draft the handover note (In progress)",
+        "Book the pilot kickoff (To do)",
+      ],
+    },
+  },
+  {
+    action: "initiatives.update",
+    label: "Change an initiative's status",
+    whatItDoes: "Changes the status of one initiative.",
+    fields: {
+      type: "object",
+      additionalProperties: false,
+      required: ["initiativeNumber", "status"],
+      properties: {
+        initiativeNumber: { type: "integer" },
+        status: { type: "string" },
+      },
+    },
+    choices: {
+      initiatives: ["Hand every trial to finance (Planned, Product)"],
+    },
+  },
+  {
+    action: "goals.update",
+    label: "Rename or redescribe an objective",
+    whatItDoes: "Changes the title or the description of one objective.",
+    fields: {
+      type: "object",
+      additionalProperties: false,
+      required: ["objectiveNumber"],
+      properties: {
+        objectiveNumber: { type: "integer" },
+        title: { type: "string" },
+        description: { type: "string" },
+      },
+    },
+    choices: { objectives: ["Raise mid-market activation"] },
+  },
+];
+
+/** An objective that takes a reason, as core offers it. */
+const REASON_OPTIONS: ProposalRequestContext["options"] = [
+  {
+    action: "goals.create",
+    label: "Create an objective",
+    whatItDoes: "Adds an objective to the current cycle.",
+    fields: {
+      type: "object",
+      additionalProperties: false,
+      required: ["title", "spaceNumber"],
+      properties: {
+        title: { type: "string" },
+        spaceNumber: { type: "integer" },
+        reason: { type: "string" },
+      },
+    },
+    choices: { spaces: ["Product"] },
+  },
+];
+
 const proposeAction = evaluationSet<ProposalRequestContext>({
   capability: "proposeAction",
   inputBudgetTokens: 4_000,
@@ -1029,6 +1110,120 @@ const proposeAction = evaluationSet<ProposalRequestContext>({
       context: PROPOSAL,
       reply: json({ ...PROPOSED_ACTION, propose: true, why: "" }),
       expected: null,
+    },
+    {
+      name: "a request to move a task, by its number",
+      context: {
+        request: "Move the handover note task to done",
+        options: EDIT_OPTIONS,
+        sources: [],
+      },
+      reply: json({
+        propose: true,
+        action: "tasks.move",
+        fields: { taskNumber: 1, status: "done" },
+        why: "You said the handover note is finished.",
+      }),
+      expected: {
+        action: "tasks.move",
+        fields: { taskNumber: 1, status: "done" },
+        why: "You said the handover note is finished.",
+      },
+    },
+    {
+      name: "a request to change an initiative's status",
+      context: {
+        request: "The finance handover initiative has started, mark it active",
+        options: EDIT_OPTIONS,
+        sources: [],
+      },
+      reply: json({
+        propose: true,
+        action: "initiatives.update",
+        fields: { initiativeNumber: 1, status: "active" },
+        why: "Work on the handover has started.",
+      }),
+      expected: {
+        action: "initiatives.update",
+        fields: { initiativeNumber: 1, status: "active" },
+        why: "Work on the handover has started.",
+      },
+    },
+    {
+      name: "a request to rename an objective",
+      context: {
+        request:
+          "Rename the activation objective to Raise mid-market activation to 60%",
+        options: EDIT_OPTIONS,
+        sources: [],
+      },
+      reply: json({
+        propose: true,
+        action: "goals.update",
+        fields: {
+          objectiveNumber: 1,
+          title: "Raise mid-market activation to 60%",
+          description: null,
+        },
+        why: "You asked for a title with the target in it.",
+      }),
+      expected: {
+        action: "goals.update",
+        fields: {
+          objectiveNumber: 1,
+          title: "Raise mid-market activation to 60%",
+        },
+        why: "You asked for a title with the target in it.",
+      },
+    },
+    {
+      name: "a reason in the person's own words is kept",
+      context: {
+        request:
+          "Create an objective to onboard partners because the pilot starts next week",
+        options: REASON_OPTIONS,
+        sources: [],
+      },
+      reply: json({
+        propose: true,
+        action: "goals.create",
+        fields: {
+          title: "Onboard partners",
+          spaceNumber: 1,
+          reason: "The pilot starts next week",
+        },
+        why: "You asked for this objective.",
+      }),
+      expected: {
+        action: "goals.create",
+        fields: {
+          title: "Onboard partners",
+          spaceNumber: 1,
+          reason: "The pilot starts next week",
+        },
+        why: "You asked for this objective.",
+      },
+    },
+    {
+      // The model never invents a reason: with none in the request the field
+      // stays empty and the card asks the person.
+      name: "a reason the person did not give stays absent",
+      context: {
+        request: "Create an objective to onboard partners",
+        options: REASON_OPTIONS,
+        sources: [],
+      },
+      reply: json({
+        propose: true,
+        action: "goals.create",
+        fields: { title: "Onboard partners", spaceNumber: 1, reason: null },
+        why: "You asked for this objective.",
+      }),
+      expected: {
+        action: "goals.create",
+        fields: { title: "Onboard partners", spaceNumber: 1 },
+        why: "You asked for this objective.",
+      },
     },
     {
       // Found live on GPT-6 Luna (plan 0.8.1 L7): asked for work behind a

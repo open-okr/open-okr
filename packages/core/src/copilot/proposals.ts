@@ -29,10 +29,20 @@
  * **Every entry declares its own reverse, or admits it has none.** A proposal
  * that cannot be undone is still applicable; the interface says so instead of
  * offering a button that does nothing.
+ *
+ * **Three edits join the creates (plan 0.9.0 L4a):** an objective's title and
+ * description, a task's status and an initiative's status. An edit returns
+ * only an id, so there is nothing to reverse from afterwards. Applying one
+ * therefore reads the values from before through the product's own read
+ * actions, as the member, just before the action runs (`capture`), and undo
+ * checks the record still holds what the edit left (`current`) before it puts
+ * the old values back. Deletes are not on this list and never will be.
  */
 import {
   INDICATOR_TYPES,
+  INITIATIVE_STATUSES,
   KEY_RESULT_DIRECTIONS,
+  TASK_STATUSES,
   withContext,
 } from "@openokr/db";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -43,7 +53,9 @@ import type { ActionCallContext } from "../actions/define.ts";
 import { callAction } from "../actions/registry.ts";
 import type { ProposalDrop, ProposalNote } from "../agents/drafter.ts";
 import { cyclesOpenForWork } from "../cycles/open-for-work.ts";
+import { excerptRichText } from "../rich-text/excerpt.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
+import type { RichTextDocument } from "../rich-text/schema.ts";
 import { errorNameOf, logProposalDrop } from "./proposal-drops.ts";
 
 /** One thing the model may be shown and point at by number. */
@@ -97,6 +109,21 @@ export interface Reversal {
   readonly payload: Record<string, unknown>;
 }
 
+/** The values an edit changes, read as the product reads them. */
+type Fields = Record<string, unknown>;
+
+/** What reading before an edit yields: how to put it back, and what it leaves. */
+interface Captured {
+  readonly reverse: Reversal;
+  /** The values the edit leaves, which undo expects to still find. */
+  readonly expect: Fields;
+}
+
+/** What `proposed_changes.reverse_payload` holds. */
+export interface StoredReverse extends Reversal {
+  readonly expect: Fields;
+}
+
 interface ProposableAction {
   readonly action: string;
   readonly label: string;
@@ -114,6 +141,50 @@ interface ProposableAction {
   ): Promise<BuiltProposal>;
   /** The reverse, given what applying it returned. */
   reverse(result: Record<string, unknown>): Reversal | null;
+  /**
+   * An edit only: reads the values from before, as the member, to build the
+   * reverse. Called just before the action runs, with the payload it will run.
+   * Null means this edit cannot be put back, and the card says so.
+   */
+  capture?(
+    context: ActionCallContext,
+    payload: Record<string, unknown>,
+  ): Promise<Captured | null>;
+  /**
+   * An edit only: the fields `capture` expects, as they are now, for undo's
+   * staleness check.
+   */
+  current?(
+    context: ActionCallContext,
+    payload: Record<string, unknown>,
+  ): Promise<Fields>;
+}
+
+/** How a status reads in a preview and in the labels the model is shown. */
+const TASK_STATUS_WORD: Readonly<Record<string, string>> = {
+  backlog: "Backlog",
+  todo: "To do",
+  in_progress: "In progress",
+  done: "Done",
+};
+const INITIATIVE_STATUS_WORD: Readonly<Record<string, string>> = {
+  planned: "Planned",
+  active: "Active",
+  done: "Done",
+  dropped: "Dropped",
+};
+
+/** A rich text value as one short line, for a before and after row. */
+function lineOf(value: unknown): string {
+  if (typeof value === "object" && value !== null) {
+    try {
+      const line = excerptRichText(value as RichTextDocument, 160);
+      return line === "" ? "(empty)" : line;
+    } catch {
+      return "(empty)";
+    }
+  }
+  return "(empty)";
 }
 
 const GOAL_LEVELS = ["company", "department", "team", "individual"] as const;
@@ -138,6 +209,8 @@ const createObjective: ProposableAction = {
     level: z.enum(GOAL_LEVELS),
     /** One-based, into the `spaces` list the model was shown. */
     spaceNumber: z.number().int().min(1),
+    /** The person's own words for why it starts now (design §4.3). */
+    reason: z.string().trim().max(500).optional(),
   }) as unknown as z.ZodType<Record<string, unknown>>,
   fields: {
     type: "object",
@@ -148,6 +221,7 @@ const createObjective: ProposableAction = {
       description: { type: "string", maxLength: 2000 },
       level: { type: "string", enum: [...GOAL_LEVELS] },
       spaceNumber: { type: "integer", minimum: 1 },
+      reason: { type: "string", maxLength: 500 },
     },
   },
   async offer(scope) {
@@ -159,6 +233,7 @@ const createObjective: ProposableAction = {
       description?: string;
       level: (typeof GOAL_LEVELS)[number];
       spaceNumber: number;
+      reason?: string;
     };
     const spaces = choices.spaces ?? [];
     const space = spaces[authored.spaceNumber - 1];
@@ -191,6 +266,7 @@ const createObjective: ProposableAction = {
         championId: memberId,
         reviewerId: memberId,
         weight: 1,
+        ...(authored.reason ? { reason: authored.reason } : {}),
       },
       preview: [
         { label: "Objective", value: authored.title },
@@ -200,6 +276,9 @@ const createObjective: ProposableAction = {
         { label: "Level", value: authored.level },
         { label: "Space", value: space.label },
         { label: "Cycle", value: cycle.name },
+        ...(authored.reason
+          ? [{ label: "Reason", value: authored.reason }]
+          : []),
       ],
       subjectType: "space",
       subjectId: space.id,
@@ -264,6 +343,8 @@ const addKeyResult: ProposableAction = {
     target: z.number().finite(),
     /** One-based, into the `objectives` list the model was shown. */
     objectiveNumber: z.number().int().min(1),
+    /** The person's own words for why it starts now (design §4.3). */
+    reason: z.string().trim().max(500).optional(),
   }) as unknown as z.ZodType<Record<string, unknown>>,
   fields: {
     type: "object",
@@ -284,6 +365,7 @@ const addKeyResult: ProposableAction = {
       baseline: { type: "number" },
       target: { type: "number" },
       objectiveNumber: { type: "integer", minimum: 1 },
+      reason: { type: "string", maxLength: 500 },
     },
   },
   async offer(scope) {
@@ -298,6 +380,7 @@ const addKeyResult: ProposableAction = {
       baseline: number;
       target: number;
       objectiveNumber: number;
+      reason?: string;
     };
     const objective = picked(choices, "objectives", authored.objectiveNumber);
     const memberId = await askingMember(context);
@@ -319,6 +402,7 @@ const addKeyResult: ProposableAction = {
         ownerId: memberId,
         weight: 1,
         ...(dueOn ? { dueOn } : {}),
+        ...(authored.reason ? { reason: authored.reason } : {}),
       },
       preview: [
         { label: "Key result", value: authored.title },
@@ -327,6 +411,9 @@ const addKeyResult: ProposableAction = {
         { label: "Target", value: measure(authored.target) },
         { label: "Direction", value: authored.direction },
         { label: "Indicator", value: authored.indicatorType },
+        ...(authored.reason
+          ? [{ label: "Reason", value: authored.reason }]
+          : []),
       ],
       subjectType: "goal",
       subjectId: objective.id,
@@ -467,12 +554,302 @@ const addTask: ProposableAction = {
   },
 };
 
+/**
+ * Renaming or redescribing an objective (plan 0.9.0 L4a).
+ *
+ * The model writes the new title and a sentence of description and picks the
+ * objective by number from the ones this member may edit. The preview reads
+ * `Title: old -> new`, with the old values read now as the member.
+ *
+ * **Undo needs an expectation.** `goals.update` has no read guard, so a later
+ * edit by somebody else would be overwritten by an undo that wrote the old
+ * title back. `expect` holds what this edit left and undo refuses when the
+ * objective no longer holds it.
+ */
+const editObjective: ProposableAction = {
+  action: "goals.update",
+  label: "Rename or redescribe an objective",
+  whatItDoes:
+    "Changes the title or the description of one objective the person may edit. Writes only the fields the person asked to change.",
+  authored: z
+    .object({
+      /** One-based, into the `objectives` list the model was shown. */
+      objectiveNumber: z.number().int().min(1),
+      title: z.string().trim().min(1).max(500).optional(),
+      description: z.string().trim().max(2000).optional(),
+    })
+    .refine(
+      (value) => value.title !== undefined || value.description !== undefined,
+      { message: "an edit has to change something" },
+    ) as unknown as z.ZodType<Record<string, unknown>>,
+  fields: {
+    type: "object",
+    additionalProperties: false,
+    required: ["objectiveNumber"],
+    properties: {
+      objectiveNumber: { type: "integer", minimum: 1 },
+      title: { type: "string", maxLength: 500 },
+      description: { type: "string", maxLength: 2000 },
+    },
+  },
+  async offer(scope) {
+    return { objectives: await scope.editableObjectives() };
+  },
+  async build(context, fields, choices) {
+    const authored = fields as {
+      objectiveNumber: number;
+      title?: string;
+      description?: string;
+    };
+    const objective = picked(choices, "objectives", authored.objectiveNumber);
+    const now = await callAction(context, "goals.read", { id: objective.id });
+    const newTitle = authored.title ? authored.title : undefined;
+    const newDescription = authored.description
+      ? authored.description
+      : undefined;
+    if (
+      (newTitle === undefined || newTitle === now.title) &&
+      newDescription === undefined
+    ) {
+      // Nothing to put in place of what is there. No card rather than a
+      // proposal that changes nothing.
+      throw new Error("That would not change the objective.");
+    }
+    // A title the model repeats unchanged is not a change, so it stays out of
+    // the payload and the preview rather than reading "X -> X".
+    const titleChanged = newTitle !== undefined && newTitle !== now.title;
+    return {
+      action: "goals.update",
+      payload: {
+        id: objective.id,
+        ...(titleChanged ? { title: newTitle } : {}),
+        ...(newDescription === undefined
+          ? {}
+          : { description: richTextFromPlainText(newDescription) }),
+      },
+      preview: [
+        { label: "Objective", value: now.title },
+        ...(titleChanged
+          ? [{ label: "Title", value: `${now.title} -> ${newTitle}` }]
+          : []),
+        ...(newDescription === undefined
+          ? []
+          : [
+              {
+                label: "Description",
+                value: `${lineOf(now.description)} -> ${newDescription}`,
+              },
+            ]),
+      ],
+      subjectType: "goal",
+      subjectId: objective.id,
+    };
+  },
+  reverse() {
+    return null;
+  },
+  async capture(context, payload) {
+    const id = String(payload.id);
+    const now = await callAction(context, "goals.read", { id });
+    return {
+      reverse: {
+        action: "goals.update",
+        payload: {
+          id,
+          ...(payload.title === undefined ? {} : { title: now.title }),
+          ...(payload.description === undefined
+            ? {}
+            : { description: now.description ?? null }),
+        },
+      },
+      expect: {
+        ...(payload.title === undefined ? {} : { title: payload.title }),
+        ...(payload.description === undefined
+          ? {}
+          : { description: payload.description }),
+      },
+    };
+  },
+  async current(context, payload) {
+    const now = await callAction(context, "goals.read", {
+      id: String(payload.id),
+    });
+    return {
+      ...(payload.title === undefined ? {} : { title: now.title }),
+      ...(payload.description === undefined
+        ? {}
+        : { description: now.description ?? null }),
+    };
+  },
+};
+
+/**
+ * Moving a task to another status (plan 0.9.0 L4a).
+ *
+ * The model picks the task by number and writes the status. Undo moves it
+ * back to the status it had. `tasks.move` puts a card at the top of its
+ * column when no slot is given, so an undone move lands at the top of the old
+ * column rather than at its old slot. That is accepted: the slot is a
+ * fraction nobody reads, and storing it would make undo refuse after any
+ * unrelated move in the same column.
+ */
+const moveTask: ProposableAction = {
+  action: "tasks.move",
+  label: "Move a task to another status",
+  whatItDoes:
+    "Moves one of the person's tasks to another status: backlog, to do, in progress or done.",
+  authored: z.object({
+    /** One-based, into the `tasks` list the model was shown. */
+    taskNumber: z.number().int().min(1),
+    status: z.enum(TASK_STATUSES),
+  }) as unknown as z.ZodType<Record<string, unknown>>,
+  fields: {
+    type: "object",
+    additionalProperties: false,
+    required: ["taskNumber", "status"],
+    properties: {
+      taskNumber: { type: "integer", minimum: 1 },
+      status: { type: "string", enum: [...TASK_STATUSES] },
+    },
+  },
+  async offer(scope) {
+    return { tasks: await scope.editableTasks() };
+  },
+  async build(_context, fields, choices) {
+    const authored = fields as {
+      taskNumber: number;
+      status: (typeof TASK_STATUSES)[number];
+    };
+    const task = picked(choices, "tasks", authored.taskNumber);
+    const from = carried(task, "status");
+    if (from === authored.status) {
+      throw new Error("The task is already there.");
+    }
+    return {
+      action: "tasks.move",
+      payload: { id: task.id, status: authored.status },
+      preview: [
+        { label: "Task", value: carried(task, "title") },
+        {
+          label: "Status",
+          value: `${TASK_STATUS_WORD[from] ?? from} -> ${TASK_STATUS_WORD[authored.status] ?? authored.status}`,
+        },
+      ],
+      subjectType: "task",
+      subjectId: task.id,
+    };
+  },
+  reverse() {
+    return null;
+  },
+  async capture(context, payload) {
+    const id = String(payload.id);
+    const now = await callAction(context, "tasks.read", { id });
+    return {
+      reverse: { action: "tasks.move", payload: { id, status: now.status } },
+      expect: { status: payload.status },
+    };
+  },
+  async current(context, payload) {
+    const now = await callAction(context, "tasks.read", {
+      id: String(payload.id),
+    });
+    return { status: now.status };
+  },
+};
+
+/**
+ * Changing an initiative's status (plan 0.9.0 L4a).
+ *
+ * Undo sends the old status with `read` set to the status the edit left, so
+ * the action's own conflict guard refuses a status somebody changed since, in
+ * addition to the check undo makes first.
+ */
+const changeInitiativeStatus: ProposableAction = {
+  action: "initiatives.update",
+  label: "Change an initiative's status",
+  whatItDoes:
+    "Changes the status of one initiative the person may edit: planned, active, done or dropped.",
+  authored: z.object({
+    /** One-based, into the `initiatives` list the model was shown. */
+    initiativeNumber: z.number().int().min(1),
+    status: z.enum(INITIATIVE_STATUSES),
+  }) as unknown as z.ZodType<Record<string, unknown>>,
+  fields: {
+    type: "object",
+    additionalProperties: false,
+    required: ["initiativeNumber", "status"],
+    properties: {
+      initiativeNumber: { type: "integer", minimum: 1 },
+      status: { type: "string", enum: [...INITIATIVE_STATUSES] },
+    },
+  },
+  async offer(scope) {
+    return { initiatives: await scope.editableInitiatives() };
+  },
+  async build(_context, fields, choices) {
+    const authored = fields as {
+      initiativeNumber: number;
+      status: (typeof INITIATIVE_STATUSES)[number];
+    };
+    const initiative = picked(
+      choices,
+      "initiatives",
+      authored.initiativeNumber,
+    );
+    const from = carried(initiative, "status");
+    if (from === authored.status) {
+      throw new Error("The initiative is already there.");
+    }
+    return {
+      action: "initiatives.update",
+      payload: { id: initiative.id, status: authored.status },
+      preview: [
+        { label: "Initiative", value: carried(initiative, "title") },
+        {
+          label: "Status",
+          value: `${INITIATIVE_STATUS_WORD[from] ?? from} -> ${INITIATIVE_STATUS_WORD[authored.status] ?? authored.status}`,
+        },
+      ],
+      subjectType: "initiative",
+      subjectId: initiative.id,
+    };
+  },
+  reverse() {
+    return null;
+  },
+  async capture(context, payload) {
+    const id = String(payload.id);
+    const now = await callAction(context, "initiatives.read", { id });
+    return {
+      reverse: {
+        action: "initiatives.update",
+        payload: {
+          id,
+          status: now.status,
+          read: { status: payload.status },
+        },
+      },
+      expect: { status: payload.status },
+    };
+  },
+  async current(context, payload) {
+    const now = await callAction(context, "initiatives.read", {
+      id: String(payload.id),
+    });
+    return { status: now.status };
+  },
+};
+
 /** Every action the copilot may propose, by registry name. */
 export const PROPOSABLE_ACTIONS: readonly ProposableAction[] = [
   createObjective,
   addKeyResult,
   startInitiative,
   addTask,
+  editObjective,
+  moveTask,
+  changeInitiativeStatus,
 ];
 
 /** How many objectives or key results a model is shown at once. */
@@ -490,6 +867,10 @@ interface OfferScope {
   editableObjectives(): Promise<NumberedChoice[]>;
   /** Key results new work may be tied to, in spaces the member may edit. */
   workKeyResults(): Promise<NumberedChoice[]>;
+  /** The member's own tasks they may edit, with their status in the label. */
+  editableTasks(): Promise<NumberedChoice[]>;
+  /** Initiatives the member may edit, with their status in the label. */
+  editableInitiatives(): Promise<NumberedChoice[]>;
 }
 
 function offerScope(context: ActionCallContext): OfferScope {
@@ -503,7 +884,7 @@ function offerScope(context: ActionCallContext): OfferScope {
 
   /** The subset of `ids` this member may change, by the access model. */
   const editable = async (
-    resourceType: "space" | "goal",
+    resourceType: "space" | "goal" | "task" | "initiative",
     ids: readonly string[],
   ): Promise<Set<string>> => {
     if (ids.length === 0) {
@@ -557,7 +938,52 @@ function offerScope(context: ActionCallContext): OfferScope {
       .map((goal) => ({ goal, cycleEndsOn: cycle.endsOn }));
   });
 
+  const tasks = once(async () => {
+    // Their own tasks: `tasks.list` has no limit, and a copilot asked to move
+    // a task is almost always asked about work that is the asker's.
+    const listed = await callAction(context, "tasks.list", { mine: true });
+    const allowed = await editable(
+      "task",
+      listed.map((task) => task.id),
+    );
+    return (
+      listed
+        .filter((task) => allowed.has(task.id))
+        // What is open first, so a cap never hides it behind finished work.
+        .sort(
+          (a, b) => Number(a.status === "done") - Number(b.status === "done"),
+        )
+        .slice(0, CHOICE_LIMIT)
+        .map((task) => ({
+          id: task.id,
+          label: `${task.title} (${TASK_STATUS_WORD[task.status] ?? task.status}${task.keyResultTitle ? `, ${task.keyResultTitle}` : ""})`,
+          with: { title: task.title, status: task.status },
+        }))
+    );
+  });
+
+  const initiatives = once(async () => {
+    const listed = await callAction(context, "initiatives.list", {});
+    const allowed = await editable(
+      "initiative",
+      listed.map((initiative) => initiative.id),
+    );
+    const closed = (status: string) =>
+      status === "done" || status === "dropped";
+    return listed
+      .filter((initiative) => allowed.has(initiative.id))
+      .sort((a, b) => Number(closed(a.status)) - Number(closed(b.status)))
+      .slice(0, CHOICE_LIMIT)
+      .map((initiative) => ({
+        id: initiative.id,
+        label: `${initiative.title} (${INITIATIVE_STATUS_WORD[initiative.status] ?? initiative.status}, ${initiative.spaceName})`,
+        with: { title: initiative.title, status: initiative.status },
+      }));
+  });
+
   return {
+    editableTasks: tasks,
+    editableInitiatives: initiatives,
     editableSpaces: spaces,
     editableObjectives: once(async () =>
       (await objectives()).map(({ goal, cycleEndsOn }) => ({
@@ -624,6 +1050,65 @@ export function reversalFor(
     return null;
   }
   return entry.reverse(result);
+}
+
+/** True for an action that is an edit, whose undo comes from `capture`. */
+export function isEdit(action: string): boolean {
+  return proposableAction(action)?.capture !== undefined;
+}
+
+/**
+ * Reads the values from before an edit and builds the reverse, as the member.
+ * Call it just before the action runs. Null for a create and for an edit that
+ * cannot be put back.
+ */
+export async function captureReverse(
+  context: ActionCallContext,
+  action: string,
+  payload: Record<string, unknown>,
+): Promise<StoredReverse | null> {
+  const entry = proposableAction(action);
+  if (!entry?.capture) {
+    return null;
+  }
+  const captured = await entry.capture(context, payload);
+  return captured ? { ...captured.reverse, expect: captured.expect } : null;
+}
+
+/** One spelling of a value, keys sorted, so two readings of it compare. */
+function stable(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stable).join(",")}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stable(record[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+/**
+ * Whether an applied edit's record no longer holds what the edit left.
+ * True when it cannot be checked, because undoing blind is the one thing
+ * this guard exists to prevent.
+ */
+export async function changedSinceApplied(
+  context: ActionCallContext,
+  action: string,
+  payload: Record<string, unknown>,
+  expect: Record<string, unknown>,
+): Promise<boolean> {
+  const entry = proposableAction(action);
+  if (!entry?.current) {
+    return true;
+  }
+  const now = await entry.current(context, payload);
+  return Object.keys(expect).some(
+    (key) => stable(expect[key]) !== stable(now[key]),
+  );
 }
 
 /** The asking member, without a second copy of the actor resolution. */

@@ -1812,6 +1812,12 @@
           "field": "id",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false

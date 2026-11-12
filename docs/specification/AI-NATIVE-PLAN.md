@@ -80,7 +80,7 @@ Each capability accelerates an existing manual action, is independently toggleab
 | Summarise a thread (`comments.summarise`) | Goal detail, above the discussion | Nothing: it is a reading, refused if it quotes words nobody wrote |
 | Decompose a key result (`goals.decomposeKeyResult`, `deep` tier) | Goal detail, on each key result | `initiatives.create` and `tasks.create` for the rows left ticked, as the person, in the space they chose |
 
-"Summarise a document" is not built: a document is already one reader's page, and the thread summary is the half REQUIREMENTS names. The copilot may propose four actions (`goals.create`, `goals.addKeyResult`, `initiatives.create`, `tasks.create`), each offered only over spaces, objectives and key results the person may edit.
+"Summarise a document" is not built: a document is already one reader's page, and the thread summary is the half REQUIREMENTS names. The copilot may propose seven actions: the four creates (`goals.create`, `goals.addKeyResult`, `initiatives.create`, `tasks.create`) and three edits (`goals.update` for the title and description, `tasks.move` and `initiatives.update` for the status). Each is offered only over what the person may edit: the spaces, objectives and key results for a create, the person's own tasks and the initiatives they may edit for an edit. Applying an edit stores the values from before, so undo can put them back, and undo is refused when the record changed after it was applied. A create that the workspace's mid-cycle reason setting would refuse carries the person's own reason, written by the model only from the person's words or typed on the card. No delete is proposable.
 
 ## 3. Architecture
 

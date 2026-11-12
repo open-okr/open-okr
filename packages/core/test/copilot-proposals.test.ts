@@ -635,16 +635,19 @@ describe("the rest of the catalogue", () => {
     why: "The first step of the handover.",
   });
 
-  it("offers all four, each pointing only at what the member may edit", async () => {
+  it("offers the four creates and the objective edit, each pointing only at what the member may edit", async () => {
     const drafter = new ProposingDrafter(null);
     await propose(drafter);
 
     const shown = drafter.seen[0];
+    // No task and no initiative exists yet, so neither of their edits is
+    // offered: an edit with nothing to point at is not offered at all.
     expect(shown?.options.map((option) => option.action)).toEqual([
       "goals.create",
       "goals.addKeyResult",
       "initiatives.create",
       "tasks.create",
+      "goals.update",
     ]);
     const choices = Object.fromEntries(
       (shown?.options ?? []).map((option) => [option.action, option.choices]),
@@ -926,5 +929,299 @@ describe("the rest of the catalogue", () => {
       "select count(*) from tasks",
     );
     expect(tasks.rows[0]?.count).toBe("0");
+  });
+});
+
+/**
+ * Edits, their undo and the mid-cycle reason (plan 0.9.0 L4a, design §4.1 to
+ * §4.4). Three edits are proposable: an objective's title and description, a
+ * task's status and an initiative's status. Applying one reads the values from
+ * before, just before the action's own transaction, because the action returns
+ * only an id. Undo puts them back, and refuses when the record moved since.
+ */
+describe("edits (plan 0.9.0 L4a)", () => {
+  let goalId: string;
+  let keyResultId: string;
+  let spaceId: string;
+  let taskId: string;
+  let initiativeId: string;
+
+  const apply = async (id: string) =>
+    call("copilot.applyProposal", { id }) as Promise<{
+      result: Record<string, unknown> | null;
+    }>;
+  const undo = async (id: string) => call("copilot.undoProposal", { id });
+  const listed = async () =>
+    (await call("copilot.proposals", { threadId })) as {
+      preview: { label: string; value: string }[];
+      reversible: boolean;
+      needsReason: boolean;
+      href: string | null;
+    }[];
+
+  const statusOfTask = async () =>
+    (
+      (await call("tasks.read", { id: taskId })) as {
+        status: string;
+      }
+    ).status;
+  const statusOfInitiative = async () =>
+    (
+      (
+        (await call("initiatives.list", {})) as {
+          id: string;
+          status: string;
+        }[]
+      ).find((entry) => entry.id === initiativeId) as { status: string }
+    ).status;
+  const goalNow = async () =>
+    (await call("goals.read", { id: goalId })) as {
+      title: string;
+      description: unknown;
+    };
+
+  const moveTask = (fields: Record<string, unknown> = {}) => ({
+    action: "tasks.move",
+    fields: { taskNumber: 1, status: "done", ...fields },
+    why: "You said the handover note is finished.",
+  });
+  const changeInitiative = (fields: Record<string, unknown> = {}) => ({
+    action: "initiatives.update",
+    fields: { initiativeNumber: 1, status: "active", ...fields },
+    why: "Work on the handover started.",
+  });
+  const renameObjective = (fields: Record<string, unknown> = {}) => ({
+    action: "goals.update",
+    fields: {
+      objectiveNumber: 1,
+      title: "Raise mid-market activation to sixty per cent",
+      description: "The trial-to-paid path is where the quarter is won.",
+      ...fields,
+    },
+    why: "You asked for a clearer title.",
+  });
+
+  beforeEach(async () => {
+    spaceId = ((await call("spaces.list", {})) as { id: string }[])[0]
+      ?.id as string;
+    const cycle = (await call("cycles.current", { mode: "quarterly" })) as {
+      id: string;
+    };
+    goalId = (
+      (await call("goals.create", {
+        title: "Raise mid-market activation",
+        cycleId: cycle.id,
+        spaceId,
+        level: "team",
+        ownerKind: "space",
+        championId: ownerMemberId,
+        reviewerId: ownerMemberId,
+        weight: 1,
+      })) as { id: string }
+    ).id;
+    keyResultId = (
+      (await call("goals.addKeyResult", {
+        goalId,
+        title: "Trial to paid conversion from 18% to 30%",
+        direction: "increase",
+        indicatorType: "lagging",
+        baselineValue: 18,
+        targetValue: 30,
+        weight: 1,
+      })) as { id: string }
+    ).id;
+    taskId = (
+      (await call("tasks.create", {
+        spaceId,
+        title: "Draft the handover note",
+        keyResultId,
+        assigneeIds: [ownerMemberId],
+      })) as { id: string }
+    ).id;
+    initiativeId = (
+      (await call("initiatives.create", {
+        spaceId,
+        title: "Hand every trial to finance by day ten",
+        ownerId: ownerMemberId,
+        keyResultIds: [keyResultId],
+      })) as { id: string }
+    ).id;
+  });
+
+  it("moves a task, shows before and after, and undo moves it back", async () => {
+    const before = await statusOfTask();
+    expect(before).not.toBe("done");
+    const drafter = new ProposingDrafter(moveTask());
+    const proposed = await propose(drafter, "Move the handover task to done");
+    expect(proposed?.action).toBe("tasks.move");
+    // The model is shown the task by label, with its status, and no id.
+    const offered = drafter.seen[0]?.options.find(
+      (option) => option.action === "tasks.move",
+    );
+    expect(offered?.choices.tasks?.[0]).toContain("Draft the handover note");
+    expect(JSON.stringify(drafter.seen[0]?.options)).not.toContain(taskId);
+
+    const [card] = await listed();
+    expect(card?.preview).toContainEqual({
+      label: "Status",
+      value: expect.stringMatching(/^.+ -> Done$/),
+    });
+    // An edit can be undone, and the card says so before it is applied.
+    expect(card?.reversible).toBe(true);
+
+    await apply(proposed?.id as string);
+    expect(await statusOfTask()).toBe("done");
+    const [applied] = await listed();
+    expect(applied?.reversible).toBe(true);
+    expect(applied?.href).toBe(`/tasks/${taskId}`);
+
+    await undo(proposed?.id as string);
+    expect(await statusOfTask()).toBe(before);
+    expect((await storedProposals())[0]?.undone_at).not.toBeNull();
+  });
+
+  it("refuses to undo a task move when somebody moved it again", async () => {
+    const proposed = await propose(new ProposingDrafter(moveTask()));
+    await apply(proposed?.id as string);
+    await call("tasks.move", { id: taskId, status: "in_progress" });
+
+    await expect(undo(proposed?.id as string)).rejects.toThrow(
+      "This changed after it was applied, so undoing it would overwrite the later change.",
+    );
+    // The later change stays, and the proposal is not marked undone.
+    expect(await statusOfTask()).toBe("in_progress");
+    expect((await storedProposals())[0]?.undone_at).toBeNull();
+  });
+
+  it("changes an initiative's status, undoes it, and refuses after a later change", async () => {
+    const before = await statusOfInitiative();
+    const first = await propose(new ProposingDrafter(changeInitiative()));
+    expect(first?.action).toBe("initiatives.update");
+    await apply(first?.id as string);
+    expect(await statusOfInitiative()).toBe("active");
+    await undo(first?.id as string);
+    expect(await statusOfInitiative()).toBe(before);
+
+    const second = await propose(new ProposingDrafter(changeInitiative()));
+    await apply(second?.id as string);
+    await call("initiatives.update", {
+      id: initiativeId,
+      status: "done",
+      read: { status: "active" },
+    });
+    await expect(undo(second?.id as string)).rejects.toThrow(
+      /changed after it was applied/,
+    );
+    expect(await statusOfInitiative()).toBe("done");
+  });
+
+  it("renames an objective, undoes it, and refuses after a later change", async () => {
+    const before = await goalNow();
+    const first = await propose(new ProposingDrafter(renameObjective()));
+    expect(first?.action).toBe("goals.update");
+    const [card] = await listed();
+    expect(card?.preview).toContainEqual({
+      label: "Title",
+      value:
+        "Raise mid-market activation -> Raise mid-market activation to sixty per cent",
+    });
+    await apply(first?.id as string);
+    expect((await goalNow()).title).toBe(
+      "Raise mid-market activation to sixty per cent",
+    );
+    await undo(first?.id as string);
+    const restored = await goalNow();
+    expect(restored.title).toBe(before.title);
+    expect(restored.description ?? null).toEqual(before.description ?? null);
+
+    const second = await propose(new ProposingDrafter(renameObjective()));
+    await apply(second?.id as string);
+    await call("goals.update", { id: goalId, title: "Somebody else's title" });
+    await expect(undo(second?.id as string)).rejects.toThrow(
+      /changed after it was applied/,
+    );
+    expect((await goalNow()).title).toBe("Somebody else's title");
+  });
+
+  it("offers no edit for an objective the member may not edit", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `update access_bindings set level = 10
+        where workspace_id = $1
+          and context_id in (
+            select id from access_contexts
+             where resource_type = 'goal' and resource_id = $2
+          )`,
+      [workspaceId, goalId],
+    );
+    await wb.admin.query(
+      "update workspace_members set role_id = null where workspace_id = $1",
+      [workspaceId],
+    );
+    const drafter = new ProposingDrafter(renameObjective());
+    expect(await propose(drafter)).toBeNull();
+    expect(
+      drafter.seen[0]?.options.map((option) => option.action),
+    ).not.toContain("goals.update");
+  });
+
+  describe("the reason, when the workspace asks for one", () => {
+    const startedWithReasonRequired = async () => {
+      const wb = await workerDb();
+      await wb.admin.query(
+        `update cycles
+            set starts_on = current_date - 35,
+                ends_on = current_date + 30,
+                published_at = now()
+          where mode = 'quarterly'`,
+      );
+      await call("practice.update", {
+        overrides: { "reasons.midCycleAddition": "required" },
+      });
+    };
+
+    it("asks for one, refuses Apply without it, and saves the typed words", async () => {
+      await startedWithReasonRequired();
+      const proposed = await propose(new ProposingDrafter(objective()));
+      const [card] = await listed();
+      expect(card?.needsReason).toBe(true);
+
+      await expect(apply(proposed?.id as string)).rejects.toThrow(
+        /asks why anything is added mid-cycle/,
+      );
+      const applied = await call("copilot.applyProposal", {
+        id: proposed?.id as string,
+        reason: "The Growth team formed this month",
+      });
+      const created = (applied as { result: { id: string } | null }).result;
+      const wb = await workerDb();
+      const { rows } = await wb.admin.query<{ payload: { reason?: string } }>(
+        "select payload from activities where subject_id = $1 and kind = 'goal.created'",
+        [created?.id],
+      );
+      expect(rows[0]?.payload.reason).toBe("The Growth team formed this month");
+    });
+
+    it("does not ask when the person already said why, and shows it", async () => {
+      await startedWithReasonRequired();
+      await propose(
+        new ProposingDrafter(
+          objective({ reason: "The pilot starts next week" }),
+        ),
+        "Create an objective for activation because the pilot starts next week",
+      );
+      const [card] = await listed();
+      expect(card?.needsReason).toBe(false);
+      expect(card?.preview).toContainEqual({
+        label: "Reason",
+        value: "The pilot starts next week",
+      });
+    });
+
+    it("asks nothing of a workspace that does not require one", async () => {
+      await propose(new ProposingDrafter(objective()));
+      const [card] = await listed();
+      expect(card?.needsReason).toBe(false);
+    });
   });
 });

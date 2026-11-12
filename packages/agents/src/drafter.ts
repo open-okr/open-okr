@@ -430,7 +430,9 @@ const PROPOSAL_SYSTEM =
   // list, it chose the nearest one, a different measure.
   "When the request names an item that is not on the list, propose nothing " +
   "rather than choosing the nearest one. Fill in the fields the " +
-  "action you chose takes, and set every other field to null. Say in one " +
+  "action you chose takes, and set every other field to null. Write a " +
+  "reason only from the person's own words saying why the change is wanted " +
+  "now, and leave it out when they did not say. Say in one " +
   `sentence why this change, now. When you propose nothing, the action is "${NO_ACTION}".`;
 
 /** The offered actions, their fields and their numbered choices, as text. */
