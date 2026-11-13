@@ -67,6 +67,9 @@ export interface Message {
   readonly running?: boolean;
   /** Why the run stopped early, in words. Null when it did not. */
   readonly haltedReason?: string | null;
+  /** The same reason as a code the panel words itself (plan 0.9.0 CP10). */
+  readonly haltedCode?: string | null;
+  readonly haltedParams?: Readonly<Record<string, string>> | null;
   /** How many live reads the answer rests on, from the record of them (L3). */
   readonly readCount?: number;
   readonly createdAt: string;

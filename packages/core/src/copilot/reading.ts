@@ -39,6 +39,7 @@ import {
   runRead,
   toolsFor,
 } from "./read-tools.ts";
+import { aiOffReason, type ReasonLike } from "./reasons.ts";
 
 /** Most model rounds that may ask for reads (design 3.1). Fixed, not a setting (D7). */
 export const COPILOT_MAX_ROUNDS = 4;
@@ -123,10 +124,10 @@ export interface ReadingOutcome {
   readonly tokensOut: number;
   /**
    * Set when the reading used up what the answer needed (credits, a budget or
-   * a switch changed during the rounds). The caller halts with this sentence
+   * a switch changed during the rounds). The caller halts with this reason
    * and does not call the answer.
    */
-  readonly blockedReason: string | null;
+  readonly blocked: ReasonLike | null;
 }
 
 export interface ReadingHooks {
@@ -146,7 +147,7 @@ async function modelBlockedReason(
   pool: Pool,
   workspaceId: string,
   memberId: string,
-): Promise<string | null> {
+): Promise<ReasonLike | null> {
   const availability = await checkFeatureAvailability(pool, {
     workspaceId,
     featureKey: COPILOT_FEATURE_KEY,
@@ -154,12 +155,11 @@ async function modelBlockedReason(
     memberId,
   });
   if (!availability.available) {
-    return (
-      availability.reason ??
-      "The copilot is not available in this workspace right now."
-    );
+    return availability.reason ?? { code: "unavailable" };
   }
-  return creditsPausedReason(pool, workspaceId);
+  return (await creditsPausedReason(pool, workspaceId))
+    ? aiOffReason("credits_used")
+    : null;
 }
 
 /**
@@ -270,12 +270,12 @@ export async function* readLiveData(
   const { reads, limited, costUsd, tokensIn, tokensOut } = chosen.value;
   // The rounds are model calls and may have spent the last of the credits, so
   // the answer's own call is checked like any other before it is made.
-  const blockedReason = await modelBlockedReason(
+  const blocked = await modelBlockedReason(
     context.pool,
     context.workspaceId,
     memberId,
   );
-  const spent = { reads, costUsd, tokensIn, tokensOut, blockedReason };
+  const spent = { reads, costUsd, tokensIn, tokensOut, blocked };
   if (reads === 0) {
     return { prepared, ...spent };
   }

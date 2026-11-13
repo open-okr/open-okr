@@ -577,7 +577,7 @@ describe("a record the member may not read", () => {
           cite: [],
           sources: [],
           ask: { question: QUESTION, history: [], sources: [] },
-          unavailableReason: null,
+          unavailable: null,
         },
       ),
     );

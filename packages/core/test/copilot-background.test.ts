@@ -25,6 +25,7 @@ import type {
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { decodeReason } from "../src/copilot/reasons.ts";
 import { runEmbedJob } from "../src/embeddings/worker.ts";
 import { dispatchOutbox } from "../src/outbox/handlers.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
@@ -379,10 +380,17 @@ describe("the run, with nobody watching", () => {
 
     const [answer] = await answers();
     expect(answer?.content).toBe("Sixty per cent");
-    expect(answer?.run_halted_reason).toContain("stopped partway");
+    // Stored as a code (plan 0.9.0 CP10); the published event carries the
+    // English sentence and the code.
+    expect(decodeReason(answer?.run_halted_reason ?? null)).toEqual({
+      code: "stopped_partway",
+    });
     expect(published.at(-1)).toMatchObject({
       event: "copilot.done",
-      data: { haltedReason: expect.stringContaining("stopped partway") },
+      data: {
+        haltedReason: expect.stringContaining("stopped partway"),
+        haltedCode: "stopped_partway",
+      },
     });
   });
 
@@ -621,7 +629,9 @@ describe("the run, with nobody watching", () => {
 
     const [answer] = await answers();
     expect(answer?.run_completed_at).not.toBeNull();
-    expect(answer?.run_halted_reason).toContain("did not answer");
+    expect(decodeReason(answer?.run_halted_reason ?? null)).toEqual({
+      code: "provider_error",
+    });
     // Not left in flight. A run that stopped and still said "still writing"
     // is a reader waiting for ever.
     expect(answer?.content).toBe("");
@@ -646,7 +656,10 @@ describe("the run, with nobody watching", () => {
     await drive(null);
 
     const [answer] = await answers();
-    expect(answer?.run_halted_reason).toContain("No AI provider is configured");
+    expect(decodeReason(answer?.run_halted_reason ?? null)).toEqual({
+      code: "ai_off",
+      params: { offReason: "no_provider" },
+    });
     expect(answer?.run_completed_at).not.toBeNull();
   });
 });
@@ -670,7 +683,9 @@ describe("the budget", () => {
     // Not a token spent: the drafter was never called.
     expect(drafter.seen).toEqual([]);
     const [answer] = await answers();
-    expect(answer?.run_halted_reason).toContain("may not spend");
+    expect(decodeReason(answer?.run_halted_reason ?? null)).toMatchObject({
+      code: "cost_cap_before",
+    });
     expect(answer?.run_completed_at).not.toBeNull();
     expect(skipped[0]).toContain("may not spend");
   });
@@ -689,6 +704,8 @@ describe("the budget", () => {
     // The answer is kept: the money is already spent and throwing it away
     // would charge the workspace for nothing.
     expect(answer?.content).toBe("An expensive answer.");
-    expect(answer?.run_halted_reason).toContain("will halt before starting");
+    expect(decodeReason(answer?.run_halted_reason ?? null)).toMatchObject({
+      code: "cost_cap_after",
+    });
   });
 });

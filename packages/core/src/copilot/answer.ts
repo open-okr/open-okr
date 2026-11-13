@@ -38,13 +38,19 @@ import type {
   GroundingSource,
 } from "../agents/drafter.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
-import { aiOffSentence } from "../ai/off-reason.ts";
 import { EmbeddingService, type RetrievalHit } from "../embeddings/service.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import { citationLabel } from "./citations.ts";
 import { offersToPropose, proposeBeforeAnswering } from "./proposals.ts";
 import { COPILOT_READS } from "./read-tools.ts";
 import { drainReading, readLiveData, withReadingCost } from "./reading.ts";
+import {
+  aiOffReason,
+  type CopilotReason,
+  type ReasonLike,
+  reasonFields,
+  reasonText,
+} from "./reasons.ts";
 
 /**
  * How many passages a grounded answer is given.
@@ -87,6 +93,11 @@ export interface AnswerQuestionResult {
   readonly sources: readonly AnswerSource[];
   /** Why there is no prose, in words for the reader. Null when there is prose. */
   readonly unavailableReason: string | null;
+  /**
+   * The same reason as a code the panel words from its own catalogue (plan
+   * 0.9.0 CP10). Absent when the reason has no code, such as a budget message.
+   */
+  readonly unavailableCode?: CopilotReason;
 }
 
 /** What the model is shown of one hit. Never its identifier. */
@@ -144,7 +155,8 @@ export interface Prepared {
   readonly sources: readonly AnswerSource[];
   /** Null when there is nothing that can answer. */
   readonly ask: GroundedQuestionContext | null;
-  readonly unavailableReason: string | null;
+  /** Why there is nothing to ask, as a code or as plain text. */
+  readonly unavailable: ReasonLike | null;
 }
 
 /**
@@ -220,23 +232,23 @@ export async function groundQuestion(
     excerpt: hit.content,
   }));
 
-  const nothing = (reason: string): Prepared => ({
+  const nothing = (reason: ReasonLike): Prepared => ({
     threadId: asked.threadId,
     questionMessageId: asked.questionMessageId,
     hits,
     cite: hits,
     sources,
     ask: null,
-    unavailableReason: reason,
+    unavailable: reason,
   });
 
   const drafter = context.drafter;
   if (!drafter || !wants(drafter)) {
     const paused = await creditsPausedReason(pool, input.workspaceId);
     if (paused) {
-      return nothing(paused);
+      return nothing(aiOffReason("credits_used"));
     }
-    return nothing(aiOffSentence(context.aiOff ?? "no_provider", "answer"));
+    return nothing(aiOffReason(context.aiOff ?? "no_provider"));
   }
 
   const availability = await checkFeatureAvailability(pool, {
@@ -246,10 +258,7 @@ export async function groundQuestion(
     memberId,
   });
   if (!availability.available) {
-    return nothing(
-      availability.reason ??
-        "The copilot is not available in this workspace right now.",
-    );
+    return nothing(availability.reason ?? { code: "unavailable" });
   }
 
   return {
@@ -268,7 +277,7 @@ export async function groundQuestion(
       sources: hits.map(sourceFor),
       ...(asker === null ? {} : { asker }),
     },
-    unavailableReason: null,
+    unavailable: null,
   };
 }
 
@@ -316,13 +325,14 @@ export async function answerQuestion(
   // The read loop, which leaves the passages as they were when it cannot run.
   const reading = await drainReading(readLiveData(context, groundedFirst));
   const prepared = reading?.prepared ?? groundedFirst;
-  const nothing = (reason: string): AnswerQuestionResult => ({
+  const nothing = (reason: ReasonLike): AnswerQuestionResult => ({
     threadId: prepared.threadId,
     questionMessageId: prepared.questionMessageId,
     answerMessageId: null,
     answer: null,
     sources: prepared.sources,
-    unavailableReason: reason,
+    unavailableReason: reasonText(reason),
+    ...(typeof reason === "string" ? {} : { unavailableCode: reason }),
   });
 
   // Called through the drafter, never as a detached function. A host's drafter
@@ -331,13 +341,12 @@ export async function answerQuestion(
   // did not answer", and a working provider reads as an absent one. Cost an
   // afternoon once.
   const drafter = context.drafter;
-  if (reading?.blockedReason) {
-    return nothing(reading.blockedReason);
+  if (reading?.blocked) {
+    return nothing(reading.blocked);
   }
   if (!prepared.ask || !drafter?.answerGrounded) {
     return nothing(
-      prepared.unavailableReason ??
-        aiOffSentence(context.aiOff ?? "no_provider", "answer"),
+      prepared.unavailable ?? aiOffReason(context.aiOff ?? "no_provider"),
     );
   }
 
@@ -347,14 +356,10 @@ export async function answerQuestion(
   } catch {
     // A model having a bad minute leaves the question recorded and the passages
     // on screen, which is the same place a provider-off workspace stands.
-    return nothing(
-      "The provider did not answer. These are the passages that match your question.",
-    );
+    return nothing({ code: "provider_error" });
   }
   if (!answer || answer.text.trim() === "") {
-    return nothing(
-      "The copilot had nothing to add. These are the passages that match your question.",
-    );
+    return nothing({ code: "nothing_to_add" });
   }
 
   const spent = withReadingCost(answer, reading);
@@ -470,7 +475,13 @@ export type CopilotEvent =
    */
   | { readonly kind: "proposal"; readonly proposalId: string }
   /** No prose is coming, and this is why, in words for the reader. */
-  | { readonly kind: "unavailable"; readonly reason: string }
+  | {
+      readonly kind: "unavailable";
+      readonly reason: string;
+      /** The same reason as a code, when it has one (plan 0.9.0 CP10). */
+      readonly code?: string;
+      readonly params?: Record<string, string>;
+    }
   | { readonly kind: "text"; readonly text: string }
   /** Last: what was recorded, and whether the reader cut it short. */
   | {
@@ -543,13 +554,15 @@ export async function* streamAnswer(
 
   // Through the drafter, for the reason `answerQuestion` records above.
   const drafter = context.drafter;
-  if (reading?.blockedReason || !prepared.ask || !drafter?.streamGrounded) {
+  if (reading?.blocked || !prepared.ask || !drafter?.streamGrounded) {
+    const why =
+      reading?.blocked ??
+      prepared.unavailable ??
+      aiOffReason(context.aiOff ?? "no_provider");
     yield {
       kind: "unavailable",
-      reason:
-        reading?.blockedReason ??
-        prepared.unavailableReason ??
-        aiOffSentence(context.aiOff ?? "no_provider", "answer"),
+      reason: reasonText(why),
+      ...reasonFields(why),
     };
     yield { kind: "done", answerMessageId: null, stopped: false };
     return;
@@ -631,10 +644,11 @@ export async function* streamAnswer(
   }
 
   if (text.trim() === "") {
+    const why: CopilotReason = { code: "nothing_to_add" };
     yield {
       kind: "unavailable",
-      reason:
-        "The copilot had nothing to add. These are the passages that match your question.",
+      reason: reasonText(why),
+      ...reasonFields(why),
     };
   }
   yield { kind: "done", answerMessageId, stopped: cited === null };

@@ -10381,6 +10381,28 @@
                                   "null"
                                 ]
                               },
+                              "haltedCode": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "haltedParams": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "readCount": {
                                 "type": "integer",
                                 "minimum": -9007199254740991,
@@ -10402,6 +10424,8 @@
                               "stopped",
                               "running",
                               "haltedReason",
+                              "haltedCode",
+                              "haltedParams",
                               "readCount",
                               "createdAt"
                             ],
@@ -10636,6 +10660,28 @@
                             "null"
                           ]
                         },
+                        "reasonCode": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "reasonParams": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "searchAvailable": {
                           "type": "boolean"
                         },
@@ -10653,6 +10699,8 @@
                         "available",
                         "providerConfigured",
                         "reason",
+                        "reasonCode",
+                        "reasonParams",
                         "searchAvailable",
                         "streaming",
                         "resetsAt"

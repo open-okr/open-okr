@@ -67,6 +67,8 @@ Each capability accelerates an existing manual action, is independently toggleab
 | Summarise a thread or a document | read | Read it |
 | Map spreadsheet columns to import fields | write | Manual mapping |
 
+**Why the copilot did not answer is a code, not a sentence (plan 0.9.0 CP10).** The server sends a reason code with its values: `ai_off` (with the step that stopped it: no provider, no plan credits, credits used, egress blocked, model unpriced), `unavailable`, `provider_error`, `nothing_to_add`, `stopped_partway`, `cost_cap_before`, `cost_cap_after` and `could_not_answer`. The panel words each from the message catalogue (`copilot.reason.*`, English and Malay). A halted run stores the code as JSON in `ai_messages.run_halted_reason`. `copilot.thread` returns `haltedReason` as the same English sentence as before, so REST and MCP clients read what they always read, with `haltedCode` and `haltedParams` beside it. A reason with no code, such as a budget message or a row from before the codes, is shown as stored text.
+
 **Where each assist sits, since completeness review M-09.** Six assists were built with no browser caller, and two in this table were not built at all. Each is now offered beside the value it helps, only where a provider may run it (a drafter exists, so the egress level allows an assist, and the assist's own switch is on), and each draft lands in fields a person edits before anything is saved.
 
 | Assist | Where | What saving it does |

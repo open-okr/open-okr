@@ -55,6 +55,8 @@ const AVAILABLE: CopilotAvailability = {
   available: true,
   providerConfigured: true,
   reason: null,
+  reasonCode: null,
+  reasonParams: null,
   searchAvailable: true,
   streaming: true,
   resetsAt: null,
@@ -66,6 +68,9 @@ const AI_OFF: CopilotAvailability = {
   providerConfigured: false,
   reason:
     "No AI provider is configured, so the copilot can find sources but cannot write an answer.",
+  // Worded from the catalogue, which reads the same in English (CP10).
+  reasonCode: "ai_off",
+  reasonParams: { offReason: "no_provider" },
   searchAvailable: true,
   streaming: false,
   resetsAt: null,

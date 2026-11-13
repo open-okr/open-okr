@@ -58,6 +58,7 @@ import {
 } from "./actions";
 import { Composer } from "./composer";
 import { type Proposal, ProposalCard } from "./proposal-card";
+import { reasonMessage } from "./reason-message";
 import { ThreadList, type ThreadSummary } from "./thread-list";
 import {
   AssistantTurn,
@@ -164,7 +165,12 @@ function Unavailable({
   return (
     <div className="mb-2 flex flex-col gap-1.5 text-xs text-ink-3">
       <p>
-        {availability.reason ?? t("copilot.copilotPanel.cannotAnswerRightNow")}
+        {reasonMessage(
+          t,
+          availability.reason,
+          { code: availability.reasonCode, params: availability.reasonParams },
+          "panel",
+        ) ?? t("copilot.copilotPanel.cannotAnswerRightNow")}
       </p>
       {availability.resetsAt ? (
         <p>
@@ -793,7 +799,12 @@ export function CopilotPanel({
               | { kind: "sources"; sources: readonly Source[] }
               | { kind: "proposal"; proposalId: string }
               | ({ kind: "step" } & Step)
-              | { kind: "unavailable"; reason: string }
+              | {
+                  kind: "unavailable";
+                  reason: string;
+                  code?: string;
+                  params?: Record<string, string>;
+                }
               | { kind: "text"; text: string }
               | { kind: "done"; stopped?: boolean };
             if (event.kind === "thread") {
@@ -824,8 +835,11 @@ export function CopilotPanel({
               found = event.sources;
               update({ sources: event.sources });
             } else if (event.kind === "unavailable") {
-              said = event.reason;
-              update({ notice: event.reason });
+              // Worded here from the code, so the notice, the status line
+              // and the kept reason all read in the reader's language.
+              said =
+                reasonMessage(t, event.reason, event, "answer") ?? event.reason;
+              update({ notice: said });
             } else if (event.kind === "text") {
               text += event.text;
               update({ text });
@@ -1181,7 +1195,15 @@ export function CopilotPanel({
                                       ? (stepsKept[turn.question.id] ?? null)
                                       : null
                                 }
-                                haltedReason={answer?.haltedReason ?? null}
+                                haltedReason={reasonMessage(
+                                  t,
+                                  answer?.haltedReason,
+                                  {
+                                    code: answer?.haltedCode,
+                                    params: answer?.haltedParams,
+                                  },
+                                  "answer",
+                                )}
                                 stopped={answer?.stopped ?? false}
                                 citations={answer?.citations ?? []}
                                 kept={extra}

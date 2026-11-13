@@ -864,6 +864,15 @@ export {
   COPILOT_MAX_READS_PER_ROUND,
   COPILOT_MAX_ROUNDS,
 } from "./copilot/reading.ts";
+export {
+  COPILOT_REASON_CODES,
+  type CopilotReason,
+  type CopilotReasonCode,
+  decodeReason,
+  encodeReason,
+  eventReasonFields,
+  reasonSentence,
+} from "./copilot/reasons.ts";
 export { sweepEndedCycles } from "./cycles/closing.ts";
 export { cyclesOpenForWork, openForWork } from "./cycles/open-for-work.ts";
 export {

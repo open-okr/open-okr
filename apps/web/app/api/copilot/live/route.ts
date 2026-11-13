@@ -25,6 +25,7 @@ import {
   callAction,
   copilotStepFrom,
   copilotThreadChannel,
+  eventReasonFields,
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getPool } from "../../../../lib/auth";
@@ -125,7 +126,11 @@ export async function GET(request: NextRequest) {
           if (event.name === "copilot.done") {
             const halted = data.haltedReason;
             if (typeof halted === "string" && halted !== "") {
-              send("unavailable", { kind: "unavailable", reason: halted });
+              send("unavailable", {
+                kind: "unavailable",
+                reason: halted,
+                ...eventReasonFields(data),
+              });
             }
             send("done", {
               kind: "done",

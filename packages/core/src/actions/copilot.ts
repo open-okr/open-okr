@@ -36,8 +36,12 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
-import { aiOffSentence } from "../ai/off-reason.ts";
 import { isCitableType, readableCitations } from "../copilot/citations.ts";
+import {
+  aiOffReason,
+  reasonSentence,
+  storedReasonFields,
+} from "../copilot/reasons.ts";
 import { subjectAddress } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { hrefsInTx } from "../search/hrefs.ts";
@@ -382,7 +386,11 @@ export const completeRun = defineWriteAction({
     tokensIn: z.number().int().min(0).optional(),
     tokensOut: z.number().int().min(0).optional(),
     cost: z.number().min(0).optional(),
-    /** Why it ended early, in the words the reader is shown. */
+    /**
+     * Why it ended early. The JSON `encodeReason` writes, so the panel can word
+     * it from its own catalogue, or plain text from a caller with no code
+     * (plan 0.9.0 CP10). `copilot.thread` reads it back as both.
+     */
     haltedReason: z.string().trim().min(1).max(500).optional(),
   }),
   output: z.object({ messageId: z.uuid(), completed: z.boolean() }),
@@ -815,8 +823,15 @@ const messageOutput = z.object({
    * reader coming back asks.
    */
   running: z.boolean(),
-  /** Why the run stopped early, in words for the reader. Null when it did not. */
+  /**
+   * Why the run stopped early, in English for a client with no catalogue. Null
+   * when it did not.
+   */
   haltedReason: z.string().nullable(),
+  /** The same reason as a code, for a client that words it itself (plan 0.9.0 CP10). */
+  haltedCode: z.string().nullable(),
+  /** The values the code's message needs, such as `cap`. */
+  haltedParams: z.record(z.string(), z.string()).nullable(),
   /**
    * How many live reads the copilot made for this answer, rebuilt from the
    * record of its reads (plan 0.9.0 L3, decision W2-Q). 0 for a member's
@@ -1046,7 +1061,7 @@ export const readThread = defineReadAction({
               row.runStartedAt !== null &&
               row.runCompletedAt === null &&
               row.stoppedAt === null,
-            haltedReason: row.runHaltedReason,
+            ...storedReasonFields(row.runHaltedReason),
             readCount: readCounts[index] ?? 0,
             createdAt: row.createdAt.toISOString(),
           });
@@ -1152,8 +1167,15 @@ export const readAvailability = defineReadAction({
      * by itself.
      */
     providerConfigured: z.boolean(),
-    /** Null when available. Shown to the reader as it is. */
+    /** Null when available. The English sentence, for a client with no catalogue. */
     reason: z.string().nullable(),
+    /**
+     * The same reason as a code, when it has one (plan 0.9.0 CP10). The panel
+     * words it from its own catalogue and falls back to `reason`.
+     */
+    reasonCode: z.string().nullable(),
+    /** The values the code's message needs. */
+    reasonParams: z.record(z.string(), z.string()).nullable(),
     /**
      * True when retrieval can still find sources without a provider, which is
      * §2.4's own degradation and is worth offering on its own.
@@ -1184,11 +1206,14 @@ export const readAvailability = defineReadAction({
         context.pool,
         context.workspaceId,
       );
+      const offReason = context.aiOff ?? "no_provider";
       if (paused) {
         return {
           available: false,
           providerConfigured: true,
-          reason: paused,
+          reason: reasonSentence(aiOffReason("credits_used"), "panel"),
+          reasonCode: "ai_off",
+          reasonParams: { offReason: "credits_used" },
           searchAvailable: true,
           streaming: false,
           // The sentence says "until the 1st" itself.
@@ -1201,7 +1226,9 @@ export const readAvailability = defineReadAction({
         // The step that stopped the host, where it said (plan 0.8.0 O1). A
         // cloud workspace with no plan used to read "No AI provider is
         // configured" while the provider's key worked for everybody else.
-        reason: aiOffSentence(context.aiOff ?? "no_provider", "panel"),
+        reason: reasonSentence(aiOffReason(offReason), "panel"),
+        reasonCode: "ai_off",
+        reasonParams: { offReason },
         // Full-text retrieval needs no provider at all (P4-T13b).
         searchAvailable: true,
         streaming: false,
@@ -1222,6 +1249,9 @@ export const readAvailability = defineReadAction({
       available: availability.available,
       providerConfigured: true,
       reason: availability.available ? null : (availability.reason ?? null),
+      // The budget sentences carry their own numbers and have no code yet.
+      reasonCode: null,
+      reasonParams: null,
       searchAvailable: true,
       streaming,
       resetsAt:

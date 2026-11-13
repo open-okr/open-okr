@@ -55,6 +55,9 @@ export interface CopilotAvailability {
   readonly available: boolean;
   readonly providerConfigured: boolean;
   readonly reason: string | null;
+  /** The reason as a code the panel words from its catalogue, when it has one. */
+  readonly reasonCode: string | null;
+  readonly reasonParams: Readonly<Record<string, string>> | null;
   readonly searchAvailable: boolean;
   readonly streaming: boolean;
   /** When a crossed budget lifts by itself, as an ISO time. */
@@ -71,6 +74,8 @@ const UNKNOWN: CopilotAvailability = {
   available: false,
   providerConfigured: true,
   reason: null,
+  reasonCode: null,
+  reasonParams: null,
   searchAvailable: false,
   streaming: false,
   resetsAt: null,
