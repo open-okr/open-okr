@@ -129,13 +129,14 @@ package without a mood fails the typecheck. The rule of thumb:
 when and for whom is METHOD.md's, and a nudge reads the same with every face
 drawn still.
 
+**The reference mockups are done** (plan 0.9.0 G6). Every agent that `docs/mockups/src` drew as the gradient `.av.bot` circle is now the face, one `.af` rule in `style.css` per kind (`coach`, `champion`, `agent`) showing the still idle pose. The PNGs are re-rendered by the lead.
+
 ## 5. Not yet
 
 | Surface | Why it waits |
 |---|---|
 | People list and profile, for an agent member | `people.directory` and `people.readMember` say a member is an agent, not which one. Adding the kind changes a public read and the API contract |
 | Proposal rows on S-36 and the review inbox | A proposal names its run, and a run older than the twenty listed has no agent to look up. Same fix: carry the agent's kind on the read |
-| The reference mockups | Ten of `docs/mockups/src` still draw an agent as the gradient `.av.bot` circle. The specification wins over a mockup, so they are a follow-up to redraw and re-render rather than a reason to hold this |
 
 ## 6. Acceptance criteria
 
