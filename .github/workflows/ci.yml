@@ -180,6 +180,10 @@ jobs:
         with:
           name: flaky-report-${{ matrix.shard }}
           path: .flaky/report-*.json
+          # A rerun of this shard must replace its report. Without this the
+          # gate read the first attempt's report and failed on a test that
+          # had since passed.
+          overwrite: true
           # `.flaky` is a hidden directory, and a glob skips hidden files
           # unless told otherwise. Without this no shard report was ever
           # uploaded and the flakiness gate merged nothing, green every time.
@@ -324,6 +328,8 @@ jobs:
         with:
           name: flaky-report-e2e-${{ matrix.shard }}
           path: .flaky/report-e2e-*.json
+          # A rerun must replace its shard's report, as for the unit shards.
+          overwrite: true
           # Hidden directory and a glob, as for the unit shards above.
           include-hidden-files: true
           if-no-files-found: error
@@ -334,6 +340,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ matrix.shard }}
+          # A rerun must replace its shard's report, not keep the first one.
+          overwrite: true
           path: |
             playwright-report
             test-results
