@@ -1289,12 +1289,12 @@ describe("the streaming look (plan 0.8.1 CP9)", () => {
       link.getAttribute("href"),
     );
     expect(hrefs).toEqual(
-      expect.arrayContaining([
-        "/key-results/kr-1",
-        "/initiatives/in-1",
-        "/tasks/t-1",
-      ]),
+      expect.arrayContaining(["/initiatives/in-1", "/tasks/t-1"]),
     );
+    // A key result's page takes a short id, so with no server link (CP5) it
+    // is named and not linked.
+    expect(turn?.textContent).toContain("Rate");
+    expect(hrefs.some((href) => href?.includes("kr-1"))).toBe(false);
     // A check-in has no page of its own, so it is named and not linked.
     expect(turn?.textContent).toContain("Check-in");
     expect(hrefs.some((href) => href?.includes("ci-1"))).toBe(false);
@@ -1388,14 +1388,18 @@ describe("Ask about this page (plan 0.9.0 CP11)", () => {
     window.history.replaceState(null, "", "/admin");
     await render(AVAILABLE);
     await open();
-    expect(panel()?.textContent).not.toContain("Ask about this");
+    expect(
+      panel()?.querySelector('[data-testid="copilot-ask-about-page"]'),
+    ).toBeNull();
   });
 
   test("hides the chip with AI off", async () => {
     window.history.replaceState(null, "", GOAL_PAGE);
     await render(AI_OFF);
     await open();
-    expect(panel()?.textContent).not.toContain("Ask about this");
+    expect(
+      panel()?.querySelector('[data-testid="copilot-ask-about-page"]'),
+    ).toBeNull();
   });
 
   test("anchors a drawer's key result to its objective", async () => {

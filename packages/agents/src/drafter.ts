@@ -1639,10 +1639,14 @@ export function createProviderDrafter(
         (turn) => turn.role === "member",
       );
       const lead: ChatMessage[] = [
-        { role: "system", content: READING_SYSTEM },
-        ...(firstRoundOnly
-          ? [{ role: "system" as const, content: PROPOSE_NOTE }]
-          : []),
+        // One system message: the evaluation harness and some providers
+        // accept only one, so the propose note joins it.
+        {
+          role: "system",
+          content: firstRoundOnly
+            ? `${READING_SYSTEM} ${PROPOSE_NOTE}`
+            : READING_SYSTEM,
+        },
         ...askerNote(context.asker),
       ];
       const messages: ChatMessage[] = [

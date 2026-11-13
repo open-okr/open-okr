@@ -125,6 +125,9 @@ beforeEach(async () => {
       ownerKind: "workspace",
     })) as { id: string }
   ).id;
+  // kpis.create records its activity against the workspace, so the KPI is a
+  // subject the member acted on only once it is edited.
+  await call("kpis.update", { kpiId, unit: "signups" });
   initiativeId = (
     (await call("initiatives.create", {
       spaceId,
