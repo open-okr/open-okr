@@ -233,6 +233,19 @@ Akmal answered every question on 12 November 2026.
 | X3-Q | If production pins its AI models, clear the pin or set Luna? | Clear it, so production follows the default | **Clear it.** Nothing was pinned, so nothing changed |
 | G11-Q | Move `docs/okr-goal/` into the okr-goal repository? | Yes. It is the site's copy, and the site keeps its own | **Yes**, and done the same day (G11) |
 
+**Decided by Agung on 13 November 2026**, on the questions the design documents and the build left open:
+
+| # | Question | Agung's answer |
+|---|---|---|
+| G1 | Design approved? Q1 file on local disk with S3, Q2 change the code by env and restart, Q3 the demo uses the code | **Approved, Q1 to Q3 as recommended** |
+| G8 | Design approved? May a Viewer named facilitator change the pack? | **Approved. A Viewer may not**: the facilitator passes only with Member or above |
+| G2 | Design approved, in 0.9.0? | **Approved, in 0.9.0** |
+| A4 | Design approved? Q1 which round offers `propose_change`, Q2 do earlier answers count as the member's words | **Approved. Round 1 only; earlier questions only** |
+| FB1 | Design approved? Q1 one retention setting, Q2 a rating goes with its deleted conversation | **Approved, both as recommended** |
+| D1-Q | Narrow data change 0035 so it skips content the product's own writes already queued? | **Yes** |
+| G4-Q2 | Nothing reads `kpi_shares`. Import FlowyTeam's KPI shares as access bindings on the KPI instead? | **Yes, as bindings**: `read` becomes view, `update` becomes edit |
+| G5-Q2 | The branch is not on this machine or GitHub | **Wait for the branch to be pushed** |
+
 **Design directions, approved by Akmal on 12 November 2026** ("all the recommended six designs are approved"). Each design document is written from its direction before any code. A question the direction does not answer goes back to Akmal first.
 
 | Design | Approved direction |
@@ -277,25 +290,25 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | CP10 | done | Reasons are codes (`ai_off` with the step as a param, and seven more) in the stream, the thread and availability; the panel words them from `copilot.reason.*` in English and Malay. Stored as JSON, no migration |
 | CP11 | done | The chip "Ask about this objective / KPI / initiative / task" starts a new anchored conversation; only the kind and id are sent (CP11-Q). The loop reads the anchor from `ai_threads` and reads the record as `[1]` before round 1 (`readSubject`), as a block of its own in `chooseReads` (`ReadingContext.subject`), recorded like any read. A key result (`&kr=`) anchors to its objective, since no access-scoped read returns a key result alone. One fixture added to the `chooseReads` set. Uncommitted, tests written and not run |
 | CP12 | done | 13 November 2026. S-39 describes CP5, CP10 and CP11; mockup `13-copilot` drawn and rendered. Known in the mockup: the chip tooltip is clipped at the panel edge, and the card is drawn after the prose |
-| A4 | design written | 13 November 2026, `copilot-live-data.md` §11. Waiting for "design approved". Q1: offer `propose_change` in round 1 only (recommended) or in every round with a second check. Q2: earlier answers are not the member's words |
-| FB1 | design written | 13 November 2026, `docs/design/copilot-feedback.md`. Waiting for "design approved". Q1: one retention setting with the tool calls. Q2: a rating goes with its deleted conversation. Code after approval: migration 0170 |
+| A4 | to build | Design approved by Agung on 13 November 2026 (round 1 only; earlier questions only) |
+| FB1 | to build | Design approved by Agung on 13 November 2026 |
 | T1 | done | 13 November 2026. `holdTenants` in `e2e/hosting-profiles.spec.ts`: inserts what is missing, sets the state on every row, restores each existing row and workspace state. Not run locally |
 | T2 | done | 13 November 2026. `overwrite: true` on the unit, end-to-end and Playwright report uploads. The gate downloads `flaky-report-*` by pattern with `merge-multiple`, so a rerun leaves only the newest |
 | T3 | done | 13 November 2026. Traced locally: 12.4 s, 410 calls, no step over 1 s, so no hang; the test gets a 60-second limit with the reason. The serial group's retry is unchanged |
-| D1 | done in part | 13 November 2026. 0001: the two agents had no time zone on every fresh workspace; fixed in provisioning. 0005: rewrites a null reviewer to null where the goal has none, which changes nothing. 0035: re-queues index items the seed already queued, because it checks only its own key. Narrowing it edits a shipped data change: **yours** (D1-Q) |
+| D1 | done in part | 13 November 2026. 0001: the two agents had no time zone on every fresh workspace; fixed in provisioning. 0005: rewrites a null reviewer to null where the goal has none, which changes nothing. 0035: re-queues index items the seed already queued, because it checks only its own key. Narrowing it edits a shipped data change: D1-Q decided by Agung on 13 November 2026: narrow 0035; to build |
 | H1 | done | 13 November 2026. The setup paragraph only on `.Release.IsInstall`; an upgrade says how to check. `check.sh` asserts both, rendering the upgrade notes from a temporary copy with `--is-upgrade` |
 | C1 | done | 13 November 2026. `docs/api/reference.md` did not change. Alert #79 closes when the fix reaches `main` |
 | C2 | done | 13 November 2026. A profile URL that is not https (http only on loopback) is a usage error; every redirect is refused. Dismissing alerts #93 and #94 as intended use waits for the merge |
 | C3 | done | 13 November 2026. #77, #78, #88, #96, #97 fixed. #85, #86, #87, #98 left: the second `FormData` argument is the submitter, which the browser uses, so those are false positives to dismiss |
 | P1 | done | 13 November 2026: 1.7.22, every Better Auth package on one patch, licences pass. Each action item in the 1.7.19 to 1.7.22 notes checked and unaffected (no oauth-provider, jwt or mcp plugin; our own SCIM; `user.create.before` refuses with an error, never `false`). CI runs the auth, SSO, SCIM, invitation, sign-up and sign-in suites |
-| G1 | design written | 13 November 2026, `docs/design/setup-code.md`. Waiting for "design approved". Q1 to Q3 in its §9 |
-| G2 | design written | 13 November 2026, `work-layer.md` §5.1. Waiting for "design approved" |
+| G1 | to build | Design approved by Agung on 13 November 2026 |
+| G2 | to build | Design approved by Agung on 13 November 2026 |
 | G3 | to do | Built in 0.7.0. Design corrected; browser check of `/admin/connections` still to do |
-| G4 | yours | Nothing in the product reads or writes `kpi_shares`: only the export and the portability policy name it, and KPI access goes through bindings. Importing into it would grant nobody anything, so G4-Q's "keeps that access" would not hold. Import as access bindings on the KPI instead, or build `kpi_shares` into `can()` first? (G4-Q2) |
-| G5 | yours | The branch `feat/profile-source-links` is not on this machine or on GitHub; it stayed on the machine of the clean-up session. Push it, or say to rebuild it |
+| G4 | to build | G4-Q2 decided by Agung on 13 November 2026: import as access bindings on the KPI |
+| G5 | yours | G5-Q2: wait for `feat/profile-source-links` to be pushed from the machine that kept it |
 | G6 | done | 13 November 2026. Eleven mockups draw agents as faces (`.af`), 12b shows the guided fields, PNGs re-rendered with Google Chrome |
 | G7 | done | 13 November 2026. `.claude/settings.json` with `attribution` empty and `includeCoAuthoredBy: false` |
-| G8 | design written | 13 November 2026, `docs/design/input-pack-access.md`. Waiting for "design approved". Q1: a Viewer named facilitator |
+| G8 | to build | Design approved by Agung on 13 November 2026 (a Viewer facilitator may not change the pack) |
 | G9 | done | 13 November 2026. No OKRGoal left in `error-reporting.md` or `observability.md` |
 | G10 | done | 13 November 2026. The row has no id, so the key is the position plus time and provider, as Obed's fix. `origin/obed` can go on Akmal's word |
 | G11 | done | 12 November 2026. okr-goal took the copy with open-okr's three later edits merged in (four conflicts settled against the live site) and 40 links pointed at GitHub, by pull request in that repository; the folder is removed here in this pull request |

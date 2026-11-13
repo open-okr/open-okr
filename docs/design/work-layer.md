@@ -428,7 +428,7 @@ what and when is a question an administrator will eventually need answered.
 
 ### 5.1 Recent items and scoped tabs in the palette (plan 0.9.0 G2)
 
-Status: **written 13 November 2026, waiting for "design approved"**. Akmal
+Status: **approved by Agung on 13 November 2026** ("design approved"). Akmal
 approved the direction on 12 November 2026 (plan 0.9.0 §10). This closes the
 "Not built, and still owed" paragraph above.
 

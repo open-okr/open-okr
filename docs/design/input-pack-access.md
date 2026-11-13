@@ -1,6 +1,6 @@
 # Who may change the input pack
 
-Status: **written 13 November 2026, waiting for "design approved"**. Plan 0.9.0 row G8. Akmal approved the direction on 12 November 2026 (plan §10, "Design directions"), answering Q-4 of Obed's 0.8.0 acceptance test: in this release, limited to the Owner, Admins and the named facilitator. A change to access, so it is designed before code (CLAUDE.md).
+Status: **approved by Agung on 13 November 2026** ("design approved"). Q1: **a Viewer named facilitator may not change the pack**; the facilitator passes only with a role of Member or above. Q2 as recommended. Plan 0.9.0 row G8. Akmal approved the direction on 12 November 2026 (plan §10, "Design directions"), answering Q-4 of Obed's 0.8.0 acceptance test: in this release, limited to the Owner, Admins and the named facilitator. A change to access, so it is designed before code (CLAUDE.md).
 
 ## 1. What is true today
 
@@ -16,7 +16,7 @@ Status: **written 13 November 2026, waiting for "design approved"**. Plan 0.9.0 
 
 | # | Decision | Why |
 |---|---|---|
-| D1 | **Who may change the pack:** an actor whose workspace-domain write floor is `edit` or more (`writeFloorFor(tx, { domain: "workspace" })`, R1's check), or the human member named as the cycle's `facilitator_id` while that member is `active` | The direction. The Owner and Admins by role, the facilitator by name. Not the sponsor |
+| D1 | **Who may change the pack:** an actor whose workspace-domain write floor is `edit` or more (`writeFloorFor(tx, { domain: "workspace" })`, R1's check), or the human member named as the cycle's `facilitator_id` while that member is `active` and holds the Member role or one above it (Q1) | The direction. The Owner and Admins by role, the facilitator by name. Not the sponsor |
 | D2 | **No facilitator, or a suspended or removed one:** the Owner and Admins only | The direction. A suspended member is refused by `resolveActor` anyway; the rule names it so nobody reads it as a gap |
 | D3 | **What it covers:** marking an item gathered or missing, its note, and Confirm distribution. Exactly `workflow.setPackItem` and `workflow.distributePack` | The direction. Nothing else on phase 1 changes |
 | D4 | **Enforced in the writes, in the operation's `load` step**, which runs before the change inside the transaction against the freshly loaded cycle row. A refusal is `forbidden` with the sentence "Only an Owner, an Admin or this cycle's facilitator can change the input pack." REST, the command line, the agent surface and the chat commands are all projections of the same action, so all are refused alike | CLAUDE.md: authorise before the change against freshly loaded rows, one rule, never the screen alone |
@@ -36,7 +36,7 @@ Status: **written 13 November 2026, waiting for "design approved"**. Plan 0.9.0 
 | Member | `view` | yes, active | **Yes** |
 | Member | `view` | no | **No, new** |
 | Member named facilitator, suspended | refused by `resolveActor` | | No |
-| Viewer | `view` | yes | Yes. The direction names the facilitator without a role condition; see Q1 |
+| Viewer | `view` | yes | **No** (Q1, decided 13 November 2026) |
 | A role a workspace made | its own workspace level | either | Yes when it grants `edit` or more, otherwise only as facilitator |
 | Guest | none | n/a: a guest cannot be named facilitator | No |
 | Agent | none | never | No |

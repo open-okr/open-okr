@@ -1,6 +1,6 @@
 # Thumbs up and down on a copilot answer
 
-Status: **written 13 November 2026, waiting for "design approved"**. Plan 0.9.0 row FB1. Akmal decided FB-Q on 12 November 2026 (in 0.9.0, after L5, as the last copilot row) and approved the direction the same day (plan §10). A new table, so it is designed before code (CLAUDE.md).
+Status: **approved by Agung on 13 November 2026** ("design approved"), with Q1 and Q2 as recommended. Plan 0.9.0 row FB1. Akmal decided FB-Q on 12 November 2026 (in 0.9.0, after L5, as the last copilot row) and approved the direction the same day (plan §10). A new table, so it is designed before code (CLAUDE.md).
 
 ## 1. Why
 

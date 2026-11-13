@@ -1,6 +1,6 @@
 # A setup code to claim a new instance
 
-Status: **written 13 November 2026, waiting for "design approved"**. Plan 0.9.0 row G1. Akmal approved the direction on 12 November 2026 (plan §10, "Design directions"). This document fills in the mechanism from that direction. Section 9 lists what the direction did not settle. A new security mechanism, so it is designed before code (CLAUDE.md).
+Status: **approved by Agung on 13 November 2026** ("design approved"), with Q1 to Q3 as recommended. Plan 0.9.0 row G1. Akmal approved the direction on 12 November 2026 (plan §10, "Design directions"). This document fills in the mechanism from that direction. Section 9 lists what the direction did not settle. A new security mechanism, so it is designed before code (CLAUDE.md).
 
 ## 1. The problem
 

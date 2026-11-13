@@ -317,7 +317,7 @@ objective's.
 
 ## 11. The proposal as a tool in the loop (plan 0.9.0 A4)
 
-Status: **written 13 November 2026, waiting for "design approved"**. Akmal decided A4-Q on 12 November 2026 (the proposal becomes one of the loop's tools) and approved this direction the same day: a `propose_change` tool beside the read tools, taking today's proposal shape and checked by the same code; at most one card per answer; only the member's own words may start a proposal, never text the copilot read, proved by an injection fixture; the card appears when the tool call finishes, while the answer streams; a provider that cannot call tools keeps 0.8.1's proposal-first path; AI off unchanged; target about 2 seconds to the first word on Luna for a question that asks for no change, measured before and after.
+Status: **approved by Agung on 13 November 2026** ("design approved"), Q1: round 1 only; Q2: earlier questions only, not earlier answers. Akmal decided A4-Q on 12 November 2026 (the proposal becomes one of the loop's tools) and approved this direction the same day: a `propose_change` tool beside the read tools, taking today's proposal shape and checked by the same code; at most one card per answer; only the member's own words may start a proposal, never text the copilot read, proved by an injection fixture; the card appears when the tool call finishes, while the answer streams; a provider that cannot call tools keeps 0.8.1's proposal-first path; AI off unchanged; target about 2 seconds to the first word on Luna for a question that asks for no change, measured before and after.
 
 ### 11.1 Why
 
