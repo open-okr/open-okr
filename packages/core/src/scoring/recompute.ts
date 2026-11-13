@@ -550,8 +550,8 @@ async function loadGoalBranch<
   // the goal that owns it. Bounded at 32 like the cascade's own walk, and a
   // loop cannot spin because a repeat ends it.
   const write = new Map<string, GoalRow>([[start.id, start]]);
-  let cursor: GoalRow | undefined = start;
-  for (let depth = 0; depth < 32 && cursor; depth += 1) {
+  let cursor: GoalRow = start;
+  for (let depth = 0; depth < 32; depth += 1) {
     let parentId: string | null = cursor.parentGoalId;
     if (!parentId && cursor.parentKeyResultId) {
       const [owner] = await tx
