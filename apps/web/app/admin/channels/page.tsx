@@ -442,9 +442,13 @@ export default async function ChannelsPage() {
             </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
-              {messages.map((message) => (
+              {messages.map((message, index) => (
                 <li
-                  key={`${message.createdAt}-${message.provider}`}
+                  // The message row carries no id, and two sent in the same
+                  // millisecond share a time and provider. The list is
+                  // read-only, so the position is a stable tiebreaker.
+                  // biome-ignore lint/suspicious/noArrayIndexKey: no id on the row.
+                  key={`${index}-${message.createdAt}-${message.provider}`}
                   className="flex flex-wrap items-center gap-2 text-xs"
                 >
                   <Chip tone="neutral">{message.provider}</Chip>
