@@ -274,30 +274,30 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | L6 | done | Spec ran green on 12 November 2026 (Node 22). `e2e/s39d-copilot-reads.spec.ts`: a set-up step and three tests. It starts a scripted OpenAI-shaped model on this machine and points the workspace's keyless `ollama` provider at it, because the server builds its provider from the database and has no mock kind. The unreadable-objective case uses a deleted objective, since every active member holds edit and a guest cannot ask. A provider that cannot call tools cannot be configured in e2e, so the third test covers provider off. Biome does not cover `e2e/`. |
 | L7b | done | Live as Priya, 2 of 7 to 5 of 7 (`copilot-live-data.md` §8). Open: "this quarter" between two same-title objectives, and "which of my key results are behind" gives no answer |
 | CP5 | done | Numbered chips in the answer, a numbered source list with icons, links made on the server (`copilot.thread` returns `n` and `href`). Local tier only, specs not run. |
-| CP10 | to do | |
-| CP11 | to do | |
-| CP12 | to do | |
-| A4 | to do | Direction approved 12 November 2026; the design addition, then the code |
-| FB1 | to do | Direction approved 12 November 2026; the design, then the code |
-| T1 | to do | |
-| T2 | to do | |
-| T3 | to do | |
-| D1 | to do | |
-| H1 | to do | |
-| C1 | to do | |
-| C2 | to do | C2-Q decided: fix, then dismiss |
-| C3 | to do | |
-| P1 | to do | P1-Q decided: the newest 1.7 patch |
-| G1 | to do | Direction approved 12 November 2026; the design, then the code |
-| G2 | to do | Direction approved 12 November 2026; a design note, then the code |
-| G3 | to do | Built in 0.7.0; the design's correction and a browser check |
-| G4 | to do | G4-Q decided: import |
-| G5 | to do | G5-Q decided: yes |
-| G6 | to do | |
-| G7 | to do | |
-| G8 | to do | Direction approved 12 November 2026; the design, then the code |
-| G9 | to do | G9-Q decided |
-| G10 | to do | Then `origin/obed` can be deleted |
+| CP10 | done | Reasons are codes (`ai_off` with the step as a param, and seven more) in the stream, the thread and availability; the panel words them from `copilot.reason.*` in English and Malay. Stored as JSON, no migration |
+| CP11 | done | The chip "Ask about this objective / KPI / initiative / task" starts a new anchored conversation; only the kind and id are sent (CP11-Q). The loop reads the anchor from `ai_threads` and reads the record as `[1]` before round 1 (`readSubject`), as a block of its own in `chooseReads` (`ReadingContext.subject`), recorded like any read. A key result (`&kr=`) anchors to its objective, since no access-scoped read returns a key result alone. One fixture added to the `chooseReads` set. Uncommitted, tests written and not run |
+| CP12 | done | 13 November 2026. S-39 describes CP5, CP10 and CP11; mockup `13-copilot` drawn and rendered. Known in the mockup: the chip tooltip is clipped at the panel edge, and the card is drawn after the prose |
+| A4 | design written | 13 November 2026, `copilot-live-data.md` §11. Waiting for "design approved". Q1: offer `propose_change` in round 1 only (recommended) or in every round with a second check. Q2: earlier answers are not the member's words |
+| FB1 | design written | 13 November 2026, `docs/design/copilot-feedback.md`. Waiting for "design approved". Q1: one retention setting with the tool calls. Q2: a rating goes with its deleted conversation. Code after approval: migration 0170 |
+| T1 | done | 13 November 2026. `holdTenants` in `e2e/hosting-profiles.spec.ts`: inserts what is missing, sets the state on every row, restores each existing row and workspace state. Not run locally |
+| T2 | done | 13 November 2026. `overwrite: true` on the unit, end-to-end and Playwright report uploads. The gate downloads `flaky-report-*` by pattern with `merge-multiple`, so a rerun leaves only the newest |
+| T3 | yours | Needs a traced end-to-end run of `e2e/reviews.spec.ts:388` to see what takes the time. Not run: owner rule, ask before any end-to-end run |
+| D1 | done in part | 13 November 2026. 0001: the two agents had no time zone on every fresh workspace; fixed in provisioning. 0005: rewrites a null reviewer to null where the goal has none, which changes nothing. 0035: re-queues index items the seed already queued, because it checks only its own key. Narrowing it edits a shipped data change: **yours** (D1-Q) |
+| H1 | done | 13 November 2026. The setup paragraph only on `.Release.IsInstall`; an upgrade says how to check. `check.sh` asserts both, rendering the upgrade notes from a temporary copy with `--is-upgrade` |
+| C1 | done | 13 November 2026. `docs/api/reference.md` did not change. Alert #79 closes when the fix reaches `main` |
+| C2 | done | 13 November 2026. A profile URL that is not https (http only on loopback) is a usage error; every redirect is refused. Dismissing alerts #93 and #94 as intended use waits for the merge |
+| C3 | done | 13 November 2026. #77, #78, #88, #96, #97 fixed. #85, #86, #87, #98 left: the second `FormData` argument is the submitter, which the browser uses, so those are false positives to dismiss |
+| P1 | done | 13 November 2026: 1.7.22, every Better Auth package on one patch, licences pass. Each action item in the 1.7.19 to 1.7.22 notes checked and unaffected (no oauth-provider, jwt or mcp plugin; our own SCIM; `user.create.before` refuses with an error, never `false`). CI runs the auth, SSO, SCIM, invitation, sign-up and sign-in suites |
+| G1 | design written | 13 November 2026, `docs/design/setup-code.md`. Waiting for "design approved". Q1 to Q3 in its §9 |
+| G2 | design written | 13 November 2026, `work-layer.md` §5.1. Waiting for "design approved" |
+| G3 | to do | Built in 0.7.0. Design corrected; browser check of `/admin/connections` still to do |
+| G4 | yours | Nothing in the product reads or writes `kpi_shares`: only the export and the portability policy name it, and KPI access goes through bindings. Importing into it would grant nobody anything, so G4-Q's "keeps that access" would not hold. Import as access bindings on the KPI instead, or build `kpi_shares` into `can()` first? (G4-Q2) |
+| G5 | yours | The branch `feat/profile-source-links` is not on this machine or on GitHub; it stayed on the machine of the clean-up session. Push it, or say to rebuild it |
+| G6 | done | 13 November 2026. Eleven mockups draw agents as faces (`.af`), 12b shows the guided fields, PNGs re-rendered with Google Chrome |
+| G7 | done | 13 November 2026. `.claude/settings.json` with `attribution` empty and `includeCoAuthoredBy: false` |
+| G8 | design written | 13 November 2026, `docs/design/input-pack-access.md`. Waiting for "design approved". Q1: a Viewer named facilitator |
+| G9 | done | 13 November 2026. No OKRGoal left in `error-reporting.md` or `observability.md` |
+| G10 | done | 13 November 2026. The row has no id, so the key is the position plus time and provider, as Obed's fix. `origin/obed` can go on Akmal's word |
 | G11 | done | 12 November 2026. okr-goal took the copy with open-okr's three later edits merged in (four conflicts settled against the live site) and 40 links pointed at GitHub, by pull request in that repository; the folder is removed here in this pull request |
 | U1 | to do | Last |
 | X1 | done | 12 November 2026, by Akmal |
