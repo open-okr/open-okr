@@ -596,8 +596,18 @@ export default async function CyclePage({
                     // Each item leads to where it is filled in, or says who
                     // can fill it when this reader cannot (plan 0.8.0 F1).
                     const place = needDestination(need);
+                    // The pack's items and its distribution answer to the
+                    // pack's own rule, not to the cycle's edit level
+                    // (docs/design/input-pack-access.md).
+                    const isPackItem =
+                      need.key === "pack.item" ||
+                      need.key === "pack.distribute";
                     const permitted =
-                      place.level === "setup" ? canSetUp : canEdit;
+                      place.level === "setup"
+                        ? canSetUp
+                        : isPackItem
+                          ? workflow.packAccess.canChange
+                          : canEdit;
                     return (
                       <li key={reason}>
                         {!permitted ? (
@@ -606,7 +616,9 @@ export default async function CyclePage({
                             <span className="text-ink-3">
                               {place.level === "setup"
                                 ? t("cycle.need.ownerFills")
-                                : t("cycle.need.editorFills")}
+                                : isPackItem
+                                  ? t("cycle.need.packFills")
+                                  : t("cycle.need.editorFills")}
                             </span>
                           </>
                         ) : place.kind === "page" ? (
@@ -644,7 +656,7 @@ export default async function CyclePage({
                 distributedAt={workflow.packDistributedAt}
                 sponsor={workflow.sponsor}
                 facilitator={workflow.facilitator}
-                canEdit={canEdit}
+                packAccess={workflow.packAccess}
               />
             </div>
           ) : null}

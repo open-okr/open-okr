@@ -30239,6 +30239,25 @@
                             "null"
                           ]
                         },
+                        "packAccess": {
+                          "type": "object",
+                          "properties": {
+                            "canChange": {
+                              "type": "boolean"
+                            },
+                            "facilitatorName": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "canChange",
+                            "facilitatorName"
+                          ],
+                          "additionalProperties": false
+                        },
                         "firstCycle": {
                           "type": "boolean"
                         },
@@ -30996,6 +31015,7 @@
                         "publishedAt",
                         "companyPublishedAt",
                         "packDistributedAt",
+                        "packAccess",
                         "firstCycle",
                         "sponsor",
                         "facilitator",

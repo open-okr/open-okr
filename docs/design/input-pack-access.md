@@ -1,6 +1,6 @@
 # Who may change the input pack
 
-Status: **approved by Agung on 13 November 2026** ("design approved"). Q1: **a Viewer named facilitator may not change the pack**; the facilitator passes only with a role of Member or above. Q2 as recommended. Plan 0.9.0 row G8. Akmal approved the direction on 12 November 2026 (plan §10, "Design directions"), answering Q-4 of Obed's 0.8.0 acceptance test: in this release, limited to the Owner, Admins and the named facilitator. A change to access, so it is designed before code (CLAUDE.md).
+Status: **approved by Agung on 13 November 2026** ("design approved"). Q1 (decided, see §7): **a Viewer named facilitator may not change the pack**; the facilitator passes only with a role of Member or above. Q2 as recommended. Plan 0.9.0 row G8. Akmal approved the direction on 12 November 2026 (plan §10, "Design directions"), answering Q-4 of Obed's 0.8.0 acceptance test: in this release, limited to the Owner, Admins and the named facilitator. A change to access, so it is designed before code (CLAUDE.md).
 
 ## 1. What is true today
 
@@ -16,13 +16,13 @@ Status: **approved by Agung on 13 November 2026** ("design approved"). Q1: **a V
 
 | # | Decision | Why |
 |---|---|---|
-| D1 | **Who may change the pack:** an actor whose workspace-domain write floor is `edit` or more (`writeFloorFor(tx, { domain: "workspace" })`, R1's check), or the human member named as the cycle's `facilitator_id` while that member is `active` and holds the Member role or one above it (Q1) | The direction. The Owner and Admins by role, the facilitator by name. Not the sponsor |
+| D1 | **Who may change the pack:** an actor whose workspace-domain write floor is `edit` or more (`writeFloorFor(tx, { domain: "workspace" })`, R1's check), or the human member named as the cycle's `facilitator_id` while that member is `active` and holds the Member role or one above it (Q1). **"Member or above" is compared as: the member's role grants at least `comment` on the `comment` domain.** The seeded Member and Viewer roles are equal on `workspace` (`view`), so that domain cannot tell them apart; `comment` is the first place the seeded ladder rises above Viewer. It follows the role the workspace actually has, edited or custom, not the role's name | The direction. The Owner and Admins by role, the facilitator by name. Not the sponsor |
 | D2 | **No facilitator, or a suspended or removed one:** the Owner and Admins only | The direction. A suspended member is refused by `resolveActor` anyway; the rule names it so nobody reads it as a gap |
 | D3 | **What it covers:** marking an item gathered or missing, its note, and Confirm distribution. Exactly `workflow.setPackItem` and `workflow.distributePack` | The direction. Nothing else on phase 1 changes |
 | D4 | **Enforced in the writes, in the operation's `load` step**, which runs before the change inside the transaction against the freshly loaded cycle row. A refusal is `forbidden` with the sentence "Only an Owner, an Admin or this cycle's facilitator can change the input pack." REST, the command line, the agent surface and the chat commands are all projections of the same action, so all are refused alike | CLAUDE.md: authorise before the change against freshly loaded rows, one rule, never the screen alone |
 | D5 | **The access level stays `edit` with no domain.** The rule is "R1's floor OR the facilitator", which a domain alone cannot say; the extra condition lives in one shared function, `mayChangeInputPack(tx, { workspaceId, actor, cycleId })`, in `packages/core/src/cycles/input-pack-access.ts` | A domain of `workspace` would refuse the facilitator who is a Member |
 | D6 | **Agents are refused.** An agent has no role and is never a cycle's facilitator, so D1 refuses it. Neither the Coach nor the Champion calls these two actions today | Least privilege; no agent autonomy change |
-| D7 | **A new read for the screen:** `workflow.read` gains `packAccess: { canChange: boolean, who: string }`, computed by the same `mayChangeInputPack`. `who` is the sentence naming who may change it, with the facilitator's name when there is one: "Only an Owner, an Admin or Siti Rahman, this cycle's facilitator, can change the input pack." | The direction: "a new read telling the screen". One function for the screen and the write, so they cannot disagree |
+| D7 | **A new read for the screen:** `workflow.read` gains `packAccess: { canChange: boolean, facilitatorName: string \| null }`, computed by the same function as the write (`inputPackAccess`, which `mayChangeInputPack` wraps). `facilitatorName` is the named facilitator who holds the right, or null. **The sentence is built on the client from the catalogue**, not sent by the server: "Only an Owner, an Admin or Siti Rahman, this cycle's facilitator, can change the input pack." with a name, "Only an Owner or an Admin can change the input pack." without | The direction: "a new read telling the screen". One function for the screen and the write, so they cannot disagree. No English sentence from the server (CP10) |
 | D8 | **Everybody else sees the pack read only**: the seven items with their gathered state and notes, the distribution date, no toggles, no note fields, no Confirm distribution, and the `who` line above the list | The direction |
 | D9 | **No migration and no data change.** Marks and notes already made stay as they are, whoever made them | The direction |
 | D10 | **The demo and the Northwind year keep working**: their pack steps act as the workspace's founder, who is the Owner | Checked: `packages/core/src/demo/year/q1-plan.ts` NW-P-04 and the builder call through `context.action`, the founder |
@@ -50,7 +50,7 @@ Status: **approved by Agung on 13 November 2026** ("design approved"). Q1: **a V
 | The writes | `packages/core/src/actions/cycle-workflow.ts`: `load` on `setPackItem` and `distributePack` |
 | The read | `workflow.read` output `packAccess` |
 | The screen | `apps/web/app/cycle/input-pack.tsx` takes `packAccess` in place of `canEdit` for the pack; `page.tsx` passes it |
-| Catalogue | `packages/ui/src/i18n/messages/{en,ms}.json`: the `who` sentence with and without a facilitator |
+| Catalogue | `packages/ui/src/i18n/messages/{en,ms}.json`: the line with and without a facilitator name, and the "still needed here" sentence for a pack item |
 | Contract | `pnpm gen:contract` (the read's output changes) |
 | Docs | `workspace-roles.md` §12 gains a line pointing here; UIUX-PLAN S-06 (the input pack) says who may change it |
 
@@ -75,5 +75,5 @@ Status: **approved by Agung on 13 November 2026** ("design approved"). Q1: **a V
 
 | # | Question | Recommended | Other option |
 |---|---|---|---|
-| Q1 | A Viewer named as facilitator: may they change the pack? | Yes. The direction names the facilitator without a role condition, and a workspace that named a Viewer facilitator meant them to run the cycle | Require the facilitator's role to be Member or above |
+| Q1 | A Viewer named as facilitator: may they change the pack? | **Decided 13 November 2026: no.** The facilitator passes only with a role of Member or above | Yes, with no role condition |
 | Q2 | Does the cycle's sponsor get it too? | No, as the direction says ("not the sponsor") | |

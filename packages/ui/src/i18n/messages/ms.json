@@ -4849,5 +4849,8 @@
   "role.builtin.owner": "Pemilik",
   "role.builtin.admin": "Pentadbir",
   "role.builtin.member": "Ahli",
-  "role.builtin.viewer": "Pemerhati"
+  "role.builtin.viewer": "Pemerhati",
+  "cycle.inputPack.whoCanChange": "Hanya Pemilik atau Pentadbir boleh mengubah pek input.",
+  "cycle.inputPack.whoCanChangeWithFacilitator": "Hanya Pemilik, Pentadbir atau {name}, fasilitator kitaran ini, boleh mengubah pek input.",
+  "cycle.need.packFills": "Pemilik, Pentadbir atau fasilitator kitaran mengisi bahagian ini."
 }

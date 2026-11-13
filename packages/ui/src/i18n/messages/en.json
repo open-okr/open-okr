@@ -4849,5 +4849,8 @@
   "role.builtin.owner": "Owner",
   "role.builtin.admin": "Admin",
   "role.builtin.member": "Member",
-  "role.builtin.viewer": "Viewer"
+  "role.builtin.viewer": "Viewer",
+  "cycle.inputPack.whoCanChange": "Only an Owner or an Admin can change the input pack.",
+  "cycle.inputPack.whoCanChangeWithFacilitator": "Only an Owner, an Admin or {name}, this cycle's facilitator, can change the input pack.",
+  "cycle.need.packFills": "An Owner, an Admin or the cycle's facilitator fills this in."
 }

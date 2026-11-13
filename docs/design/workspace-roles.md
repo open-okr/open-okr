@@ -410,6 +410,11 @@ is drawn on `full`, as R1-Q3 decided. F1's
 destinations at `full` read it too, and its sentence for a reader who cannot act
 becomes "An Owner or an Admin fills this in."
 
+**The input pack is narrower still (plan 0.9.0 G8).** Marking a pack item,
+its note and Confirm distribution ask the workspace floor above or the cycle's
+named facilitator, who must be a Member or above. See
+[input-pack-access.md](input-pack-access.md).
+
 ### Which actions move
 
 | Action | What it does | Today | Proposed |

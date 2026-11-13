@@ -308,7 +308,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | G5 | yours | G5-Q2: wait for `feat/profile-source-links` to be pushed from the machine that kept it |
 | G6 | done | 13 November 2026. Eleven mockups draw agents as faces (`.af`), 12b shows the guided fields, PNGs re-rendered with Google Chrome |
 | G7 | done | 13 November 2026. `.claude/settings.json` with `attribution` empty and `includeCoAuthoredBy: false` |
-| G8 | to build | Design approved by Agung on 13 November 2026 (a Viewer facilitator may not change the pack) |
+| G8 | done | 13 November 2026. `mayChangeInputPack` guards both pack writes in their `load` step, `workflow.read` returns `packAccess`, the screen is read only for everybody else. Local tier not yet run. The end-to-end case checks the Owner only, because the suite has no second account to sign in as |
 | G9 | done | 13 November 2026. No OKRGoal left in `error-reporting.md` or `observability.md` |
 | G10 | done | 13 November 2026. The row has no id, so the key is the position plus time and provider, as Obed's fix. `origin/obed` can go on Akmal's word |
 | G11 | done | 12 November 2026. okr-goal took the copy with open-okr's three later edits merged in (four conflicts settled against the live site) and 40 links pointed at GitHub, by pull request in that repository; the folder is removed here in this pull request |
