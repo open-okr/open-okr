@@ -70,7 +70,7 @@ export type PaletteGroupId =
   | "actions";
 
 /** How many recents the palette draws, whatever the server returned. */
-export const RECENT_SHOWN = 8;
+const RECENT_SHOWN = 8;
 
 /**
  * The scoped tabs (work-layer.md §5.1, G2-D6). A tab narrows every group to

@@ -76,9 +76,7 @@ const nullable = (shapes: readonly JsonSchema[]): JsonSchema => ({
  * take is null and is dropped below. The shapes come from the offers, so this
  * file holds no copy of any action's fields.
  */
-export function proposeToolSchema(
-  offers: readonly ProposalOffer[],
-): JsonSchema {
+function proposeToolSchema(offers: readonly ProposalOffer[]): JsonSchema {
   const fields: Record<string, JsonSchema[]> = {};
   for (const offer of offers) {
     const properties = (offer.fields.properties ?? {}) as Record<

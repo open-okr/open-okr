@@ -341,7 +341,13 @@ describe("a grounded answer", () => {
     })) as {
       messages: {
         role: string;
-        citations: { entityType: string; entityId: string; label: string }[];
+        citations: {
+          n: number;
+          entityType: string;
+          entityId: string;
+          label: string;
+          href: string;
+        }[];
         model: string | null;
         tokensIn: number | null;
         tokensOut: number | null;
@@ -354,9 +360,11 @@ describe("a grounded answer", () => {
     expect(answer?.role).toBe("assistant");
     expect(answer?.citations).toEqual([
       {
+        n: 1,
         entityType: "goal",
         entityId: goalId,
         label: "Raise mid-market activation to sixty per cent",
+        href: `/goals/${goalId}`,
       },
     ]);
     expect(answer?.model).toBe("stub-1");

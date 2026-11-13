@@ -826,7 +826,7 @@ export const deleteThread = defineWriteAction({
 });
 
 /** The longest note a member may leave on a rating (copilot-feedback.md §2). */
-export const RATING_NOTE_MAX = 500;
+const RATING_NOTE_MAX = 500;
 
 /**
  * Rates one answer in the caller's own conversation (plan 0.9.0 FB1,

@@ -15,6 +15,7 @@ import type {
   GroundedChunk,
   GroundedQuestionContext,
 } from "@openokr/core";
+import { newId } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
@@ -839,11 +840,11 @@ describe("a conversation anchored to a page (plan 0.9.0 CP11)", () => {
     // A guest cannot ask the copilot, so its thread is written directly with
     // the anchor, and the shared step is driven as the guest.
     const { rows } = await wb.admin.query<{ id: string }>(
-      `insert into ai_threads (workspace_id, member_id, subject_type, subject_id)
-       select $1, m.id, 'goal', $3 from workspace_members m
+      `insert into ai_threads (id, workspace_id, member_id, subject_type, subject_id)
+       select $4, $1, m.id, 'goal', $3 from workspace_members m
         where m.workspace_id = $1 and m.user_id = $2
        returning id`,
-      [workspaceId, GUEST, goalId],
+      [workspaceId, GUEST, goalId, newId()],
     );
     const drafter = new AnchoredDrafter(async () => spent(0));
     const outcome = await drainReading(

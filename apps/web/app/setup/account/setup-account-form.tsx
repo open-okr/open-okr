@@ -145,18 +145,12 @@ export function SetupAccountForm({
         autoCapitalize="characters"
         spellCheck={false}
         required
-        description={
-          <>
-            {t("setup.account.setupAccountForm.setupCodeHelp", {
-              path: codeSource.path,
-            })}
-            {codeSource.fromDeployment
-              ? ""
-              : ` ${t("setup.account.setupAccountForm.setupCodeRead", {
-                  path: codeSource.path,
-                })}`}
-          </>
-        }
+        description={t(
+          codeSource.fromDeployment
+            ? "setup.account.setupAccountForm.setupCodeHelpFromDeployment"
+            : "setup.account.setupAccountForm.setupCodeHelpFromFile",
+          { path: codeSource.path },
+        )}
       />
 
       <Field

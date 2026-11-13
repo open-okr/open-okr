@@ -36,7 +36,7 @@ export const SETUP_CODE_HEADER = "x-openokr-setup-code";
  * person (D6). Thirty-one characters, twelve places: about 59 bits.
  */
 export const SETUP_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-export const SETUP_CODE_LENGTH = 12;
+const SETUP_CODE_LENGTH = 12;
 
 /** The file a generated code is written to, relative to the storage root. */
 export const SETUP_CODE_FILE = "setup-code";

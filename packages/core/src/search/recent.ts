@@ -47,7 +47,7 @@ export const RECENT_KINDS = [
   "space",
 ] as const;
 
-export type RecentKind = (typeof RECENT_KINDS)[number];
+type RecentKind = (typeof RECENT_KINDS)[number];
 
 /** How many a member keeps, and so the most this answers. */
 export const RECENT_LIMIT = 20;
