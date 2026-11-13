@@ -36,9 +36,11 @@ const actions = vi.hoisted(() => ({
   deleteCopilotThreadAction: vi.fn(),
   listCopilotProposalsAction: vi.fn(async (): Promise<unknown[]> => []),
   listCopilotThreadsAction: vi.fn(async (): Promise<unknown[]> => []),
+  rateCopilotAnswerAction: vi.fn(async () => ({ error: null })),
   readCopilotThreadAction: vi.fn(),
   stopCopilotRunAction: vi.fn(async () => ({})),
   undoCopilotProposalAction: vi.fn(),
+  unrateCopilotAnswerAction: vi.fn(async () => ({ error: null })),
 }));
 vi.mock("../app/copilot/actions", () => actions);
 // The address the panel reads and writes (plan 0.8.1 CP2): the window's own,

@@ -108,11 +108,15 @@ export {
   type ModelTier,
 } from "./schema/ai-models.ts";
 export {
+  AI_ANSWER_RATINGS,
   AI_MESSAGE_ROLES,
+  type AiAnswerRating,
+  type AiAnswerRatingValue,
   type AiCitation,
   type AiMessage,
   type AiMessageRole,
   type AiThread,
+  aiAnswerRatings,
   aiMessages,
   aiThreads,
 } from "./schema/ai-threads.ts";

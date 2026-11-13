@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { AnswerRating, type MyRating } from "./answer-rating";
 import { ReadCountLine, StepLine, StepSummary } from "./step-line";
 
 /** A thing the copilot named: what it is, and how to read it. */
@@ -72,6 +73,8 @@ export interface Message {
   readonly haltedParams?: Readonly<Record<string, string>> | null;
   /** How many live reads the answer rests on, from the record of them (L3). */
   readonly readCount?: number;
+  /** The reader's own rating of this answer, or null (plan 0.9.0 FB1). */
+  readonly myRating?: MyRating | null;
   readonly createdAt: string;
 }
 
@@ -355,6 +358,7 @@ export function AssistantTurn({
   onRetry = null,
   retryDisabled = false,
   error = null,
+  rate = null,
 }: {
   /** The recorded answer, or the words that have arrived so far. */
   readonly text: string;
@@ -380,6 +384,15 @@ export function AssistantTurn({
   readonly retryDisabled?: boolean;
   /** What went wrong with this turn, said where it happened. */
   readonly error?: string | null;
+  /**
+   * The thumbs under a recorded answer (plan 0.9.0 FB1). Null for an answer
+   * still arriving, and for any answer while the copilot cannot answer at
+   * all, so no control is drawn then.
+   */
+  readonly rate?: {
+    readonly messageId: string;
+    readonly initial: MyRating | null;
+  } | null;
 }) {
   const { t } = useTranslations();
   return (
@@ -456,8 +469,8 @@ export function AssistantTurn({
           {error}
         </p>
       ) : null}
-      {copyText || onRetry ? (
-        <div className="flex items-center gap-1">
+      {copyText || onRetry || rate ? (
+        <div className="flex flex-wrap items-center gap-1">
           {copyText ? (
             <CopyButton
               text={copyText}
@@ -481,6 +494,13 @@ export function AssistantTurn({
               <RotateCcw className="size-3.5" aria-hidden="true" />
               {t("copilot.copilotPanel.retry")}
             </Button>
+          ) : null}
+          {rate ? (
+            <AnswerRating
+              key={rate.messageId}
+              messageId={rate.messageId}
+              initial={rate.initial}
+            />
           ) : null}
         </div>
       ) : null}

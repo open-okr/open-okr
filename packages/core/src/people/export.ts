@@ -105,6 +105,13 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     label: "Copilot conversations",
   },
   {
+    // Plan 0.9.0 FB1: the member's thumbs on copilot answers, with the
+    // note they wrote. Theirs, so it is exported with their conversations.
+    table: "ai_answer_ratings",
+    column: "member_id",
+    label: "Your ratings of copilot answers",
+  },
+  {
     table: "ai_usage_events",
     column: "member_id",
     label: "AI usage recorded against you",

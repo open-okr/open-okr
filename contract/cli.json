@@ -1392,6 +1392,39 @@
       "pages": false
     },
     {
+      "name": "ai answerRatings",
+      "action": "ai.answerRatings",
+      "method": "GET",
+      "path": "/ai/answerRatings",
+      "scope": "read",
+      "summary": "The thumbs members gave copilot answers, newest first, with the note, the model and what was read. The question and the answer are included only when the member shared them.",
+      "flags": [
+        {
+          "name": "rating",
+          "field": "rating",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "up",
+            "down"
+          ]
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": true
+    },
+    {
       "name": "tokens mine",
       "action": "tokens.mine",
       "method": "GET",
@@ -1867,6 +1900,62 @@
         {
           "name": "thread-id",
           "field": "threadId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "copilot rate",
+      "action": "copilot.rate",
+      "method": "POST",
+      "path": "/copilot/rate",
+      "scope": "write",
+      "summary": "Rates one copilot answer in the caller's own conversation, with an optional note and an optional share with AI administrators.",
+      "flags": [
+        {
+          "name": "message-id",
+          "field": "messageId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "rating",
+          "field": "rating",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "up",
+            "down"
+          ]
+        },
+        {
+          "name": "note",
+          "field": "note",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "shared",
+          "field": "shared",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "copilot unrate",
+      "action": "copilot.unrate",
+      "method": "POST",
+      "path": "/copilot/unrate",
+      "scope": "write",
+      "summary": "Removes the caller's rating of one copilot answer.",
+      "flags": [
+        {
+          "name": "message-id",
+          "field": "messageId",
           "type": "string",
           "required": true
         }

@@ -25,11 +25,13 @@ const SELF_SERVICE = new Set([
   "copilot.completeRun",
   "copilot.deleteThread",
   "copilot.dismissProposal",
+  "copilot.rate",
   "copilot.recordAnswer",
   "copilot.recordProposal",
   // A member stopping their own run; checks the thread is theirs (W4).
   "copilot.stopRun",
   "copilot.undoProposal",
+  "copilot.unrate",
   "invitations.acceptLink",
   "invitations.joinByTrustedDomain",
   "notifications.markRead",

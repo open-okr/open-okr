@@ -689,6 +689,14 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     reason: "The messages in those copilot threads.",
   },
   {
+    // After the messages it points at: the export order is the order rows
+    // are restored in.
+    table: "ai_answer_ratings",
+    decision: "export",
+    reason:
+      "A member's thumbs on copilot answers, with the note they wrote. Exported with their AI threads, which it points into (copilot-feedback.md FB-D12).",
+  },
+  {
     table: "attachments",
     decision: "export",
     reason: "Which file is hung on which subject.",

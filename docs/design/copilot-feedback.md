@@ -80,3 +80,15 @@ Unique on `(workspace_id, message_id, member_id)` where `deleted_at` is null. No
 |---|---|---|---|
 | Q1 | One retention setting for tool calls and ratings, or a setting of its own? | One: `agentToolCallRetentionDays` covers both. A rating without the reads it points at is half the evidence | A separate `copilotRatingRetentionDays`, default 90 |
 | Q2 | When an answer is deleted with its conversation, does its rating go too? | Yes, soft deleted with it. An administrator then sees nothing for it, which is what the member asked for by deleting | Keep the rating and the note, without the text |
+
+## 8. As built
+
+| Point | What was built |
+|---|---|
+| Taking a rating back | `copilot.unrate` soft deletes the row and clears its note and share, so the soft deleted row holds only the fact of a rating until the sweep removes it. The same applies when `copilot.deleteThread` soft deletes a thread's ratings (Q2) |
+| Switching thumbs | `copilot.rate` with the other value starts without the old note and share. The same value with no note or share sent keeps them, which is how the form's Send adds a note to a rating already saved |
+| The sweep | `connections.sweepToolCalls` also deletes `ai_answer_ratings` older than the window, soft deleted rows included, and returns `ratingsDeleted` beside `deleted` |
+| Paging | `ai.answerRatings` takes `{ rating?, cursor?, limit? }` where the cursor is `{ at, id }` of the last row, like the audit list. Rows have no member id |
+| Reads count | Rebuilt from `ai_tool_calls` by member and time through the same window rule as `copilot.thread` |
+| AI off | The panel draws the thumbs only while a provider is configured (the same test as Retry). The Admin, AI card is drawn only when a drafter resolves for the workspace |
+| The command | `pnpm copilot:feedback` is `scripts/copilot-feedback.ts` over `packages/core/src/copilot/feedback-fixtures.ts`, which reads through the same page as `ai.answerRatings`. The asker, their manager and other members become role words; text in double quotes becomes `[title]` because the answer does not store the kind of thing a title names; emails and figures are replaced. `[n]` citation markers stay |

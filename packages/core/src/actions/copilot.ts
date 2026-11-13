@@ -25,13 +25,14 @@
 import {
   type AiCitation,
   activeOnly,
+  aiAnswerRatings,
   aiMessages,
   aiThreads,
   aiToolCalls,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { and, desc, eq, gte, isNotNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -771,6 +772,38 @@ export const deleteThread = defineWriteAction({
           ),
         );
 
+      // The thread's ratings go with it (copilot-feedback.md Q2). What the
+      // member asked for by deleting is that an administrator then sees
+      // nothing of it, and a rating the member shared would otherwise keep
+      // the question and the answer readable. The note and the share are
+      // cleared too, so the soft-deleted row holds nothing more than the
+      // fact of a rating until the retention sweep removes it.
+      const answerIds = tx
+        .select({ id: aiMessages.id })
+        .from(aiMessages)
+        .where(
+          activeOnly(
+            aiMessages,
+            eq(aiMessages.workspaceId, workspaceId),
+            eq(aiMessages.threadId, thread.id),
+          ),
+        );
+      await tx
+        .update(aiAnswerRatings)
+        .set({
+          deletedAt: new Date(),
+          updatedAt: new Date(),
+          note: null,
+          shared: false,
+        })
+        .where(
+          activeOnly(
+            aiAnswerRatings,
+            eq(aiAnswerRatings.workspaceId, workspaceId),
+            inArray(aiAnswerRatings.messageId, answerIds),
+          ),
+        );
+
       return {
         result: { id: thread.id },
         activity: {
@@ -786,6 +819,232 @@ export const deleteThread = defineWriteAction({
           targetType: "ai_thread",
           targetId: thread.id,
           payload: {},
+        },
+      };
+    },
+  }),
+});
+
+/** The longest note a member may leave on a rating (copilot-feedback.md §2). */
+export const RATING_NOTE_MAX = 500;
+
+/**
+ * Rates one answer in the caller's own conversation (plan 0.9.0 FB1,
+ * docs/design/copilot-feedback.md FB-D1, FB-D2, FB-D10).
+ *
+ * **One live rating per member per answer.** Calling it again with the other
+ * value replaces the rating; calling it again with the same value changes only
+ * the note and the share. Pressing the same thumb to remove a rating is
+ * `copilot.unrate`, which the screen calls, so this action never has to guess
+ * what a repeated press meant.
+ *
+ * A note or a share that is not sent is kept when the value is the same and
+ * reset when the value changes: a note written under a poor answer says
+ * nothing about a good one, and a share the member ticked for one judgement
+ * is not theirs to carry to the next without seeing it.
+ *
+ * The question and the answer text are never copied here. The administrator's
+ * list reads them from the message, and only while `shared` is true (FB-D4).
+ * Not on the agent surface: it is a person's judgement of an answer they read
+ * (FB-D13).
+ */
+export const rateAnswer = defineWriteAction({
+  name: "copilot.rate",
+  agentSurface: false,
+  summary:
+    "Rates one copilot answer in the caller's own conversation, with an optional note and an optional share with AI administrators.",
+  input: z.object({
+    messageId: z.uuid(),
+    rating: z.enum(["up", "down"]),
+    /** Plain text. A blank note is no note. */
+    note: z.string().trim().max(RATING_NOTE_MAX).optional(),
+    /** Lets AI administrators read this question and answer on this rating. */
+    shared: z.boolean().optional(),
+  }),
+  output: z.object({
+    messageId: z.uuid(),
+    rating: z.enum(["up", "down"]),
+    note: z.string().nullable(),
+    shared: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.comment,
+  operation: (_context, input) => ({
+    requires: ACCESS_LEVELS.comment,
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const [message] = await tx
+        .select({
+          id: aiMessages.id,
+          threadId: aiMessages.threadId,
+          role: aiMessages.role,
+          model: aiMessages.model,
+        })
+        .from(aiMessages)
+        .where(
+          activeOnly(
+            aiMessages,
+            eq(aiMessages.workspaceId, workspaceId),
+            eq(aiMessages.id, input.messageId),
+          ),
+        )
+        .limit(1);
+      // A question is not an answer, and somebody else's thread answers as
+      // one that does not exist.
+      if (message?.role !== "assistant") {
+        throw new OperationError("not_found", "No such answer.");
+      }
+      await ownThread(tx, workspaceId, memberId, message.threadId);
+
+      const [existing] = await tx
+        .select({
+          rating: aiAnswerRatings.rating,
+          note: aiAnswerRatings.note,
+          shared: aiAnswerRatings.shared,
+        })
+        .from(aiAnswerRatings)
+        .where(
+          activeOnly(
+            aiAnswerRatings,
+            eq(aiAnswerRatings.workspaceId, workspaceId),
+            eq(aiAnswerRatings.messageId, message.id),
+            eq(aiAnswerRatings.memberId, memberId),
+          ),
+        )
+        .limit(1);
+
+      const same = existing?.rating === input.rating;
+      const sentNote =
+        input.note === undefined ? undefined : input.note || null;
+      const note =
+        sentNote !== undefined ? sentNote : same ? existing.note : null;
+      const shared =
+        input.shared !== undefined
+          ? input.shared
+          : same
+            ? existing.shared
+            : false;
+
+      await tx
+        .insert(aiAnswerRatings)
+        .values({
+          workspaceId,
+          messageId: message.id,
+          memberId,
+          rating: input.rating,
+          note,
+          shared,
+          model: message.model,
+        })
+        .onConflictDoUpdate({
+          // The partial unique index, so two quick presses end as one row.
+          target: [
+            aiAnswerRatings.workspaceId,
+            aiAnswerRatings.messageId,
+            aiAnswerRatings.memberId,
+          ],
+          targetWhere: isNull(aiAnswerRatings.deletedAt),
+          set: {
+            rating: input.rating,
+            note,
+            shared,
+            updatedAt: new Date(),
+          },
+        });
+
+      return {
+        result: {
+          messageId: message.id,
+          rating: input.rating,
+          note,
+          shared,
+        },
+        activity: {
+          kind: "copilot.rated",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          // Never the note: it is the member's own words.
+          payload: {
+            threadId: message.threadId,
+            rating: input.rating,
+            shared,
+          },
+        },
+        audit: {
+          // Who changed what was shared is the reason this is audited.
+          action: "copilot.rate",
+          targetType: "ai_message",
+          targetId: message.id,
+          payload: {
+            threadId: message.threadId,
+            rating: input.rating,
+            shared,
+            hasNote: note !== null,
+          },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Removes the caller's rating of one answer (FB-D1, FB-D10).
+ *
+ * **Removing what is not there is not an error**, because the press that
+ * removes a rating and a reload race. `removed` says whether this call removed
+ * anything. The row is soft deleted, and its note and share are cleared with
+ * it: a member who took the rating back has taken the words back too.
+ */
+export const unrateAnswer = defineWriteAction({
+  name: "copilot.unrate",
+  agentSurface: false,
+  summary: "Removes the caller's rating of one copilot answer.",
+  input: z.object({ messageId: z.uuid() }),
+  output: z.object({ messageId: z.uuid(), removed: z.boolean() }),
+  access: ACCESS_LEVELS.comment,
+  operation: (_context, input) => ({
+    requires: ACCESS_LEVELS.comment,
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      // Scoped by the caller's own member id, so somebody else's rating
+      // answers as no rating at all.
+      const removed = await tx
+        .update(aiAnswerRatings)
+        .set({
+          deletedAt: new Date(),
+          updatedAt: new Date(),
+          note: null,
+          shared: false,
+        })
+        .where(
+          activeOnly(
+            aiAnswerRatings,
+            eq(aiAnswerRatings.workspaceId, workspaceId),
+            eq(aiAnswerRatings.messageId, input.messageId),
+            eq(aiAnswerRatings.memberId, memberId),
+          ),
+        )
+        .returning({ id: aiAnswerRatings.id });
+      const didRemove = removed.length > 0;
+
+      return {
+        result: { messageId: input.messageId, removed: didRemove },
+        activity: {
+          kind: "copilot.unrated",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { removed: didRemove },
+        },
+        audit: {
+          action: "copilot.unrate",
+          targetType: "ai_message",
+          targetId: input.messageId,
+          payload: { removed: didRemove },
         },
       };
     },
@@ -839,6 +1098,18 @@ const messageOutput = z.object({
    * reads were recorded.
    */
   readCount: z.number().int(),
+  /**
+   * The reader's own rating of this answer, or null (copilot-feedback.md
+   * FB-D3). Always null on a member's question and on an answer the reader
+   * has not rated. Nobody else's rating is ever here.
+   */
+  myRating: z
+    .object({
+      rating: z.enum(["up", "down"]),
+      note: z.string().nullable(),
+      shared: z.boolean(),
+    })
+    .nullable(),
   createdAt: z.string(),
 });
 
@@ -897,6 +1168,105 @@ function readsPerAnswer(
     return calledAt.filter((at) => at.getTime() >= from && at.getTime() <= to)
       .length;
   });
+}
+
+/**
+ * What an AI administrator's rating list needs about the answers of one
+ * conversation: how many reads each answer made, the question it followed and
+ * the answer's own text (plan 0.9.0 FB1, copilot-feedback.md FB-D4).
+ *
+ * **It returns the text and leaves the choice to the caller.** The caller
+ * copies the text into a response only for a rating whose member shared it.
+ * The read count is rebuilt exactly as `copilot.thread` rebuilds it, so the
+ * administrator and the member see the same number and no count is stored.
+ */
+export async function answerContextsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  threadId: string,
+): Promise<
+  Map<
+    string,
+    {
+      readonly readCount: number;
+      readonly question: string | null;
+      readonly answer: string;
+    }
+  >
+> {
+  const rows = await tx
+    .select({
+      id: aiMessages.id,
+      role: aiMessages.role,
+      content: aiMessages.content,
+      stoppedAt: aiMessages.stoppedAt,
+      runStartedAt: aiMessages.runStartedAt,
+      runCompletedAt: aiMessages.runCompletedAt,
+      createdAt: aiMessages.createdAt,
+      updatedAt: aiMessages.updatedAt,
+    })
+    .from(aiMessages)
+    .where(
+      activeOnly(
+        aiMessages,
+        eq(aiMessages.workspaceId, workspaceId),
+        eq(aiMessages.threadId, threadId),
+      ),
+    )
+    .orderBy(aiMessages.createdAt, aiMessages.id);
+  const first = rows[0]?.createdAt;
+  const recorded = first
+    ? await tx
+        .select({ calledAt: aiToolCalls.calledAt })
+        .from(aiToolCalls)
+        .where(
+          and(
+            eq(aiToolCalls.workspaceId, workspaceId),
+            eq(aiToolCalls.memberId, memberId),
+            eq(aiToolCalls.source, "copilot"),
+            isNotNull(aiToolCalls.tool),
+            gte(aiToolCalls.calledAt, first),
+          ),
+        )
+    : [];
+  const counts = readsPerAnswer(
+    rows.map((row) => ({
+      role: row.role,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      runCompletedAt: row.runCompletedAt,
+      stoppedAt: row.stoppedAt,
+      running:
+        row.runStartedAt !== null &&
+        row.runCompletedAt === null &&
+        row.stoppedAt === null,
+    })),
+    recorded.map((call) => call.calledAt),
+  );
+  const found = new Map<
+    string,
+    { readCount: number; question: string | null; answer: string }
+  >();
+  for (const [index, row] of rows.entries()) {
+    if (row.role !== "assistant") {
+      continue;
+    }
+    // The latest question at or before the answer, as `readsPerAnswer` finds it.
+    const question = rows
+      .filter(
+        (other) =>
+          other.role === "member" &&
+          other.createdAt.getTime() <= row.createdAt.getTime(),
+      )
+      .at(-1);
+    found.set(row.id, {
+      readCount: counts[index] ?? 0,
+      question: question?.content ?? null,
+      answer: row.content,
+    });
+  }
+  return found;
 }
 
 /**
@@ -1015,6 +1385,33 @@ export const readThread = defineReadAction({
           recorded.map((call) => call.calledAt),
         );
 
+        // The reader's own ratings, one lookup for the whole thread.
+        const mine =
+          rows.length > 0
+            ? await tx
+                .select({
+                  messageId: aiAnswerRatings.messageId,
+                  rating: aiAnswerRatings.rating,
+                  note: aiAnswerRatings.note,
+                  shared: aiAnswerRatings.shared,
+                })
+                .from(aiAnswerRatings)
+                .where(
+                  activeOnly(
+                    aiAnswerRatings,
+                    eq(aiAnswerRatings.workspaceId, context.workspaceId),
+                    eq(aiAnswerRatings.memberId, memberId),
+                    inArray(
+                      aiAnswerRatings.messageId,
+                      rows.map((row) => row.id),
+                    ),
+                  ),
+                )
+            : [];
+        const ratingByMessage = new Map(
+          mine.map((row) => [row.messageId, row]),
+        );
+
         const resolved = [];
         for (const row of rows) {
           resolved.push(
@@ -1063,6 +1460,16 @@ export const readThread = defineReadAction({
               row.stoppedAt === null,
             ...storedReasonFields(row.runHaltedReason),
             readCount: readCounts[index] ?? 0,
+            myRating: (() => {
+              const found = ratingByMessage.get(row.id);
+              return found
+                ? {
+                    rating: found.rating,
+                    note: found.note,
+                    shared: found.shared,
+                  }
+                : null;
+            })(),
             createdAt: row.createdAt.toISOString(),
           });
         }

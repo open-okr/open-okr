@@ -213,6 +213,54 @@ export async function deleteCopilotThreadAction(
 }
 
 /**
+ * Rates one answer in the reader's own conversation (plan 0.9.0 FB1).
+ *
+ * Answers with a sentence rather than throwing, for the reason
+ * `deleteCopilotThreadAction` gives: a server action's thrown message does
+ * not reach a production browser.
+ */
+export async function rateCopilotAnswerAction(input: {
+  readonly messageId: string;
+  readonly rating: "up" | "down";
+  readonly note?: string;
+  readonly shared?: boolean;
+}): Promise<{ readonly error: string | null }> {
+  try {
+    await callAction(await context(), "copilot.rate", {
+      messageId: input.messageId,
+      rating: input.rating,
+      ...(input.note === undefined ? {} : { note: input.note }),
+      ...(input.shared === undefined ? {} : { shared: input.shared }),
+    });
+    return { error: null };
+  } catch (error) {
+    const refused = refusalOf(error);
+    if (refused) {
+      return { error: refused };
+    }
+    const { t } = await getTranslations();
+    return { error: t("copilot.copilotPanel.rating.couldNotSave") };
+  }
+}
+
+/** Takes the reader's rating of one answer back (plan 0.9.0 FB1). */
+export async function unrateCopilotAnswerAction(
+  messageId: string,
+): Promise<{ readonly error: string | null }> {
+  try {
+    await callAction(await context(), "copilot.unrate", { messageId });
+    return { error: null };
+  } catch (error) {
+    const refused = refusalOf(error);
+    if (refused) {
+      return { error: refused };
+    }
+    const { t } = await getTranslations();
+    return { error: t("copilot.copilotPanel.rating.couldNotSave") };
+  }
+}
+
+/**
  * A decision on a card, answered with the refusal's own sentence (plan 0.8.1
  * CP7). A server action's thrown message does not reach a production
  * browser, so a member who may not create an objective was told nothing

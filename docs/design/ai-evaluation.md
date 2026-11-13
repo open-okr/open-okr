@@ -183,6 +183,16 @@ The results need no provider. They show with AI off, and they are not an AI affo
 8. **Given** AI is off, **when** an administrator opens the AI console, **then** the usage card shows the evaluation results.
 9. **Given** `pnpm ai:evaluate`, **when** a set fails, **then** it names the capability, the fixture and the check, and exits 1.
 
+## 10.1 Where a real failure comes from (plan 0.9.0 FB1)
+
+The sets above are written by hand, from what we guess goes wrong. A member's thumbs-down on a copilot answer is a real failure, kept with the answer ([copilot-feedback](copilot-feedback.md)). **A rating becomes a fixture by a person's hand, never automatically**, because fixtures are committed to a public repository.
+
+| Step | Who | What |
+|---|---|---|
+| 1 | The member | Rates the answer poor and chooses to share the conversation. A rating that is not shared has no text anywhere an administrator can read it |
+| 2 | A person on the team | Runs `pnpm copilot:feedback --workspace <slug>`. It prints each shared poor answer with the asker, their manager and other members replaced by role words, quoted titles by `[title]`, emails by `[email]` and every figure by `[number]`. It writes nothing |
+| 3 | The same person | Reads each one, decides whether it is a failure a mock can judge (§3), strips anything still identifying, and writes the fixture into the capability's set by hand |
+
 ## 11. What it does not do
 
 | Gap | Why it is left |

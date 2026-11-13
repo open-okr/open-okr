@@ -1317,6 +1317,19 @@ export function CopilotPanel({
                                 }
                                 retryDisabled={busy || !availability.available}
                                 error={last ? notice : null}
+                                rate={
+                                  // Not with AI off, and not on an answer
+                                  // still arriving (plan 0.9.0 FB1, FB-D8).
+                                  !live &&
+                                  availability.providerConfigured &&
+                                  answer &&
+                                  answer.content.trim() !== ""
+                                    ? {
+                                        messageId: answer.id,
+                                        initial: answer.myRating ?? null,
+                                      }
+                                    : null
+                                }
                               />
                             ) : null}
                           </div>

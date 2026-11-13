@@ -84,6 +84,7 @@ import {
   updatePrompt,
 } from "./ai-models.ts";
 import { readPrivacySettings, updatePrivacySettings } from "./ai-privacy.ts";
+import { listAnswerRatings } from "./ai-ratings.ts";
 import {
   readBudgets,
   readUsageSummary,
@@ -193,11 +194,13 @@ import {
   ask,
   completeRun,
   deleteThread,
+  rateAnswer,
   readAvailability,
   readThread,
   readThreads,
   recordAnswer,
   stopRun,
+  unrateAnswer,
 } from "./copilot.ts";
 import {
   applyProposal,
@@ -645,6 +648,7 @@ export const ACTION_MAP = {
   // Plan 0.7.0 A2: a member's own agent calls, and the admin totals.
   "connections.toolCalls": listOwnToolCalls,
   "ai.readToolCallSummary": readToolCallSummary,
+  "ai.answerRatings": listAnswerRatings,
   "tokens.mine": listMyTokens,
   "tokens.create": createApiToken,
   "tokens.revoke": revokeApiToken,
@@ -663,6 +667,8 @@ export const ACTION_MAP = {
   "copilot.dismissProposal": dismissProposal,
   "copilot.undoProposal": undoProposal,
   "copilot.deleteThread": deleteThread,
+  "copilot.rate": rateAnswer,
+  "copilot.unrate": unrateAnswer,
   "blobs.prepareUpload": prepareUpload,
   "blobs.reapOrphans": reapOrphanedBlobs,
   // P6-T04c. Reserves a blob for a file an import found, keeping its uploader.

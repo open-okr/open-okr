@@ -375,6 +375,8 @@ export const sweepToolCalls = defineWriteAction({
   }),
   output: z.object({
     deleted: z.number().int(),
+    /** Answer ratings removed by the same window (copilot-feedback.md FB-D6). */
+    ratingsDeleted: z.number().int(),
     retentionDays: z.number().int(),
     /** True when the batch filled, so a backlog remains for the next run. */
     more: z.boolean(),
@@ -399,6 +401,7 @@ export const sweepToolCalls = defineWriteAction({
           : DEFAULT_AGENT_TOOL_CALL_RETENTION_DAYS);
 
       let deleted = 0;
+      let ratingsDeleted = 0;
       let more = false;
       if (retentionDays > 0) {
         const cutoff = new Date(Date.now() - retentionDays * 86_400_000);
@@ -415,22 +418,40 @@ export const sweepToolCalls = defineWriteAction({
           returning id`);
         deleted = removed.rows.length;
         more = deleted === TOOL_CALL_SWEEP_BATCH;
+
+        // The ratings of copilot answers keep the same window under the
+        // same setting (copilot-feedback.md FB-D6, Q1): a rating without
+        // the reads it points at is half the evidence. Soft deleted rows go
+        // too, which is the only thing that removes them. A hard delete,
+        // as migration 0170's marker says.
+        // openokr:allow-mutation: the Operation's own transaction.
+        const removedRatings = await tx.execute<{ id: string }>(sql`
+          delete from ai_answer_ratings
+           where id in (
+             select id from ai_answer_ratings
+              where workspace_id = ${workspaceId}
+                and created_at < ${cutoff}
+              limit ${TOOL_CALL_SWEEP_BATCH}
+           )
+          returning id`);
+        ratingsDeleted = removedRatings.rows.length;
+        more = more || ratingsDeleted === TOOL_CALL_SWEEP_BATCH;
       }
 
       return {
-        result: { deleted, retentionDays, more },
+        result: { deleted, ratingsDeleted, retentionDays, more },
         activity: {
           kind: "connection.tool_calls_swept",
           subjectType: "workspace",
           subjectId: workspaceId,
-          payload: { deleted, retentionDays },
+          payload: { deleted, ratingsDeleted, retentionDays },
         },
         audit: {
           // Counts and the window, never a tool or an id.
           action: "connections.sweepToolCalls",
           targetType: "workspace",
           targetId: workspaceId,
-          payload: { deleted, retentionDays, more },
+          payload: { deleted, ratingsDeleted, retentionDays, more },
         },
       };
     },
