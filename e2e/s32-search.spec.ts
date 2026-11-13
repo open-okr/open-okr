@@ -226,10 +226,18 @@ test("acceptance: what was opened is listed first, and a tab narrows to one kind
   // And a goal's word finds no goal under Tasks.
   const word = goalTitle.split(" ").find((one) => one.length > 4) ?? goalTitle;
   await paletteInput().fill(word);
-  await expect(page.getByTestId("palette-results")).not.toContainText(
-    goalTitle,
-    { timeout: 15_000 },
-  );
+  // The palette renders `palette-results` only when it has rows and a status
+  // note otherwise, so wait for either answer before asserting the goal is
+  // absent. The footer "looking" status (class ml-auto) is excluded.
+  const dialog = page.getByTestId("palette");
+  await expect(
+    dialog
+      .getByTestId("palette-results")
+      .or(dialog.locator('[role="status"]:not(.ml-auto)')),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.getByTestId("palette-results").filter({ hasText: goalTitle }),
+  ).toHaveCount(0);
   await page.keyboard.press("Escape");
 });
 
