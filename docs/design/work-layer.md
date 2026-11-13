@@ -426,6 +426,47 @@ sets run asynchronously through the outbox, and every export is audited: an
 export is the one action that takes data out of the product, so who exported
 what and when is a question an administrator will eventually need answered.
 
+### 5.1 Recent items and scoped tabs in the palette (plan 0.9.0 G2)
+
+Status: **written 13 November 2026, waiting for "design approved"**. Akmal
+approved the direction on 12 November 2026 (plan 0.9.0 §10). This closes the
+"Not built, and still owed" paragraph above.
+
+| # | Decision | Why |
+|---|---|---|
+| G2-D1 | **Recents live in the browser, per device**: `localStorage` key `openokr.recent.<workspaceId>`, the last 20 objects opened, newest first, each `{ kind, id, at }`. Every read and write is wrapped so a blocked store means no recents, never an error | The direction. No server record of what anybody reads |
+| G2-D2 | **What counts as opened**: the page of an objective (and the drawer `?okr=`), a key result row opened in it (`&kr=`), a KPI, an initiative, a task, a person and a space. A second open moves it to the top | The palette's own kinds, the ones with a page |
+| G2-D3 | **Re-read before shown**: a new read, `search.recent`, takes up to 20 `{ kind, id }` and returns those the member may still read, with title, kind and `href` from `hrefsInTx`, in the order given. It reads through the access getter, so an object the member lost, or that was deleted, drops out and is pruned from the store | The direction. The browser's list is a hint, never an authority |
+| G2-D4 | **A new device starts from what the member changed**: with an empty store, `search.recent` with no refs answers the member's own last 20 distinct subjects from the activity rows they are the actor of (`activities.actor_member_id`), newest first, same kinds, same access filter. Nothing new is recorded on the server | The direction. Activity already records changes; it does not record reads, and must not start |
+| G2-D5 | **Ranking**: with an empty query the palette shows a "Recent" group first (at most 8). With a query, a result that is also recent is lifted within its group, never above an exact title match | The direction |
+| G2-D6 | **Scoped tabs in the palette**: All, Objectives, Key results, KPIs, Initiatives, Tasks, People. A tab passes `kinds` to `search.entities` (it already takes `kinds`) and the matching type to `search.query`; recents are filtered by the same kind. Keyboard: the tabs are a tablist, Ctrl+Tab and Ctrl+Shift+Tab move between them | The direction: the search page's filters, in the palette |
+| G2-D7 | **No table, no migration, no setting, no new dependency.** `search.recent` is a read in the action registry, so the contract changes (`pnpm gen:contract`). It is not offered to agents (`agentSurface: false`): it answers about one browser's habits | |
+
+**Given** Priya opened two objectives and a task today on this device,
+**when** she opens the palette,
+**then** the three are listed first, newest first.
+
+**Given** one of them was moved to a space Priya cannot see,
+**when** she opens the palette,
+**then** it is not listed and is removed from the stored list.
+
+**Given** Priya signs in on a new device,
+**when** she opens the palette,
+**then** the Recent group lists what she last changed, and only what she may still read.
+
+**Given** Priya types a word that matches a recent task and another task with that exact title,
+**when** results arrive,
+**then** the exact title match is first and the recent one is second.
+
+**Given** the Tasks tab,
+**when** Priya types,
+**then** only tasks appear, recents included.
+
+Tests: `apps/web/test/command-palette.test.tsx` for D5 and D6, a core
+integration test for `search.recent` (access, deletion, the activity fallback),
+and one end-to-end case in the palette spec. G2 is the row to move to the next
+release if 0.9.0 runs long (plan §11).
+
 ## 6. What this layer must not do
 
 Written down because each one is a tempting shortcut that would cost the
