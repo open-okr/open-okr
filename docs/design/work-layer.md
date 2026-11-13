@@ -394,9 +394,9 @@ server action and the Related group is another, asked beside it, so a slow or
 failing provider delays or empties Related and nothing else. With no provider
 nothing is embedded and no Related group is drawn.
 
-**Not built, and still owed to UIUX-PLAN §3 and S-32:** recent items, and
-recents boosting the ranking, because nothing records what a member opened;
-and scoped tabs inside the palette, which the search page has as type filters.
+**Recent items, recents lifting the ranking and scoped tabs were built at plan
+0.9.0 G2** and are in §5.1 below. The palette now draws Recent as a fifth
+group, and a tablist narrows every group to one kind.
 
 **A known limit at §13.1's scale.** The jump matches names with `ILIKE`, which
 no index serves. Measured on 29 September 2026 over 1.2 million titles in one
@@ -428,9 +428,24 @@ what and when is a question an administrator will eventually need answered.
 
 ### 5.1 Recent items and scoped tabs in the palette (plan 0.9.0 G2)
 
-Status: **approved by Agung on 13 November 2026** ("design approved"). Akmal
-approved the direction on 12 November 2026 (plan 0.9.0 §10). This closes the
-"Not built, and still owed" paragraph above.
+Status: **approved by Agung on 13 November 2026** ("design approved"). Built
+13 November 2026. Akmal approved the direction on 12 November 2026 (plan 0.9.0
+§10). This closes the "Not built, and still owed" paragraph above.
+
+**As built.** Four places differ from a literal reading of the table, and none
+changes a decision.
+
+| Where | What was built | Why |
+|---|---|---|
+| G2-D2, recording | One client component in the shell, `RecentRecorder`, reads the address: the six pages and the drawer's `okr` and `kr` parameters. No page calls a hook | The drawer opens on any screen through the same two parameters, so the address is the one place that says what was opened. A short link redirects to the key before anything is drawn |
+| G2-D3, reading | `search.recent` reads the five indexed kinds through the index row's access context, the space and person kinds by their own list rules, and the source table of each indexed kind as well | The index row of a deleted thing is removed by the relay a moment later. The source table makes the delete take effect at once |
+| G2-D3, failure | `paletteRecentAction` answers `null` when the read fails, and the store is pruned only on an answer | An empty answer means nothing is readable. A failed request must not erase the list |
+| G2-D6, keys | Ctrl+Tab and Ctrl+Shift+Tab are bound as written. A click on a tab always works | A browser may keep Ctrl+Tab for its own tabs, and the page cannot stop that |
+
+The People tab asks `search.entities` only. People are not in the search
+index, so full text and the short-code jump have nothing to say about them.
+A scoped tab also hides the Actions group, because a tab named Tasks promises
+that only tasks appear.
 
 | # | Decision | Why |
 |---|---|---|

@@ -196,6 +196,43 @@ test("acceptance: the palette opens anywhere, and the keyboard drives it", async
   await expect(page.getByTestId("palette")).toHaveCount(0);
 });
 
+test("acceptance: what was opened is listed first, and a tab narrows to one kind (work-layer.md §5.1)", async () => {
+  // The goal opened by the test above is the newest thing this browser opened.
+  await goTo(page, "/");
+  await openPalette();
+
+  const recent = page.getByTestId("palette-group-recent");
+  await expect(recent).toContainText(goalTitle, { timeout: 15_000 });
+  // Recent comes before the actions, which are alone only when nothing is
+  // recent.
+  const order = await page
+    .locator('[data-testid^="palette-group-"]')
+    .evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute("data-testid")),
+    );
+  expect(order.indexOf("palette-group-recent")).toBeLessThan(
+    order.indexOf("palette-group-actions"),
+  );
+
+  // Scoped to Tasks, the recent goal is not listed and nor are the actions.
+  await page.getByTestId("palette-tab-tasks").click();
+  await expect(page.getByTestId("palette-tab-tasks")).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByTestId("palette-group-recent")).toHaveCount(0);
+  await expect(page.getByTestId("palette-group-actions")).toHaveCount(0);
+
+  // And a goal's word finds no goal under Tasks.
+  const word = goalTitle.split(" ").find((one) => one.length > 4) ?? goalTitle;
+  await paletteInput().fill(word);
+  await expect(page.getByTestId("palette-results")).not.toContainText(
+    goalTitle,
+    { timeout: 15_000 },
+  );
+  await page.keyboard.press("Escape");
+});
+
 test("acceptance: a short identifier opens the KPI it names", async () => {
   const kpi = (
     await pool.query<{ id: string; short_id: string; title: string }>(

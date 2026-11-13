@@ -34,9 +34,8 @@ vi.mock("../lib/embedder", () => ({
   embedFor: (workspaceId: string) => embedFor(workspaceId),
 }));
 
-const { paletteRelatedAction, paletteSearchAction } = await import(
-  "../app/search/actions.ts"
-);
+const { paletteRecentAction, paletteRelatedAction, paletteSearchAction } =
+  await import("../app/search/actions.ts");
 
 const KPI = "11111111-1111-4111-8111-111111111111";
 const GOAL = "22222222-2222-4222-8222-222222222222";
@@ -152,5 +151,96 @@ describe("the Related group", () => {
     embedFor.mockResolvedValue(vi.fn());
     callAction.mockRejectedValue(new Error("provider unreachable"));
     expect(await paletteRelatedAction("retention")).toEqual([]);
+  });
+});
+
+describe("a scoped tab (work-layer.md §5.1, G2-D6)", () => {
+  test("narrows the jump, the name search and full text to its kind", async () => {
+    callAction.mockResolvedValue([]);
+    await paletteSearchAction("aurora", "tasks");
+
+    const inputs = Object.fromEntries(
+      callAction.mock.calls.map((call) => [call[1], call[2]]),
+    );
+    expect(inputs["search.entities"]).toEqual({
+      text: "aurora",
+      limit: 8,
+      kinds: ["task"],
+    });
+    expect(inputs["search.query"]).toEqual({
+      text: "aurora",
+      limit: 12,
+      entityTypes: ["task"],
+    });
+    expect(inputs["search.jump"]).toEqual({
+      shortId: "aurora",
+      kinds: ["task"],
+    });
+  });
+
+  test("the people tab has no full-text or short-code half, people are not indexed", async () => {
+    callAction.mockResolvedValue([]);
+    await paletteSearchAction("ada", "people");
+    expect(callAction.mock.calls.map((call) => call[1])).toEqual([
+      "search.entities",
+    ]);
+    expect(callAction.mock.calls[0]?.[2]).toEqual({
+      text: "ada",
+      limit: 8,
+      kinds: ["person"],
+    });
+  });
+
+  test("an unknown tab from the browser means All", async () => {
+    callAction.mockResolvedValue([]);
+    await paletteSearchAction("aurora", "nonsense");
+    const entities = callAction.mock.calls.find(
+      (call) => call[1] === "search.entities",
+    );
+    expect(entities?.[2]).toEqual({ text: "aurora", limit: 8 });
+  });
+
+  test("Related is asked for the same kind, and not at all for people", async () => {
+    embedFor.mockResolvedValue(vi.fn());
+    callAction.mockResolvedValue([]);
+    await paletteRelatedAction("retention", "tasks");
+    expect(callAction.mock.calls[0]?.[2]).toEqual({
+      text: "retention",
+      limit: 12,
+      entityTypes: ["task"],
+    });
+
+    callAction.mockClear();
+    expect(await paletteRelatedAction("retention", "people")).toEqual([]);
+    expect(callAction).not.toHaveBeenCalled();
+  });
+});
+
+describe("the Recent group", () => {
+  test("sends only what the read would accept, and hands back what it kept", async () => {
+    callAction.mockResolvedValue([
+      {
+        entityType: "task",
+        entityId: GOAL,
+        title: "Pricing copy",
+        href: `/tasks/${GOAL}`,
+      },
+    ]);
+    const found = await paletteRecentAction([
+      { kind: "task", id: GOAL },
+      // A kind the read does not know would refuse the whole list.
+      { kind: "document", id: KPI },
+    ]);
+
+    expect(callAction.mock.calls[0]?.[1]).toBe("search.recent");
+    expect(callAction.mock.calls[0]?.[2]).toEqual({
+      refs: [{ kind: "task", id: GOAL }],
+    });
+    expect(found?.map((one) => one.entityId)).toEqual([GOAL]);
+  });
+
+  test("answers null on a failure, so the browser prunes nothing", async () => {
+    callAction.mockRejectedValue(new Error("down"));
+    expect(await paletteRecentAction([])).toBeNull();
   });
 });

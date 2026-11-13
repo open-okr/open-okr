@@ -6261,6 +6261,23 @@
       "pages": false
     },
     {
+      "name": "search recent",
+      "action": "search.recent",
+      "method": "GET",
+      "path": "/search/recent",
+      "scope": "read",
+      "summary": "Which of the things a browser remembers opening this member may still open, newest first. With none given, the member's own last changes.",
+      "flags": [
+        {
+          "name": "refs",
+          "field": "refs",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "exports list",
       "action": "exports.list",
       "method": "POST",

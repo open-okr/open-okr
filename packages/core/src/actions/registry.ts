@@ -426,7 +426,12 @@ import {
   ScopeCeilingRefused,
   withCeiling,
 } from "./scope-ceiling.ts";
-import { findEntities, readPaletteJump, runSearch } from "./search.ts";
+import {
+  findEntities,
+  readPaletteJump,
+  readRecent,
+  runSearch,
+} from "./search.ts";
 import {
   addRetroNote,
   addReviewAction,
@@ -844,6 +849,7 @@ export const ACTION_MAP = {
   "search.query": runSearch,
   "search.jump": readPaletteJump,
   "search.entities": findEntities,
+  "search.recent": readRecent,
   "exports.list": exportList,
   "exports.mine": listMyExports,
   "imports.listRuns": listImportRuns,

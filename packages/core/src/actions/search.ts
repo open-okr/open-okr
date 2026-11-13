@@ -21,6 +21,11 @@ import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
 import { findByName, NAMED_KINDS } from "../search/entities.ts";
 import { hrefsInTx, resolveHrefs } from "../search/hrefs.ts";
+import {
+  RECENT_KINDS,
+  RECENT_LIMIT,
+  recentEntities,
+} from "../search/recent.ts";
 import { searchWithSemantic } from "../search/service.ts";
 import { defineReadAction } from "./define.ts";
 
@@ -298,5 +303,52 @@ export const readPaletteJump = defineReadAction({
         return null;
       },
     );
+  },
+});
+
+const recentInput = z.object({
+  /**
+   * What this browser remembers opening, newest first. Absent or empty means a
+   * new device, and the answer is the member's own last changes instead.
+   */
+  refs: z
+    .array(z.object({ kind: z.enum(RECENT_KINDS), id: z.uuid() }))
+    .max(RECENT_LIMIT)
+    .optional(),
+});
+
+export const readRecent = defineReadAction({
+  name: "search.recent",
+  summary:
+    "Which of the things a browser remembers opening this member may still open, newest first. With none given, the member's own last changes.",
+  input: recentInput,
+  output: z.array(
+    z.object({
+      entityType: z.enum(RECENT_KINDS),
+      entityId: z.uuid(),
+      title: z.string(),
+      href: z.string(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  // It answers about one browser's habits, which an agent has no use for and
+  // no browser to ask about (work-layer.md §5.1, G2-D7).
+  agentSurface: false,
+  async handler(context, input) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      return [];
+    }
+    const memberId = await withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      (rawTx) =>
+        actingMember(rawTx as OperationTx, context.workspaceId, userId),
+    );
+    return recentEntities(context.pool, {
+      workspaceId: context.workspaceId,
+      memberId,
+      ...(input.refs ? { refs: input.refs } : {}),
+    });
   },
 });

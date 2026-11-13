@@ -10,11 +10,18 @@
 import { callAction, OperationError } from "@openokr/core";
 import { getPool } from "../../lib/auth";
 import { embedFor } from "../../lib/embedder";
+import {
+  RECENT_STORE_KINDS,
+  RECENT_STORE_LIMIT,
+  type RecentStoreKind,
+} from "../../lib/recent-store.ts";
 import { requireWorkspace } from "../../lib/workspace";
 import {
   EMPTY_ANSWER,
   type PaletteAnswer,
+  type PaletteEntry,
   type PaletteHit,
+  paletteTab,
 } from "./palette-groups.ts";
 
 /** The longest phrase the palette sends, which is the jump's own limit. */
@@ -57,15 +64,24 @@ const asHit = (hit: {
  * Postgres alone and answers with the AI provider off exactly as with it on.
  * The semantic half is `paletteRelatedAction`, asked beside this one, so a
  * slow provider delays the Related group and nothing else.
+ *
+ * **A tab narrows each read to its kinds** (work-layer.md §5.1, G2-D6). The
+ * tab id comes from the browser, so an unknown one means All. The people tab
+ * has no full-text half, because people are not in the search index, and a
+ * short code names no person.
  */
 export async function paletteSearchAction(
   text: string,
+  tabId?: string,
 ): Promise<PaletteAnswer> {
   const phrase = text.trim().slice(0, PHRASE_LIMIT);
   if (phrase === "") {
     return EMPTY_ANSWER;
   }
   const context = await paletteContext();
+  const kinds = paletteTab(tabId).kinds;
+  const indexed = kinds?.filter((kind) => kind !== "person");
+  const searchesIndex = indexed === undefined || indexed.length > 0;
 
   try {
     // Three reads, independent of one another, so asked together. The short
@@ -73,11 +89,24 @@ export async function paletteSearchAction(
     // thing and not a list with the thing in it; a phrase that is not a code
     // answers null for the cost of one indexed lookup.
     const [code, named, hits] = await Promise.all([
-      phrase.length <= 40
-        ? callAction(context, "search.jump", { shortId: phrase })
+      phrase.length <= 40 && searchesIndex
+        ? callAction(context, "search.jump", {
+            shortId: phrase,
+            ...(indexed ? { kinds: indexed } : {}),
+          })
         : Promise.resolve(null),
-      callAction(context, "search.entities", { text: phrase, limit: 8 }),
-      callAction(context, "search.query", { text: phrase, limit: 12 }),
+      callAction(context, "search.entities", {
+        text: phrase,
+        limit: 8,
+        ...(kinds ? { kinds: [...kinds] } : {}),
+      }),
+      searchesIndex
+        ? callAction(context, "search.query", {
+            text: phrase,
+            limit: 12,
+            ...(indexed ? { entityTypes: indexed } : {}),
+          })
+        : Promise.resolve([]),
     ]);
 
     const goTo = [
@@ -121,9 +150,12 @@ export async function paletteSearchAction(
  */
 export async function paletteRelatedAction(
   text: string,
+  tabId?: string,
 ): Promise<readonly PaletteHit[]> {
   const phrase = text.trim().slice(0, PHRASE_LIMIT);
-  if (phrase.length < SEMANTIC_MIN_LENGTH) {
+  const indexed = paletteTab(tabId).kinds?.filter((kind) => kind !== "person");
+  // People are not embedded, so the people tab has nothing to relate.
+  if (phrase.length < SEMANTIC_MIN_LENGTH || indexed?.length === 0) {
     return [];
   }
   const context = await paletteContext();
@@ -135,6 +167,7 @@ export async function paletteRelatedAction(
     const hits = await callAction({ ...context, embed }, "search.query", {
       text: phrase,
       limit: 12,
+      ...(indexed ? { entityTypes: indexed } : {}),
     });
     return hits.filter((hit) => hit.semantic).map(asHit);
   } catch {
@@ -144,6 +177,40 @@ export async function paletteRelatedAction(
     // from the fast answer, and a refusal about the reader would have been
     // said there too.
     return [];
+  }
+}
+
+/**
+ * The palette's Recent group (work-layer.md §5.1, G2-D3 and G2-D4).
+ *
+ * The browser sends what it remembers opening, or nothing on a new device, and
+ * gets back only what this member may still open. The caller prunes what did
+ * not come back. A failure answers `null`, which is not the same as an empty
+ * list: nothing may be pruned from the store because a request failed.
+ */
+export async function paletteRecentAction(
+  refs: readonly { readonly kind: string; readonly id: string }[],
+): Promise<readonly PaletteEntry[] | null> {
+  const context = await paletteContext();
+  // The browser's list is untrusted text. One entry the read would refuse
+  // refuses the whole list, so what it does not know is left out here.
+  const known = refs.flatMap((ref) =>
+    (RECENT_STORE_KINDS as readonly string[]).includes(ref.kind)
+      ? [{ kind: ref.kind as RecentStoreKind, id: ref.id }]
+      : [],
+  );
+  try {
+    const found = await callAction(context, "search.recent", {
+      refs: known.slice(0, RECENT_STORE_LIMIT),
+    });
+    return found.map((one) => ({
+      entityType: one.entityType,
+      entityId: one.entityId,
+      title: one.title,
+      href: one.href,
+    }));
+  } catch {
+    return null;
   }
 }
 
