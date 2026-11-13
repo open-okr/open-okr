@@ -281,7 +281,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | FB1 | design written | 13 November 2026, `docs/design/copilot-feedback.md`. Waiting for "design approved". Q1: one retention setting with the tool calls. Q2: a rating goes with its deleted conversation. Code after approval: migration 0170 |
 | T1 | done | 13 November 2026. `holdTenants` in `e2e/hosting-profiles.spec.ts`: inserts what is missing, sets the state on every row, restores each existing row and workspace state. Not run locally |
 | T2 | done | 13 November 2026. `overwrite: true` on the unit, end-to-end and Playwright report uploads. The gate downloads `flaky-report-*` by pattern with `merge-multiple`, so a rerun leaves only the newest |
-| T3 | yours | Needs a traced end-to-end run of `e2e/reviews.spec.ts:388` to see what takes the time. Not run: owner rule, ask before any end-to-end run |
+| T3 | done | 13 November 2026. Traced locally: 12.4 s, 410 calls, no step over 1 s, so no hang; the test gets a 60-second limit with the reason. The serial group's retry is unchanged |
 | D1 | done in part | 13 November 2026. 0001: the two agents had no time zone on every fresh workspace; fixed in provisioning. 0005: rewrites a null reviewer to null where the goal has none, which changes nothing. 0035: re-queues index items the seed already queued, because it checks only its own key. Narrowing it edits a shipped data change: **yours** (D1-Q) |
 | H1 | done | 13 November 2026. The setup paragraph only on `.Release.IsInstall`; an upgrade says how to check. `check.sh` asserts both, rendering the upgrade notes from a temporary copy with `--is-upgrade` |
 | C1 | done | 13 November 2026. `docs/api/reference.md` did not change. Alert #79 closes when the fix reaches `main` |
