@@ -1,6 +1,6 @@
 # Access to one KPI, and FlowyTeam's KPI shares
 
-Status: **written 13 November 2026, waiting for "design approved"**. Plan 0.9.0 row G4. On 13 November 2026 Agung chose to build access per KPI before importing FlowyTeam's KPI shares (G4-Q3), after the build found that nothing reads a binding on one KPI. A change to access, so it is designed before code (CLAUDE.md).
+Status: **written 13 November 2026, waiting for "design approved"**. Agung on 13 November 2026: Q2 as recommended (its owner, an Owner or an Admin); Q1 and the approval wait for Akmal. Plan 0.9.0 row G4. On 13 November 2026 Agung chose to build access per KPI before importing FlowyTeam's KPI shares (G4-Q3), after the build found that nothing reads a binding on one KPI. A change to access, so it is designed before code (CLAUDE.md).
 
 ## 1. What is true today
 
