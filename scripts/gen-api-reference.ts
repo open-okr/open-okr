@@ -106,7 +106,7 @@ function render(contract: Contract): string {
     for (const { method, path, op } of list) {
       const safety = SAFETY[op["x-openokr-safety"] ?? "read"] ?? "reads";
       const name = op.operationId ?? "";
-      const summary = (op.summary ?? "").replace(/\|/g, "\\|");
+      const summary = (op.summary ?? "").replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
       lines.push(
         `| \`${name}\`<br/>${summary} | \`${method} /api/v1${path}\` | ${safety} |`,
       );
