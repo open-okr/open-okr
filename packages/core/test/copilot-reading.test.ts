@@ -721,3 +721,166 @@ describe("credits used up by the reading", () => {
     expect(String(done?.data?.haltedReason)).toMatch(/AI is paused/);
   });
 });
+
+/** A model that reads nothing itself, and keeps what the loop handed it first. */
+class AnchoredDrafter extends ReadingDrafter {
+  readonly asked: {
+    question: string;
+    history: unknown;
+    subject?: {
+      ref: number;
+      label: string;
+      kind: string;
+      text: string;
+    };
+  }[] = [];
+
+  override async chooseReads(
+    context: unknown,
+    tools: readonly { readonly name: string }[],
+    read: Read,
+    beforeRound: () => Promise<boolean>,
+  ) {
+    this.asked.push(context as (typeof this.asked)[number]);
+    return super.chooseReads(context, tools, read, beforeRound);
+  }
+}
+
+const copilotReads = async () => {
+  const wb = await workerDb();
+  const { rows } = await wb.admin.query<{
+    tool: string | null;
+    outcome: string;
+    refusal_code: string | null;
+    target_ids: string[];
+  }>(
+    "select tool, outcome, refusal_code, target_ids from ai_tool_calls where workspace_id = $1 and source = 'copilot' order by called_at, id",
+    [workspaceId],
+  );
+  return rows;
+};
+
+describe("a conversation anchored to a page (plan 0.9.0 CP11)", () => {
+  it("reads the subject as [1] before round one, apart from the question, and records the read", async () => {
+    const drafter = new AnchoredDrafter(async () => spent(0));
+    const result = await answerQuestion(await contextFor(drafter), {
+      workspaceId,
+      question: "How is this going?",
+      subjectType: "goal",
+      subjectId: goalId,
+    });
+
+    const first = drafter.asked[0];
+    expect(first?.subject?.ref).toBe(1);
+    expect(first?.subject?.label).toBe(GOAL_TITLE);
+    expect(first?.subject?.kind).toBe("objective");
+    expect(first?.subject?.text).toContain(KR_TITLE);
+    // The question is the member's words, and no identifier reaches the model.
+    expect(first?.question).toBe("How is this going?");
+    expect(JSON.stringify(first)).not.toContain(goalId);
+
+    // The record is the first source, so the answer can cite it as [1].
+    const ask = drafter.seen[0];
+    expect(ask?.sources[0]?.label).toBe(GOAL_TITLE);
+    expect(ask?.reading).toEqual({ reads: 1, limited: false });
+    expect(result.sources[0]?.entityType).toBe("goal");
+
+    // Recorded like any loop read, with the record it opened.
+    const rows = await copilotReads();
+    expect(rows).toEqual([
+      {
+        tool: "goals.read",
+        outcome: "ok",
+        refusal_code: null,
+        target_ids: [goalId],
+      },
+    ]);
+  });
+
+  it("shows the read as a step, so the made-n-reads line counts it", async () => {
+    const drafter = new AnchoredDrafter(async () => spent(0));
+    const events: CopilotEvent[] = [];
+    for await (const event of streamAnswer(await contextFor(drafter), {
+      workspaceId,
+      question: "How is this going?",
+      subjectType: "goal",
+      subjectId: goalId,
+    })) {
+      events.push(event);
+    }
+    expect(events).toContainEqual({
+      kind: "step",
+      step: "reading",
+      tool: "goals.read",
+      subject: GOAL_TITLE,
+    });
+  });
+
+  it("joins the grounding sources for a provider that cannot call tools", async () => {
+    const drafter = new PassagesOnlyDrafter();
+    const result = await answerQuestion(await contextFor(drafter), {
+      workspaceId,
+      question: "How is this going?",
+      subjectType: "goal",
+      subjectId: goalId,
+    });
+    expect(result.answer).toBe("From the passages.");
+    const ask = drafter.seen[0];
+    expect(ask?.sources[0]?.label).toBe(GOAL_TITLE);
+    expect(ask?.sources[0]?.content).toContain(GOAL_TITLE);
+    expect(ask?.reading).toEqual({ reads: 1, limited: false });
+    expect((await copilotReads()).map((row) => row.tool)).toEqual([
+      "goals.read",
+    ]);
+  });
+
+  it("adds nothing for a member who cannot read the subject, and never sends its title", async () => {
+    const wb = await workerDb();
+    // A guest cannot ask the copilot, so its thread is written directly with
+    // the anchor, and the shared step is driven as the guest.
+    const { rows } = await wb.admin.query<{ id: string }>(
+      `insert into ai_threads (workspace_id, member_id, subject_type, subject_id)
+       select $1, m.id, 'goal', $3 from workspace_members m
+        where m.workspace_id = $1 and m.user_id = $2
+       returning id`,
+      [workspaceId, GUEST, goalId],
+    );
+    const drafter = new AnchoredDrafter(async () => spent(0));
+    const outcome = await drainReading(
+      readLiveData(
+        {
+          pool: wb.appPool,
+          workspaceId,
+          actor: { kind: "human" as const, userId: GUEST },
+          drafter,
+        },
+        {
+          threadId: rows[0]?.id as string,
+          questionMessageId: "q",
+          hits: [],
+          cite: [],
+          sources: [],
+          ask: { question: "How is this going?", history: [], sources: [] },
+          unavailable: null,
+        },
+      ),
+    );
+
+    expect(drafter.asked[0]?.subject).toBeUndefined();
+    // Everything the model was sent, which holds neither title.
+    expect(JSON.stringify(drafter.asked)).not.toContain(GOAL_TITLE);
+    expect(JSON.stringify(drafter.asked)).not.toContain(KR_TITLE);
+    expect(outcome?.prepared.cite).toEqual([]);
+    expect(outcome?.prepared.ask?.sources).toEqual([]);
+    expect(outcome?.reads).toBe(0);
+    // The refused read is still a row, with nothing else in it.
+    expect(await copilotReads()).toEqual([
+      {
+        tool: "goals.read",
+        outcome: "refused",
+        refusal_code: expect.any(String),
+        target_ids: [],
+      },
+    ]);
+  });
+});

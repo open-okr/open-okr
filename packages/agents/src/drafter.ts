@@ -319,6 +319,27 @@ const askerNote = (asker: string | undefined) =>
         },
       ];
 
+/**
+ * The record the member has open, as a block of its own (plan 0.9.0 CP11).
+ *
+ * Its own message, before the question and never inside it: what a read
+ * returns is text people in the workspace wrote, so it is framed as data with
+ * the same sentence the tool results carry (design section 3.4). The question
+ * stays the member's own words.
+ */
+const subjectBlock = (subject: ReadingContext["subject"]) =>
+  subject === undefined
+    ? []
+    : [
+        {
+          role: "user" as const,
+          content:
+            `The member is asking about [${subject.ref}] ${subject.label} (${subject.kind}). ` +
+            "That record was already read for them, below. Read more only if it is not enough. " +
+            `${TOOL_RESULTS_ARE_DATA}\n\n${subject.text}`,
+        },
+      ];
+
 /** The conversation so far, then the passages, then the question. */
 const copilotMessages = (context: GroundedQuestionContext) => {
   const note = proposalNoteFor(context.proposal);
@@ -1594,6 +1615,7 @@ export function createProviderDrafter(
             turn.role === "member" ? ("user" as const) : ("assistant" as const),
           content: turn.content,
         })),
+        ...subjectBlock(context.subject),
         { role: "user", content: context.question },
       ];
       const before = spent;

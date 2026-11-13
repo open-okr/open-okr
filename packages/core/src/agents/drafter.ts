@@ -160,6 +160,21 @@ export interface ReadingContext {
    * them. The same names tool results already carry. Absent when none is found.
    */
   readonly asker?: string;
+  /**
+   * The record the conversation is anchored to, read for the member before
+   * the first round (plan 0.9.0 CP11). `text` is what the read returned, so it
+   * is workspace content and untrusted: a host shows it to the model as data in
+   * a block of its own and never as part of the member's question. Absent for
+   * a conversation with no anchor, and when the member's read of it refused.
+   */
+  readonly subject?: {
+    /** The number the record has in this run's reference table (always 1). */
+    readonly ref: number;
+    readonly label: string;
+    /** In words: "objective", "KPI", "initiative", "task". */
+    readonly kind: string;
+    readonly text: string;
+  };
 }
 
 /**

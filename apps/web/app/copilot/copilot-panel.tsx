@@ -34,8 +34,16 @@ import {
   useKeyboardShortcut,
   useTranslations,
 } from "@openokr/ui";
-import { ArrowDown, History, Maximize2, SquarePen, X } from "lucide-react";
+import {
+  ArrowDown,
+  History,
+  Maximize2,
+  MessageSquareQuote,
+  SquarePen,
+  X,
+} from "lucide-react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   type RefObject,
   useCallback,
@@ -57,6 +65,14 @@ import {
   undoCopilotProposalAction,
 } from "./actions";
 import { Composer } from "./composer";
+import {
+  ABOUT_KEY,
+  ANCHORED_SUGGESTIONS,
+  ASK_ABOUT_KEY,
+  type PageSubject,
+  pageSubject,
+  sameSubject,
+} from "./page-subject";
 import { type Proposal, ProposalCard } from "./proposal-card";
 import { reasonMessage } from "./reason-message";
 import { ThreadList, type ThreadSummary } from "./thread-list";
@@ -308,6 +324,16 @@ export function CopilotPanel({
   /** The conversation, or the list of them (plan 0.8.1 CP2). */
   const [view, setView] = useState<"chat" | "history">("chat");
   const [threadId, setThreadId] = useState<string | null>(null);
+  /**
+   * What the open conversation is anchored to (plan 0.9.0 CP11). `via` is the
+   * address the panel sent when it made the thread, since the server keeps the
+   * UUID and the page may name the same record by its short id.
+   */
+  const [anchor, setAnchor] = useState<
+    (PageSubject & { readonly via?: string }) | null
+  >(null);
+  /** Set by the chip: the next question starts a conversation about this. */
+  const [pending, setPending] = useState<PageSubject | null>(null);
   const [messages, setMessages] = useState<readonly Message[]>([]);
   const [question, setQuestion] = useState("");
   const [arriving, setArriving] = useState<Arriving | null>(null);
@@ -355,6 +381,10 @@ export function CopilotPanel({
     `${open}:${view}:${threadId}`,
   );
   const { addressed, write } = useCopilotAddress();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  /** The record the page is about, by kind and id only (CP11-Q). */
+  const onPage = pageSubject(pathname, searchParams);
   /**
    * What the address last said that the panel already acts on: what it wrote
    * itself, or adopted. Anything else is Back, Forward, a reload or a link.
@@ -486,6 +516,7 @@ export function CopilotPanel({
 
   /** Puts a conversation on screen. Called in the render that swaps it in. */
   const show = useCallback((thread: Thread, listed: readonly Proposal[]) => {
+    const sameThread = shownThread.current === thread.id;
     // What was kept belongs to the conversation it was asked in.
     if (shownThread.current !== thread.id) {
       setKept({});
@@ -493,6 +524,19 @@ export function CopilotPanel({
     }
     shownThread.current = thread.id;
     setThreadId(thread.id);
+    setPending(null);
+    setAnchor((was) =>
+      thread.subjectType && thread.subjectId
+        ? {
+            type: thread.subjectType as PageSubject["type"],
+            id: thread.subjectId,
+            // The server keeps a UUID. The address the panel sent is kept
+            // while the same conversation stays open, so the chip knows the
+            // page's short id and this UUID are one record.
+            ...(sameThread && was?.via ? { via: was.via } : {}),
+          }
+        : null,
+    );
     setMessages(thread.messages);
     setProposals(listed);
     setRejoined({ text: "", steps: [] });
@@ -511,6 +555,8 @@ export function CopilotPanel({
   const clear = useCallback(() => {
     shownThread.current = null;
     setThreadId(null);
+    setAnchor(null);
+    setPending(null);
     setMessages([]);
     setProposals([]);
     setKept({});
@@ -556,6 +602,21 @@ export function CopilotPanel({
     address(null, "replace");
     inputRef.current?.focus();
   }, [address, clear]);
+
+  /**
+   * "Ask about this ..." (plan 0.9.0 CP11): a new conversation anchored to
+   * the page's record. The anchor goes with the first question only.
+   */
+  const askAboutPage = useCallback(
+    (subject: PageSubject) => {
+      clear();
+      setView("chat");
+      address(null, "replace");
+      setPending(subject);
+      inputRef.current?.focus();
+    },
+    [address, clear],
+  );
 
   /**
    * The address changed under the panel: Back, Forward, a reload, or a link
@@ -743,6 +804,9 @@ export function CopilotPanel({
 
       const controller = new AbortController();
       abort.current = controller;
+      // Only a conversation that does not exist yet can be anchored: the
+      // anchor is stored when the thread is made and never changed.
+      const anchoring = threadId ? null : pending;
       let landedThreadId = threadId;
       // What this question was given, kept past the re-read when no words came.
       let questionId: string | null = null;
@@ -760,6 +824,9 @@ export function CopilotPanel({
           body: JSON.stringify({
             question: asked,
             ...(threadId ? { threadId } : {}),
+            ...(anchoring
+              ? { subjectType: anchoring.type, subjectId: anchoring.id }
+              : {}),
           }),
           signal: controller.signal,
         });
@@ -813,6 +880,10 @@ export function CopilotPanel({
               runningAnswer.current = event.answerMessageId ?? null;
               shownThread.current = event.threadId;
               setThreadId(event.threadId);
+              if (anchoring) {
+                setAnchor({ ...anchoring, via: anchoring.id });
+                setPending(null);
+              }
               // A new conversation goes into the address the moment it
               // exists, so a reload mid-answer comes back to it.
               if (written.current !== event.threadId) {
@@ -944,10 +1015,20 @@ export function CopilotPanel({
         }
       }
     },
-    [address, busy, question, read, show, stick, t, threadId],
+    [address, busy, pending, question, read, show, stick, t, threadId],
   );
 
   const canAsk = availability.available;
+  /** What the conversation on screen is about, if anything. */
+  const anchored: (PageSubject & { readonly via?: string }) | null = threadId
+    ? anchor
+    : pending;
+  const onPageIsAnchor =
+    sameSubject(anchored, onPage) ||
+    (onPage !== null &&
+      anchored?.via !== undefined &&
+      anchored.type === onPage.type &&
+      anchored.via === onPage.id);
   // The copilot's face, in the order a reader would want the reason: off
   // before working, working before a problem with the last answer.
   const mood: AgentMood = !availability.providerConfigured
@@ -1047,6 +1128,11 @@ export function CopilotPanel({
               {availability.providerConfigured ? null : (
                 <Chip tone="neutral">{t("copilot.copilotPanel.aiOff")}</Chip>
               )}
+              {/* The kind only. The client never knew the record's title, and
+                naming it here would mean reading the page (CP11-Q). */}
+              {anchored && view === "chat" ? (
+                <Chip tone="neutral">{t(ABOUT_KEY[anchored.type])}</Chip>
+              ) : null}
               <div className="ml-auto flex items-center gap-1">
                 {/* A label beside the icon from 640px; below that the icon,
                   with the same words for a screen reader. */}
@@ -1135,18 +1221,20 @@ export function CopilotPanel({
                           aria-label={t("copilot.copilotPanel.suggestions")}
                           className="flex flex-col gap-1.5"
                         >
-                          {SUGGESTIONS.map((key) => (
-                            <li key={key}>
-                              <Button
-                                variant="default"
-                                disabled={busy}
-                                onClick={() => void send(t(key))}
-                                className="h-auto w-full justify-start whitespace-normal py-2 text-left font-normal"
-                              >
-                                {t(key)}
-                              </Button>
-                            </li>
-                          ))}
+                          {(anchored ? ANCHORED_SUGGESTIONS : SUGGESTIONS).map(
+                            (key) => (
+                              <li key={key}>
+                                <Button
+                                  variant="default"
+                                  disabled={busy}
+                                  onClick={() => void send(t(key))}
+                                  className="h-auto w-full justify-start whitespace-normal py-2 text-left font-normal"
+                                >
+                                  {t(key)}
+                                </Button>
+                              </li>
+                            ),
+                          )}
                         </ul>
                       ) : null}
                     </div>
@@ -1289,6 +1377,25 @@ export function CopilotPanel({
             </p>
             <footer className="flex-none border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               {canAsk ? null : <Unavailable availability={availability} />}
+              {/* Offered where an answer can come, on a page that is about one
+                record, and not while this conversation is already about it. */}
+              {canAsk && view === "chat" && onPage && !onPageIsAnchor ? (
+                <div className="mb-2">
+                  <Button
+                    variant="default"
+                    disabled={arriving !== null}
+                    onClick={() => askAboutPage(onPage)}
+                    className="h-7 gap-1.5 rounded-full px-2.5 text-xs"
+                    data-testid="copilot-ask-about-page"
+                  >
+                    <MessageSquareQuote
+                      className="size-3.5"
+                      aria-hidden="true"
+                    />
+                    {t(ASK_ABOUT_KEY[onPage.type])}
+                  </Button>
+                </div>
+              ) : null}
               <Composer
                 value={question}
                 onChange={(next) => {

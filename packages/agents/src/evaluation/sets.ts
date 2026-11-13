@@ -1695,6 +1695,13 @@ interface ReadingFixtureSpec {
   /** What the fake host answers, by tool. Anything else is "Nothing found." */
   readonly results?: Readonly<Record<string, string>>;
   readonly tools?: boolean;
+  /** The record a conversation is anchored to, read before round one (plan 0.9.0 CP11). */
+  readonly subject?: {
+    readonly ref: number;
+    readonly label: string;
+    readonly kind: string;
+    readonly text: string;
+  };
   readonly expected: unknown;
 }
 
@@ -1719,6 +1726,7 @@ function readingOutcome(parts: {
   readonly refused?: number;
   readonly limitNotices?: number;
   readonly injectedAs?: readonly string[];
+  readonly subject?: { framed: boolean; questionIntact: boolean };
 }): unknown {
   return {
     reads: parts.reads,
@@ -1733,6 +1741,7 @@ function readingOutcome(parts: {
     refused: parts.refused ?? 0,
     limitNotices: parts.limitNotices ?? 0,
     injectedAs: parts.injectedAs ?? [],
+    subject: parts.subject ?? null,
   };
 }
 
@@ -1758,7 +1767,11 @@ async function runReading(
     return spec.results?.[name] ?? "Nothing found.";
   };
   const chosen = await drafter.chooseReads?.(
-    { question: spec.question, history: [] },
+    {
+      question: spec.question,
+      history: [],
+      ...(spec.subject === undefined ? {} : { subject: spec.subject }),
+    },
     READING_TOOLS,
     read,
     async () => true,
@@ -1812,6 +1825,23 @@ async function runReading(
         message.content.toLowerCase().includes("ignore your instructions"),
       )
       .map((message) => message.role),
+    // The anchored record is a block of its own, framed as data, and the
+    // member's question is still only the member's words.
+    subject:
+      spec.subject === undefined
+        ? null
+        : {
+            framed: (first?.messages ?? []).some(
+              (message) =>
+                message.role === "user" &&
+                message.content !== spec.question &&
+                message.content.includes(spec.subject?.text ?? "\0") &&
+                message.content.includes(TOOL_RESULTS_ARE_DATA),
+            ),
+            questionIntact:
+              first?.messages[first.messages.length - 1]?.content ===
+              spec.question,
+          },
   };
 }
 
@@ -1896,6 +1926,26 @@ const READING_FIXTURES: readonly ReadingFixtureSpec[] = [
       ],
       refused: 1,
       injectedAs: ["tool"],
+    }),
+  },
+  {
+    // CP11: the record the member has open comes first, as data in a block of
+    // its own. The question is not touched, and the one read it needs is the
+    // history, not the record again.
+    name: "an anchored objective: shown as data, the question left alone",
+    question: "How is this going?",
+    subject: {
+      ref: 1,
+      label: "Raise activation for mid-market teams",
+      kind: "objective",
+      text: "[1] Raise activation for mid-market teams (objective)\n  health: at risk",
+    },
+    rounds: [[["goals.keyResultHistory", { keyResultId: 2 }]]],
+    expected: readingOutcome({
+      reads: 1,
+      rounds: 2,
+      calls: [{ tool: "goals.keyResultHistory", fields: ["keyResultId"] }],
+      subject: { framed: true, questionIntact: true },
     }),
   },
   {

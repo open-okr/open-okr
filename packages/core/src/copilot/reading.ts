@@ -20,6 +20,9 @@
  * sources, so `[3]` in the prose and the citation are the same record.
  */
 
+import { activeOnly, aiThreads, withWorkspace } from "@openokr/db";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import {
   askingMemberId,
@@ -27,7 +30,7 @@ import {
   COPILOT_FEATURE_KEY,
 } from "../actions/copilot.ts";
 import type { ActionCallContext } from "../actions/define.ts";
-import type { GroundingSource } from "../agents/drafter.ts";
+import type { GroundingSource, ReadingContext } from "../agents/drafter.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import type { AnswerSource, CopilotStep, Prepared } from "./answer.ts";
@@ -36,7 +39,10 @@ import { recordCopilotRead } from "./read-record.ts";
 import {
   COPILOT_READS,
   createRefTable,
+  kindWord,
+  readSubject,
   runRead,
+  SUBJECT_READS,
   toolsFor,
 } from "./read-tools.ts";
 import { aiOffReason, type ReasonLike } from "./reasons.ts";
@@ -114,6 +120,48 @@ function collectSegments(text: string, into: Map<number, string>): void {
 const clip = (value: string, max: number) =>
   value.length <= max ? value : `${value.slice(0, max - 1)}…`;
 
+/**
+ * The record a conversation is anchored to, read from the thread itself.
+ *
+ * **The anchor is read here, by thread id, and never taken from the caller**
+ * (plan 0.9.0 CP11-Q): the panel sends the entity id once, when the thread is
+ * made, and what the model sees of it is whatever this member's own read
+ * returns. Only the member's own thread is looked at, and only the kinds the
+ * copilot can read are used. Any failure leaves the conversation unanchored.
+ */
+async function threadAnchor(
+  pool: Pool,
+  workspaceId: string,
+  memberId: string,
+  threadId: string,
+): Promise<{ readonly kind: string; readonly id: string } | null> {
+  try {
+    const rows = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
+      tx
+        .select({
+          subjectType: aiThreads.subjectType,
+          subjectId: aiThreads.subjectId,
+        })
+        .from(aiThreads)
+        .where(
+          activeOnly(
+            aiThreads,
+            eq(aiThreads.workspaceId, workspaceId),
+            eq(aiThreads.id, threadId),
+            eq(aiThreads.memberId, memberId),
+          ),
+        )
+        .limit(1),
+    );
+    const row = rows[0];
+    return row?.subjectType && row.subjectId && row.subjectType in SUBJECT_READS
+      ? { kind: row.subjectType, id: row.subjectId }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /** What a finished read loop hands back to a caller. */
 export interface ReadingOutcome {
   /** The question prepared again, answering from what was read. Unchanged when nothing was read. */
@@ -176,15 +224,27 @@ export async function* readLiveData(
   hooks: ReadingHooks = {},
 ): AsyncGenerator<CopilotStep, ReadingOutcome | null> {
   const drafter = context.drafter;
-  if (!prepared.ask || !drafter?.chooseReads) {
+  if (!prepared.ask) {
     return null;
   }
   const ask = prepared.ask;
   const memberId = await askingMemberId(context);
+  // The anchor decides whether a provider with no tools still has something
+  // to read, so it is looked up before the drafter is.
+  const anchor = await threadAnchor(
+    context.pool,
+    context.workspaceId,
+    memberId,
+    prepared.threadId,
+  );
+  if (!drafter?.chooseReads && !anchor) {
+    return null;
+  }
   // One table per run and per member, never shared (design 3.3).
   const refs = createRefTable();
   const segments = new Map<number, string>();
   const queue: CopilotStep[] = [];
+  let subject: ReadingContext["subject"];
   let wake: (() => void) | null = null;
   const poke = () => {
     const was = wake;
@@ -229,11 +289,51 @@ export async function* readLiveData(
     );
   };
 
+  // The anchored record, read as the member before the first round, so it is
+  // [1] (plan 0.9.0 CP11). A refusal or an empty read adds nothing and says
+  // nothing: the model and the panel learn no more than "Nothing found."
+  // would tell them. The read is recorded either way, like any loop read.
+  let subjectReads = 0;
+  if (anchor) {
+    const result = await readSubject(context, refs, anchor.kind, anchor.id);
+    await recordCopilotRead(context.pool, {
+      workspaceId: context.workspaceId,
+      memberId,
+      result,
+    });
+    const opened = result.entities.find(
+      (entity) => entity.entityId === anchor.id,
+    );
+    const ref = refs.refOf(anchor.id);
+    if (result.outcome === "ok" && opened && ref !== undefined) {
+      subjectReads = 1;
+      collectSegments(result.text, segments);
+      subject = {
+        ref,
+        label: opened.label,
+        kind: kindWord(opened.entityType),
+        text: result.text,
+      };
+      queue.push({
+        step: "reading",
+        tool: result.tool,
+        subject: clip(opened.label, SUBJECT_MAX),
+      });
+    } else {
+      refs.truncate(0);
+    }
+  }
+
   let settled = false;
   const running = Promise.resolve()
     .then(() =>
-      drafter.chooseReads?.(
-        { question: ask.question, history: ask.history, asker: ask.asker },
+      drafter?.chooseReads?.(
+        {
+          question: ask.question,
+          history: ask.history,
+          asker: ask.asker,
+          ...(subject ? { subject } : {}),
+        },
         toolsFor(),
         read,
         beforeRound,
@@ -264,10 +364,17 @@ export async function* readLiveData(
     });
   }
   const chosen = await running;
-  if (!chosen.ok || !chosen.value) {
+  // A provider with no tools, or a loop that gave up, still has the anchored
+  // record: it joins the grounding sources, so the answer can use it.
+  if ((!chosen.ok || !chosen.value) && subjectReads === 0) {
     return null;
   }
-  const { reads, limited, costUsd, tokensIn, tokensOut } = chosen.value;
+  const loop = chosen.ok ? chosen.value : null;
+  const reads = (loop?.reads ?? 0) + subjectReads;
+  const limited = loop?.limited ?? false;
+  const costUsd = loop?.costUsd ?? 0;
+  const tokensIn = loop?.tokensIn ?? 0;
+  const tokensOut = loop?.tokensOut ?? 0;
   // The rounds are model calls and may have spent the last of the credits, so
   // the answer's own call is checked like any other before it is made.
   const blocked = await modelBlockedReason(

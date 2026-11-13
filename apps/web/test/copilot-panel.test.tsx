@@ -1371,3 +1371,78 @@ describe("a stopped answer (plan 0.8.1 CP9 with W4)", () => {
     expect(turn?.textContent).toContain("Stopped");
   });
 });
+
+describe("Ask about this page (plan 0.9.0 CP11)", () => {
+  const GOAL_PAGE = "/goals/ab3dk9xq";
+
+  test("offers the chip on an objective page and not on /admin", async () => {
+    window.history.replaceState(null, "", GOAL_PAGE);
+    await render(AVAILABLE);
+    await open();
+    expect(panel()?.textContent).toContain("Ask about this objective");
+
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    window.history.replaceState(null, "", "/admin");
+    await render(AVAILABLE);
+    await open();
+    expect(panel()?.textContent).not.toContain("Ask about this");
+  });
+
+  test("hides the chip with AI off", async () => {
+    window.history.replaceState(null, "", GOAL_PAGE);
+    await render(AI_OFF);
+    await open();
+    expect(panel()?.textContent).not.toContain("Ask about this");
+  });
+
+  test("anchors a drawer's key result to its objective", async () => {
+    window.history.replaceState(null, "", "/goals?okr=ab3dk9xq&kr=zz9yy8xx");
+    await render(AVAILABLE);
+    await open();
+    expect(panel()?.textContent).toContain("Ask about this objective");
+  });
+
+  test("sends only the kind and the id, with the first question, then hides the chip", async () => {
+    window.history.replaceState(null, "", GOAL_PAGE);
+    fetchMock.mockResolvedValue(
+      streamOf([
+        { kind: "thread", threadId: THREAD, questionMessageId: QUESTION_ID },
+        { kind: "done", answerMessageId: null, stopped: false },
+      ]),
+    );
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: "goal",
+      subjectId: "00000000-0000-4000-8000-0000000000aa",
+      title: "How is this going?",
+      messages: [],
+    });
+    await render(AVAILABLE);
+    await open();
+    await act(async () => byName("Ask about this objective").click());
+
+    // Two anchored suggestions replace the workspace four, and the header
+    // names the kind with no title.
+    const suggestions = panel()?.querySelector(
+      '[aria-label="Suggested questions"]',
+    );
+    expect(suggestions?.querySelectorAll("button")).toHaveLength(2);
+    expect(panel()?.querySelector("header")?.textContent).toContain(
+      "About this objective",
+    );
+
+    await act(async () => byName("How is this going?").click());
+    await settle();
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({
+      question: "How is this going?",
+      subjectType: "goal",
+      subjectId: "ab3dk9xq",
+    });
+    // The thread is anchored to the page's record now, so the chip is gone
+    // although the server kept a UUID and the page names a short id.
+    expect(panel()?.textContent).not.toContain("Ask about this objective");
+  });
+});

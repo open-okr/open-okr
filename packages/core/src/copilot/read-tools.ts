@@ -155,7 +155,7 @@ const KIND_WORD: Readonly<Record<string, string>> = {
   blocker: "blocker",
   space: "space",
 };
-const kindWord = (kind: string): string =>
+export const kindWord = (kind: string): string =>
   KIND_WORD[kind] ?? kind.replace(/_/g, " ");
 
 function refDescription(kind: string | null, many: boolean): string {
@@ -1282,34 +1282,110 @@ export async function runRead(
     const { text, entities } = assemble(groups, refs);
     return done({ text, entities, outcome: "ok" });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return done({
-        text: NOTHING_FOUND,
-        outcome: "refused",
-        refusalCode: error.code,
-      });
-    }
-    if (error instanceof ZodError) {
-      const fields = error.issues
-        .map((issue) => issue.path.join("."))
-        .filter(Boolean)
-        .join(", ");
-      return done({
-        text: fields
-          ? `That input is not valid. Check: ${fields}.`
-          : "That input is not valid.",
-        outcome: "invalid_input",
-      });
-    }
-    if (error instanceof ScopeCeilingRefused) {
-      return done({
-        text: "That tool is not available.",
-        outcome: "refused_scope",
-      });
-    }
+    return done(failureOf(error));
+  }
+}
+
+/** What a failed read becomes: a sentence for the model and the outcome to record. */
+function failureOf(
+  error: unknown,
+): Pick<ReadResult, "text" | "outcome" | "refusalCode"> {
+  if (error instanceof OperationError) {
+    return {
+      text: NOTHING_FOUND,
+      outcome: "refused",
+      refusalCode: error.code,
+    };
+  }
+  if (error instanceof ZodError) {
+    const fields = error.issues
+      .map((issue) => issue.path.join("."))
+      .filter(Boolean)
+      .join(", ");
+    return {
+      text: fields
+        ? `That input is not valid. Check: ${fields}.`
+        : "That input is not valid.",
+      outcome: "invalid_input",
+    };
+  }
+  if (error instanceof ScopeCeilingRefused) {
+    return { text: "That tool is not available.", outcome: "refused_scope" };
+  }
+  return { text: "That call could not be completed.", outcome: "failed" };
+}
+
+/**
+ * The page's entity kinds the panel may anchor a conversation to (plan 0.9.0
+ * CP11), each with the one read that opens it and the field that read names
+ * its id by.
+ *
+ * **There is no key result here on purpose.** No access-scoped read returns a
+ * key result's title alone: `goals.keyResultHistory` gives values and
+ * `goals.read` needs the objective. The panel anchors a key result's page to
+ * its objective, whose read already nests its key results.
+ */
+export const SUBJECT_READS: Readonly<
+  Record<string, { readonly tool: CopilotRead; readonly field: string }>
+> = {
+  goal: { tool: "goals.read", field: "id" },
+  kpi: { tool: "kpis.detail", field: "kpiId" },
+  initiative: { tool: "initiatives.read", field: "id" },
+  task: { tool: "tasks.read", field: "id" },
+};
+
+/**
+ * Reads the record a conversation is anchored to, by its real id.
+ *
+ * **The same read, the same renderer and the same access as `runRead`**: the
+ * action runs as the member with the read scope, so a record the member may
+ * not see comes back as "Nothing found." exactly as it would for the model.
+ * The difference is that the id comes from the thread's own anchor and not
+ * from a number the model chose, which is why this is not a tool. The record
+ * takes the next number in `refs`, so when it is read first it is `[1]`.
+ * A kind this does not know is a refusal, never a guess.
+ */
+export async function readSubject(
+  context: ActionCallContext,
+  refs: RefTable,
+  kind: string,
+  id: string,
+): Promise<ReadResult> {
+  const started = performance.now();
+  const tool = SUBJECT_READS[kind];
+  const done = (
+    partial: Pick<ReadResult, "text" | "outcome"> &
+      Partial<Pick<ReadResult, "refusalCode" | "entities">>,
+  ): ReadResult => ({
+    entities: [],
+    ...partial,
+    durationMs: Math.round(performance.now() - started),
+    tool: tool?.tool ?? kind,
+  });
+  if (!tool || !isUuid(id)) {
     return done({
-      text: "That call could not be completed.",
-      outcome: "failed",
+      text: "That tool is not available.",
+      outcome: "unknown_tool",
     });
+  }
+  const mark = refs.size();
+  try {
+    const readContext: ActionCallContext = { ...context, scopes: ["read"] };
+    const output = await callAction(
+      readContext,
+      tool.tool as ActionName,
+      { [tool.field]: id } as never,
+    );
+    const names = await lookupNames(context, output);
+    const groups = groupsOf(tool.tool, output, new Renderer(refs, names));
+    if (groups.length === 0) {
+      refs.truncate(mark);
+      return done({ text: NOTHING_FOUND, outcome: "ok" });
+    }
+    const { text, entities } = assemble(groups, refs);
+    return done({ text, entities, outcome: "ok" });
+  } catch (error) {
+    refs.truncate(mark);
+    return done(failureOf(error));
   }
 }
