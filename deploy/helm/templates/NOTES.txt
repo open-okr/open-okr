@@ -18,15 +18,25 @@ then open http://localhost:8080
 
 {{- if .Release.IsInstall }}
 
-The instance has not been set up. The first person to open it gets the
-first-run wizard, creates the owner account, and registration closes behind
-them. Finish setup right after the first start: until then, anyone who reaches
-this address can claim the instance.
+The instance has not been set up. The first-run wizard creates the owner
+account, and registration closes behind it.
+The setup wizard asks for a setup code. Read it with:
+
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "openokr.secretName" . }} -o jsonpath='{.data.{{ .Values.secrets.setupCodeKey | default "setup-code" }}}' | base64 -d
+{{- if .Values.secrets.existingSecret }}
+
+Your own Secret has no setup code unless you added that key. Without it the
+server makes a code at first boot and keeps it in /app/storage/setup-code.
+
+Finish setup right after the first start. The code is dead once setup is done.
+{{- else }}
+
+Finish setup right after the first start. The code is dead once setup is done.
+{{- end }}
 {{- else }}
 
 To check that setup finished, open the address above. A set-up instance shows
-the sign-in page. A new one shows the first-run wizard, and until someone
-finishes it, anyone who reaches that address can claim the instance.
+the sign-in page. A new one shows the first-run wizard.
 {{- end }}
 
 {{- if and .Values.database.existingSecret .Values.database.adminUrl (not (dig "existingSecretAdminKey" "" .Values.database)) }}

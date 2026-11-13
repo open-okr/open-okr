@@ -75,9 +75,9 @@ helm install               -> winner writes file               -> POST /api/auth
 |---|---|
 | Generate, normalise, HMAC, compare | `packages/core/src/setup/setup-code.ts` (pure apart from the insert and the file write) |
 | Boot: make a code when none is set | `apps/web/instrumentation.node.ts`, through a core function |
-| The check | `packages/core/src/auth/auth.ts`, the unclaimed branch of `user.create.before` |
+| The check | `packages/core/src/auth/auth.ts`, the unclaimed branch of `user.create.before`, switched on by the `setupCode` option of `createAuth`. Only `apps/web/lib/auth.ts` passes it, so the many tests and commands that build their own instance and claim it by signing up are unchanged. With the option on and no code in force (neither the variable nor a stored hash), the sign-up is refused as `SETUP_CODE_REQUIRED`: it fails closed |
 | Clear on finish | `packages/core/src/setup/complete.ts` |
-| Variable | `packages/config/src/env.ts`: `OPENOKR_SETUP_CODE`, optional, normalised by D6 |
+| Variable | `packages/config/src/env.ts`: `OPENOKR_SETUP_CODE`, optional, normalised by D6 and at least 12 characters once normalised |
 | Field and catalogue | `apps/web/app/setup/account/setup-account-form.tsx`, `packages/ui/src/i18n/messages/{en,ms}.json` |
 | Compose | `deploy/docker/openokr` (generate, write, print), `deploy/docker/smoke-test.sh` |
 | Helm | `deploy/helm/templates/secrets.yaml`, `deployment.yaml` env, `NOTES.txt`, `check.sh`, `cluster-test.sh` |

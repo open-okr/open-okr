@@ -1290,6 +1290,7 @@ export {
   INSTANCE_SETTINGS,
   type InstanceSettingDefinition,
   SCHEDULER_LAST_RUN_AT,
+  SETUP_CODE_HASH,
   SETUP_COMPLETED_AT,
 } from "./secrets/instance-registry.ts";
 export {
@@ -1380,6 +1381,22 @@ export {
   type StorageProbeOptions,
   storageProbe,
 } from "./setup/probes.ts";
+export {
+  checkSetupCode,
+  clearSetupCode,
+  formatSetupCode,
+  generateSetupCode,
+  hashSetupCode,
+  normaliseSetupCode,
+  type PrepareSetupCodeInput,
+  type PrepareSetupCodeResult,
+  prepareSetupCode,
+  SETUP_CODE_FILE,
+  SETUP_CODE_HEADER,
+  type SetupCodeVerdict,
+  setupCodeMatches,
+  setupCodePath,
+} from "./setup/setup-code.ts";
 export {
   readSetupState,
   type SetupState,

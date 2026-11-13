@@ -158,7 +158,7 @@ drops the overlay and the seeder can no longer reach the database.
 ## 4. Run the two wizards in the browser
 
 This is the first part of the test, not a setup chore. A tester opens the
-address, creates the first account in the setup wizard, and walks the welcome
+address, enters the setup code that `deploy-staging.sh` printed, creates the first account in the setup wizard, and walks the welcome
 wizard, choosing the **OKR starter cycle** template.
 
 The seeder refuses to run before this: until the wizard has created a

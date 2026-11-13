@@ -106,10 +106,15 @@ log "healthy after ${waited}s"
 # The first account on an unclaimed instance. Registration closes behind it,
 # which is the rule rather than a demo-specific setting: every visitor after
 # this signs in as a persona.
+# The claim needs the setup code `up` just wrote beside BETTER_AUTH_SECRET, read
+# from the same file. The demo is no exception (docs/design/setup-code.md Q3).
+setup_code=$(grep '^OPENOKR_SETUP_CODE=' "$REPO/deploy/docker/secrets/app.env" | cut -d= -f2-)
+[ -n "$setup_code" ] || fail "could not read the generated setup code"
 log "creating the operator account"
 code=$(curl -s -o /dev/null -w '%{http_code}' \
   -X POST "$BASE/api/auth/sign-up/email" \
   -H 'Content-Type: application/json' \
+  -H "x-openokr-setup-code: $setup_code" \
   -d "{\"email\":\"$OPENOKR_DEMO_OWNER_EMAIL\",\"password\":\"$OPENOKR_DEMO_OWNER_PASSWORD\",\"name\":\"$OPENOKR_DEMO_OWNER_NAME\"}")
 [ "$code" = "200" ] || fail "creating the operator account returned $code"
 

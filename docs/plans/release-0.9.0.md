@@ -301,7 +301,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | C2 | done | 13 November 2026. A profile URL that is not https (http only on loopback) is a usage error; every redirect is refused. Dismissing alerts #93 and #94 as intended use waits for the merge |
 | C3 | done | 13 November 2026. #77, #78, #88, #96, #97 fixed. #85, #86, #87, #98 left: the second `FormData` argument is the submitter, which the browser uses, so those are false positives to dismiss |
 | P1 | done | 13 November 2026: 1.7.22, every Better Auth package on one patch, licences pass. Each action item in the 1.7.19 to 1.7.22 notes checked and unaffected (no oauth-provider, jwt or mcp plugin; our own SCIM; `user.create.before` refuses with an error, never `false`). CI runs the auth, SSO, SCIM, invitation, sign-up and sign-in suites |
-| G1 | to build | Design approved by Agung on 13 November 2026 |
+| G1 | done | 13 November 2026. Built as designed. `createAuth` takes a `setupCode` option that only the web app passes, so existing tests that claim an instance by signing up need no code. An environment code decides alone, which also kills a generated one left from an earlier boot |
 | G2 | to build | Design approved by Agung on 13 November 2026 |
 | G3 | to do | Built in 0.7.0. Design corrected; browser check of `/admin/connections` still to do |
 | G4 | to build | G4-Q2 decided by Agung on 13 November 2026: import as access bindings on the KPI |

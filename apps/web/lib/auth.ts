@@ -214,6 +214,13 @@ function buildAuth(
     // Resolved at boot from `mail.transport` too, and read by Your account
     // through `canSendMail()` (account-self-service.md D14).
     canSendMail: canSendMail(),
+    // The first account needs the setup code, from the deployment's variable
+    // or from the one the server made at boot (setup-code.md D7).
+    setupCode: {
+      ...(env.OPENOKR_SETUP_CODE
+        ? { environmentCode: env.OPENOKR_SETUP_CODE }
+        : {}),
+    },
     // From sso_connections, as last read (P8-T07, L-15).
     ssoProviders: providers,
     // Lets a server action set and clear the session cookie. Framework glue,

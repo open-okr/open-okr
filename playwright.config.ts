@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { E2E_ENCRYPTION_KEY } from "./e2e/root-key.ts";
+import { E2E_SETUP_CODE } from "./e2e/setup-code.ts";
 import { TRACKER_DSN } from "./e2e/tracker.ts";
 
 /**
@@ -192,6 +193,8 @@ export default defineConfig({
         DATABASE_URL: databaseUrl("openokr_e2e_wizard"),
         // The whole point of this instance: never set up.
         E2E_MARK_CONFIGURED: "0",
+        // The claim needs a code, which the wizard spec types (plan 0.9.0 G1).
+        OPENOKR_SETUP_CODE: E2E_SETUP_CODE,
         // Closed before the first run, as an operator who wants a private
         // instance sets it. The wizard's own sign-up is the claim and is
         // admitted whatever this says (registration-policy.md §10 D17, plan

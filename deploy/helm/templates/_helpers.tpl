@@ -87,6 +87,23 @@ Call with a dict: (dict "ctx" $ "key" "encryption-key" "value" (randBytes 32))
 {{- end -}}
 
 {{/*
+A new setup code (docs/design/setup-code.md D6): twelve characters in three
+groups of four, from an alphabet with no 0, O, 1, I or L. Sprig has no random
+pick from a custom alphabet, so each character is four random digits taken
+modulo 31. The bias across the 10,000 values is under a third of a percent
+for the first eighteen characters, which does not matter at 59 bits.
+*/}}
+{{- define "openokr.newSetupCode" -}}
+{{- $alphabet := "23456789ABCDEFGHJKMNPQRSTUVWXYZ" -}}
+{{- $code := "" -}}
+{{- range until 12 -}}
+{{- $n := int (mod (randNumeric 4 | atoi) 31) -}}
+{{- $code = printf "%s%s" $code (substr $n (int (add1 $n)) $alphabet) -}}
+{{- end -}}
+{{- printf "%s-%s-%s" (substr 0 4 $code) (substr 4 8 $code) (substr 8 12 $code) -}}
+{{- end -}}
+
+{{/*
 The address people actually use.
 
 Passkeys are bound to their origin, so getting this wrong does not degrade
@@ -276,6 +293,17 @@ erasure job lost the auth secret (plan 0.8.0 O3). check.sh compares the two.
       name: {{ include "openokr.secretName" . }}
       {{- /* Absent from values reused from a release older than 0.7 (helm upgrade --reuse-values). */}}
       key: {{ .Values.secrets.metricsTokenKey | default "metrics-token" }}
+      optional: true
+# The code that claims a new instance (docs/design/setup-code.md D1).
+# Optional, so a release with its own Secret and no such key still starts:
+# the server then makes a code of its own at first boot and the setup
+# wizard says where it kept it.
+- name: OPENOKR_SETUP_CODE
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "openokr.secretName" . }}
+      {{- /* Absent from values reused from a release older than 0.9 (helm upgrade --reuse-values). */}}
+      key: {{ .Values.secrets.setupCodeKey | default "setup-code" }}
       optional: true
 - name: OPENOKR_INSTANCE_NAME
   value: {{ .Values.instance.name | quote }}

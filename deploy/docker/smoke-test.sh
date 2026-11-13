@@ -332,13 +332,33 @@ grep -q 'header_up X-Forwarded-Host {hostport}' Caddyfile \
 pass "the proxy forwards the host with its port"
 
 # --- an admin can be created and can use the instance ---------------------
+# The claim needs the setup code `up` wrote to secrets/app.env (plan 0.9.0 G1,
+# docs/design/setup-code.md). Without it, and with a wrong one, nobody is made.
+grep -q '^OPENOKR_SETUP_CODE=' secrets/app.env || fail "up wrote no setup code"
+setup_code="$(grep '^OPENOKR_SETUP_CODE=' secrets/app.env | cut -d= -f2-)"
+printf '%s\n' "$first_up" | grep -q "Setup code: $setup_code" \
+  || fail "the first up did not print the setup code"
+signup_body='{"email":"admin@example.com","password":"correct-horse-battery-staple","name":"Ada Lovelace"}'
+code=$(curl -s -o /dev/null -w '%{http_code}' \
+  -X POST "$BASE/api/auth/sign-up/email" \
+  -H 'Content-Type: application/json' -d "$signup_body")
+[ "$code" = "422" ] || fail "a sign-up with no setup code returned $code, not 422"
+code=$(curl -s -o /dev/null -w '%{http_code}' \
+  -X POST "$BASE/api/auth/sign-up/email" \
+  -H 'Content-Type: application/json' -H 'x-openokr-setup-code: ZZZZ-ZZZZ-ZZZZ' \
+  -d "$signup_body")
+[ "$code" = "422" ] || fail "a sign-up with a wrong setup code returned $code, not 422"
+pass "a sign-up without the setup code, or with a wrong one, is refused"
+
 jar=$(mktemp)
+# Lower case and spaces for dashes: the code is the same one (setup-code D6).
+typed="$(printf '%s' "$setup_code" | tr 'A-Z-' 'a-z ')"
 code=$(curl -s -c "$jar" -b "$jar" -o /dev/null -w '%{http_code}' \
   -X POST "$BASE/api/auth/sign-up/email" \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"admin@example.com","password":"correct-horse-battery-staple","name":"Ada Lovelace"}')
-[ "$code" = "200" ] || fail "creating the first account returned $code"
-pass "the first account was created"
+  -H 'Content-Type: application/json' -H "x-openokr-setup-code: $typed" \
+  -d "$signup_body")
+[ "$code" = "200" ] || fail "creating the first account with the setup code returned $code"
+pass "the first account was created with the setup code"
 
 curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
   || fail "the admin could not reach a provisioned workspace"

@@ -27,6 +27,7 @@ import {
   writeSettings,
 } from "../secrets/instance-settings.ts";
 import type { KeyRing } from "../secrets/key-ring.ts";
+import { clearSetupCode } from "./setup-code.ts";
 import { readSetupState } from "./state.ts";
 
 export interface CompleteSetupInput {
@@ -38,6 +39,8 @@ export interface CompleteSetupInput {
   // working after setup. The saved `invite_only` this used to write did the
   // opposite of all three.
   readonly now?: () => Date;
+  /** Where a generated setup code's file lives. Tests only; absent reads the environment. */
+  readonly storageRoot?: string;
 }
 
 export interface CompleteSetupResult {
@@ -84,6 +87,16 @@ export async function completeSetup(
     await writeSettings(pool, ring, [
       { key: SETUP_COMPLETED_AT, value: completedAt, source: "wizard" },
     ]);
+
+    // The code is dead the moment setup is recorded, so its hash and file go
+    // in the same step (setup-code.md D10). After completion on purpose: the
+    // hook that read it reads only an unclaimed instance, so a failure here
+    // leaves a dead row at worst, and never a closed wizard with no way in.
+    await clearSetupCode(pool, input.storageRoot).catch((error: unknown) => {
+      process.stderr.write(
+        `setup: could not remove the setup code: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    });
 
     return { completedAt, claimed: true };
   } finally {

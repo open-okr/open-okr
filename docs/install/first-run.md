@@ -4,9 +4,19 @@ What the wizard does, and what is worth doing next.
 
 ## The wizard asks for one thing
 
-An account. Name, email address, and a password of at least twelve characters.
-That account owns the instance. Finish this right after the first start: until
-it is done, anyone who reaches the address can create that account.
+A setup code, then an account. The code proves you are the person who deployed
+the instance: `./openokr up` prints it and keeps it in `secrets/app.env`, and on
+Helm it is in the release's Secret, which the install notes say how to read.
+With neither, the server made one at first boot and the wizard names the file
+it is in, `setup-code` under the storage directory, for example
+`docker exec <container> cat /app/storage/setup-code`. Then the account: name,
+email address, and a password of at least twelve characters. That account owns
+the instance. Finish this right after the first start. The code works until
+setup finishes and never again.
+
+If the code leaked before you claimed the instance, change `OPENOKR_SETUP_CODE`
+and restart. With a code the server made, delete the `setup-code` file and the
+`setup.codeHash` row in `system_settings`, then restart, and it makes a new one.
 
 The screen also asks what the instance should be called. It is filled in with
 `OPENOKR_INSTANCE_NAME` when your deployment sets it, or `OpenOKR` when it does
