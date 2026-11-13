@@ -197,6 +197,66 @@ else
   fail "does not say where uploads go when a bucket is named"
 fi
 
+# --- the setup note is for a first install only (plan 0.9.0 H1) -------------
+# An upgrade cannot know whether setup finished, so it says how to check
+# instead of claiming the instance is new. No helm command renders NOTES.txt
+# for an upgrade without a cluster, so a copy of the chart gets the file under
+# a template name, and `--debug` prints the text even though it is not YAML.
+install_notes=$(notes)
+if printf '%s' "$install_notes" | grep -q "has not been set up"; then
+  pass "a first install says the instance has not been set up"
+else
+  fail "a first install does not say the instance has not been set up"
+fi
+
+notes_chart=$(mktemp -d)
+cp -R . "$notes_chart/chart"
+mv "$notes_chart/chart/templates/NOTES.txt" "$notes_chart/chart/templates/notes-copy.yaml"
+upgrade_notes=$(cd "$notes_chart/chart" && helm template openokr . --debug --is-upgrade \
+  --show-only templates/notes-copy.yaml --set "database.url=$DB" 2>&1 || true)
+rm -rf "$notes_chart"
+if ! printf '%s' "$upgrade_notes" | grep -q "OpenOKR .* is installed as"; then
+  fail "could not render the upgrade notes"
+elif printf '%s' "$upgrade_notes" | grep -q "has not been set up"; then
+  fail "an upgrade tells a set-up instance it has not been set up"
+elif printf '%s' "$upgrade_notes" | grep -q "To check that setup finished"; then
+  pass "an upgrade says how to check setup instead"
+else
+  fail "an upgrade does not say how to check setup"
+fi
+
+# --- the setup code (plan 0.9.0 G1, docs/design/setup-code.md) -------------
+# The chart generates it into its Secret, the pods read it from there, and the
+# install notes say how to read it. An upgrade does not repeat that: by then
+# the instance is usually claimed and the line would send somebody looking for
+# a code nothing asks for.
+if printf '%s' "$install_notes" | grep -q "asks for a setup code" \
+  && printf '%s' "$install_notes" | grep -q "jsonpath='{.data.setup-code}'"; then
+  pass "a first install says how to read the setup code"
+else
+  fail "a first install does not say how to read the setup code"
+fi
+if printf '%s' "$upgrade_notes" | grep -q "setup code"; then
+  fail "an upgrade repeats the setup code instructions"
+else
+  pass "an upgrade does not repeat the setup code instructions"
+fi
+# The value is a Secret entry, base64 of twelve characters in three groups of
+# four with no 0, O, 1, I or L. Decoded here, because a pattern over the
+# encoded text would pass for any string.
+setup_code_b64=$(render_one secrets.yaml | sed -n 's/^  setup-code: //p' | head -n 1)
+setup_code=$(printf '%s' "$setup_code_b64" | base64 -d 2>/dev/null || true)
+if printf '%s' "$setup_code" | grep -Eq '^[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$'; then
+  pass "the chart generates a setup code in its Secret"
+else
+  fail "the chart's Secret holds no well-formed setup code ('$setup_code')"
+fi
+if render_one deployment.yaml | grep -A6 "name: OPENOKR_SETUP_CODE" | grep -q "optional: true"; then
+  pass "the pods read the setup code from the Secret, and start without it"
+else
+  fail "OPENOKR_SETUP_CODE is not an optional Secret reference in the deployment"
+fi
+
 # --- the database's CA bundle (plan 0.8.0 H6) ------------------------------
 # A managed Postgres signs with an authority Node does not hold, so without a
 # bundle the only working connection was sslmode=no-verify. With one, every

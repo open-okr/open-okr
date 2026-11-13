@@ -30,7 +30,7 @@ From `docs/design/copilot-live-data.md` §8, in the order D9 chose: the edits fi
 
 | # | What | Migration | Depends on | Size |
 |---|---|---|---|---|
-| L4 | **Five edit proposals**: rename or redescribe an objective, check in, record a KPI value, move a task, change an initiative's status (§4.1). Each offered only over what the member may edit. Undo for an edit stores the values from before it was applied (§4.2, D5). The card shows before and after (§4.4). A mid-cycle target change needs a reason: the model writes it from the person's words, or the card asks for it (§4.3, D10). Every change stays a proposal the member applies (D4) | **Migration 2**: `proposed_changes.reverse_payload` | | L |
+| L4 | **Five edit proposals**, built in three changes: **L4a** (the title and description edit, the task move, the initiative status, undo for them, and the mid-cycle reason), **L4b** (KPI value delete, which the KPI value proposal's undo needs) and **L4c** (the check-in and KPI value proposals). Rename or redescribe an objective, check in, record a KPI value, move a task, change an initiative's status (§4.1). Each offered only over what the member may edit. Undo for an edit stores the values from before it was applied (§4.2, D5). The card shows before and after (§4.4). The reason (§4.3, D10) applies to adding an objective or a key result after the cycle started, not to editing a target: the model writes it from the person's words, or the card asks for it. Every change stays a proposal the member applies (D4) | **Migration 2**: `proposed_changes.reverse_payload` | | L |
 | L1 | **Port**: assistant tool-call turns in every driver, the Google tool result, tool-name mapping (§3.5). `chatWithTools` gets its first caller | None | | M |
 | L2 | **The read tools and the loop**: the curated dozen read actions in §3.2 (D2), called as the member, 4 rounds, 6 reads a round, 6,000 characters a result (D7). Results are untrusted text (§3.4). Citations come from what was read (§3.3). The reading status line, "Reading New accounts reach value in their first week", joins 0.8.1's step line. A provider that cannot call tools keeps today's path, and AI off is unchanged | None | L1 | L |
 | L3 | **Record the copilot's reads** in `ai_tool_calls`, beside the agent surface's (§3.6, D6). After a reload, the "Searched, read N" line under an answer is rebuilt from these rows, which closes W2-Q (section 10) | **Migration 1**: `ai_tool_calls.source` admits `copilot` | L2 | S |
@@ -233,6 +233,19 @@ Akmal answered every question on 12 November 2026.
 | X3-Q | If production pins its AI models, clear the pin or set Luna? | Clear it, so production follows the default | **Clear it.** Nothing was pinned, so nothing changed |
 | G11-Q | Move `docs/okr-goal/` into the okr-goal repository? | Yes. It is the site's copy, and the site keeps its own | **Yes**, and done the same day (G11) |
 
+**Decided by Agung on 13 November 2026**, on the questions the design documents and the build left open:
+
+| # | Question | Agung's answer |
+|---|---|---|
+| G1 | Design approved? Q1 file on local disk with S3, Q2 change the code by env and restart, Q3 the demo uses the code | **Approved, Q1 to Q3 as recommended** |
+| G8 | Design approved? May a Viewer named facilitator change the pack? | **Approved. A Viewer may not**: the facilitator passes only with Member or above |
+| G2 | Design approved, in 0.9.0? | **Approved, in 0.9.0** |
+| A4 | Design approved? Q1 which round offers `propose_change`, Q2 do earlier answers count as the member's words | **Approved. Round 1 only; earlier questions only** |
+| FB1 | Design approved? Q1 one retention setting, Q2 a rating goes with its deleted conversation | **Approved, both as recommended** |
+| D1-Q | Narrow data change 0035 so it skips content the product's own writes already queued? | **Yes** |
+| G4-Q2 | Nothing reads `kpi_shares`. Import FlowyTeam's KPI shares as access bindings on the KPI instead? | **Yes, as bindings**: `read` becomes view, `update` becomes edit |
+| G5-Q2 | The branch is not on this machine or GitHub | **Wait for the branch to be pushed** |
+
 **Design directions, approved by Akmal on 12 November 2026** ("all the recommended six designs are approved"). Each design document is written from its direction before any code. A question the direction does not answer goes back to Akmal first.
 
 | Design | Approved direction |
@@ -266,40 +279,40 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 
 | Row | Status | Note |
 |---|---|---|
-| L4 | to do | Design approved 11 November 2026 |
-| L1 | to do | |
-| L2 | to do | |
-| L3 | to do | |
-| L5 | to do | |
-| L6 | to do | |
-| L7b | to do | |
-| CP5 | to do | |
-| CP10 | to do | |
-| CP11 | to do | |
-| CP12 | to do | |
-| A4 | to do | Direction approved 12 November 2026; the design addition, then the code |
-| FB1 | to do | Direction approved 12 November 2026; the design, then the code |
-| T1 | to do | |
-| T2 | to do | |
-| T3 | to do | |
-| D1 | to do | |
-| H1 | to do | |
-| C1 | to do | |
-| C2 | to do | C2-Q decided: fix, then dismiss |
-| C3 | to do | |
-| P1 | to do | P1-Q decided: the newest 1.7 patch |
-| G1 | to do | Direction approved 12 November 2026; the design, then the code |
-| G2 | to do | Direction approved 12 November 2026; a design note, then the code |
-| G3 | to do | Built in 0.7.0; the design's correction and a browser check |
-| G4 | to do | G4-Q decided: import |
-| G5 | to do | G5-Q decided: yes |
-| G6 | to do | |
-| G7 | to do | |
-| G8 | to do | Direction approved 12 November 2026; the design, then the code |
-| G9 | to do | G9-Q decided |
-| G10 | to do | Then `origin/obed` can be deleted |
+| L4 | done | Design approved 11 November 2026. L4a, L4b and L4c committed. L4c keeps the value it recorded and refuses an undo when the period was edited since, and refuses a check-in's undo once a newer one exists. Follow-ups from its review: the status words in an edit's preview (`To do`, `Done`, `(empty)`) are stored in English, so a Malay reader sees them untranslated, and so are the check-in status words (`On track`, `Caution`, `Off track`); store the raw values and translate on the card. The reason a person types is saved in the payload but not shown on the applied card. Follow-up from L4b: a webhook event for a removed KPI value, not in 0.9.0 |
+| L1 | done | The port: tool-call turns in every driver. Committed |
+| L2 | done | L2a (the read tools) and L2b (the loop and the panel) done. L3 (recording the reads) is done below, so the "Searched, read N" line survives a reload. A check-in citation is not linked yet: it has no page and a citation carries no objective id (CP5) |
+| L3 | done | Migration 0169 (source `copilot`, one-connection check widened). Every read the loop makes is a row: `recordCopilotRead`. `copilot.thread` returns `readCount` per answer, rebuilt from the member and the time (no new column, W2-Q); the panel shows the line after a reload. Admin, AI lists each copilot read with the member, tool, outcome and time. Uncommitted until Agung approves. Known limit: two questions one member runs at the same moment in two threads share a count. `pnpm db:lint` fails on `read-tools.ts:537` (`from(workspaceMembers)` without a soft-delete scope), which L2a added |
+| L5 | done | Set `chooseReads` in `packages/agents/src/evaluation/sets.ts`, nine fixtures: tool choice, injection, two-round, the four-round and six-read limits, no tools. The runner gained `toolRounds`, `tools` and a view of the requests sent. Design in `docs/design/ai-evaluation.md` §5.1. Uncommitted. Live smoke test: yours |
+| L6 | done | Spec ran green on 12 November 2026 (Node 22). `e2e/s39d-copilot-reads.spec.ts`: a set-up step and three tests. It starts a scripted OpenAI-shaped model on this machine and points the workspace's keyless `ollama` provider at it, because the server builds its provider from the database and has no mock kind. The unreadable-objective case uses a deleted objective, since every active member holds edit and a guest cannot ask. A provider that cannot call tools cannot be configured in e2e, so the third test covers provider off. Biome does not cover `e2e/`. |
+| L7b | done | Live as Priya, 2 of 7 to 5 of 7 (`copilot-live-data.md` §8). Open: "this quarter" between two same-title objectives, and "which of my key results are behind" gives no answer |
+| CP5 | done | Numbered chips in the answer, a numbered source list with icons, links made on the server (`copilot.thread` returns `n` and `href`). Local tier only, specs not run. |
+| CP10 | done | Reasons are codes (`ai_off` with the step as a param, and seven more) in the stream, the thread and availability; the panel words them from `copilot.reason.*` in English and Malay. Stored as JSON, no migration |
+| CP11 | done | The chip "Ask about this objective / KPI / initiative / task" starts a new anchored conversation; only the kind and id are sent (CP11-Q). The loop reads the anchor from `ai_threads` and reads the record as `[1]` before round 1 (`readSubject`), as a block of its own in `chooseReads` (`ReadingContext.subject`), recorded like any read. A key result (`&kr=`) anchors to its objective, since no access-scoped read returns a key result alone. One fixture added to the `chooseReads` set. Uncommitted, tests written and not run |
+| CP12 | done | 13 November 2026. S-39 describes CP5, CP10 and CP11; mockup `13-copilot` drawn and rendered. Known in the mockup: the chip tooltip is clipped at the panel edge, and the card is drawn after the prose |
+| A4 | done | 13 November 2026. `propose_change` is a first-round-only tool in the read loop (`packages/core/src/copilot/propose-tool.ts`, `reading.ts`), checked by `buildProposal` and stored by `copilot.recordProposal`; one card per answer; the card is published when the call finishes; no proposal call on the tool path. Anchored conversations and providers without tools keep the 0.8.1 path (the anchored case is a deviation Agung decided, `copilot-live-data.md` §11). No migration, no setting. Six fixtures in the `chooseReads` set and seven unit tests, written, not run. The 2-second target is measured in a live run that is still to do. Uncommitted |
+| FB1 | done | 13 November 2026. Migration 0170 `ai_answer_ratings`. `copilot.rate` and `copilot.unrate` (own thread, `comment`, private activity kinds), `myRating` on `copilot.thread`, `ai.answerRatings` for `manage_ai` (the text of a rating that is not shared is not in the response). The sweep deletes ratings by the same window, `copilot.deleteThread` soft deletes them, erasure and the personal export carry them. Thumbs under a recorded answer, the note form, an Admin, AI ratings card, `pnpm copilot:feedback`. Contract regenerated. Not run: tests and the e2e |
+| T1 | done | 13 November 2026. `holdTenants` in `e2e/hosting-profiles.spec.ts`: inserts what is missing, sets the state on every row, restores each existing row and workspace state. Not run locally |
+| T2 | done | 13 November 2026. `overwrite: true` on the unit, end-to-end and Playwright report uploads. The gate downloads `flaky-report-*` by pattern with `merge-multiple`, so a rerun leaves only the newest |
+| T3 | done | 13 November 2026. Traced locally: 12.4 s, 410 calls, no step over 1 s, so no hang; the test gets a 60-second limit with the reason. The serial group's retry is unchanged |
+| D1 | done in part | 13 November 2026. 0001: the two agents had no time zone on every fresh workspace; fixed in provisioning. 0005: rewrites a null reviewer to null where the goal has none, which changes nothing. 0035: re-queues index items the seed already queued, because it checks only its own key. Narrowing it edits a shipped data change: D1-Q decided by Agung on 13 November 2026: narrow 0035. Done 13 November 2026: 0035 now also skips content with a product job of the same topic in any state. Its declared columns are unchanged, so the runner's checksum is too. Tests written, not run |
+| H1 | done | 13 November 2026. The setup paragraph only on `.Release.IsInstall`; an upgrade says how to check. `check.sh` asserts both, rendering the upgrade notes from a temporary copy with `--is-upgrade` |
+| C1 | done | 13 November 2026. `docs/api/reference.md` did not change. Alert #79 closes when the fix reaches `main` |
+| C2 | done | 13 November 2026. A profile URL that is not https (http only on loopback) is a usage error; every redirect is refused. Dismissing alerts #93 and #94 as intended use waits for the merge |
+| C3 | done | 13 November 2026. #77, #78, #88, #96, #97 fixed. #85, #86, #87, #98 left: the second `FormData` argument is the submitter, which the browser uses, so those are false positives to dismiss |
+| P1 | done | 13 November 2026: 1.7.22, every Better Auth package on one patch, licences pass. Each action item in the 1.7.19 to 1.7.22 notes checked and unaffected (no oauth-provider, jwt or mcp plugin; our own SCIM; `user.create.before` refuses with an error, never `false`). CI runs the auth, SSO, SCIM, invitation, sign-up and sign-in suites |
+| G1 | done | 13 November 2026. Built as designed. `createAuth` takes a `setupCode` option that only the web app passes, so existing tests that claim an instance by signing up need no code. An environment code decides alone, which also kills a generated one left from an earlier boot |
+| G2 | done | Built 13 November 2026 as designed, with the differences listed under "As built" in `work-layer.md` §5.1 (one recorder in the shell instead of a hook per page). New read `search.recent`, not offered to agents. Tests written, not run |
+| G3 | to do | Built in 0.7.0. Design corrected; browser check of `/admin/connections` still to do |
+| G4 | design written | 13 November 2026: nothing reads a binding on one KPI (human KPI access is the role alone), so Agung chose per-KPI access first (G4-Q3). `docs/design/kpi-access.md`, waiting for "design approved"; Q1 asks whether to ship only the import report in 0.9.0 |
+| G5 | yours | G5-Q2: wait for `feat/profile-source-links` to be pushed from the machine that kept it |
+| G6 | done | 13 November 2026. Eleven mockups draw agents as faces (`.af`), 12b shows the guided fields, PNGs re-rendered with Google Chrome |
+| G7 | done | 13 November 2026. `.claude/settings.json` with `attribution` empty and `includeCoAuthoredBy: false` |
+| G8 | done | 13 November 2026. `mayChangeInputPack` guards both pack writes in their `load` step, `workflow.read` returns `packAccess`, the screen is read only for everybody else. Local tier not yet run. The end-to-end case checks the Owner only, because the suite has no second account to sign in as |
+| G9 | done | 13 November 2026. No OKRGoal left in `error-reporting.md` or `observability.md` |
+| G10 | done | 13 November 2026. The row has no id, so the key is the position plus time and provider, as Obed's fix. `origin/obed` can go on Akmal's word |
 | G11 | done | 12 November 2026. okr-goal took the copy with open-okr's three later edits merged in (four conflicts settled against the live site) and 40 links pointed at GitHub, by pull request in that repository; the folder is removed here in this pull request |
-| U1 | to do | Last |
+| U1 | done | 13 November 2026. "0.8 to 0.9" in `docs/runbooks/upgrade.md`: 0168 to 0170, no new data change, setup code, copilot, input pack, smaller changes. G4 and G5 left out |
 | X1 | done | 12 November 2026, by Akmal |
 | X2 | done | 12 November 2026, by Akmal |
 | X3 | done | 12 November 2026: nothing was pinned |

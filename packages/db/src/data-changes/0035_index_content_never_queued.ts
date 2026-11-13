@@ -18,7 +18,9 @@
  * **Only what the index lacks.** A row the index already holds, which every
  * objective `goals.create` wrote does, is left alone. The key carries this
  * script's number, so a batch never queues a row an earlier batch queued, and a
- * second run queues nothing.
+ * second run queues nothing. A job the product queued, in any state, counts as
+ * queued too, so a run right after a seed or a busy day
+ * does not pay for the same embedding twice.
  *
  * **One workspace at a time, inside its own tenant setting**, as 0034 does: the
  * admin connection may be the table owner, FORCE ROW LEVEL SECURITY binds the
@@ -78,6 +80,19 @@ async function queue(
         )
         and not exists (
           select 1 from outbox o where o.idempotency_key = ${key}
+        )
+        -- Content the product already queued once is not "never queued",
+        -- whatever became of that job. Its key is never this script's, so
+        -- the check above cannot see it (13 November 2026: after db:seed this
+        -- queued 1,337 jobs the seed's own writes had queued, and each
+        -- duplicate embed is a model call). Any row counts, delivered or not,
+        -- so no new column is declared and the runner's checksum is unchanged:
+        -- an instance that started this script on 0.8.1 keeps running it.
+        and not exists (
+          select 1 from outbox o
+           where o.topic = $2
+             and o.payload->>'entityType' = $3
+             and o.payload->>'entityId' = t.id::text
         )
       order by t.id
       limit $4

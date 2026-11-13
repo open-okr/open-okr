@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures.ts";
 import { goTo, skipOnboarding } from "./instance-account.ts";
+import { E2E_SETUP_CODE } from "./setup-code.ts";
 
 /**
  * The first-run wizard, in a browser (P1-T09).
@@ -75,6 +76,33 @@ test("it reports the deployment honestly, including what is not built yet", asyn
   await expect(page.getByText(/Mail: Ready/)).toBeVisible();
 });
 
+test("the account step asks for the setup code, and a wrong one creates nobody", async ({
+  page,
+}) => {
+  // The claim needs proof that the person can read the deployment's secrets
+  // (docs/design/setup-code.md). The field comes first on the form.
+  await page.goto("/setup/account");
+  const setupCode = page.getByLabel("Setup code");
+  await expect(setupCode).toBeVisible();
+  await expect(setupCode).toBeEditable();
+
+  await setupCode.fill("ZZZZ-ZZZZ-ZZZZ");
+  await page.getByLabel("Your name").fill(ADMIN.name);
+  await page.getByLabel("Email").fill(ADMIN.email);
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill(ADMIN.password);
+  await page.getByRole("button", { name: "Finish setup" }).click();
+
+  // The catalogue sentence, not Better Auth's generic failure. Still the
+  // wizard, with its form: no account was made, so the page did not move on.
+  await expect(
+    page.getByText("That setup code is not right. Check it and try again."),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/setup\/account$/);
+  await expect(setupCode).toBeVisible();
+});
+
 test("creating the first account finishes setup", async ({ page }) => {
   // This server runs with `OPENOKR_REGISTRATION=invite_only`
   // (playwright.config.ts). The policy closes the instance behind its owner,
@@ -89,6 +117,10 @@ test("creating the first account finishes setup", async ({ page }) => {
   await expect(
     page.getByLabel("What should this instance be called?"),
   ).toHaveValue("OKR Goal");
+  // Lower case and spaces for dashes: the same code (setup-code.md D6).
+  await page
+    .getByLabel("Setup code")
+    .fill(E2E_SETUP_CODE.toLowerCase().replaceAll("-", " "));
   await page.getByLabel("Your name").fill(ADMIN.name);
   await page.getByLabel("Email").fill(ADMIN.email);
   const password = page.getByLabel("Password", { exact: true });

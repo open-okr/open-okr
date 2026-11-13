@@ -39,7 +39,6 @@ let goalId = "";
 
 const authed = () => ({ authorization: `Bearer ${token}` });
 const main = () => page.locator("#main-content");
-const drawer = () => page.getByTestId("okr-drawer");
 const keyResultRow = (title: string) =>
   main()
     .locator(titleField("Key result title", title))

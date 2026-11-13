@@ -60,6 +60,20 @@ describe("MockAIProvider", () => {
     expect(response.toolCalls).toEqual(toolCalls);
   });
 
+  it("plays toolRounds one per chatWithTools call, then answers plainly", async () => {
+    const round1 = [{ id: "1", name: "goals.read", arguments: { id: 1 } }];
+    const round2 = [{ id: "2", name: "goals.read", arguments: { id: 2 } }];
+    const provider = new MockAIProvider({ toolRounds: [round1, round2] });
+    const request = {
+      model: "any",
+      messages: [{ role: "user" as const, content: "hi" }],
+      tools: [],
+    };
+    expect((await provider.chatWithTools(request)).toolCalls).toEqual(round1);
+    expect((await provider.chatWithTools(request)).toolCalls).toEqual(round2);
+    expect((await provider.chatWithTools(request)).toolCalls).toBeUndefined();
+  });
+
   it("embeds deterministically: the same input always produces the same vector", async () => {
     const provider = new MockAIProvider();
     const first = await provider.embed({ model: "any", input: ["hello"] });

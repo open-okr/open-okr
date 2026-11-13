@@ -367,3 +367,232 @@ test("a deleted conversation leaves History and its address says so", async () =
       .getByText("That conversation is not there any more."),
   ).toBeVisible({ timeout: 15_000 });
 });
+
+/**
+ * **Edits and the mid-cycle reason** (plan 0.9.0 L4a, design §4.2 to §4.4).
+ *
+ * Acceptance criteria:
+ *   Given a pending proposal to move a task, then the card reads
+ *   `To do -> Done`, Apply moves the task and Undo moves it back.
+ *   Given a workspace that requires a reason for a mid-cycle addition, when a
+ *   pending objective proposal has no reason, then Apply waits until a reason
+ *   is typed, and the objective is saved with those words.
+ *
+ * The proposals are inserted with SQL for the reason the file's header gives.
+ * The task is made through the API with a token, the way `short-links.spec.ts`
+ * makes its rows, so it has the access context a raw insert would lack.
+ */
+test.describe("edits and the reason", () => {
+  let token = "";
+  let spaceId: string;
+  let taskId: string;
+
+  const post = async (action: string, data: unknown) => {
+    const response = await page.request.post(
+      `/api/v1/${action.replace(".", "/")}`,
+      { headers: { authorization: `Bearer ${token}` }, data },
+    );
+    expect(response.status(), `${action}: ${await response.text()}`).toBe(200);
+    return (await response.json()).data as { id: string };
+  };
+
+  const proposalIn = async (
+    title: string,
+    action: string,
+    payload: Record<string, unknown>,
+    subject: [string, string],
+  ): Promise<string> => {
+    const thread = (
+      await pool.query<{ id: string }>(
+        `insert into ai_threads (id, workspace_id, member_id, title)
+         values (gen_random_uuid(), $1, $2, $3) returning id`,
+        [workspaceId, memberId, title],
+      )
+    ).rows[0]?.id as string;
+    await pool.query(
+      `insert into ai_messages (id, workspace_id, thread_id, role, content)
+       values (gen_random_uuid(), $1, $2, 'member', $3)`,
+      [workspaceId, thread, title],
+    );
+    await pool.query(
+      `insert into proposed_changes
+         (id, workspace_id, run_id, thread_id, action, payload, subject_type, subject_id, status, ai_generated)
+       values (gen_random_uuid(), $1, null, $2, $3, $4::jsonb, $5, $6, 'pending', true)`,
+      [
+        workspaceId,
+        thread,
+        action,
+        JSON.stringify(payload),
+        subject[0],
+        subject[1],
+      ],
+    );
+    return thread;
+  };
+
+  const taskStatus = async (): Promise<string | undefined> =>
+    (
+      await pool.query<{ status: string }>(
+        "select status from tasks where id = $1",
+        [taskId],
+      )
+    ).rows[0]?.status;
+
+  test("a task move reads before and after, applies, and undoes", async () => {
+    await page.goto("/account/api-tokens");
+    await page.getByLabel("Name").fill("Copilot edits e2e");
+    await page.getByRole("checkbox", { name: "Write" }).check();
+    await page.getByRole("button", { name: "Create token" }).click();
+    const shown = page.getByTestId("minted-token");
+    await expect(shown).toBeVisible({ timeout: 10_000 });
+    token = ((await shown.textContent()) ?? "").trim();
+
+    spaceId = (
+      await pool.query<{ id: string }>(
+        "select id from spaces where workspace_id = $1 and deleted_at is null order by created_at limit 1",
+        [workspaceId],
+      )
+    ).rows[0]?.id as string;
+    taskId = (
+      await post("tasks.create", {
+        spaceId,
+        title: "Write the handover note",
+        assigneeIds: [memberId],
+      })
+    ).id;
+    await post("tasks.move", { id: taskId, status: "todo" });
+
+    await proposalIn(
+      "Move the handover task",
+      "tasks.move",
+      {
+        id: taskId,
+        status: "done",
+        __preview: [
+          { label: "Task", value: "Write the handover note" },
+          { label: "Status", value: "To do -> Done" },
+        ],
+        __why: "You said the handover note is finished.",
+      },
+      ["task", taskId],
+    );
+
+    await page.goto("/");
+    await openConversation("Move the handover task");
+    const card = page
+      .getByRole("dialog", { name: "Copilot" })
+      .getByRole("region", { name: "Proposed change" });
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    await expect(card.getByText("Move task")).toBeVisible();
+    await expect(card.getByText("To do -> Done")).toBeVisible();
+    await expect(card.getByText("tasks.move")).toHaveCount(0);
+
+    await card.getByRole("button", { name: "Apply" }).click();
+    await expect(card.getByText("Applied")).toBeVisible({ timeout: 20_000 });
+    expect(await taskStatus()).toBe("done");
+
+    await card.getByRole("button", { name: "Undo" }).click();
+    await expect(card.getByText("Undone")).toBeVisible({ timeout: 20_000 });
+    expect(await taskStatus()).toBe("todo");
+  });
+
+  test("a card that needs a reason blocks Apply until one is typed", async () => {
+    const cycle = (
+      await pool.query<{
+        id: string;
+        starts_on: string;
+        ends_on: string;
+        published_at: Date | null;
+      }>(
+        `select c.id, c.starts_on::text, c.ends_on::text, c.published_at
+           from cycles c
+          where c.workspace_id = $1 and c.mode = 'quarterly' and c.deleted_at is null
+          order by c.starts_on desc limit 1`,
+        [workspaceId],
+      )
+    ).rows[0];
+    if (!cycle) {
+      throw new Error("No quarterly cycle to start an objective in.");
+    }
+    const title = `Reason required ${Date.now()}`;
+    try {
+      // Started five weeks ago and published: a start now is mid-cycle.
+      await pool.query(
+        `update cycles
+            set starts_on = current_date - 35, ends_on = current_date + 30,
+                published_at = now()
+          where id = $1`,
+        [cycle.id],
+      );
+      await post("practice.update", {
+        overrides: { "reasons.midCycleAddition": "required" },
+      });
+
+      await proposalIn(
+        "Start an objective mid-cycle",
+        "goals.create",
+        {
+          title,
+          cycleId: cycle.id,
+          level: "team",
+          ownerKind: "space",
+          spaceId,
+          championId: memberId,
+          reviewerId: memberId,
+          weight: 1,
+          __preview: [
+            { label: "Objective", value: title },
+            { label: "Level", value: "team" },
+          ],
+          __why: "You asked for this objective.",
+        },
+        ["space", spaceId],
+      );
+
+      await page.goto("/");
+      await openConversation("Start an objective mid-cycle");
+      const card = page
+        .getByRole("dialog", { name: "Copilot" })
+        .getByRole("region", { name: "Proposed change" });
+      await expect(card).toBeVisible({ timeout: 15_000 });
+      const apply = card.getByRole("button", { name: "Apply" });
+      const reason = card.getByLabel(
+        "Why it starts now (required, it is added mid-cycle)",
+      );
+      await expect(reason).toBeVisible();
+      await expect(apply).toBeDisabled();
+
+      await reason.fill("The Growth team formed this month");
+      await expect(apply).toBeEnabled();
+      await apply.click();
+      await expect(card.getByText("Applied")).toBeVisible({ timeout: 20_000 });
+
+      const goal = (
+        await pool.query<{ id: string }>(
+          "select id from goals where workspace_id = $1 and title = $2 and deleted_at is null",
+          [workspaceId, title],
+        )
+      ).rows[0];
+      expect(goal?.id).toBeTruthy();
+      const created = await pool.query<{ payload: { reason?: string } }>(
+        "select payload from activities where subject_id = $1 and kind = 'goal.created'",
+        [goal?.id],
+      );
+      expect(created.rows[0]?.payload.reason).toBe(
+        "The Growth team formed this month",
+      );
+      // Leave the shared instance as it was found.
+      await card.getByRole("button", { name: "Undo" }).click();
+      await expect(card.getByText("Undone")).toBeVisible({ timeout: 20_000 });
+    } finally {
+      await post("practice.update", {
+        overrides: { "reasons.midCycleAddition": "optional" },
+      });
+      await pool.query(
+        `update cycles set starts_on = $2::date, ends_on = $3::date, published_at = $4
+          where id = $1`,
+        [cycle.id, cycle.starts_on, cycle.ends_on, cycle.published_at],
+      );
+    }
+  });
+});

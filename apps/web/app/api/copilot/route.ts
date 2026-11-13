@@ -35,6 +35,8 @@ import {
   callAction,
   copilotStepFrom,
   copilotThreadChannel,
+  eventReasonFields,
+  reasonSentence,
   streamAnswer,
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
@@ -44,6 +46,9 @@ import { resolveDrafterFor } from "../../../lib/drafter";
 import { getRealtime } from "../../../lib/realtime";
 import { refuseCrossSite } from "../../../lib/same-origin";
 import { requireWorkspace } from "../../../lib/workspace";
+
+/** The reason the panel words from its catalogue when the stream itself fails. */
+const couldNotAnswer = { code: "could_not_answer" } as const;
 
 export const dynamic = "force-dynamic";
 
@@ -160,7 +165,8 @@ export async function POST(request: NextRequest) {
         if (!request.signal.aborted) {
           send({
             kind: "unavailable",
-            reason: "The copilot could not answer. Your question was saved.",
+            reason: reasonSentence(couldNotAnswer),
+            ...couldNotAnswer,
           });
           send({ kind: "done", answerMessageId: null, stopped: true });
         }
@@ -271,7 +277,11 @@ data: ${JSON.stringify(event)}
           if (event.name === "copilot.done") {
             const halted = data.haltedReason;
             if (typeof halted === "string" && halted !== "") {
-              send({ kind: "unavailable", reason: halted });
+              send({
+                kind: "unavailable",
+                reason: halted,
+                ...eventReasonFields(data),
+              });
             }
             send({
               kind: "done",

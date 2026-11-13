@@ -8,6 +8,7 @@
  *
  * | Group | Holds | Shown |
  * |---|---|---|
+ * | Recent | What this member opened lately, at most eight | Before anything is typed, first |
  * | Go to | Things of every kind whose name matches, and a KPI a short code names | When something matches |
  * | Search results | Full-text matches not already under Go to | When something matches |
  * | Related | Semantic matches | Only with an AI provider, and only when it found something |
@@ -15,7 +16,7 @@
  */
 
 /** One thing the palette can open. */
-interface PaletteEntry {
+export interface PaletteEntry {
   readonly entityType: string;
   readonly entityId: string;
   readonly title: string;
@@ -61,7 +62,45 @@ export interface PaletteRow {
   readonly command: string | null;
 }
 
-export type PaletteGroupId = "goTo" | "results" | "related" | "actions";
+export type PaletteGroupId =
+  | "recent"
+  | "goTo"
+  | "results"
+  | "related"
+  | "actions";
+
+/** How many recents the palette draws, whatever the server returned. */
+const RECENT_SHOWN = 8;
+
+/**
+ * The scoped tabs (work-layer.md §5.1, G2-D6). A tab narrows every group to
+ * the kinds it names. `kinds` is `null` for All, and the kinds are the
+ * entity names `search.entities` and the index use.
+ */
+export const PALETTE_TABS = [
+  { id: "all", label: "search.everything", kinds: null },
+  { id: "objectives", label: "search.objectives", kinds: ["goal"] },
+  {
+    id: "keyResults",
+    label: "cycle.reviewAndLearn.keyResults",
+    kinds: ["key_result"],
+  },
+  { id: "kpis", label: "pageTitle.kpis", kinds: ["kpi"] },
+  { id: "initiatives", label: "common.initiatives", kinds: ["initiative"] },
+  { id: "tasks", label: "search.tasks", kinds: ["task"] },
+  { id: "people", label: "people.people", kinds: ["person"] },
+] as const;
+
+export type PaletteTab = (typeof PALETTE_TABS)[number];
+export type PaletteTabId = PaletteTab["id"];
+
+/**
+ * A tab by the id a server action was handed. The id arrives from the
+ * browser, so an unknown one means All rather than an error.
+ */
+export function paletteTab(id: string | undefined): PaletteTab {
+  return PALETTE_TABS.find((tab) => tab.id === id) ?? PALETTE_TABS[0];
+}
 
 export interface PaletteGroup {
   readonly id: PaletteGroupId;
@@ -125,27 +164,85 @@ const hitRow =
   });
 
 /**
+ * Whether a thing belongs on the tab. All takes everything. A scoped tab takes
+ * only the kinds it names, so a recent is filtered by the same rule as a result.
+ */
+const onTab = (entry: PaletteEntry, kinds: readonly string[] | null) =>
+  kinds === null || kinds.includes(entry.entityType);
+
+/**
+ * Orders a group's rows for a phrase (G2-D5). A title that is exactly what was
+ * typed comes first, and a recent one among those first of all. Below the exact
+ * titles a recent is lifted above the rest. The sort is stable, so the
+ * server's own order holds inside each band.
+ */
+function liftRecent<T extends PaletteEntry>(
+  entries: readonly T[],
+  phrase: string,
+  recent: ReadonlySet<string>,
+): T[] {
+  const typed = phrase.toLocaleLowerCase();
+  const band = (entry: T) => {
+    const exact = entry.title.trim().toLocaleLowerCase() === typed;
+    const lately = recent.has(keyOf(entry));
+    return exact ? (lately ? 0 : 1) : lately ? 2 : 3;
+  };
+  return entries
+    .map((entry, position) => ({ entry, position, band: band(entry) }))
+    .sort((a, b) => a.band - b.band || a.position - b.position)
+    .map((one) => one.entry);
+}
+
+/**
  * The groups for one phrase, in the order they are drawn.
  *
  * Nothing is listed twice. A thing already offered under Go to is dropped from
  * both kinds of result, and a related result that full text also found is
  * dropped from Related, because the words matching is the stronger reason.
+ *
+ * **A scoped tab has no Actions group.** The actions are pages and commands,
+ * and a tab that says "Tasks" is a promise that only tasks appear.
  */
 export function paletteGroups(
   phrase: string,
   answer: PaletteAnswer,
   related: readonly PaletteHit[],
   commands: readonly PaletteCommand[],
+  recent: readonly PaletteEntry[] = [],
+  tabKinds: readonly string[] | null = null,
 ): readonly PaletteGroup[] {
   const typed = phrase.trim();
+  const actions = tabKinds === null ? commands : [];
   if (typed === "") {
-    return commands.length === 0
-      ? []
-      : [{ id: "actions", rows: commands.map(commandRow) }];
+    const lately = recent
+      .filter((entry) => onTab(entry, tabKinds))
+      .slice(0, RECENT_SHOWN);
+    return [
+      {
+        id: "recent" as const,
+        rows: lately.map(
+          (entry): PaletteRow => ({
+            id: rowId("recent", keyOf(entry)),
+            title: entry.title,
+            kind: KIND_LABEL[entry.entityType] ?? null,
+            detail: null,
+            href: entry.href,
+            command: null,
+          }),
+        ),
+      },
+      { id: "actions" as const, rows: actions.map(commandRow) },
+    ].filter((group) => group.rows.length > 0);
   }
 
-  const offered = new Set(answer.goTo.map(keyOf));
-  const goTo = answer.goTo.map(
+  const lately = new Set(recent.map(keyOf));
+  const goToEntries = liftRecent(
+    answer.goTo.filter((entry) => onTab(entry, tabKinds)),
+    typed,
+    lately,
+  );
+  const offered = new Set(goToEntries.map(keyOf));
+  const goTo = goToEntries.map(
     (entry): PaletteRow => ({
       id: rowId("goto", keyOf(entry)),
       title: entry.title,
@@ -155,7 +252,13 @@ export function paletteGroups(
       command: null,
     }),
   );
-  const results = answer.hits.filter((hit) => !offered.has(keyOf(hit)));
+  const results = liftRecent(
+    answer.hits.filter(
+      (hit) => !offered.has(keyOf(hit)) && onTab(hit, tabKinds),
+    ),
+    typed,
+    lately,
+  );
   for (const hit of results) {
     offered.add(keyOf(hit));
   }
@@ -165,13 +268,17 @@ export function paletteGroups(
     { id: "results", rows: results.map(hitRow("hit")) },
     {
       id: "related",
-      rows: related
-        .filter((hit) => !offered.has(keyOf(hit)))
-        .map(hitRow("related")),
+      rows: liftRecent(
+        related.filter(
+          (hit) => !offered.has(keyOf(hit)) && onTab(hit, tabKinds),
+        ),
+        typed,
+        lately,
+      ).map(hitRow("related")),
     },
     {
       id: "actions",
-      rows: commands
+      rows: actions
         .filter((command) => commandMatches(command, typed))
         .map(commandRow),
     },

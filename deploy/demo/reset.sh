@@ -106,10 +106,15 @@ log "healthy after ${waited}s"
 # The first account on an unclaimed instance. Registration closes behind it,
 # which is the rule rather than a demo-specific setting: every visitor after
 # this signs in as a persona.
+# The claim needs the setup code `up` just wrote beside BETTER_AUTH_SECRET, read
+# from the same file. The demo is no exception (docs/design/setup-code.md Q3).
+setup_code=$(grep '^OPENOKR_SETUP_CODE=' "$REPO/deploy/docker/secrets/app.env" | cut -d= -f2-)
+[ -n "$setup_code" ] || fail "could not read the generated setup code"
 log "creating the operator account"
 code=$(curl -s -o /dev/null -w '%{http_code}' \
   -X POST "$BASE/api/auth/sign-up/email" \
   -H 'Content-Type: application/json' \
+  -H "x-openokr-setup-code: $setup_code" \
   -d "{\"email\":\"$OPENOKR_DEMO_OWNER_EMAIL\",\"password\":\"$OPENOKR_DEMO_OWNER_PASSWORD\",\"name\":\"$OPENOKR_DEMO_OWNER_NAME\"}")
 [ "$code" = "200" ] || fail "creating the operator account returned $code"
 
@@ -128,12 +133,20 @@ export BETTER_AUTH_SECRET
 log "seeding the Northwind year as of today"
 ( cd "$REPO" && pnpm db:seed ) || fail "the seed failed"
 
-# The data changes, after the seed and before the cast (plan 0.8.1 U2). A
-# freshly seeded year still has work for them: checked on 12 November 2026,
-# 0001 filled two members' time zones, 0005 gave 156 check-ins their
-# reviewer, and 0035 queued 1,337 items for search and the copilot. Without
-# them the copilot cannot find a check-in the story wrote. The root key is
-# needed by the script that seals stored identity-provider tokens.
+# The data changes, after the seed and before the cast (plan 0.8.1 U2). They
+# stay for an upgrade, which is what they are for. Checked on 12 November
+# 2026, a freshly seeded year still showed work for three of them:
+#   0001 filled two time zones. They were the Coach's and the Champion's
+#        member rows, which every new workspace created without one. The
+#        product now gives them the workspace's zone (plan 0.9.0 D1).
+#   0005 reported 156 check-ins. It rewrites a null reviewer to null on
+#        check-ins whose goal has no reviewer, so it changes nothing.
+#   0035 queued 1,337 items for search and the copilot again. The seed's own
+#        writes had already queued them, and 0035 checks only its own key.
+#        Open question for Akmal.
+# Without the step the copilot cannot find a check-in the story wrote, because
+# the relay has not run when the seed ends. The root key is needed by the
+# script that seals stored identity-provider tokens.
 OPENOKR_ENCRYPTION_KEY=$(grep '^OPENOKR_ENCRYPTION_KEY=' "$REPO/deploy/docker/secrets/app.env" | cut -d= -f2-)
 [ -n "$OPENOKR_ENCRYPTION_KEY" ] || fail "could not read the instance's root key"
 export OPENOKR_ENCRYPTION_KEY

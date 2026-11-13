@@ -1387,9 +1387,42 @@
       "method": "GET",
       "path": "/ai/readToolCallSummary",
       "scope": "read",
-      "summary": "How much external agents were used in this workspace over 30 days, and how often refused, with no member named.",
+      "summary": "How much external agents were used in this workspace over 30 days, and how often refused, with no member named, and the copilot's reads over the same days with the member each was made for.",
       "flags": [],
       "pages": false
+    },
+    {
+      "name": "ai answerRatings",
+      "action": "ai.answerRatings",
+      "method": "GET",
+      "path": "/ai/answerRatings",
+      "scope": "read",
+      "summary": "The thumbs members gave copilot answers, newest first, with the note, the model and what was read. The question and the answer are included only when the member shared them.",
+      "flags": [
+        {
+          "name": "rating",
+          "field": "rating",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "up",
+            "down"
+          ]
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": true
     },
     {
       "name": "tokens mine",
@@ -1812,6 +1845,12 @@
           "field": "id",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -1861,6 +1900,62 @@
         {
           "name": "thread-id",
           "field": "threadId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "copilot rate",
+      "action": "copilot.rate",
+      "method": "POST",
+      "path": "/copilot/rate",
+      "scope": "write",
+      "summary": "Rates one copilot answer in the caller's own conversation, with an optional note and an optional share with AI administrators.",
+      "flags": [
+        {
+          "name": "message-id",
+          "field": "messageId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "rating",
+          "field": "rating",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "up",
+            "down"
+          ]
+        },
+        {
+          "name": "note",
+          "field": "note",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "shared",
+          "field": "shared",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "copilot unrate",
+      "action": "copilot.unrate",
+      "method": "POST",
+      "path": "/copilot/unrate",
+      "scope": "write",
+      "summary": "Removes the caller's rating of one copilot answer.",
+      "flags": [
+        {
+          "name": "message-id",
+          "field": "messageId",
           "type": "string",
           "required": true
         }
@@ -6166,6 +6261,23 @@
       "pages": false
     },
     {
+      "name": "search recent",
+      "action": "search.recent",
+      "method": "GET",
+      "path": "/search/recent",
+      "scope": "read",
+      "summary": "Which of the things a browser remembers opening this member may still open, newest first. With none given, the member's own last changes.",
+      "flags": [
+        {
+          "name": "refs",
+          "field": "refs",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "exports list",
       "action": "exports.list",
       "method": "POST",
@@ -9503,6 +9615,23 @@
           "field": "remark",
           "type": "string",
           "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "kpis deleteRecord",
+      "action": "kpis.deleteRecord",
+      "method": "POST",
+      "path": "/kpis/deleteRecord",
+      "scope": "destructive",
+      "summary": "Removes one period's value from a KPI. Recording the same period again brings it back.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
         }
       ],
       "pages": false

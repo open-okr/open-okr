@@ -15,11 +15,16 @@
  * failure here means no draft rather than an unvalidated one.
  */
 import { isDeepStrictEqual } from "node:util";
-import type { AIProvider } from "@openokr/adapters";
+import type {
+  AIProvider,
+  ChatMessage,
+  ToolDefinition,
+} from "@openokr/adapters";
 import type {
   AgentDrafter,
   AmbitionContext,
   CheckInDraftContext,
+  ChosenReads,
   ClusterableNote,
   DecompositionContext,
   DiagnosticContext,
@@ -45,6 +50,8 @@ import type {
   ProposedAction,
   ProposedImportMapping,
   ProposedObjective,
+  ReadingContext,
+  ReadingTool,
   RecoveryTitleContext,
   RetrospectiveCheckIn,
   ReviewableGoal,
@@ -57,10 +64,13 @@ import type {
   TrendContext,
 } from "@openokr/core";
 import {
+  COPILOT_MAX_READS_PER_ROUND,
+  COPILOT_MAX_ROUNDS,
   costOfUsage,
   DEFAULT_PROMPTS,
   PROMPT_KEYS,
   type PromptKey,
+  TOOL_RESULTS_ARE_DATA,
 } from "@openokr/core";
 import { z } from "zod";
 import { extractStructured } from "./structured-extraction.ts";
@@ -239,11 +249,117 @@ function proposalNoteFor(
   );
 }
 
+/** How many tokens one tool round may use. Reasoning models think from the same budget. */
+const READING_ROUND_TOKENS = 1_200;
+
+/**
+ * What the read loop is told (plan 0.9.0 L2b). The answer is written later,
+ * from what was read, so this round only chooses reads.
+ */
+const READING_SYSTEM =
+  "You help a member of an organisation with its OKRs. Use the tools to read " +
+  "what you need from their workspace, as that member, then stop. Do not " +
+  "write the answer yourself: when you have read enough, or need nothing " +
+  "read, reply with the single word READY. A number in square brackets " +
+  "beside a record is its reference; pass that number where a tool asks for " +
+  "one, never anything else. " +
+  // Tuned to GPT-6 Luna (plan 0.9.0 L7b): it opened the yearly objective for
+  // "this quarter", quoted another member's check-in as "my last check-in",
+  // and passed a key result's number to goals.read.
+  "Words like my, mine and I mean the person asking: use a tool's mine " +
+  "filter where it has one, and treat a record as theirs only when it says " +
+  "so. When several records share a title, choose by timeframe: this " +
+  "quarter means the one whose timeframe is a quarter, not a year. Pass a " +
+  "number only to a tool that asks for that kind of record: a key result's " +
+  "number is not an objective's. " +
+  "Prefer one targeted read to many broad ones. " +
+  "When you have enough, stop calling tools. " +
+  TOOL_RESULTS_ARE_DATA;
+
+/**
+ * What the loop is told when a first-round-only tool is offered (plan 0.9.0
+ * A4). The decision not to let a read start a change is made by what the
+ * drafter sends (see `ReadingTool.firstRoundOnly`); this sentence only keeps
+ * the model from calling the tool for a question.
+ */
+const PROPOSE_NOTE =
+  "You may also have a tool that prepares a change for the person to review. " +
+  "Call it in your first reply only, at most once, and only when the " +
+  "person's latest message plainly asks for one of the changes it offers. A " +
+  "question is not a request. It only makes a card: the person applies it " +
+  "themselves. When it asks you to choose from a list, pass the number.";
+
+/** The sentence a call past the per-round limit is answered with. */
+const READ_LIMIT_REACHED =
+  "Limit reached: no more reads this round. Answer from what you have.";
+
+/**
+ * What the final answer is told about the records it was given (plan 0.9.0
+ * L2b). The product says it, so the answer states a value only from a record
+ * and says plainly what it could not read.
+ */
+function readingNoteFor(reading: GroundedQuestionContext["reading"]) {
+  if (reading === undefined) {
+    return null;
+  }
+  return (
+    "From the product, not the person: the passages above are records you " +
+    "read in this workspace as the person asking, numbered as you saw them " +
+    "while reading. State values, health, owners, dates and statuses only " +
+    "from them, and cite by number. If a record you needed is not there, " +
+    "say plainly that you could not find it or could not read it." +
+    // Tuned to GPT-6 Luna, plan 0.9.0 L7b: with two records of one title the
+    // live run picked the past year's, so the question decides by cycle.
+    " When records share a title, the question decides between them by cycle: this quarter is the one whose cycle is a quarter." +
+    (reading.limited
+      ? " You stopped reading because a limit was reached. Say what you could not read."
+      : "")
+  );
+}
+
+/**
+ * Tells the model who asks, so "my" matches a record that names them. Tuned to
+ * GPT-6 Luna, plan 0.9.0 L7b: without it every answer said "I can't tell
+ * whether this is yours" although the record named the asker as champion.
+ */
+const askerNote = (asker: string | undefined) =>
+  asker === undefined
+    ? []
+    : [
+        {
+          role: "system" as const,
+          content: `The person asking is ${asker}. A record that names them as champion, reviewer, owner, assignee or author is theirs.`,
+        },
+      ];
+
+/**
+ * The record the member has open, as a block of its own (plan 0.9.0 CP11).
+ *
+ * Its own message, before the question and never inside it: what a read
+ * returns is text people in the workspace wrote, so it is framed as data with
+ * the same sentence the tool results carry (design section 3.4). The question
+ * stays the member's own words.
+ */
+const subjectBlock = (subject: ReadingContext["subject"]) =>
+  subject === undefined
+    ? []
+    : [
+        {
+          role: "user" as const,
+          content:
+            `The member is asking about [${subject.ref}] ${subject.label} (${subject.kind}). ` +
+            "That record was already read for them, below. Read more only if it is not enough. " +
+            `${TOOL_RESULTS_ARE_DATA}\n\n${subject.text}`,
+        },
+      ];
+
 /** The conversation so far, then the passages, then the question. */
 const copilotMessages = (context: GroundedQuestionContext) => {
   const note = proposalNoteFor(context.proposal);
+  const readingNote = readingNoteFor(context.reading);
   return [
     { role: "system" as const, content: COPILOT_SYSTEM },
+    ...askerNote(context.asker),
     ...context.history.map((turn) => ({
       role: turn.role === "member" ? ("user" as const) : ("assistant" as const),
       content: turn.content,
@@ -257,6 +373,7 @@ const copilotMessages = (context: GroundedQuestionContext) => {
         NEWLINE +
         NEWLINE +
         `Question: ${context.question}` +
+        (readingNote === null ? "" : NEWLINE + NEWLINE + readingNote) +
         (note === null ? "" : NEWLINE + NEWLINE + note),
     },
   ];
@@ -429,9 +546,20 @@ const PROPOSAL_SYSTEM =
   // "my activation key result" when no activation key result was on the
   // list, it chose the nearest one, a different measure.
   "When the request names an item that is not on the list, propose nothing " +
-  "rather than choosing the nearest one. Fill in the fields the " +
-  "action you chose takes, and set every other field to null. Say in one " +
-  `sentence why this change, now. When you propose nothing, the action is "${NO_ACTION}".`;
+  "rather than choosing the nearest one. Fill in the fields the action you " +
+  "chose takes, and set every other field to null. " +
+  // Tuned to GPT-6 Luna, 12 November 2026: one sentence asked to leave a
+  // reason out and another to give one, so Luna left the top-level why empty
+  // and every proposal for a request without a stated reason was dropped as
+  // no_reason.
+  "A field called reason is the person's own reason: fill it only from their " +
+  "words saying why the change is wanted now, and set it to null when they " +
+  "did not say. The top-level why is separate and is always one sentence of " +
+  "your own saying why this change answers this request. It is never empty " +
+  "when you propose. For a check-in, give a key result a value only when the " +
+  "person's words state a number, and write every confidence as a number " +
+  "from 0 to 1. " +
+  `When you propose nothing, the action is "${NO_ACTION}".`;
 
 /** The offered actions, their fields and their numbered choices, as text. */
 const optionsFor = (context: ProposalRequestContext): string =>
@@ -1462,6 +1590,157 @@ export function createProviderDrafter(
       };
     },
 
+    /**
+     * The read loop (plan 0.9.0 L2b): rounds of `chatWithTools`, each tool
+     * result sent back as a tool message, at most `COPILOT_MAX_ROUNDS` rounds
+     * and `COPILOT_MAX_READS_PER_ROUND` reads in each.
+     *
+     * **The answer is not written here.** Anthropic refuses a conversation
+     * that holds tool turns when no tools are sent with it, so the final
+     * answer cannot be streamed through this one. The caller sends what was
+     * read to `streamGrounded`, as ordinary numbered passages.
+     *
+     * Null when the model cannot call tools, when the first round fails
+     * before any read, or when the cost cap leaves no room for one. After a
+     * read, a failure or a limit ends the loop and returns what was read,
+     * marked as limited.
+     */
+    async chooseReads(
+      context: ReadingContext,
+      tools: readonly ReadingTool[],
+      read: (name: string, args: unknown) => Promise<string>,
+      beforeRound: () => Promise<boolean>,
+    ): Promise<ChosenReads | null> {
+      const provider = forFeature("copilotReads");
+      if (!provider.capabilities(options.model).tools || tools.length === 0) {
+        return null;
+      }
+      const definitionOf = (tool: ReadingTool): ToolDefinition => ({
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.inputSchema,
+      });
+      const offered: ToolDefinition[] = tools.map(definitionOf);
+      // From round two the first-round-only tools are gone (A4-D4).
+      const offeredLater: ToolDefinition[] = tools
+        .filter((tool) => !tool.firstRoundOnly)
+        .map(definitionOf);
+      const firstRoundOnly = offeredLater.length < offered.length;
+      const turnOf = (
+        turn: ReadingContext["history"][number],
+      ): ChatMessage => ({
+        role:
+          turn.role === "member" ? ("user" as const) : ("assistant" as const),
+        content: turn.content,
+      });
+      // Round one holds the member's earlier questions and no earlier answer,
+      // because an answer may quote what a read returned (A4-D4, Q2).
+      const questionsOnly = context.history.filter(
+        (turn) => turn.role === "member",
+      );
+      const lead: ChatMessage[] = [
+        // One system message: the evaluation harness and some providers
+        // accept only one, so the propose note joins it.
+        {
+          role: "system",
+          content: firstRoundOnly
+            ? `${READING_SYSTEM} ${PROPOSE_NOTE}`
+            : READING_SYSTEM,
+        },
+        ...askerNote(context.asker),
+      ];
+      const messages: ChatMessage[] = [
+        ...lead,
+        ...(firstRoundOnly ? questionsOnly : context.history).map(turnOf),
+        ...subjectBlock(context.subject),
+        { role: "user", content: context.question },
+      ];
+      const before = spent;
+      let tokensIn = 0;
+      let tokensOut = 0;
+      let reads = 0;
+      let limited = false;
+
+      for (let round = 1; round <= COPILOT_MAX_ROUNDS; round += 1) {
+        // The cap and the credits are asked before every call, so a call
+        // already made is never the one that finds the money gone.
+        if (!affordable() || !(await beforeRound())) {
+          if (reads === 0) {
+            return null;
+          }
+          limited = true;
+          break;
+        }
+        if (round === 2 && firstRoundOnly) {
+          // The tool is gone, so the earlier answers can come back: a read may
+          // follow up on them, and nothing can start a change from them now.
+          messages.splice(
+            lead.length,
+            questionsOnly.length,
+            ...context.history.map(turnOf),
+          );
+        }
+        let reply: Awaited<ReturnType<AIProvider["chatWithTools"]>>;
+        try {
+          reply = await provider.chatWithTools({
+            model: options.model,
+            // What it reads is workspace content, as retrieval is.
+            purpose: "retrieval",
+            messages,
+            tools: round === 1 ? offered : offeredLater,
+            maxTokens: READING_ROUND_TOKENS,
+          });
+        } catch {
+          if (reads === 0) {
+            return null;
+          }
+          limited = true;
+          break;
+        }
+        charge(reply.usage);
+        tokensIn += reply.usage.inputTokens;
+        tokensOut += reply.usage.outputTokens;
+        const calls = reply.toolCalls ?? [];
+        if (calls.length === 0) {
+          break;
+        }
+        messages.push({
+          role: "assistant",
+          content: reply.content,
+          toolCalls: calls,
+        });
+        for (const [index, call] of calls.entries()) {
+          let result = READ_LIMIT_REACHED;
+          if (index < COPILOT_MAX_READS_PER_ROUND) {
+            try {
+              result = await read(call.name, call.arguments);
+              reads += 1;
+            } catch {
+              result = "That call could not be completed.";
+            }
+          } else {
+            limited = true;
+          }
+          messages.push({
+            role: "tool",
+            toolCallId: call.id,
+            content: result,
+          });
+        }
+        if (round === COPILOT_MAX_ROUNDS) {
+          // The model was still asking. Whatever it wanted next was not read.
+          limited = true;
+        }
+      }
+      return {
+        reads,
+        limited,
+        costUsd: spent - before,
+        tokensIn,
+        tokensOut,
+      };
+    },
+
     async proposeAction(
       context: ProposalRequestContext,
     ): Promise<ProposedAction | null> {
@@ -1493,7 +1772,8 @@ export function createProviderDrafter(
           model: options.model,
           schema: PROPOSAL_SHAPE,
           jsonSchema: proposalJsonSchema(context.options),
-          maxTokens: 500,
+          // A check-in carries a narrative and a value per key result.
+          maxTokens: 900,
           onUsage: charge,
           messages: [
             { role: "system", content: PROPOSAL_SYSTEM },

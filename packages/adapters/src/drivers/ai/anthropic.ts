@@ -31,6 +31,7 @@ import {
   type ToolDefinition,
 } from "../../ports/ai.ts";
 import type { TierModelMap } from "./tier-map.ts";
+import { fromWireName, toWireName } from "./tool-names.ts";
 
 /** A seed, not a catalogue: refined per model once P2-T15's catalogue exists. */
 export const ANTHROPIC_DEFAULT_TIER_MODELS: TierModelMap = {
@@ -87,28 +88,58 @@ function splitSystem(messages: readonly ChatMessage[]): SplitMessages {
 function toMessages(
   messages: readonly ChatMessage[],
 ): Anthropic.MessageParam[] {
-  return messages.map((message) => {
+  const out: Anthropic.MessageParam[] = [];
+  for (const message of messages) {
     if (message.role === "tool") {
-      return {
-        role: "user",
-        content: [
-          {
-            type: "tool_result",
-            tool_use_id: message.toolCallId ?? "",
-            content: message.content,
-          },
-        ],
+      // Results of one assistant turn go back together in one user turn, which
+      // is what the Messages API requires after parallel tool_use blocks.
+      const block: Anthropic.ToolResultBlockParam = {
+        type: "tool_result",
+        tool_use_id: message.toolCallId ?? "",
+        content: message.content,
       };
+      const last = out[out.length - 1];
+      if (
+        last?.role === "user" &&
+        Array.isArray(last.content) &&
+        last.content.every((part) => part.type === "tool_result")
+      ) {
+        last.content.push(block);
+      } else {
+        out.push({ role: "user", content: [block] });
+      }
+      continue;
+    }
+    if (message.role === "assistant" && message.toolCalls?.length) {
+      out.push({
+        role: "assistant",
+        content: [
+          ...(message.content === ""
+            ? []
+            : [{ type: "text" as const, text: message.content }]),
+          ...message.toolCalls.map((call) => ({
+            type: "tool_use" as const,
+            id: call.id,
+            name: toWireName(call.name),
+            input: call.arguments,
+          })),
+        ],
+      });
+      continue;
     }
     // "system" is already filtered out by splitSystem before this runs.
-    return {
+    out.push({
       role: message.role as "user" | "assistant",
       content: message.content,
-    };
-  });
+    });
+  }
+  return out;
 }
 
-function fromMessage(message: Anthropic.Message): ChatResponse {
+function fromMessage(
+  message: Anthropic.Message,
+  tools: readonly ToolDefinition[] = [],
+): ChatResponse {
   const textBlocks = message.content.filter(
     (block): block is Anthropic.TextBlock => block.type === "text",
   );
@@ -123,7 +154,7 @@ function fromMessage(message: Anthropic.Message): ChatResponse {
       ? {
           toolCalls: toolBlocks.map((block) => ({
             id: block.id,
-            name: block.name,
+            name: fromWireName(block.name, tools),
             arguments: block.input as Record<string, unknown>,
           })),
         }
@@ -277,12 +308,12 @@ export class AnthropicProvider implements AIProvider {
       system,
       messages: toMessages(rest),
       tools: request.tools.map((tool) => ({
-        name: tool.name,
+        name: toWireName(tool.name),
         description: tool.description,
         input_schema: tool.parameters as AnthropicInputSchema,
       })),
     });
-    return fromMessage(message);
+    return fromMessage(message, request.tools);
   }
 
   async embed(_request: EmbedRequest): Promise<EmbedResponse> {

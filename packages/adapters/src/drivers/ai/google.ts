@@ -18,6 +18,7 @@
  * `GoogleProviderOptions.client` accepts a pre-built stand-in for contract
  * tests instead of trying to intercept the network layer.
  */
+import { randomUUID } from "node:crypto";
 import { GoogleGenAI } from "@google/genai";
 import type {
   AIProvider,
@@ -32,6 +33,7 @@ import type {
   ToolDefinition,
 } from "../../ports/ai.ts";
 import type { TierModelMap } from "./tier-map.ts";
+import { fromWireName, toWireName } from "./tool-names.ts";
 
 /** A seed, not a catalogue: refined per model once P2-T15's catalogue exists. */
 export const GOOGLE_DEFAULT_TIER_MODELS: TierModelMap = {
@@ -46,6 +48,20 @@ interface GenerateContentResult {
   readonly functionCalls?: readonly {
     readonly name?: string;
     readonly args?: Record<string, unknown>;
+    readonly id?: string;
+  }[];
+  /** Read for `thoughtSignature`, which `functionCalls` drops. */
+  readonly candidates?: readonly {
+    readonly content?: {
+      readonly parts?: readonly {
+        readonly functionCall?: {
+          readonly name?: string;
+          readonly args?: Record<string, unknown>;
+          readonly id?: string;
+        };
+        readonly thoughtSignature?: string;
+      }[];
+    };
   }[];
   readonly usageMetadata?: {
     readonly promptTokenCount?: number;
@@ -117,15 +133,83 @@ export interface GoogleProviderOptions {
   readonly defaultContextWindow?: number;
 }
 
-function toContents(
-  messages: readonly ChatMessage[],
-): { role: string; parts: { text: string }[] }[] {
-  return messages
-    .filter((message) => message.role !== "system")
-    .map((message) => ({
+interface GooglePart {
+  text?: string;
+  functionCall?: {
+    name: string;
+    args: Record<string, unknown>;
+    id?: string;
+  };
+  functionResponse?: {
+    name: string;
+    id?: string;
+    response: Record<string, unknown>;
+  };
+  thoughtSignature?: string;
+}
+
+interface GoogleContent {
+  role: string;
+  parts: GooglePart[];
+}
+
+function toContents(messages: readonly ChatMessage[]): GoogleContent[] {
+  const out: GoogleContent[] = [];
+  // Which function a tool message answers: Gemini wants the name, the port
+  // only carries the call id.
+  const nameById = new Map<string, string>();
+  for (const message of messages) {
+    if (message.role === "system") {
+      continue;
+    }
+    if (message.role === "tool") {
+      const id = message.toolCallId;
+      const name = (id !== undefined ? nameById.get(id) : undefined) ?? "";
+      const part: GooglePart = {
+        functionResponse: {
+          name: toWireName(name),
+          ...(id !== undefined ? { id } : {}),
+          response: { content: message.content },
+        },
+      };
+      const last = out[out.length - 1];
+      if (
+        last?.role === "user" &&
+        last.parts.every((p) => p.functionResponse)
+      ) {
+        last.parts.push(part);
+      } else {
+        out.push({ role: "user", parts: [part] });
+      }
+      continue;
+    }
+    if (message.role === "assistant" && message.toolCalls?.length) {
+      const parts: GooglePart[] = message.content
+        ? [{ text: message.content }]
+        : [];
+      for (const call of message.toolCalls) {
+        nameById.set(call.id, call.name);
+        const signature = call.providerData?.thoughtSignature;
+        parts.push({
+          functionCall: {
+            name: toWireName(call.name),
+            args: call.arguments,
+            id: call.id,
+          },
+          ...(typeof signature === "string"
+            ? { thoughtSignature: signature }
+            : {}),
+        });
+      }
+      out.push({ role: "model", parts });
+      continue;
+    }
+    out.push({
       role: message.role === "assistant" ? "model" : "user",
       parts: [{ text: message.content }],
-    }));
+    });
+  }
+  return out;
 }
 
 function systemInstruction(
@@ -138,20 +222,41 @@ function systemInstruction(
   return system === "" ? undefined : system;
 }
 
-function fromResult(result: GenerateContentResult): ChatResponse {
-  const toolCalls = result.functionCalls?.map((call, index) => ({
-    // Gemini's own function-call id is optional; a stable synthetic one is
-    // still needed for the port's own ToolCall shape, and index is stable
-    // within one response.
-    id: String(index),
-    name: call.name ?? "",
+function fromResult(
+  result: GenerateContentResult,
+  tools: readonly ToolDefinition[] = [],
+): ChatResponse {
+  // Parts carry the thoughtSignature that `functionCalls` drops. Fall back to
+  // `functionCalls` when a response has no candidates.
+  const partCalls = (result.candidates?.[0]?.content?.parts ?? []).flatMap(
+    (part) =>
+      part.functionCall
+        ? [{ call: part.functionCall, signature: part.thoughtSignature }]
+        : [],
+  );
+  const calls =
+    partCalls.length > 0
+      ? partCalls
+      : (result.functionCalls ?? []).map((call) => ({
+          call,
+          signature: undefined,
+        }));
+  const toolCalls = calls.map(({ call, signature }) => ({
+    // Gemini's own id is optional. A synthetic one must be unique across
+    // rounds, because results are matched to calls by id over the whole
+    // history; an index would repeat in every round.
+    id: call.id ?? `gemini-call-${randomUUID()}`,
+    name: fromWireName(call.name ?? "", tools),
     arguments: call.args ?? {},
+    ...(signature !== undefined
+      ? { providerData: { thoughtSignature: signature } }
+      : {}),
   }));
 
   return {
     content: result.text ?? "",
     usage: usageOf(result.usageMetadata),
-    ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
+    ...(toolCalls.length > 0 ? { toolCalls } : {}),
   };
 }
 
@@ -225,7 +330,7 @@ export class GoogleProvider implements AIProvider {
         tools: [
           {
             functionDeclarations: request.tools.map((tool) => ({
-              name: tool.name,
+              name: toWireName(tool.name),
               description: tool.description,
               parametersJsonSchema: tool.parameters,
             })),
@@ -233,7 +338,7 @@ export class GoogleProvider implements AIProvider {
         ],
       },
     });
-    return fromResult(result);
+    return fromResult(result, request.tools);
   }
 
   async embed(request: EmbedRequest): Promise<EmbedResponse> {

@@ -55,6 +55,9 @@ export interface CopilotAvailability {
   readonly available: boolean;
   readonly providerConfigured: boolean;
   readonly reason: string | null;
+  /** The reason as a code the panel words from its catalogue, when it has one. */
+  readonly reasonCode: string | null;
+  readonly reasonParams: Readonly<Record<string, string>> | null;
   readonly searchAvailable: boolean;
   readonly streaming: boolean;
   /** When a crossed budget lifts by itself, as an ISO time. */
@@ -71,6 +74,8 @@ const UNKNOWN: CopilotAvailability = {
   available: false,
   providerConfigured: true,
   reason: null,
+  reasonCode: null,
+  reasonParams: null,
   searchAvailable: false,
   streaming: false,
   resetsAt: null,
@@ -208,6 +213,54 @@ export async function deleteCopilotThreadAction(
 }
 
 /**
+ * Rates one answer in the reader's own conversation (plan 0.9.0 FB1).
+ *
+ * Answers with a sentence rather than throwing, for the reason
+ * `deleteCopilotThreadAction` gives: a server action's thrown message does
+ * not reach a production browser.
+ */
+export async function rateCopilotAnswerAction(input: {
+  readonly messageId: string;
+  readonly rating: "up" | "down";
+  readonly note?: string;
+  readonly shared?: boolean;
+}): Promise<{ readonly error: string | null }> {
+  try {
+    await callAction(await context(), "copilot.rate", {
+      messageId: input.messageId,
+      rating: input.rating,
+      ...(input.note === undefined ? {} : { note: input.note }),
+      ...(input.shared === undefined ? {} : { shared: input.shared }),
+    });
+    return { error: null };
+  } catch (error) {
+    const refused = refusalOf(error);
+    if (refused) {
+      return { error: refused };
+    }
+    const { t } = await getTranslations();
+    return { error: t("copilot.copilotPanel.rating.couldNotSave") };
+  }
+}
+
+/** Takes the reader's rating of one answer back (plan 0.9.0 FB1). */
+export async function unrateCopilotAnswerAction(
+  messageId: string,
+): Promise<{ readonly error: string | null }> {
+  try {
+    await callAction(await context(), "copilot.unrate", { messageId });
+    return { error: null };
+  } catch (error) {
+    const refused = refusalOf(error);
+    if (refused) {
+      return { error: refused };
+    }
+    const { t } = await getTranslations();
+    return { error: t("copilot.copilotPanel.rating.couldNotSave") };
+  }
+}
+
+/**
  * A decision on a card, answered with the refusal's own sentence (plan 0.8.1
  * CP7). A server action's thrown message does not reach a production
  * browser, so a member who may not create an objective was told nothing
@@ -229,10 +282,19 @@ async function decided(
   }
 }
 
-/** Applies one, as the reader. The proposed action's own access decides. */
-export async function applyCopilotProposalAction(id: string) {
+/**
+ * Applies one, as the reader. The proposed action's own access decides.
+ * `reason` is the person's own words for why it starts mid-cycle, typed on
+ * the card when the workspace asks for one (design §4.3).
+ */
+export async function applyCopilotProposalAction(id: string, reason?: string) {
   const base = await context();
-  return decided(() => callAction(base, "copilot.applyProposal", { id }));
+  return decided(() =>
+    callAction(base, "copilot.applyProposal", {
+      id,
+      ...(reason === undefined ? {} : { reason }),
+    }),
+  );
 }
 
 export async function dismissCopilotProposalAction(id: string) {

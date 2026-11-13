@@ -268,8 +268,9 @@ with the class, the message, readable frames and the tags.
 | Tracker | Version | Checked | Result |
 |---|---|---|---|
 | Bugsink | 2.6.3 (`bugsink/bugsink`, SQLite) | 9 November 2026 | One issue, two events, grouped by the product's fingerprint. Frames with file, function, line and in-app; release, environment, transaction and every tag as sent |
-| GlitchTip | Not yet | Before 0.7.0 ships | |
-| Sentry (sentry.io, EU) | Not yet | When OKRGoal's project exists | |
+| Bugsink | A live instance | 10 November 2026 | Checked by hand |
+| GlitchTip | Speaks the protocol | Not checked by hand | |
+| Sentry (hosted or self-hosted) | Speaks the protocol | Not checked by hand | |
 
 **Checking one yourself.** Start the tracker, make a project, copy its DSN,
 set `OPENOKR_ERROR_DSN` and restart. Then open the instance signed in, open

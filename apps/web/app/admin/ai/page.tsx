@@ -21,6 +21,7 @@ import {
 } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { resolveDrafterFor } from "../../../lib/drafter";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { latestEvaluations } from "../../../lib/prompt-evaluation.ts";
@@ -49,6 +50,7 @@ import {
   PromptsCard,
   UsageCard,
 } from "./governance.tsx";
+import { RatingsCard, type RatingsFilter } from "./ratings-card";
 
 export const generateMetadata = pageTitle("pageTitle.adminAi");
 
@@ -118,8 +120,34 @@ const STATUS_TONE: Readonly<Record<string, "ok" | "bad" | "warn">> = {
   unverified: "warn",
 };
 
-export default async function AdminAIPage() {
+/**
+ * The ratings list's place in the address: `ratings=down|up` narrows it and
+ * `before=<time>_<id>` is the last row of the page before (plan 0.9.0 FB1).
+ */
+function ratingsQuery(params: Record<string, string | undefined>): {
+  readonly filter: RatingsFilter;
+  readonly cursor?: { readonly at: string; readonly id: string };
+} {
+  const filter =
+    params.ratings === "down" || params.ratings === "up"
+      ? params.ratings
+      : "all";
+  const [at, id] = (params.before ?? "").split("_");
+  const valid =
+    at !== undefined &&
+    id !== undefined &&
+    /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(at) &&
+    /^[0-9a-f-]{36}$/i.test(id);
+  return { filter, ...(valid ? { cursor: { at, id } } : {}) };
+}
+
+export default async function AdminAIPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<Record<string, string | undefined>>;
+}) {
   const { t } = await getTranslations();
+  const ratingsParams = ratingsQuery(await searchParams);
   // A value the schema adds before the catalogue knows it is shown as itself
   // rather than hidden.
   const tierWord = (tier: string): string => {
@@ -665,7 +693,21 @@ export default async function AdminAIPage() {
       {/* Plan 0.7.0 A2: external agents' calls, totals only. */}
       <AgentCallsCard
         summary={await callAction(context, "ai.readToolCallSummary", {})}
+        timeZone={String(
+          (await callAction(context, "settings.readForMember", {})).settings
+            .timezone ?? "UTC",
+        )}
       />
+      {/* Plan 0.9.0 FB1: how members rated the copilot's answers. Hidden
+          while the copilot cannot answer, like every AI affordance. */}
+      {
+        await ratingsCard(
+          context,
+          session.user.id,
+          workspace.workspaceId,
+          ratingsParams,
+        )
+      }
       <BudgetsCard
         budgets={budgets}
         people={directory.filter(
@@ -680,5 +722,36 @@ export default async function AdminAIPage() {
         egress={egressStateOf(routes, providers)}
       />
     </div>
+  );
+}
+
+/** The ratings list, or nothing while there is no AI to rate. */
+async function ratingsCard(
+  context: Parameters<typeof callAction>[0],
+  userId: string,
+  workspaceId: string,
+  query: ReturnType<typeof ratingsQuery>,
+) {
+  const outcome = await resolveDrafterFor(workspaceId, "balanced", userId, {
+    source: "copilot",
+  });
+  if (!("drafter" in outcome)) {
+    return null;
+  }
+  const page = await callAction(context, "ai.answerRatings", {
+    ...(query.filter === "all" ? {} : { rating: query.filter }),
+    ...(query.cursor ? { cursor: query.cursor } : {}),
+  });
+  return (
+    <RatingsCard
+      rows={page.rows}
+      more={page.more}
+      filter={query.filter}
+      paged={query.cursor !== undefined}
+      timeZone={String(
+        (await callAction(context, "settings.readForMember", {})).settings
+          .timezone ?? "UTC",
+      )}
+    />
   );
 }

@@ -135,4 +135,28 @@ describe("what it never does", () => {
     expect(performance.now() - started).toBeLessThan(1_000);
     expect(blocks).toHaveLength(1);
   });
+
+  it("hands [n] markers in text to renderCitation, and drops a null one", () => {
+    // Given an answer "Value 45% [1], owner [3] and `a[2]`" and a renderer
+    // that draws 1 and drops 3, then the node shows, "[3]" does not, and the
+    // brackets inside code stay.
+    const box = render(
+      <TranslationsProvider locale="en">
+        <AnswerText
+          text="Value 45% [1], owner [3] and `a[2]`"
+          renderCitation={(n) =>
+            n === 1 ? <sup data-testid="chip">{n}</sup> : null
+          }
+        />
+      </TranslationsProvider>,
+    ).container;
+    expect(box.querySelector("[data-testid=chip]")?.textContent).toBe("1");
+    expect(box.textContent).not.toContain("[1]");
+    expect(box.textContent).not.toContain("[3]");
+    expect(box.querySelector("code")?.textContent).toBe("a[2]");
+  });
+
+  it("leaves [n] as typed without renderCitation", () => {
+    expect(shown("Value [1]").textContent).toContain("Value [1]");
+  });
 });

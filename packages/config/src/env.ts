@@ -312,6 +312,28 @@ const envSchema = z
      * product reads it, so turning it on cannot weaken a rule. */
     OPENOKR_DEMO: optional(z.enum(["on", "off"]).default("off")),
 
+    /**
+     * The code that claims a new instance (docs/design/setup-code.md D1, D6).
+     * Optional: with none, the server makes one at first boot and writes it to
+     * a file under the storage root. Upper-cased with spaces and dashes
+     * removed, so `abcd efgh jkmn` and `ABCD-EFGH-JKMN` are one code, and at
+     * least twelve characters left, because a short code is guessable.
+     * `./openokr up` and the Helm chart generate it. It is only read while
+     * the instance is unclaimed.
+     */
+    OPENOKR_SETUP_CODE: optional(
+      z
+        .string()
+        .transform((value) => value.replace(/[\s-]/g, "").toUpperCase())
+        .pipe(
+          z
+            .string()
+            .min(12, "must be at least 12 characters, so it cannot be guessed")
+            .max(64),
+        )
+        .optional(),
+    ),
+
     /** Where the local-disk storage driver keeps files (P5-T15). Relative to the
      * working directory, and `storage` is what the compose file already mounts a
      * named volume at, so a container keeps its files across an upgrade with

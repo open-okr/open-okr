@@ -27,7 +27,7 @@ import {
 import { Ellipsis } from "lucide-react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import type { ReactNode } from "react";
+import { type ReactNode, Suspense } from "react";
 import { type AccountBadge, AvatarMenu } from "../app/avatar-menu.tsx";
 import { copilotAvailabilityAction } from "../app/copilot/actions.ts";
 import { CopilotPanel } from "../app/copilot/copilot-panel.tsx";
@@ -35,6 +35,7 @@ import {
   CommandPalette,
   type PaletteDestination,
 } from "../app/search/palette.tsx";
+import { RecentRecorder } from "../app/search/recent-recorder.tsx";
 import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
@@ -691,7 +692,13 @@ export async function AppShellLayout({
           destinations={paletteDestinations}
           canCreateObjective={createsGoals}
           semantic={semantic}
+          workspaceId={workspace.workspaceId}
         />
+        {/* `useSearchParams` wants a boundary, so a static neighbour of
+         * this page is never made to wait for it. */}
+        <Suspense fallback={null}>
+          <RecentRecorder workspaceId={workspace.workspaceId} />
+        </Suspense>
         {/* The Review count, kept current by the workspace's own feed
          * stream (completeness review M-32). Only for somebody who can
          * read the workspace, which is who the badge is drawn for. */}

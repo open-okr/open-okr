@@ -25,21 +25,27 @@
 import {
   type AiCitation,
   activeOnly,
+  aiAnswerRatings,
   aiMessages,
   aiThreads,
+  aiToolCalls,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
-import { aiOffSentence } from "../ai/off-reason.ts";
-import { readableCitations } from "../copilot/citations.ts";
-import { isEmbeddableType } from "../embeddings/subjects.ts";
+import { isCitableType, readableCitations } from "../copilot/citations.ts";
+import {
+  aiOffReason,
+  reasonSentence,
+  storedReasonFields,
+} from "../copilot/reasons.ts";
 import { subjectAddress } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { hrefsInTx } from "../search/hrefs.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import {
   type ActionCallContext,
@@ -164,6 +170,8 @@ const titleFrom = (question: string) =>
 const citationSchema = z.object({
   entityType: z.string().trim().min(1).max(40),
   entityId: z.uuid(),
+  /** The `[n]` the model wrote in the prose for this source (plan 0.9.0 CP5). */
+  n: z.number().int().min(1).max(500).optional(),
 });
 
 /**
@@ -379,7 +387,11 @@ export const completeRun = defineWriteAction({
     tokensIn: z.number().int().min(0).optional(),
     tokensOut: z.number().int().min(0).optional(),
     cost: z.number().min(0).optional(),
-    /** Why it ended early, in the words the reader is shown. */
+    /**
+     * Why it ended early. The JSON `encodeReason` writes, so the panel can word
+     * it from its own catalogue, or plain text from a caller with no code
+     * (plan 0.9.0 CP10). `copilot.thread` reads it back as both.
+     */
     haltedReason: z.string().trim().min(1).max(500).optional(),
   }),
   output: z.object({ messageId: z.uuid(), completed: z.boolean() }),
@@ -441,7 +453,7 @@ export const completeRun = defineWriteAction({
       }
 
       const citations: AiCitation[] = input.citations.filter((citation) =>
-        isEmbeddableType(citation.entityType),
+        isCitableType(citation.entityType),
       );
 
       await tx
@@ -655,7 +667,7 @@ export const recordAnswer = defineWriteAction({
       }
 
       const citations: AiCitation[] = input.citations.filter((citation) =>
-        isEmbeddableType(citation.entityType),
+        isCitableType(citation.entityType),
       );
 
       const [message] = await tx
@@ -760,6 +772,38 @@ export const deleteThread = defineWriteAction({
           ),
         );
 
+      // The thread's ratings go with it (copilot-feedback.md Q2). What the
+      // member asked for by deleting is that an administrator then sees
+      // nothing of it, and a rating the member shared would otherwise keep
+      // the question and the answer readable. The note and the share are
+      // cleared too, so the soft-deleted row holds nothing more than the
+      // fact of a rating until the retention sweep removes it.
+      const answerIds = tx
+        .select({ id: aiMessages.id })
+        .from(aiMessages)
+        .where(
+          activeOnly(
+            aiMessages,
+            eq(aiMessages.workspaceId, workspaceId),
+            eq(aiMessages.threadId, thread.id),
+          ),
+        );
+      await tx
+        .update(aiAnswerRatings)
+        .set({
+          deletedAt: new Date(),
+          updatedAt: new Date(),
+          note: null,
+          shared: false,
+        })
+        .where(
+          activeOnly(
+            aiAnswerRatings,
+            eq(aiAnswerRatings.workspaceId, workspaceId),
+            inArray(aiAnswerRatings.messageId, answerIds),
+          ),
+        );
+
       return {
         result: { id: thread.id },
         activity: {
@@ -781,6 +825,232 @@ export const deleteThread = defineWriteAction({
   }),
 });
 
+/** The longest note a member may leave on a rating (copilot-feedback.md §2). */
+const RATING_NOTE_MAX = 500;
+
+/**
+ * Rates one answer in the caller's own conversation (plan 0.9.0 FB1,
+ * docs/design/copilot-feedback.md FB-D1, FB-D2, FB-D10).
+ *
+ * **One live rating per member per answer.** Calling it again with the other
+ * value replaces the rating; calling it again with the same value changes only
+ * the note and the share. Pressing the same thumb to remove a rating is
+ * `copilot.unrate`, which the screen calls, so this action never has to guess
+ * what a repeated press meant.
+ *
+ * A note or a share that is not sent is kept when the value is the same and
+ * reset when the value changes: a note written under a poor answer says
+ * nothing about a good one, and a share the member ticked for one judgement
+ * is not theirs to carry to the next without seeing it.
+ *
+ * The question and the answer text are never copied here. The administrator's
+ * list reads them from the message, and only while `shared` is true (FB-D4).
+ * Not on the agent surface: it is a person's judgement of an answer they read
+ * (FB-D13).
+ */
+export const rateAnswer = defineWriteAction({
+  name: "copilot.rate",
+  agentSurface: false,
+  summary:
+    "Rates one copilot answer in the caller's own conversation, with an optional note and an optional share with AI administrators.",
+  input: z.object({
+    messageId: z.uuid(),
+    rating: z.enum(["up", "down"]),
+    /** Plain text. A blank note is no note. */
+    note: z.string().trim().max(RATING_NOTE_MAX).optional(),
+    /** Lets AI administrators read this question and answer on this rating. */
+    shared: z.boolean().optional(),
+  }),
+  output: z.object({
+    messageId: z.uuid(),
+    rating: z.enum(["up", "down"]),
+    note: z.string().nullable(),
+    shared: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.comment,
+  operation: (_context, input) => ({
+    requires: ACCESS_LEVELS.comment,
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const [message] = await tx
+        .select({
+          id: aiMessages.id,
+          threadId: aiMessages.threadId,
+          role: aiMessages.role,
+          model: aiMessages.model,
+        })
+        .from(aiMessages)
+        .where(
+          activeOnly(
+            aiMessages,
+            eq(aiMessages.workspaceId, workspaceId),
+            eq(aiMessages.id, input.messageId),
+          ),
+        )
+        .limit(1);
+      // A question is not an answer, and somebody else's thread answers as
+      // one that does not exist.
+      if (message?.role !== "assistant") {
+        throw new OperationError("not_found", "No such answer.");
+      }
+      await ownThread(tx, workspaceId, memberId, message.threadId);
+
+      const [existing] = await tx
+        .select({
+          rating: aiAnswerRatings.rating,
+          note: aiAnswerRatings.note,
+          shared: aiAnswerRatings.shared,
+        })
+        .from(aiAnswerRatings)
+        .where(
+          activeOnly(
+            aiAnswerRatings,
+            eq(aiAnswerRatings.workspaceId, workspaceId),
+            eq(aiAnswerRatings.messageId, message.id),
+            eq(aiAnswerRatings.memberId, memberId),
+          ),
+        )
+        .limit(1);
+
+      const same = existing?.rating === input.rating;
+      const sentNote =
+        input.note === undefined ? undefined : input.note || null;
+      const note =
+        sentNote !== undefined ? sentNote : same ? existing.note : null;
+      const shared =
+        input.shared !== undefined
+          ? input.shared
+          : same
+            ? existing.shared
+            : false;
+
+      await tx
+        .insert(aiAnswerRatings)
+        .values({
+          workspaceId,
+          messageId: message.id,
+          memberId,
+          rating: input.rating,
+          note,
+          shared,
+          model: message.model,
+        })
+        .onConflictDoUpdate({
+          // The partial unique index, so two quick presses end as one row.
+          target: [
+            aiAnswerRatings.workspaceId,
+            aiAnswerRatings.messageId,
+            aiAnswerRatings.memberId,
+          ],
+          targetWhere: isNull(aiAnswerRatings.deletedAt),
+          set: {
+            rating: input.rating,
+            note,
+            shared,
+            updatedAt: new Date(),
+          },
+        });
+
+      return {
+        result: {
+          messageId: message.id,
+          rating: input.rating,
+          note,
+          shared,
+        },
+        activity: {
+          kind: "copilot.rated",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          // Never the note: it is the member's own words.
+          payload: {
+            threadId: message.threadId,
+            rating: input.rating,
+            shared,
+          },
+        },
+        audit: {
+          // Who changed what was shared is the reason this is audited.
+          action: "copilot.rate",
+          targetType: "ai_message",
+          targetId: message.id,
+          payload: {
+            threadId: message.threadId,
+            rating: input.rating,
+            shared,
+            hasNote: note !== null,
+          },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Removes the caller's rating of one answer (FB-D1, FB-D10).
+ *
+ * **Removing what is not there is not an error**, because the press that
+ * removes a rating and a reload race. `removed` says whether this call removed
+ * anything. The row is soft deleted, and its note and share are cleared with
+ * it: a member who took the rating back has taken the words back too.
+ */
+export const unrateAnswer = defineWriteAction({
+  name: "copilot.unrate",
+  agentSurface: false,
+  summary: "Removes the caller's rating of one copilot answer.",
+  input: z.object({ messageId: z.uuid() }),
+  output: z.object({ messageId: z.uuid(), removed: z.boolean() }),
+  access: ACCESS_LEVELS.comment,
+  operation: (_context, input) => ({
+    requires: ACCESS_LEVELS.comment,
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      // Scoped by the caller's own member id, so somebody else's rating
+      // answers as no rating at all.
+      const removed = await tx
+        .update(aiAnswerRatings)
+        .set({
+          deletedAt: new Date(),
+          updatedAt: new Date(),
+          note: null,
+          shared: false,
+        })
+        .where(
+          activeOnly(
+            aiAnswerRatings,
+            eq(aiAnswerRatings.workspaceId, workspaceId),
+            eq(aiAnswerRatings.messageId, input.messageId),
+            eq(aiAnswerRatings.memberId, memberId),
+          ),
+        )
+        .returning({ id: aiAnswerRatings.id });
+      const didRemove = removed.length > 0;
+
+      return {
+        result: { messageId: input.messageId, removed: didRemove },
+        activity: {
+          kind: "copilot.unrated",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { removed: didRemove },
+        },
+        audit: {
+          action: "copilot.unrate",
+          targetType: "ai_message",
+          targetId: input.messageId,
+          payload: { removed: didRemove },
+        },
+      };
+    },
+  }),
+});
+
 const messageOutput = z.object({
   id: z.uuid(),
   role: z.enum(["member", "assistant"]),
@@ -791,6 +1061,10 @@ const messageOutput = z.object({
       entityType: z.string(),
       entityId: z.uuid(),
       label: z.string(),
+      /** The `[n]` in the prose, or null for an answer recorded before 0.9.0. */
+      n: z.number().int().nullable(),
+      /** Where this opens for this reader, built on the server. Null when it has no page. */
+      href: z.string().nullable(),
     }),
   ),
   model: z.string().nullable(),
@@ -808,10 +1082,219 @@ const messageOutput = z.object({
    * reader coming back asks.
    */
   running: z.boolean(),
-  /** Why the run stopped early, in words for the reader. Null when it did not. */
+  /**
+   * Why the run stopped early, in English for a client with no catalogue. Null
+   * when it did not.
+   */
   haltedReason: z.string().nullable(),
+  /** The same reason as a code, for a client that words it itself (plan 0.9.0 CP10). */
+  haltedCode: z.string().nullable(),
+  /** The values the code's message needs, such as `cap`. */
+  haltedParams: z.record(z.string(), z.string()).nullable(),
+  /**
+   * How many live reads the copilot made for this answer, rebuilt from the
+   * record of its reads (plan 0.9.0 L3, decision W2-Q). 0 for a member's
+   * question, for an answer that read nothing and for one written before
+   * reads were recorded.
+   */
+  readCount: z.number().int(),
+  /**
+   * The reader's own rating of this answer, or null (copilot-feedback.md
+   * FB-D3). Always null on a member's question and on an answer the reader
+   * has not rated. Nobody else's rating is ever here.
+   */
+  myRating: z
+    .object({
+      rating: z.enum(["up", "down"]),
+      note: z.string().nullable(),
+      shared: z.boolean(),
+    })
+    .nullable(),
   createdAt: z.string(),
 });
+
+/**
+ * How many reads fall inside each answer's window.
+ *
+ * **No column ties a read to an answer** (decision W2-Q: no new column), so
+ * the answer's window is what the rows already say: from the question the
+ * answer follows to the last time the answer's own row was written. A read
+ * recorded in between, by this member, is the answer's. A run still in flight
+ * ends at the next question in the thread, or has no end when it is the last. Two questions this member has running at the same moment, in
+ * two threads, share a window and so share a count; the count is a line under
+ * an answer and never a decision.
+ *
+ * The question is found by time, not by its place in the list: a background
+ * run's question and its empty answer are written in one transaction and so
+ * carry the same `created_at`, and the list breaks that tie by id.
+ */
+function readsPerAnswer(
+  rows: readonly {
+    readonly role: string;
+    readonly createdAt: Date;
+    readonly updatedAt: Date;
+    readonly runCompletedAt: Date | null;
+    readonly stoppedAt: Date | null;
+    readonly running: boolean;
+  }[],
+  calledAt: readonly Date[],
+): number[] {
+  const asked = rows
+    .filter((row) => row.role === "member")
+    .map((row) => row.createdAt.getTime())
+    .sort((a, b) => a - b);
+  return rows.map((row) => {
+    if (row.role === "member") {
+      return 0;
+    }
+    // The latest question at or before this answer was written.
+    const before = asked.filter((at) => at <= row.createdAt.getTime());
+    if (before.length === 0) {
+      return 0;
+    }
+    const from = Math.max(...before);
+    // A run still in flight ends at the next question in this thread, so a
+    // process that died mid-run cannot claim every later read the member
+    // makes. Only the last answer has no end.
+    const next = asked.find((at) => at > from);
+    const to = row.running
+      ? (next ?? Number.POSITIVE_INFINITY)
+      : Math.max(
+          row.createdAt.getTime(),
+          row.updatedAt.getTime(),
+          row.runCompletedAt?.getTime() ?? 0,
+          row.stoppedAt?.getTime() ?? 0,
+        );
+    return calledAt.filter((at) => at.getTime() >= from && at.getTime() <= to)
+      .length;
+  });
+}
+
+/**
+ * What an AI administrator's rating list needs about the answers of one
+ * conversation: how many reads each answer made, the question it followed and
+ * the answer's own text (plan 0.9.0 FB1, copilot-feedback.md FB-D4).
+ *
+ * **It returns the text and leaves the choice to the caller.** The caller
+ * copies the text into a response only for a rating whose member shared it.
+ * The read count is rebuilt exactly as `copilot.thread` rebuilds it, so the
+ * administrator and the member see the same number and no count is stored.
+ */
+export async function answerContextsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  threadId: string,
+): Promise<
+  Map<
+    string,
+    {
+      readonly readCount: number;
+      readonly question: string | null;
+      readonly answer: string;
+    }
+  >
+> {
+  const rows = await tx
+    .select({
+      id: aiMessages.id,
+      role: aiMessages.role,
+      content: aiMessages.content,
+      stoppedAt: aiMessages.stoppedAt,
+      runStartedAt: aiMessages.runStartedAt,
+      runCompletedAt: aiMessages.runCompletedAt,
+      createdAt: aiMessages.createdAt,
+      updatedAt: aiMessages.updatedAt,
+    })
+    .from(aiMessages)
+    .where(
+      activeOnly(
+        aiMessages,
+        eq(aiMessages.workspaceId, workspaceId),
+        eq(aiMessages.threadId, threadId),
+      ),
+    )
+    .orderBy(aiMessages.createdAt, aiMessages.id);
+  const first = rows[0]?.createdAt;
+  const recorded = first
+    ? await tx
+        .select({ calledAt: aiToolCalls.calledAt })
+        .from(aiToolCalls)
+        .where(
+          and(
+            eq(aiToolCalls.workspaceId, workspaceId),
+            eq(aiToolCalls.memberId, memberId),
+            eq(aiToolCalls.source, "copilot"),
+            isNotNull(aiToolCalls.tool),
+            gte(aiToolCalls.calledAt, first),
+          ),
+        )
+    : [];
+  const counts = readsPerAnswer(
+    rows.map((row) => ({
+      role: row.role,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      runCompletedAt: row.runCompletedAt,
+      stoppedAt: row.stoppedAt,
+      running:
+        row.runStartedAt !== null &&
+        row.runCompletedAt === null &&
+        row.stoppedAt === null,
+    })),
+    recorded.map((call) => call.calledAt),
+  );
+  const found = new Map<
+    string,
+    { readCount: number; question: string | null; answer: string }
+  >();
+  for (const [index, row] of rows.entries()) {
+    if (row.role !== "assistant") {
+      continue;
+    }
+    // The latest question at or before the answer, as `readsPerAnswer` finds it.
+    const question = rows
+      .filter(
+        (other) =>
+          other.role === "member" &&
+          other.createdAt.getTime() <= row.createdAt.getTime(),
+      )
+      .at(-1);
+    found.set(row.id, {
+      readCount: counts[index] ?? 0,
+      question: question?.content ?? null,
+      answer: row.content,
+    });
+  }
+  return found;
+}
+
+/**
+ * An answer's text without the `[n]` markers for sources this reader may not
+ * see (plan 0.9.0 CP5). A marker for a citation that was dropped would point at
+ * nothing. Only answers stored with numbers are touched: an older answer has
+ * no way to say which marker is which.
+ */
+function withoutHiddenMarkers(
+  row: {
+    readonly role: string;
+    readonly content: string;
+    readonly citations: readonly AiCitation[];
+  },
+  readable: readonly { readonly n: number | null }[],
+): string {
+  if (
+    row.role !== "assistant" ||
+    !row.citations.some((citation) => citation.n !== undefined)
+  ) {
+    return row.content;
+  }
+  const visible = new Set(readable.map((citation) => citation.n));
+  // The space before a removed marker goes with it, so no double space is left.
+  return row.content.replace(/[ \t]?\[(\d{1,3})\]/g, (marker, k: string) =>
+    visible.has(Number(k)) ? marker : "",
+  );
+}
 
 /** One conversation, with its citations resolved against the reader's access now. */
 export const readThread = defineReadAction({
@@ -856,6 +1339,7 @@ export const readThread = defineReadAction({
             runCompletedAt: aiMessages.runCompletedAt,
             runHaltedReason: aiMessages.runHaltedReason,
             createdAt: aiMessages.createdAt,
+            updatedAt: aiMessages.updatedAt,
           })
           .from(aiMessages)
           .where(
@@ -867,17 +1351,102 @@ export const readThread = defineReadAction({
           )
           .orderBy(aiMessages.createdAt, aiMessages.id);
 
-        const messages = [];
-        for (const row of rows) {
-          messages.push({
-            id: row.id,
+        // This member's recorded reads since the conversation began, which
+        // the answers' windows are counted from (plan 0.9.0 L3).
+        const first = rows[0]?.createdAt;
+        const recorded = first
+          ? await tx
+              .select({ calledAt: aiToolCalls.calledAt })
+              .from(aiToolCalls)
+              .where(
+                and(
+                  eq(aiToolCalls.workspaceId, context.workspaceId),
+                  eq(aiToolCalls.memberId, memberId),
+                  eq(aiToolCalls.source, "copilot"),
+                  // Only the copilot's own tools, as the live line labels
+                  // only those: an unknown tool's row has a null tool.
+                  isNotNull(aiToolCalls.tool),
+                  gte(aiToolCalls.calledAt, first),
+                ),
+              )
+          : [];
+        const readCounts = readsPerAnswer(
+          rows.map((row) => ({
             role: row.role,
-            content: row.content,
-            citations: await readableCitations(tx, {
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+            runCompletedAt: row.runCompletedAt,
+            stoppedAt: row.stoppedAt,
+            running:
+              row.runStartedAt !== null &&
+              row.runCompletedAt === null &&
+              row.stoppedAt === null,
+          })),
+          recorded.map((call) => call.calledAt),
+        );
+
+        // The reader's own ratings, one lookup for the whole thread.
+        const mine =
+          rows.length > 0
+            ? await tx
+                .select({
+                  messageId: aiAnswerRatings.messageId,
+                  rating: aiAnswerRatings.rating,
+                  note: aiAnswerRatings.note,
+                  shared: aiAnswerRatings.shared,
+                })
+                .from(aiAnswerRatings)
+                .where(
+                  activeOnly(
+                    aiAnswerRatings,
+                    eq(aiAnswerRatings.workspaceId, context.workspaceId),
+                    eq(aiAnswerRatings.memberId, memberId),
+                    inArray(
+                      aiAnswerRatings.messageId,
+                      rows.map((row) => row.id),
+                    ),
+                  ),
+                )
+            : [];
+        const ratingByMessage = new Map(
+          mine.map((row) => [row.messageId, row]),
+        );
+
+        const resolved = [];
+        for (const row of rows) {
+          resolved.push(
+            await readableCitations(tx, {
               workspaceId: context.workspaceId,
               memberId,
               citations: row.citations,
             }),
+          );
+        }
+        // One lookup for the whole thread, through the same builder search
+        // uses, so a link is only made for a page this reader may open (CP5).
+        const hrefs = await hrefsInTx(
+          tx,
+          context.workspaceId,
+          memberId,
+          resolved.flat().map((citation) => ({
+            entityType: citation.entityType,
+            entityId: citation.entityId,
+          })),
+        );
+
+        const messages = [];
+        for (const [index, row] of rows.entries()) {
+          const readable = resolved[index] ?? [];
+          messages.push({
+            id: row.id,
+            role: row.role,
+            content: withoutHiddenMarkers(row, readable),
+            citations: readable.map((citation) => ({
+              ...citation,
+              href:
+                hrefs.get(`${citation.entityType}:${citation.entityId}`) ??
+                null,
+            })),
             model: row.model,
             tokensIn: row.tokensIn,
             tokensOut: row.tokensOut,
@@ -889,7 +1458,18 @@ export const readThread = defineReadAction({
               row.runStartedAt !== null &&
               row.runCompletedAt === null &&
               row.stoppedAt === null,
-            haltedReason: row.runHaltedReason,
+            ...storedReasonFields(row.runHaltedReason),
+            readCount: readCounts[index] ?? 0,
+            myRating: (() => {
+              const found = ratingByMessage.get(row.id);
+              return found
+                ? {
+                    rating: found.rating,
+                    note: found.note,
+                    shared: found.shared,
+                  }
+                : null;
+            })(),
             createdAt: row.createdAt.toISOString(),
           });
         }
@@ -994,8 +1574,15 @@ export const readAvailability = defineReadAction({
      * by itself.
      */
     providerConfigured: z.boolean(),
-    /** Null when available. Shown to the reader as it is. */
+    /** Null when available. The English sentence, for a client with no catalogue. */
     reason: z.string().nullable(),
+    /**
+     * The same reason as a code, when it has one (plan 0.9.0 CP10). The panel
+     * words it from its own catalogue and falls back to `reason`.
+     */
+    reasonCode: z.string().nullable(),
+    /** The values the code's message needs. */
+    reasonParams: z.record(z.string(), z.string()).nullable(),
     /**
      * True when retrieval can still find sources without a provider, which is
      * §2.4's own degradation and is worth offering on its own.
@@ -1026,11 +1613,14 @@ export const readAvailability = defineReadAction({
         context.pool,
         context.workspaceId,
       );
+      const offReason = context.aiOff ?? "no_provider";
       if (paused) {
         return {
           available: false,
           providerConfigured: true,
-          reason: paused,
+          reason: reasonSentence(aiOffReason("credits_used"), "panel"),
+          reasonCode: "ai_off",
+          reasonParams: { offReason: "credits_used" },
           searchAvailable: true,
           streaming: false,
           // The sentence says "until the 1st" itself.
@@ -1043,7 +1633,9 @@ export const readAvailability = defineReadAction({
         // The step that stopped the host, where it said (plan 0.8.0 O1). A
         // cloud workspace with no plan used to read "No AI provider is
         // configured" while the provider's key worked for everybody else.
-        reason: aiOffSentence(context.aiOff ?? "no_provider", "panel"),
+        reason: reasonSentence(aiOffReason(offReason), "panel"),
+        reasonCode: "ai_off",
+        reasonParams: { offReason },
         // Full-text retrieval needs no provider at all (P4-T13b).
         searchAvailable: true,
         streaming: false,
@@ -1064,6 +1656,9 @@ export const readAvailability = defineReadAction({
       available: availability.available,
       providerConfigured: true,
       reason: availability.available ? null : (availability.reason ?? null),
+      // The budget sentences carry their own numbers and have no code yet.
+      reasonCode: null,
+      reasonParams: null,
       searchAvailable: true,
       streaming,
       resetsAt:

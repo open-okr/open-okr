@@ -85,6 +85,16 @@ random_key() {
   fi
 }
 
+# The setup code that claims a new instance (docs/design/setup-code.md D6).
+# Twelve characters in three groups of four from an alphabet with no 0, O, 1, I
+# or L, because a person reads it off this terminal and types it. `tr -dc`
+# drops every byte outside the alphabet, so each kept byte is uniform.
+random_setup_code() {
+  code="$(LC_ALL=C tr -dc '23456789ABCDEFGHJKMNPQRSTUVWXYZ' </dev/urandom | head -c 12 || true)"
+  [ "${#code}" -eq 12 ] || fail "could not make a setup code"
+  printf '%s' "$code" | sed 's/\(....\)\(....\)\(....\)/\1-\2-\3/'
+}
+
 # A password for a connection string: base64 would need URL-escaping, and an
 # escaping bug in a generated password is a bad way to spend an afternoon.
 random_password() {
@@ -158,6 +168,9 @@ OPENOKR_APP_ROLE=openokr_app
 BETTER_AUTH_SECRET=$(random_key)
 OPENOKR_ENCRYPTION_KEY=$(random_key)
 BETTER_AUTH_URL=$(public_url)
+# The setup wizard asks for this once, to claim the instance. It is dead when
+# setup finishes and is read at no other time.
+OPENOKR_SETUP_CODE=$(random_setup_code)
 EOF
 
   chmod 600 "$APP_ENV" "$DB_ENV"
@@ -276,7 +289,16 @@ announce_unclaimed() {
   [ "$people" = "0" ] || return 0
   setup_url="$(instance_url)/setup"
   log "setup link: $setup_url"
-  log "finish setup now. Until then, anyone who reaches this address can claim the instance."
+  # Only the instance's own deployment can read it, which is the point
+  # (docs/design/setup-code.md D1). An instance made before 0.9.0 has no line
+  # in app.env, and its server made a code of its own at boot.
+  setup_code="$(grep '^OPENOKR_SETUP_CODE=' "$APP_ENV" 2>/dev/null | cut -d= -f2- || true)"
+  if [ -n "$setup_code" ]; then
+    log "Setup code: $setup_code. The setup wizard asks for it. It is also in $APP_ENV."
+  else
+    log "The setup wizard asks for a setup code and says where the server kept it."
+  fi
+  log "finish setup now. Until then, anyone with the setup code can claim the instance."
   return 0
 }
 

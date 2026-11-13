@@ -56,9 +56,10 @@ Three switches, each independent of the others:
 public.** With the flag on and no policy saved, sign-up is open to anybody who can
 reach the instance unless you say otherwise.
 
-**The account that claims the instance is always admitted.** Set the variable
-before the first run if you like: the setup wizard's own sign-up gets through
-whatever it says, and the policy holds for everybody after.
+**The account that claims the instance is always admitted, with the setup
+code.** Set the variable before the first run if you like: the setup wizard's
+own sign-up gets through whatever it says, and the policy holds for everybody
+after. The code is asked for only on that first account.
 
 **A saved policy wins over the variable.** The setup wizard saves none from
 0.7.0, so the variable keeps working after setup. On an instance without the

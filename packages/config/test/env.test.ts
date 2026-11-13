@@ -52,6 +52,27 @@ describe("parseEnv", () => {
     expect(parseEnv(VALID).OPENOKR_METRICS_TOKEN).toBeUndefined();
   });
 
+  // docs/design/setup-code.md D1 and D6, plan 0.9.0 G1.
+  test("leaves the setup code unset by default, so the server makes one", () => {
+    expect(parseEnv(VALID).OPENOKR_SETUP_CODE).toBeUndefined();
+    expect(
+      parseEnv({ ...VALID, OPENOKR_SETUP_CODE: "" }).OPENOKR_SETUP_CODE,
+    ).toBeUndefined();
+  });
+
+  test("normalises the setup code: upper case, no spaces, no dashes", () => {
+    expect(
+      parseEnv({ ...VALID, OPENOKR_SETUP_CODE: "abcd-efgh jkmn" })
+        .OPENOKR_SETUP_CODE,
+    ).toBe("ABCDEFGHJKMN");
+  });
+
+  test("refuses a setup code shorter than 12 characters once normalised", () => {
+    expect(() =>
+      parseEnv({ ...VALID, OPENOKR_SETUP_CODE: "ABCD-EFGH" }),
+    ).toThrow(/OPENOKR_SETUP_CODE/);
+  });
+
   // docs/design/error-reporting.md D14 and D15, plan 0.7.0 E2.
   test("sends errors nowhere by default, and names production", () => {
     const env = parseEnv(VALID);

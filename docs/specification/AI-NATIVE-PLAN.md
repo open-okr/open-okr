@@ -62,10 +62,14 @@ Each capability accelerates an existing manual action, is independently toggleab
 | Capability | Kind | Degrades to |
 |---|---|---|
 | Decompose a key result into initiatives and tasks | write | Manual creation |
-| Grounded question answering across everything the user may see, with citations | read | Full-text search |
+| Grounded question answering across everything the user may see, with citations. It reads through the member's own read actions (values, health, owners, check-ins, tasks), as that member and with read scope, and cites what it read. A request for a change is a `propose_change` tool in the same loop, offered in the first round only, so only the member's own words can start a card (plan 0.9.0 A4) | read | Full-text search |
 | Turn a sentence into a validated list filter | read | Manual filters |
 | Summarise a thread or a document | read | Read it |
 | Map spreadsheet columns to import fields | write | Manual mapping |
+
+**A member can rate an answer (plan 0.9.0 FB1, [copilot-feedback](../design/copilot-feedback.md)).** A thumbs up or down under a recorded answer, with an optional note of at most 500 characters after a thumbs-down and a "Share this conversation" choice, unticked by default. The rating is kept in `ai_answer_ratings`, one per member per answer. AI administrators read the rating, the note, the model, the time and what was read; **they read the question and the answer only when the member shared them**. Nothing leaves the instance. Ratings are kept for `agentToolCallRetentionDays` and go with a deleted conversation or an erased member. `pnpm copilot:feedback` lists the shared poor answers with names and numbers replaced, for a person to turn into evaluation fixtures by hand. Neither agents nor the agent surface rate or read ratings. Hidden with AI off.
+
+**Why the copilot did not answer is a code, not a sentence (plan 0.9.0 CP10).** The server sends a reason code with its values: `ai_off` (with the step that stopped it: no provider, no plan credits, credits used, egress blocked, model unpriced), `unavailable`, `provider_error`, `nothing_to_add`, `stopped_partway`, `cost_cap_before`, `cost_cap_after` and `could_not_answer`. The panel words each from the message catalogue (`copilot.reason.*`, English and Malay). A halted run stores the code as JSON in `ai_messages.run_halted_reason`. `copilot.thread` returns `haltedReason` as the same English sentence as before, so REST and MCP clients read what they always read, with `haltedCode` and `haltedParams` beside it. A reason with no code, such as a budget message or a row from before the codes, is shown as stored text.
 
 **Where each assist sits, since completeness review M-09.** Six assists were built with no browser caller, and two in this table were not built at all. Each is now offered beside the value it helps, only where a provider may run it (a drafter exists, so the egress level allows an assist, and the assist's own switch is on), and each draft lands in fields a person edits before anything is saved.
 
@@ -80,7 +84,7 @@ Each capability accelerates an existing manual action, is independently toggleab
 | Summarise a thread (`comments.summarise`) | Goal detail, above the discussion | Nothing: it is a reading, refused if it quotes words nobody wrote |
 | Decompose a key result (`goals.decomposeKeyResult`, `deep` tier) | Goal detail, on each key result | `initiatives.create` and `tasks.create` for the rows left ticked, as the person, in the space they chose |
 
-"Summarise a document" is not built: a document is already one reader's page, and the thread summary is the half REQUIREMENTS names. The copilot may propose four actions (`goals.create`, `goals.addKeyResult`, `initiatives.create`, `tasks.create`), each offered only over spaces, objectives and key results the person may edit.
+"Summarise a document" is not built: a document is already one reader's page, and the thread summary is the half REQUIREMENTS names. The copilot may propose nine actions: the four creates (`goals.create`, `goals.addKeyResult`, `initiatives.create`, `tasks.create`) and five edits (`goals.update` for the title and description, `tasks.move` and `initiatives.update` for the status, `goals.publishDraftedCheckIn` for a check-in and `kpis.record` for a KPI value). Each is offered only over what the person may edit: the spaces, objectives and key results for a create, the person's own tasks and the initiatives they may edit for an edit, the objectives they may edit with their metric key results for a check-in, and the non-calculated KPIs for a KPI value, only when their role lets them edit KPIs. Applying an edit stores the values from before, so undo can put them back, and undo is refused when the record changed after it was applied. A check-in's undo is refused once a newer check-in is the latest, and a KPI value's undo is refused when the period no longer holds the value the copilot recorded. The model writes a key result's value only from a number the person gave. A create that the workspace's mid-cycle reason setting would refuse carries the person's own reason, written by the model only from the person's words or typed on the card. No delete is proposable.
 
 ## 3. Architecture
 
@@ -349,7 +353,8 @@ Conventions from TECHNICAL-PLAN.md §3 and §4 apply. Credentials and token hash
 | `ai_feature_settings` | feature key, enabled, tier override, quota |
 | `ai_prompts` | feature key or agent identifier and phase, version, system prompt, default flag |
 | `ai_threads` / `ai_messages` | Copilot and agent conversations anchored to a subject, roles, tokens, cost |
-| `ai_tool_calls` | member, the grant or agent token it came through, tool, the scope it needed, outcome (where the call stopped), refusal code, up to five ids the input named, duration. **Never an input value, an output or a refusal sentence** (changed in 0.7.0 with Akmal's approval: docs/design/agent-tool-calls.md). Kept 90 days by default |
+| `ai_answer_ratings` | member, the answer rated (`message_id`), `rating` (`up` / `down`), optional note (at most 500 characters), `shared`, the answer's model copied at rating time. One live row per member per answer. Soft deleted with its conversation; removed by the retention sweep after `agentToolCallRetentionDays` (plan 0.9.0 FB1) |
+| `ai_tool_calls` | member, the grant or agent token it came through (none for the copilot's own reads, `source = 'copilot'`, 0.9.0), tool, the scope it needed, outcome (where the call stopped), refusal code, up to five ids the input named, duration. **Never an input value, an output or a refusal sentence** (changed in 0.7.0 with Akmal's approval: docs/design/agent-tool-calls.md). Kept 90 days by default. An administrator sees each copilot read with the member it was made for |
 | `ai_usage_events` | member or agent, feature, source (copilot, mcp, assist, agent, rest, channel), provider, model, tokens, cost, latency, status, flagged |
 | `embeddings` | subject, chunk, content, vector, model, content hash |
 | `agents` | member reference, definition, planning instructions, execution instructions, provider and tier, schedule, autonomy (`sandbox` / `propose` / `scoped_direct`), scope, enabled, built-in kind (`coach` / `champion` / `custom`) |
@@ -393,6 +398,8 @@ Any external agent drives OpenOKR as the authenticated user.
 
 pgvector with no new service. An outbox-driven worker chunks and embeds goals, key results, check-ins, blockers, sessions, documents, comments and cycle artifacts on write, keyed by content hash. Retrieval is always access-filtered through the same layer as reads, with hybrid ranking against full text. Local embeddings keep retrieval air-gap safe. Chunks are passed as cited, untrusted data. Where pgvector is unavailable, semantic features degrade to full text and everything still works.
 
+**Retrieval is one of the copilot's tools (plan 0.9.0 L2b).** The copilot no longer learns about the workspace from retrieval alone. It calls a curated set of the product's own read actions in a loop, as the asking member, and `passages` (this section's retrieval, access-filtered as before) is one tool among them. Retrieval still runs first, so a provider that cannot call tools, or a first round that fails, answers from passages exactly as before. See [copilot-live-data](../design/copilot-live-data.md) section 3.
+
 **As built at 0.7.0 (plan A10).** A document is embedded once it is published, never as a draft. A session is embedded as its shared record: its title, the wins it named and the shifts it agreed, never the facilitator's per-stage notes, which are private by design. KPIs are embedded too, by title and description, and like their search rows every member reads them. "Cycle artifacts" are the learnings and next-cycle drafts; a cycle itself is a period with a name and no prose, so it is not embedded. Rows written before 0.7.0 are embedded on their next write, as nothing reindexes the past.
 
 ## 10. Evaluation, quality and degradation
@@ -402,6 +409,7 @@ pgvector with no new service. An outbox-driven worker chunks and embeds goals, k
 - **Degradation leg.** CI boots with the provider off and asserts every P0 flow passes, every AI affordance is hidden or disabled, and both agents still nudge, escalate and compute.
 - **Live transport tests.** Drive the real authorisation and transport stack end to end and assert that an under-privileged call is denied and no cross-tenant data appears in any result. The claim that every call is permission-checked is machine-verified, not asserted.
 - **Prompt gating.** A prompt version that regresses the evaluation set fails the check.
+- **Ratings feed the fixtures by a person's hand (plan 0.9.0 FB1).** A member's thumbs-down on a copilot answer, shared with AI administrators, is a real failure the hand-written sets did not guess. `pnpm copilot:feedback --workspace <slug>` prints those with names and numbers replaced. Nothing is turned into a fixture automatically, because fixtures are committed to a public repository.
 - **Agent safety tests.** Sandbox commits nothing. Proposal mode commits nothing until applied. A cost cap halts a run mid-flight. An instruction injected into retrieved content cannot exceed the agent's bindings.
 - **As built at 0.7.0 (plan A9).** One set per drafter capability, 23 in all, each passing whole against the mock: decision A4's bar, stated per capability in [ai-evaluation](../design/ai-evaluation.md) §5. The unit suite runs them, so a built-in prompt that regresses one fails CI; `ai.updatePrompt` runs the key's set and refuses a version that fails it; a stored version is sent only while it passes, which also covers one saved before the gate; the usage card computes the latest results as it renders; and `pnpm ai:evaluate --provider --model` is the live smoke test. Before A9 nothing sent a saved version, and the two built-in texts the card showed were not the ones the drafter sent; both are fixed.
 - **Nudge tests.** Deduplication holds under bursts. Quiet hours defer. Escalation advances exactly one step. A snooze never hides a review-inbox obligation. Volume per member per week stays under the configured ceiling in a simulated month.
@@ -418,3 +426,16 @@ pgvector with no new service. An outbox-driven worker chunks and embeds goals, k
 | A6 | Embedding model and dimension | Open. The column is kept swappable |
 | A7 | Nudge volume ceiling per member per week | Five. A workspace setting in the METHOD.md §11 registry; anything past it waits for the member's next daily digest, which is not itself held or counted. |
 | A8 | Outbound MCP, meaning the copilot calling external tools | Later. The registry is designed so it bolts on |
+
+**Copilot live data.** Decided by Akmal on 11 November 2026, "design approved for all", with the model changed by him in D8. The reasons are in [copilot-live-data](../design/copilot-live-data.md) section 10.
+
+| # | Decision | Position |
+|---|---|---|
+| D1 | How the copilot learns about data | It reads through the product's own actions, as the member |
+| D2 | Which reads it may call | A curated dozen and `passages`, not the agent surface's whole core toolset |
+| D3 | Which edits become proposable | Five more edits, in design section 4.1 |
+| D4 | Whether any write may skip the apply step | No. Every change stays a proposal the member applies |
+| D5 | Undo for edits | The before values are stored when a proposal is applied (migration 2) |
+| D6 | Recording the copilot's reads | In `ai_tool_calls` beside the agent surface's (migration 1, L3) |
+| D7 | Limits | Fixed: 4 rounds, 6 reads a round, 6,000 characters a result. Not settings |
+| D8 | Model | GPT-6 Luna is the default for `fast` and `balanced` on OpenRouter. Sonnet 5.5 was the recommendation |

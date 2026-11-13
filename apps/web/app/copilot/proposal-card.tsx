@@ -5,9 +5,10 @@
  * about it (P4-T14b-a, screen S-39). Moved out of the panel when the cards
  * went into the turns that made them (plan 0.8.1 CP3).
  */
-import { Button, Chip, useTranslations } from "@openokr/ui";
+import { Button, Chip, TextInput, useTranslations } from "@openokr/ui";
 import { ArrowUpRight, Check, Undo2 } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
 export interface Proposal {
   readonly id: string;
@@ -20,6 +21,11 @@ export interface Proposal {
   readonly status: "pending" | "applied" | "dismissed";
   readonly undone: boolean;
   readonly reversible: boolean;
+  /**
+   * The workspace asks why anything is added mid-cycle and this proposal gives
+   * no reason, so the card asks for one and Apply waits for it (design §4.3).
+   */
+  readonly needsReason: boolean;
   /** When it was made, which places it in the turn whose question made it. */
   readonly createdAt: string;
   /** Where what it made lives, once applied and not undone (CP7). */
@@ -32,6 +38,11 @@ const OPEN_KEYS: Readonly<Record<string, string>> = {
   "goals.addKeyResult": "copilot.copilotPanel.open.keyResult",
   "initiatives.create": "copilot.copilotPanel.open.initiative",
   "tasks.create": "copilot.copilotPanel.open.task",
+  "goals.update": "copilot.copilotPanel.open.objective",
+  "tasks.move": "copilot.copilotPanel.open.task",
+  "initiatives.update": "copilot.copilotPanel.open.initiative",
+  "goals.publishDraftedCheckIn": "copilot.copilotPanel.open.objective",
+  "kpis.record": "copilot.copilotPanel.open.kpi",
 };
 
 /**
@@ -48,6 +59,11 @@ const ACTION_NAME_KEYS: Readonly<Record<string, string>> = {
   "goals.addKeyResult": "copilot.copilotPanel.actions.newKeyResult",
   "initiatives.create": "copilot.copilotPanel.actions.newInitiative",
   "tasks.create": "copilot.copilotPanel.actions.newTask",
+  "goals.update": "copilot.copilotPanel.actions.editObjective",
+  "tasks.move": "copilot.copilotPanel.actions.moveTask",
+  "initiatives.update": "copilot.copilotPanel.actions.changeInitiative",
+  "goals.publishDraftedCheckIn": "common.checkIn",
+  "kpis.record": "copilot.copilotPanel.actions.recordKpiValue",
 };
 
 /**
@@ -70,6 +86,15 @@ const PREVIEW_LABEL_KEYS: Readonly<Record<string, string>> = {
   Indicator: "copilot.copilotPanel.preview.indicator",
   Initiative: "copilot.copilotPanel.preview.initiative",
   Task: "copilot.copilotPanel.preview.task",
+  Title: "copilot.copilotPanel.preview.title",
+  Status: "copilot.copilotPanel.preview.status",
+  Reason: "copilot.copilotPanel.preview.reason",
+  Confidence: "common.confidence",
+  Narrative: "checkIn.timeline.narrative",
+  KPI: "kpis.grid.kpi",
+  Period: "common.period",
+  Value: "copilot.copilotPanel.preview.value",
+  Remark: "copilot.copilotPanel.preview.remark",
 };
 
 /**
@@ -94,13 +119,17 @@ export function ProposalCard({
   readonly busy: boolean;
   /** The button that started the work in flight, so only that one spins. */
   readonly acting: string | null;
-  readonly onApply: () => void;
+  /** With the person's reason, when the card asked for one. */
+  readonly onApply: (reason?: string) => void;
   readonly onDismiss: () => void;
   readonly onUndo: () => void;
   /** Why the last decision on this card was refused, on the card itself. */
   readonly error: string | null;
 }) {
   const { t } = useTranslations();
+  const [reason, setReason] = useState("");
+  const asksReason = proposal.status === "pending" && proposal.needsReason;
+  const reasonMissing = asksReason && reason.trim() === "";
 
   return (
     <section
@@ -129,8 +158,10 @@ export function ProposalCard({
       <p className="mt-2 text-xs text-ink-3">{proposal.why}</p>
       <dl className="mt-2 flex flex-col gap-1">
         {proposal.preview.map((row) => (
-          <div key={row.label} className="flex gap-2 text-xs">
-            <dt className="w-20 flex-none text-ink-4">
+          // A check-in lists one row per key result, labelled with its title,
+          // and two can share a title but not a title and a value.
+          <div key={`${row.label}:${row.value}`} className="flex gap-2 text-xs">
+            <dt className="w-20 flex-none break-words text-ink-4">
               {PREVIEW_LABEL_KEYS[row.label]
                 ? t(PREVIEW_LABEL_KEYS[row.label] as string)
                 : row.label}
@@ -139,14 +170,29 @@ export function ProposalCard({
           </div>
         ))}
       </dl>
+      {asksReason ? (
+        // The same words and the same field the objective form uses for a
+        // mid-cycle start: the workspace requires them, so Apply waits.
+        <TextInput
+          value={reason}
+          label={t("midCycle.whyNowRequired")}
+          hideLabel
+          maxLength={500}
+          placeholder={t("midCycle.whyNowPlaceholder")}
+          disabled={busy}
+          onChange={(event) => setReason(event.target.value)}
+          className="mt-2 w-full min-w-0"
+          inputClassName="px-2 text-xs"
+        />
+      ) : null}
       <div className="mt-3 flex items-center gap-2">
         {proposal.status === "pending" ? (
           <>
             <Button
               variant="primary"
-              disabled={busy}
+              disabled={busy || reasonMissing}
               pending={busy && acting === `apply:${proposal.id}`}
-              onClick={onApply}
+              onClick={() => onApply(asksReason ? reason.trim() : undefined)}
             >
               <Check className="size-4" />
               {t("common.apply")}

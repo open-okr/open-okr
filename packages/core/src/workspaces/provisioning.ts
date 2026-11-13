@@ -495,12 +495,18 @@ async function insertWorkspaceAndMember(
         // The Champion, before the first space rather than after it: a space
         // binds the agent as it is created, and an agent that did not exist yet
         // would silently miss the workspace's own first space (P4-T05a).
-        await seedChampionInTx(savepoint, { workspaceId });
+        await seedChampionInTx(savepoint, {
+          workspaceId,
+          timezone: settings.timezone,
+        });
         // Both agents before the first space, for the reason P4-T05a records:
         // a space binds every seeded agent as it is created, so an agent
         // created after the workspace's own space would silently have missed
         // it.
-        await seedCoachInTx(savepoint, { workspaceId });
+        await seedCoachInTx(savepoint, {
+          workspaceId,
+          timezone: settings.timezone,
+        });
 
         // TECHNICAL-PLAN §4.14: "One space named after the workspace, with the
         // first member as its manager, who covers the coordinator's duties

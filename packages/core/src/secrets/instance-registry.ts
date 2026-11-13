@@ -30,6 +30,13 @@ export interface InstanceSettingDefinition {
 export const SETUP_COMPLETED_AT = "setup.completed_at";
 
 /**
+ * The HMAC of the setup code the server made at first boot, never the code
+ * (docs/design/setup-code.md D2, D5). Internal: no screen reads or edits it,
+ * and `completeSetup` deletes it, so a claimed instance holds none.
+ */
+export const SETUP_CODE_HASH = "setup.codeHash";
+
+/**
  * When any of the instance's schedulers last completed a run (plan 0.8.0 H12).
  *
  * A stamp, like the one above, not a setting anybody chooses. Kept in the
@@ -69,6 +76,13 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     fallback: "",
     summary:
       "When the first-run wizard finished. Empty means the instance is unconfigured.",
+  },
+  {
+    key: SETUP_CODE_HASH,
+    kind: "string",
+    fallback: "",
+    summary:
+      "The HMAC of a setup code the server made at first boot, kept until setup finishes. Internal, not editable. Empty means no generated code is waiting.",
   },
   {
     key: SCHEDULER_LAST_RUN_AT,

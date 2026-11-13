@@ -457,3 +457,29 @@ achievement still reads 50 wherever both are shown.
 **Given** a recovering KPI whose real achievement re-enters the healthy
 corridor, **when** the coach evaluates it twice, **then** exactly one closure
 proposal exists.
+
+## 12. Removing a period's value
+
+`kpis.deleteRecord` removes one period's value. It exists for one caller: the copilot's undo of a value it recorded for a period that had none (copilot-live-data.md §4.1). Deletes stay unproposable, and the action is kept off the agent surface (`agentSurface: false`). It stays on REST and the command line.
+
+| Rule | Detail |
+|---|---|
+| Input | `{ id }`, the record id that `kpis.record` returns |
+| Access | Domain `kpi`, level `edit`, safety `destructive`. Authorised like `kpis.record`, on the role's KPI level |
+| Soft delete | `kpi_records.deleted_at` is stamped. No migration: the unique index on `(workspace_id, kpi_id, period_start)` already includes deleted rows |
+| Refused | A calculated KPI's record (the next evaluation would write it back), a record that does not exist, and a record already deleted |
+| Recompute | The chain `kpis.record` runs, in the same order, in the same Operation: the cascade to calculated KPIs and each one's state, the KPI's own state, then the key results that read any of them and their goals |
+| Nothing left | When the removed value was the only one, the KPI reads `no_data`, because an unmeasured KPI is not a zero (§10) |
+| Re-recording | `kpis.record` for the same period revives the row, because its upsert clears `deleted_at` |
+| Activity and audit | Activity `kpi.value_removed`, audit `kpis.deleteRecord` |
+| Webhook | None. `kpi.value_removed` has no route in `ACTIVITY_EVENT_ROUTES`, so nothing is sent |
+
+**Given** a monthly KPI with values for August and September, **when** the September value is removed, **then** the grid omits September, the KPI's state reads from August, a linked key result and its goal move back to August's reading, and an audit row names the removed record.
+
+**Given** a KPI whose only value is removed, **then** its state reads `no_data`.
+
+**Given** a removed period, **when** that period is recorded again, **then** the same row comes back with the new value.
+
+**Given** a calculated KPI, **when** one of its records is removed, **then** the removal is refused and the row is untouched. **Given** a missing or already removed record, **then** it is refused as not found.
+
+**Given** a member without `edit` on the KPI domain, **when** they remove a value, **then** it is refused.

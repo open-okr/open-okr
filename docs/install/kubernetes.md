@@ -59,9 +59,13 @@ from a checkout with `helm install openokr ./deploy/helm` and set
    on first install and keeps it across upgrades and uninstalls, and it cannot
    recover it. Losing it makes stored credentials unreadable while everything
    else keeps working, which is the worst way to find out.
-6. Open the host and finish setup right after the first start. Until somebody
-   does, anyone who reaches the host can create the owner account. The first-run
-   wizard takes over exactly as it does on a single server.
+6. Open the host and finish setup right after the first start. The wizard asks
+   for a setup code first. The chart generated it into its Secret and the
+   install notes print the command that reads it:
+   `kubectl -n <namespace> get secret <release>-openokr-secrets -o jsonpath='{.data.setup-code}' | base64 -d`.
+   With your own Secret, add a `setup-code` key, or leave it out and the server
+   makes a code at first boot and keeps it in `/app/storage/setup-code`. The
+   first-run wizard then takes over exactly as it does on a single server.
 
 Migrations run as a job from the same image, before the application rolls,
 and the data changes run as another once it has, so an upgrade is

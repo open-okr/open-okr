@@ -388,6 +388,11 @@ test("a monthly review records a trend and a decision, and the goal shows it", a
 test("a quarterly review runs its rail, and the second client follows", async ({
   browser,
 }) => {
+  // Traced locally on 13 November 2026 it passes in 12.4 s over 410 calls,
+  // and no single step takes more than 1 s. Two browser clients follow one
+  // rail, so on a slow CI runner the many steps passed the 30 s default once.
+  // That is volume, not a hang, so the test gets a 60-second limit.
+  test.setTimeout(60_000);
   const member = (
     await pool.query<{ id: string; workspace_id: string }>(
       `select m.id, m.workspace_id

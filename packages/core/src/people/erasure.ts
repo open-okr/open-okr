@@ -26,6 +26,7 @@
 import {
   accounts,
   activeOnly,
+  aiAnswerRatings,
   aiMessages,
   aiThreads,
   aiToolCalls,
@@ -72,6 +73,8 @@ export interface ErasureSweep {
   readonly copilotMessages: number;
   /** Plan 0.7.0 A2: the record of calls the member's agents made. */
   readonly agentToolCalls: number;
+  /** Plan 0.9.0 FB1: the member's thumbs on copilot answers, soft deleted ones too. */
+  readonly answerRatings: number;
 }
 
 const EMPTY_PAYLOAD = {} as const;
@@ -151,14 +154,34 @@ export async function sweepPersonalData(
     )
     .returning({ id: channelMessages.id });
 
-  // The record of what the member's agents did (agent-tool-calls.md D17),
-  // first, by member: deleting the tokens and grants below would cascade to
-  // most of it, but uncounted, and a count is the evidence the member gets.
+  // The record of what the member's agents did (agent-tool-calls.md D17) and
+  // of what the copilot read for them (plan 0.9.0 L3), first, by member: the
+  // copilot's rows have no token or grant to cascade from, so this delete is
+  // the only thing that removes them. Deleting the tokens and grants below
+  // would cascade to the agents' rows, but uncounted, and a count is the
+  // evidence the member gets.
   // openokr:allow-mutation: the calling Operation's own transaction.
   const toolCalls = await tx
     .delete(aiToolCalls)
     .where(eq(aiToolCalls.memberId, input.memberId))
     .returning({ id: aiToolCalls.id });
+
+  // The member's thumbs on copilot answers (plan 0.9.0 FB1), by member and
+  // counted: they would also go with the messages they point at, but those
+  // are only deleted when the thread is the member's, and the count is the
+  // evidence the member gets. Soft deleted ones included: erasure removes
+  // rows, it does not hide them.
+  // openokr:allow-mutation: the calling Operation's own transaction.
+  const ratings = await tx
+    .delete(aiAnswerRatings)
+    .where(
+      includeDeleted(
+        aiAnswerRatings,
+        eq(aiAnswerRatings.workspaceId, input.workspaceId),
+        eq(aiAnswerRatings.memberId, input.memberId),
+      ),
+    )
+    .returning({ id: aiAnswerRatings.id });
 
   // **Credentials, and they go first in spirit if not in order.** A token
   // that outlives an erasure is an account somebody can still act as.
@@ -285,6 +308,7 @@ export async function sweepPersonalData(
     copilotThreads: threadIds.length,
     copilotMessages: messageCount,
     agentToolCalls: toolCalls.length,
+    answerRatings: ratings.length,
   };
 }
 

@@ -54,7 +54,7 @@ locally built image is a supported path.
 On the first run this generates every secret it needs, writes them to
 `./secrets/` with mode 600, pulls the image, starts PostgreSQL, runs the
 migrations, and waits until the application answers its own health check. It
-prints the address to open when it is ready.
+prints the address to open when it is ready, and the setup code the wizard asks for.
 
 For a real domain with an automatic certificate, name it:
 
@@ -67,7 +67,7 @@ a laptop and wrong for a server anybody else reaches.
 
 **3. Finish setup in the browser.**
 
-Open the address it printed, right after the first start. Until somebody finishes setup, anyone who reaches that address can create the owner account, and `./openokr up` prints the setup link with a reminder of that. The wizard asks for one thing: the account that
+Open the address it printed, right after the first start. `./openokr up` prints the setup link and the setup code: `Setup code: ABCD-EFGH-JKMN`. It is also in `secrets/app.env` as `OPENOKR_SETUP_CODE`. Without the code nobody can create the owner account, so finding the address is not enough to claim the instance. The wizard asks for the code first, in any case and with or without the dashes, and then for one more thing: the account that
 owns the instance. Name, address, and a password of at least twelve
 characters. The instance's name is on the same form, already filled in.
 
@@ -143,6 +143,7 @@ a browser binds a passkey to an origin and nothing can migrate that.
 | "the application is healthy but the proxy is ..." | The proxy started and then stopped. `./openokr logs proxy` says why |
 | The browser cannot reach it | Check a firewall between you and the machine before looking at the instance |
 | The wizard says setup is already done | Somebody has claimed this instance. Sign in, or ask them for an invitation |
+| "That setup code is not right" | Read it again from `secrets/app.env` (`grep OPENOKR_SETUP_CODE secrets/app.env`). If it leaked before you claimed the instance, change the value, run `./openokr up` again and use the new one. It is dead once setup finishes |
 
 More in the [incident runbook](../runbooks/incident.md).
 

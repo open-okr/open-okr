@@ -12,8 +12,10 @@ import {
   EMPTY_ANSWER,
   type PaletteAnswer,
   type PaletteCommand,
+  type PaletteEntry,
   type PaletteHit,
   paletteGroups,
+  paletteTab,
 } from "../app/search/palette-groups.ts";
 
 /**
@@ -36,12 +38,23 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, refresh: () => undefined }),
 }));
 
-const paletteSearchAction = vi.fn<(text: string) => Promise<PaletteAnswer>>();
+const paletteSearchAction =
+  vi.fn<(text: string, tab?: string) => Promise<PaletteAnswer>>();
 const paletteRelatedAction =
-  vi.fn<(text: string) => Promise<readonly PaletteHit[]>>();
+  vi.fn<(text: string, tab?: string) => Promise<readonly PaletteHit[]>>();
+const paletteRecentAction =
+  vi.fn<
+    (
+      refs: readonly { kind: string; id: string }[],
+    ) => Promise<readonly PaletteEntry[] | null>
+  >();
 vi.mock("../app/search/actions.ts", () => ({
-  paletteSearchAction: (text: string) => paletteSearchAction(text),
-  paletteRelatedAction: (text: string) => paletteRelatedAction(text),
+  paletteSearchAction: (text: string, tab?: string) =>
+    paletteSearchAction(text, tab),
+  paletteRelatedAction: (text: string, tab?: string) =>
+    paletteRelatedAction(text, tab),
+  paletteRecentAction: (refs: readonly { kind: string; id: string }[]) =>
+    paletteRecentAction(refs),
 }));
 
 const setAppearance = vi.fn(async (_input: unknown) => ({ error: null }));
@@ -153,6 +166,118 @@ describe("which groups a phrase produces", () => {
   });
 });
 
+const entry = (
+  entityType: string,
+  entityId: string,
+  title: string,
+): PaletteEntry => ({
+  entityType,
+  entityId,
+  title,
+  href: `/${entityType}s/${entityId}`,
+});
+
+const uuid = (n: number) =>
+  `${String(n).padStart(8, "0")}-aaaa-4aaa-8aaa-aaaaaaaaaaaa`;
+
+describe("Recent, and its place in the ranking (work-layer.md §5.1, G2-D5)", () => {
+  test("before anything is typed, Recent comes first and holds at most eight", () => {
+    const recent = Array.from({ length: 10 }, (_, n) =>
+      entry("task", uuid(n), `Task ${n}`),
+    );
+    const groups = paletteGroups("", EMPTY_ANSWER, [], COMMANDS, recent);
+    expect(groups.map((group) => group.id)).toEqual(["recent", "actions"]);
+    expect(groups[0]?.rows).toHaveLength(8);
+    // Newest first, as the server returned them.
+    expect(groups[0]?.rows[0]?.title).toBe("Task 0");
+    expect(groups[0]?.rows[0]?.href).toBe(`/tasks/${uuid(0)}`);
+    expect(groups[0]?.rows[0]?.kind).toBe("search.task");
+  });
+
+  test("with nothing recent there is no Recent group", () => {
+    const groups = paletteGroups("", EMPTY_ANSWER, [], COMMANDS, []);
+    expect(groups.map((group) => group.id)).toEqual(["actions"]);
+  });
+
+  test("a result that is also recent is lifted within its group", () => {
+    const plain = entry("task", uuid(1), "Pricing page");
+    const lately = entry("task", uuid(2), "Pricing copy");
+    const answer: PaletteAnswer = {
+      goTo: [],
+      hits: [plain, lately].map((one) => ({ ...one, snippet: "x" })),
+      error: null,
+    };
+    const groups = paletteGroups("pricing", answer, [], [], [lately]);
+    expect(groups[0]?.rows.map((row) => row.title)).toEqual([
+      "Pricing copy",
+      "Pricing page",
+    ]);
+  });
+
+  test("never above an exact title match", () => {
+    const exact = entry("task", uuid(3), "Pricing copy");
+    const lately = entry("task", uuid(4), "Pricing copy draft two");
+    const answer: PaletteAnswer = {
+      goTo: [],
+      hits: [lately, exact].map((one) => ({ ...one, snippet: "x" })),
+      error: null,
+    };
+    const groups = paletteGroups("Pricing copy", answer, [], [], [lately]);
+    expect(groups[0]?.rows.map((row) => row.title)).toEqual([
+      "Pricing copy",
+      "Pricing copy draft two",
+    ]);
+  });
+});
+
+describe("scoped tabs (work-layer.md §5.1, G2-D6)", () => {
+  const task = entry("task", uuid(5), "Aurora pricing copy");
+  const goal = entry("goal", uuid(6), "Aurora launch lands");
+  const answer: PaletteAnswer = {
+    goTo: [task, goal],
+    hits: [task, goal].map((one) => ({ ...one, snippet: "x" })),
+    error: null,
+  };
+
+  test("the seven tabs are All, Objectives, Key results, KPIs, Initiatives, Tasks and People", () => {
+    expect(paletteTab(undefined).id).toBe("all");
+    expect(paletteTab("tasks").kinds).toEqual(["task"]);
+    expect(paletteTab("people").kinds).toEqual(["person"]);
+    // An id from the browser that the server does not know means All.
+    expect(paletteTab("nonsense").id).toBe("all");
+  });
+
+  test("a scoped tab shows only its kind, and no actions", () => {
+    const groups = paletteGroups(
+      "aurora",
+      answer,
+      [{ ...goal, entityId: uuid(7), snippet: "x" }],
+      COMMANDS,
+      [],
+      ["task"],
+    );
+    expect(groups.map((group) => group.id)).toEqual(["goTo"]);
+    expect(groups[0]?.rows.map((row) => row.href)).toEqual([
+      `/tasks/${uuid(5)}`,
+    ]);
+  });
+
+  test("recents are filtered by the same kind", () => {
+    const groups = paletteGroups(
+      "",
+      EMPTY_ANSWER,
+      [],
+      COMMANDS,
+      [task, goal],
+      ["task"],
+    );
+    expect(groups.map((group) => group.id)).toEqual(["recent"]);
+    expect(groups[0]?.rows.map((row) => row.title)).toEqual([
+      "Aurora pricing copy",
+    ]);
+  });
+});
+
 describe("the palette, driven by the keyboard alone", () => {
   let host: HTMLDivElement;
   let root: Root;
@@ -217,6 +342,8 @@ describe("the palette, driven by the keyboard alone", () => {
     setAppearance.mockClear();
     paletteSearchAction.mockReset();
     paletteRelatedAction.mockReset();
+    paletteRecentAction.mockReset();
+    paletteRecentAction.mockResolvedValue([]);
     paletteSearchAction.mockResolvedValue(ANSWER);
     paletteRelatedAction.mockResolvedValue([]);
 
@@ -224,7 +351,13 @@ describe("the palette, driven by the keyboard alone", () => {
   });
 
   /** Renders the palette as the shell does, and opens it with ⌘K. */
-  const mount = async ({ semantic }: { semantic: boolean }) => {
+  const mount = async ({
+    semantic,
+    workspaceId,
+  }: {
+    semantic: boolean;
+    workspaceId?: string;
+  }) => {
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -236,6 +369,7 @@ describe("the palette, driven by the keyboard alone", () => {
               <CommandPalette
                 canCreateObjective
                 semantic={semantic}
+                {...(workspaceId ? { workspaceId } : {})}
                 destinations={[
                   {
                     id: "review",
@@ -355,7 +489,7 @@ describe("the palette, driven by the keyboard alone", () => {
     await type("retention");
     // The shell said there is no embedding model, or that the workspace
     // keeps retrieval here, so the Related group is not even requested.
-    expect(paletteSearchAction).toHaveBeenCalledWith("retention");
+    expect(paletteSearchAction).toHaveBeenCalledWith("retention", "all");
     expect(paletteRelatedAction).not.toHaveBeenCalled();
     expect(
       host.querySelector('[data-testid="palette-group-related"]'),
@@ -368,7 +502,7 @@ describe("the palette, driven by the keyboard alone", () => {
     await mount({ semantic: true });
     paletteRelatedAction.mockResolvedValue([RELATED_HIT]);
     await type("retention");
-    expect(paletteRelatedAction).toHaveBeenCalledWith("retention");
+    expect(paletteRelatedAction).toHaveBeenCalledWith("retention", "all");
     const group = host.querySelector('[data-testid="palette-group-related"]');
     expect(group?.textContent).toContain("Related");
     expect(group?.textContent).toContain("Glacier retention");
@@ -389,5 +523,151 @@ describe("the palette, driven by the keyboard alone", () => {
     expect(host.querySelector('[role="alert"]')?.textContent).toBe(
       "The search did not answer. Try again.",
     );
+  });
+  const tabs = () =>
+    [...host.querySelectorAll<HTMLElement>('[role="tab"]')].map((tab) => ({
+      label: tab.textContent,
+      selected: tab.getAttribute("aria-selected"),
+    }));
+
+  test("the tabs are a tablist, with All selected to begin with", () => {
+    const list = host.querySelector('[role="tablist"]');
+    expect(list?.getAttribute("aria-label")).toBe(
+      "Narrow the search to one kind",
+    );
+    expect(tabs().map((tab) => tab.label)).toEqual([
+      "Everything",
+      "Objectives",
+      "Key results",
+      "KPIs",
+      "Initiatives",
+      "Tasks",
+      "People",
+    ]);
+    expect(tabs().map((tab) => tab.selected)).toEqual([
+      "true",
+      ...Array(6).fill("false"),
+    ]);
+  });
+
+  test("Ctrl+Tab moves to the next tab, Ctrl+Shift+Tab back, and both wrap", async () => {
+    const field = input() as HTMLInputElement;
+    const selected = () => tabs().find((tab) => tab.selected === "true")?.label;
+
+    await press(field, { key: "Tab", ctrlKey: true });
+    expect(selected()).toBe("Objectives");
+    await press(field, { key: "Tab", ctrlKey: true, shiftKey: true });
+    expect(selected()).toBe("Everything");
+    // Back from the first goes to the last.
+    await press(field, { key: "Tab", ctrlKey: true, shiftKey: true });
+    expect(selected()).toBe("People");
+    await press(field, { key: "Tab", ctrlKey: true });
+    expect(selected()).toBe("Everything");
+    // Focus never left the field.
+    expect(host.ownerDocument.activeElement).toBe(field);
+  });
+
+  test("a tab asks the server for its own kind, and shows only that", async () => {
+    paletteSearchAction.mockImplementation(async (_text, tab) =>
+      tab === "tasks"
+        ? {
+            goTo: [
+              {
+                entityType: "task",
+                entityId: TASK,
+                title: "Pricing copy",
+                href: `/tasks/${TASK}`,
+              },
+            ],
+            hits: [],
+            error: null,
+          }
+        : ANSWER,
+    );
+    await type("aurora");
+    const tasksTab = host.querySelector<HTMLElement>(
+      '[data-testid="palette-tab-tasks"]',
+    );
+    await act(async () => tasksTab?.click());
+    await wait(250);
+
+    expect(paletteSearchAction).toHaveBeenLastCalledWith("aurora", "tasks");
+    const titles = [...host.querySelectorAll('[role="option"]')].map(
+      (option) => option.textContent,
+    );
+    expect(titles.join(" | ")).toContain("Pricing copy");
+    expect(titles.join(" | ")).not.toContain("Aurora launch lands");
+    // The actions are pages and commands, which a Tasks tab does not offer.
+    expect(
+      host.querySelector('[data-testid="palette-group-actions"]'),
+    ).toBeNull();
+  });
+
+  test("lists what was opened first, and prunes what the server dropped", async () => {
+    await unmount();
+    const kept = { kind: "task", id: TASK, at: 2 };
+    const lost = { kind: "goal", id: GOAL, at: 1 };
+    window.localStorage.setItem(
+      "openokr.recent.ws-1",
+      JSON.stringify([kept, lost]),
+    );
+    paletteRecentAction.mockResolvedValue([
+      {
+        entityType: "task",
+        entityId: TASK,
+        title: "Pricing copy",
+        href: `/tasks/${TASK}`,
+      },
+    ]);
+    await mount({ semantic: false, workspaceId: "ws-1" });
+    await wait(50);
+
+    expect(paletteRecentAction).toHaveBeenCalledWith([kept, lost]);
+    const recent = host.querySelector('[data-testid="palette-group-recent"]');
+    expect(recent?.textContent).toContain("Recent");
+    expect(recent?.textContent).toContain("Pricing copy");
+    // Before the actions, which are alone only when nothing is recent.
+    const groups = [...host.querySelectorAll('[role="group"]')].map((group) =>
+      group.getAttribute("data-testid"),
+    );
+    expect(groups).toEqual(["palette-group-recent", "palette-group-actions"]);
+    // What the server did not return is gone from the stored list.
+    expect(
+      JSON.parse(window.localStorage.getItem("openokr.recent.ws-1") ?? "[]"),
+    ).toEqual([kept]);
+  });
+
+  test("a failed request prunes nothing", async () => {
+    await unmount();
+    const stored = [{ kind: "task", id: TASK, at: 2 }];
+    window.localStorage.setItem("openokr.recent.ws-1", JSON.stringify(stored));
+    paletteRecentAction.mockResolvedValue(null);
+    await mount({ semantic: false, workspaceId: "ws-1" });
+    await wait(50);
+
+    expect(
+      host.querySelector('[data-testid="palette-group-recent"]'),
+    ).toBeNull();
+    expect(
+      JSON.parse(window.localStorage.getItem("openokr.recent.ws-1") ?? "[]"),
+    ).toEqual(stored);
+  });
+
+  test("a new device asks with nothing and writes nothing back", async () => {
+    await unmount();
+    paletteRecentAction.mockResolvedValue([
+      {
+        entityType: "goal",
+        entityId: GOAL,
+        title: "Aurora launch lands",
+        href: `/goals/${GOAL}`,
+      },
+    ]);
+    await mount({ semantic: false, workspaceId: "ws-1" });
+    await wait(50);
+
+    expect(paletteRecentAction).toHaveBeenCalledWith([]);
+    expect(host.textContent).toContain("Aurora launch lands");
+    expect(window.localStorage.getItem("openokr.recent.ws-1")).toBeNull();
   });
 });

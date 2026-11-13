@@ -198,12 +198,23 @@ curl -sL "http://127.0.0.1:18080/setup" | grep -q "PostgreSQL" \
   || fail "the wizard did not reach the database"
 pass "the wizard reached the database"
 
+# The first account needs the setup code the chart put in its Secret, read the
+# way the install notes say (plan 0.9.0 G1). Without it, nobody is made.
+setup_code=$(kubectl get secret "$RELEASE-openokr-secrets" -n "$NAMESPACE" \
+  -o jsonpath='{.data.setup-code}' | base64 -d)
+[ -n "$setup_code" ] || fail "the chart's Secret holds no setup code"
+signup_body='{"email":"admin@example.com","password":"correct-horse-battery-staple","name":"Grace Hopper"}'
 code=$(curl -s -o /dev/null -w '%{http_code}' \
   -X POST "http://127.0.0.1:18080/api/auth/sign-up/email" \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"admin@example.com","password":"correct-horse-battery-staple","name":"Grace Hopper"}')
-[ "$code" = "200" ] || fail "registration returned $code"
-pass "a user can register"
+  -H 'Content-Type: application/json' -d "$signup_body")
+[ "$code" = "422" ] || fail "registration with no setup code returned $code, not 422"
+pass "registration without the setup code is refused"
+code=$(curl -s -o /dev/null -w '%{http_code}' \
+  -X POST "http://127.0.0.1:18080/api/auth/sign-up/email" \
+  -H 'Content-Type: application/json' -H "x-openokr-setup-code: $setup_code" \
+  -d "$signup_body")
+[ "$code" = "200" ] || fail "registration with the setup code returned $code"
+pass "a user can register with the setup code"
 
 # --- upgrade -------------------------------------------------------------
 # The property that matters for a customer: an upgrade re-runs the hook, finds
