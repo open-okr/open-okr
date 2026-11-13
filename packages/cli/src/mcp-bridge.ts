@@ -47,6 +47,30 @@ function idOf(message: unknown): string | number | null | undefined {
   return typeof id === "string" || typeof id === "number" ? id : null;
 }
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/**
+ * Why the bridge will not send a token to `url`, or null when it may. The
+ * token goes to whatever address the profile holds, so that address has to be
+ * an encrypted one. Plain http is allowed only for the machine's own
+ * loopback, where a developer runs an instance.
+ */
+export function bridgeUrlRefusal(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return `"${url}" is not a web address.`;
+  }
+  if (parsed.protocol === "https:") {
+    return null;
+  }
+  if (parsed.protocol === "http:" && LOOPBACK_HOSTS.has(parsed.hostname)) {
+    return null;
+  }
+  return `Refusing to send the agent token to ${url}. Use an https:// address, or http:// only for localhost.`;
+}
+
 function endpointOf(url: string): string {
   let end = url.length;
   while (end > 0 && url.charCodeAt(end - 1) === 47) {
@@ -60,6 +84,10 @@ function endpointOf(url: string): string {
  * process can exit with the agent.
  */
 export async function runMcpBridge(options: BridgeOptions): Promise<void> {
+  const refusal = bridgeUrlRefusal(options.url);
+  if (refusal !== null) {
+    throw new Error(refusal);
+  }
   const call = options.fetch ?? globalThis.fetch;
   const endpoint = endpointOf(options.url);
   const write = (message: unknown) =>
@@ -100,6 +128,9 @@ export async function runMcpBridge(options: BridgeOptions): Promise<void> {
             ? { "mcp-protocol-version": protocolVersion }
             : {}),
         },
+        // Never follow a redirect: it would carry the token to wherever the
+        // Location header points.
+        redirect: "manual",
         body: line,
       });
     } catch (error) {
@@ -111,6 +142,20 @@ export async function runMcpBridge(options: BridgeOptions): Promise<void> {
           `Could not reach ${options.url}: ${
             error instanceof Error ? error.message : String(error)
           }`,
+        );
+      }
+      continue;
+    }
+
+    // Every redirect is refused, same-origin ones too: a POST that is
+    // replayed after a redirect is a second request nobody asked for, and the
+    // endpoint has no reason to move.
+    if (response.status >= 300 && response.status < 400) {
+      if (id !== undefined) {
+        await failure(
+          id,
+          UNREACHABLE,
+          `${options.url} answered with a redirect (${response.status}). The bridge does not follow redirects, so the agent token stays with the address in the profile. Update the profile's url.`,
         );
       }
       continue;
