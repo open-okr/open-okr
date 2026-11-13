@@ -304,7 +304,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | G1 | done | 13 November 2026. Built as designed. `createAuth` takes a `setupCode` option that only the web app passes, so existing tests that claim an instance by signing up need no code. An environment code decides alone, which also kills a generated one left from an earlier boot |
 | G2 | to build | Design approved by Agung on 13 November 2026 |
 | G3 | to do | Built in 0.7.0. Design corrected; browser check of `/admin/connections` still to do |
-| G4 | to build | G4-Q2 decided by Agung on 13 November 2026: import as access bindings on the KPI |
+| G4 | design written | 13 November 2026: nothing reads a binding on one KPI (human KPI access is the role alone), so Agung chose per-KPI access first (G4-Q3). `docs/design/kpi-access.md`, waiting for "design approved"; Q1 asks whether to ship only the import report in 0.9.0 |
 | G5 | yours | G5-Q2: wait for `feat/profile-source-links` to be pushed from the machine that kept it |
 | G6 | done | 13 November 2026. Eleven mockups draw agents as faces (`.af`), 12b shows the guided fields, PNGs re-rendered with Google Chrome |
 | G7 | done | 13 November 2026. `.claude/settings.json` with `attribution` empty and `includeCoAuthoredBy: false` |
