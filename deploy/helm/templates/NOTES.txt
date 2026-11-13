@@ -16,10 +16,18 @@ Reach it locally with:
 then open http://localhost:8080
 {{- end }}
 
+{{- if .Release.IsInstall }}
+
 The instance has not been set up. The first person to open it gets the
 first-run wizard, creates the owner account, and registration closes behind
 them. Finish setup right after the first start: until then, anyone who reaches
 this address can claim the instance.
+{{- else }}
+
+To check that setup finished, open the address above. A set-up instance shows
+the sign-in page. A new one shows the first-run wizard, and until someone
+finishes it, anyone who reaches that address can claim the instance.
+{{- end }}
 
 {{- if and .Values.database.existingSecret .Values.database.adminUrl (not (dig "existingSecretAdminKey" "" .Values.database)) }}
 

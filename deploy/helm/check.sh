@@ -197,6 +197,34 @@ else
   fail "does not say where uploads go when a bucket is named"
 fi
 
+# --- the setup note is for a first install only (plan 0.9.0 H1) -------------
+# An upgrade cannot know whether setup finished, so it says how to check
+# instead of claiming the instance is new. No helm command renders NOTES.txt
+# for an upgrade without a cluster, so a copy of the chart gets the file under
+# a template name, and `--debug` prints the text even though it is not YAML.
+install_notes=$(notes)
+if printf '%s' "$install_notes" | grep -q "has not been set up"; then
+  pass "a first install says the instance has not been set up"
+else
+  fail "a first install does not say the instance has not been set up"
+fi
+
+notes_chart=$(mktemp -d)
+cp -R . "$notes_chart/chart"
+mv "$notes_chart/chart/templates/NOTES.txt" "$notes_chart/chart/templates/notes-copy.yaml"
+upgrade_notes=$(cd "$notes_chart/chart" && helm template openokr . --debug --is-upgrade \
+  --show-only templates/notes-copy.yaml --set "database.url=$DB" 2>&1 || true)
+rm -rf "$notes_chart"
+if ! printf '%s' "$upgrade_notes" | grep -q "OpenOKR .* is installed as"; then
+  fail "could not render the upgrade notes"
+elif printf '%s' "$upgrade_notes" | grep -q "has not been set up"; then
+  fail "an upgrade tells a set-up instance it has not been set up"
+elif printf '%s' "$upgrade_notes" | grep -q "To check that setup finished"; then
+  pass "an upgrade says how to check setup instead"
+else
+  fail "an upgrade does not say how to check setup"
+fi
+
 # --- the database's CA bundle (plan 0.8.0 H6) ------------------------------
 # A managed Postgres signs with an authority Node does not hold, so without a
 # bundle the only working connection was sslmode=no-verify. With one, every
