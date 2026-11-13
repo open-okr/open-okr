@@ -143,6 +143,94 @@ seals identity-provider tokens stored before they were encrypted needs the
 root key, and refuses to finish without it rather than report them sealed.
 [Security](../admin/security.md#what-is-encrypted-at-rest) says more.
 
+## 0.8 to 0.9
+
+Three migrations, **0168 to 0170**, all additive. No data change is new, and
+nothing needs setting on an instance that is already set up. A new install
+has one extra step, the [setup code](#the-setup-code).
+
+### Migrations
+
+None of the three drops, renames or rewrites anything. Each adds something the
+0.8 release never reads or writes, so a rolling upgrade is safe: pods still on
+0.8 keep working against the new schema. Nothing is lost on the way up. Going
+back is the [restore](#going-back), as always.
+
+| Migration | What it does | What you do |
+|---|---|---|
+| 0168 | Adds `proposed_changes.reverse_payload` (jsonb, null). It holds what undoing an applied copilot edit needs. Null on every existing row. No new table, so the row's own tenant policy covers it | Nothing |
+| 0169 | Widens two checks on `ai_tool_calls`: `source` admits `copilot` beside `mcp`, and a copilot row carries a member and no grant or token. Every existing row still satisfies both checks and none changes | Nothing |
+| 0170 | Creates `ai_answer_ratings`, the thumbs up and down on copilot answers, with row-level security and its tenant policy in the same migration | Nothing |
+
+### Data changes
+
+| Data change | What changed | What you do |
+|---|---|---|
+| 0035 | It now skips content whose indexing job is already queued, so a fresh seed no longer pays for one embedding twice. Its declared columns are unchanged, so the runner's checksum is too | Nothing. An instance that is part way through 0035 keeps running it |
+
+The registry holds no other change since 0.8.1.
+
+### The setup code
+
+A **new** install needs a setup code before the wizard creates the first
+account. It proves that whoever opens the address first also controls the
+deployment. [The design](../design/setup-code.md) has the reasoning.
+
+An instance that is already claimed needs nothing, and the code is never asked
+for again.
+
+| Deployment | Where the code is |
+|---|---|
+| Compose | `./openokr up` generates it, prints it and writes it to `secrets/app.env` as `OPENOKR_SETUP_CODE` |
+| Helm | The chart generates it into its Secret, and the install notes show how to read it. The notes show this on a first install only |
+| Your own Secret, or any other setup | Set `OPENOKR_SETUP_CODE` yourself. With none set, the server makes a code at first boot and keeps it in `setup-code` under the storage root (`/app/storage/setup-code` in the image). The wizard names the path, and the log names it too |
+
+A code set in the environment decides alone. That also ends a generated one
+left from an earlier boot. A script that claims an instance sends the code in
+the `x-openokr-setup-code` header of the sign-up request.
+
+### The Helm notes
+
+The chart's notes no longer say "not set up" on `helm upgrade`. They say it on
+a first install only. An upgrade is told how to check that setup finished.
+Nothing to do.
+
+### The copilot
+
+| Change | What it means | What you do |
+|---|---|---|
+| Reads live data | It calls the product's read actions as the asking member, so it never sees more than that member can. It says what it read and links the records. A provider that cannot call tools, or AI off, answers from matching passages as before | Nothing |
+| Cost | [Design §6](../design/copilot-live-data.md) estimates a tool loop at $0.02 to $0.08 on Sonnet 4.5. On GPT-6 Luna, the default on OpenRouter, it is about a thirtieth of that, and a five-call run is well under a cent | Nothing. A model chosen per tier is kept |
+| Proposals in the first round | The model that chooses what to read may prepare the change card itself, so a question that asks for no change gets its first word sooner. A provider that cannot call tools asks for the card first, as in 0.8 | Nothing |
+| Ask about this page | A record's page and the objective drawer offer "Ask about this objective" (or KPI, initiative, task) | Nothing |
+| Undo | An applied copilot edit can be undone while the record still holds the values the edit left. A KPI period's value can now be removed through the API for this | Nothing |
+| Thumbs | A member can rate an answer and add a note after a thumbs down. The note stays private to AI administrators unless the member shares the conversation. Hidden while AI is off | Nothing |
+
+Ratings are kept as long as the agent activity record, which is
+`agentToolCallRetentionDays` (90 days by default, 0 keeps every row) on the
+Limits card. They are deleted with the conversation or the member, and never
+leave the instance. The copilot's reads are recorded in the same activity
+record, with `source` set to `copilot`, and follow the same window.
+
+### Who may change the input pack
+
+Only an Owner, an Admin or the cycle's facilitator may now mark an item
+gathered, write its note or confirm distribution. The facilitator must be an
+active human member with the Member role or above. Everybody else sees the pack
+read only, with a line naming who may change it. The same rule holds through
+the API, the command line and agents. Marks already made stay as they are.
+Nothing to do, except to name a facilitator on a cycle where somebody else has
+been changing the pack.
+
+### Smaller changes
+
+| Change | What you do |
+|---|---|
+| The OKR Coach and the OKR Champion start with the workspace's time zone, as a human member does. This applies to **new workspaces only**. An existing workspace's two agents keep the zone they have | Nothing |
+| `okr mcp` refuses a profile address that is not https, except on localhost, and refuses to follow a redirect, so the agent token goes only to the address in the profile | If a profile uses plain http to a remote host, move it to https |
+| Better Auth moves from 1.7.18 to 1.7.22 (session cookie expiry on sign-out, SAML assertion clock skew) | Nothing |
+| The command palette lists what you opened lately first, and has tabs by type. Recents stay in the browser, per device | Nothing |
+
 ## 0.8.0 to 0.8.1
 
 A patch release: no migration, one data change, and nothing to set.

@@ -312,7 +312,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | G9 | done | 13 November 2026. No OKRGoal left in `error-reporting.md` or `observability.md` |
 | G10 | done | 13 November 2026. The row has no id, so the key is the position plus time and provider, as Obed's fix. `origin/obed` can go on Akmal's word |
 | G11 | done | 12 November 2026. okr-goal took the copy with open-okr's three later edits merged in (four conflicts settled against the live site) and 40 links pointed at GitHub, by pull request in that repository; the folder is removed here in this pull request |
-| U1 | to do | Last |
+| U1 | done | 13 November 2026. "0.8 to 0.9" in `docs/runbooks/upgrade.md`: 0168 to 0170, no new data change, setup code, copilot, input pack, smaller changes. G4 and G5 left out |
 | X1 | done | 12 November 2026, by Akmal |
 | X2 | done | 12 November 2026, by Akmal |
 | X3 | done | 12 November 2026: nothing was pinned |
