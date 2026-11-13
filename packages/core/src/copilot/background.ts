@@ -236,11 +236,26 @@ export async function runCopilotAnswer(
   // The read loop (plan 0.9.0 L2b): one step per read, and a Stop pressed
   // while it reads ends it before the next model call. It leaves the
   // passages in place when it cannot run.
+  //
+  // What the member may propose is read first, because the loop offers it as a
+  // tool (plan 0.9.0 A4). The card is published the moment the call finishes,
+  // before the answer starts.
+  const offers = await offersToPropose(context);
   const reading = await drainReading(
     readLiveData(context, groundedFirst, {
       proceed: async () => !(await stopped()),
+      proposal: { offers },
     }),
-    step,
+    async (event) => {
+      if (event.step === "card") {
+        await publish("copilot.proposal", {
+          answerMessageId: job.answerMessageId,
+          proposalId: event.proposalId,
+        });
+        return;
+      }
+      await step(event);
+    },
   );
   const prepared = reading?.prepared ?? groundedFirst;
   if (reading?.blocked) {
@@ -255,20 +270,26 @@ export async function runCopilotAnswer(
   }
 
   // The proposal first, so the answer is told whether a card exists (A2).
-  const offers = await offersToPropose(context);
-  if (offers !== null) {
-    await step({ step: "proposing" });
-  }
-  const proposal = await proposeBeforeAnswering(
-    context,
-    { threadId: job.threadId, request: job.question },
-    offers,
-  );
-  if (proposal.proposalId !== null) {
-    await publish("copilot.proposal", {
-      answerMessageId: job.answerMessageId,
-      proposalId: proposal.proposalId,
-    });
+  // On the tool path the loop already decided, and published the card when
+  // its call finished (A4-D5, A4-D6): no second call. Without the tool (a
+  // provider that cannot call tools, or a conversation anchored to a page,
+  // A4-D7) it is asked for the 0.8.1 way, with one structured call.
+  let proposal = reading?.proposal ?? null;
+  if (proposal === null) {
+    if (offers !== null) {
+      await step({ step: "proposing" });
+    }
+    proposal = await proposeBeforeAnswering(
+      context,
+      { threadId: job.threadId, request: job.question },
+      offers,
+    );
+    if (proposal.proposalId !== null) {
+      await publish("copilot.proposal", {
+        answerMessageId: job.answerMessageId,
+        proposalId: proposal.proposalId,
+      });
+    }
   }
   const ask = {
     ...(prepared.ask ?? groundedFirst.ask),

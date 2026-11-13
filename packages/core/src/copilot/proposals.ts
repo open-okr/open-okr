@@ -1959,12 +1959,24 @@ export async function proposeBeforeAnswering(
     return { note: { made: false }, proposalId: null };
   }
   return {
-    note: {
-      made: true,
-      label: proposableAction(proposed.action)?.label ?? proposed.action,
-      preview: proposed.preview,
-    },
+    note: proposalNoteFor(proposed.action, proposed.preview),
     proposalId: proposed.id,
+  };
+}
+
+/**
+ * What the answer is told about a card that exists. One place for both ways a
+ * card is made: the proposal-first call above and the `propose_change` tool
+ * (plan 0.9.0 A4).
+ */
+export function proposalNoteFor(
+  action: string,
+  preview: BuiltProposal["preview"],
+): Extract<ProposalNote, { made: true }> {
+  return {
+    made: true,
+    label: proposableAction(action)?.label ?? action,
+    preview,
   };
 }
 

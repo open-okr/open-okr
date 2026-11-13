@@ -149,6 +149,15 @@ export interface ReadingTool {
   readonly name: string;
   readonly description: string;
   readonly inputSchema: Record<string, unknown>;
+  /**
+   * Offered in the loop's first round only (plan 0.9.0 A4-D4). A host that
+   * marks a tool this way gets two things from the drafter: the tool is left
+   * out of every later request, and round one is sent with the thread's
+   * earlier questions but not its earlier answers (which may quote read text),
+   * so what started the call can only be the member's own words. The earlier
+   * answers are put back for round two, so reads still follow up on them.
+   */
+  readonly firstRoundOnly?: boolean;
 }
 
 /** What the read loop is asked, before any answer is written. */

@@ -317,7 +317,11 @@ objective's.
 
 ## 11. The proposal as a tool in the loop (plan 0.9.0 A4)
 
-Status: **approved by Agung on 13 November 2026** ("design approved"), Q1: round 1 only; Q2: earlier questions only, not earlier answers. Akmal decided A4-Q on 12 November 2026 (the proposal becomes one of the loop's tools) and approved this direction the same day: a `propose_change` tool beside the read tools, taking today's proposal shape and checked by the same code; at most one card per answer; only the member's own words may start a proposal, never text the copilot read, proved by an injection fixture; the card appears when the tool call finishes, while the answer streams; a provider that cannot call tools keeps 0.8.1's proposal-first path; AI off unchanged; target about 2 seconds to the first word on Luna for a question that asks for no change, measured before and after.
+Status: **built on 13 November 2026**, with one deviation (below), measurement still to do. **Approved by Agung on 13 November 2026** ("design approved"), Q1: round 1 only; Q2: earlier questions only, not earlier answers. Akmal decided A4-Q on 12 November 2026 (the proposal becomes one of the loop's tools) and approved this direction the same day: a `propose_change` tool beside the read tools, taking today's proposal shape and checked by the same code; at most one card per answer; only the member's own words may start a proposal, never text the copilot read, proved by an injection fixture; the card appears when the tool call finishes, while the answer streams; a provider that cannot call tools keeps 0.8.1's proposal-first path; AI off unchanged; target about 2 seconds to the first word on Luna for a question that asks for no change, measured before and after.
+
+**Built 13 November 2026, with this deviation, decided by Agung the same day.** A conversation anchored to a page (CP11, "Ask about this page") keeps 0.8.1's proposal-first path and is not offered `propose_change`. Its round 1 holds the anchored record's read text as the `subject` block, and A4-D4 says no read result may be in the context that starts a proposal. The cost is that an anchored conversation still pays the separate proposal call. The 2-second target is measured in a live run that is still to do (§11.4); no timing is claimed here.
+
+**Details of the build.** The loop (`reading.ts`) offers the tool and passes the card to its caller as an event, so the card is published when the call finishes. The loop counts model calls with `beforeRound`, and refuses a `propose_change` that arrives after round 1 as `unknown_tool` even if a provider sends one. The drafter marks the tool `firstRoundOnly`: it leaves it out of every request after the first, sends round 1 with the thread's earlier questions only, and puts the earlier answers back for round 2 so that reads can still follow up on them. A `propose_change` call is counted as one of the round's six calls but is not a read: it opens no record and is left out of the "made n reads" line and the sources. After a card the model needs one more round to say it has finished, so a request that asks for a change costs that round; a request that asks for none does not. The call is recorded in `ai_tool_calls` with tool `propose_change` and scope `write`, because it makes a proposal row (the table's check allows it, so no migration).
 
 ### 11.1 Why
 
@@ -350,8 +354,11 @@ Status: **approved by Agung on 13 November 2026** ("design approved"), Q1: round
 | Two proposals | The model calls `propose_change` twice | One card; the second call's result says one was already made |
 | Refused by the builder | The model names a choice that is not offered | No card; the tool result names why; the answer does not claim a card |
 | No tools | A provider without tool calls | The 0.8.1 path: the proposal call, then the answer |
+| Anchored | A conversation opened from a page asks for a change | The 0.8.1 path. `propose_change` is not offered, and the unit test `copilot-background.test.ts` checks it. This is a core decision, so it is a unit test, not an evaluation fixture. The six fixtures above are in the evaluation set `chooseReads` |
 
 ### 11.4 Measure
+
+**Not done yet (13 November 2026).** The live run on Luna is still to do.
 
 Before and after, as L7b did: the §1 questions as Priya on a fresh Northwind year on Luna, time from Send to the first word for each, and the same for two questions that ask for a change. Written into §8's L7b row.
 

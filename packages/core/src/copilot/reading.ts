@@ -30,11 +30,22 @@ import {
   COPILOT_FEATURE_KEY,
 } from "../actions/copilot.ts";
 import type { ActionCallContext } from "../actions/define.ts";
-import type { GroundingSource, ReadingContext } from "../agents/drafter.ts";
+import type {
+  GroundingSource,
+  ProposalNote,
+  ReadingContext,
+} from "../agents/drafter.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import type { AnswerSource, CopilotStep, Prepared } from "./answer.ts";
 import { isCitableType } from "./citations.ts";
+import { type ProposalOffer, proposalNoteFor } from "./proposals.ts";
+import {
+  createProposer,
+  PROPOSE_TOOL,
+  type ProposedCard,
+  proposeChangeTool,
+} from "./propose-tool.ts";
 import { recordCopilotRead } from "./read-record.ts";
 import {
   COPILOT_READS,
@@ -162,6 +173,15 @@ async function threadAnchor(
   }
 }
 
+/**
+ * What the loop tells its caller as it runs: a step, or the card a
+ * `propose_change` call just made, so the caller can show it at that moment
+ * (plan 0.9.0 A4-D5) rather than after the loop ends.
+ */
+export type ReadingEvent =
+  | CopilotStep
+  | { readonly step: "card"; readonly proposalId: string };
+
 /** What a finished read loop hands back to a caller. */
 export interface ReadingOutcome {
   /** The question prepared again, answering from what was read. Unchanged when nothing was read. */
@@ -176,6 +196,17 @@ export interface ReadingOutcome {
    * and does not call the answer.
    */
   readonly blocked: ReasonLike | null;
+  /**
+   * What the `propose_change` tool made, or null when the tool was not part of
+   * this run (plan 0.9.0 A4-D7). Null tells the caller to ask for the
+   * proposal the 0.8.1 way, with one structured call before the answer. Not
+   * null means the model was offered the tool in round one, so a note with
+   * `made: false` is the final word: nothing was asked for.
+   */
+  readonly proposal: {
+    readonly note: ProposalNote;
+    readonly proposalId: string | null;
+  } | null;
 }
 
 export interface ReadingHooks {
@@ -184,6 +215,12 @@ export interface ReadingHooks {
    * A background run uses it to stop when its member pressed Stop.
    */
   readonly proceed?: () => Promise<boolean>;
+  /**
+   * What the member may be offered (`offersToPropose`). Given, the loop offers
+   * `propose_change` in round one, unless the conversation is anchored to a
+   * page (see `proposer` below). Left out, the loop is as it was.
+   */
+  readonly proposal?: { readonly offers: readonly ProposalOffer[] | null };
 }
 
 /**
@@ -222,7 +259,7 @@ export async function* readLiveData(
   context: ActionCallContext,
   prepared: Prepared,
   hooks: ReadingHooks = {},
-): AsyncGenerator<CopilotStep, ReadingOutcome | null> {
+): AsyncGenerator<ReadingEvent, ReadingOutcome | null> {
   const drafter = context.drafter;
   if (!prepared.ask) {
     return null;
@@ -243,7 +280,7 @@ export async function* readLiveData(
   // One table per run and per member, never shared (design 3.3).
   const refs = createRefTable();
   const segments = new Map<number, string>();
-  const queue: CopilotStep[] = [];
+  const queue: ReadingEvent[] = [];
   let subject: ReadingContext["subject"];
   let wake: (() => void) | null = null;
   const poke = () => {
@@ -252,7 +289,49 @@ export async function* readLiveData(
     was?.();
   };
 
+  // **An anchored conversation keeps the 0.8.1 proposal-first path** (A4,
+  // decided by Agung on 13 November 2026). Its round one holds the anchored
+  // record's read text as the `subject` block, and A4-D4 says nothing a read
+  // returned may be in the context that starts a proposal. Not offering the
+  // tool there is what keeps that literally true.
+  const proposer =
+    anchor === null && drafter?.chooseReads && hooks.proposal?.offers
+      ? createProposer(context, {
+          threadId: prepared.threadId,
+          offers: hooks.proposal.offers,
+        })
+      : null;
+  // One object rather than three `let`s: they are changed inside callbacks,
+  // and TypeScript would narrow a `let` to its first value after them.
+  const run = {
+    round: 0,
+    card: null as ProposedCard | null,
+    // Calls to `propose_change` the drafter counted among its reads.
+    proposalCalls: 0,
+  };
+
   const read = async (name: string, args: unknown): Promise<string> => {
+    if (name === PROPOSE_TOOL && proposer) {
+      run.proposalCalls += 1;
+      if (run.round === 1 && run.card === null) {
+        // Shown while the call is being built, and only then (A4-D5).
+        queue.push({ step: "proposing" });
+        poke();
+      }
+      const { result, card: made } = await proposer.handle(args, run.round);
+      // Recorded like a read, with its outcome (A4-D8).
+      await recordCopilotRead(context.pool, {
+        workspaceId: context.workspaceId,
+        memberId,
+        result,
+      });
+      if (made) {
+        run.card = made;
+        queue.push({ step: "card", proposalId: made.id });
+        poke();
+      }
+      return result.text;
+    }
     const result = await runRead(context, refs, name, args);
     // Every read, including a refused or unknown one, is written down as the
     // member's (design 3.6). Never in the way of the answer.
@@ -277,6 +356,9 @@ export async function* readLiveData(
   };
 
   const beforeRound = async (): Promise<boolean> => {
+    // Asked once before every model call, so this is the round about to run.
+    // It is how a `propose_change` call in round two is told apart (A4-D4).
+    run.round += 1;
     if (hooks.proceed && !(await hooks.proceed())) {
       return false;
     }
@@ -334,7 +416,9 @@ export async function* readLiveData(
           asker: ask.asker,
           ...(subject ? { subject } : {}),
         },
-        toolsFor(),
+        proposer && hooks.proposal?.offers
+          ? [...toolsFor(), proposeChangeTool(hooks.proposal.offers)]
+          : toolsFor(),
         read,
         beforeRound,
       ),
@@ -366,11 +450,21 @@ export async function* readLiveData(
   const chosen = await running;
   // A provider with no tools, or a loop that gave up, still has the anchored
   // record: it joins the grounding sources, so the answer can use it.
-  if ((!chosen.ok || !chosen.value) && subjectReads === 0) {
+  // A card that was made stands even when the loop failed after it, so the
+  // caller never asks for a second one.
+  if (
+    (!chosen.ok || !chosen.value) &&
+    subjectReads === 0 &&
+    run.card === null
+  ) {
     return null;
   }
   const loop = chosen.ok ? chosen.value : null;
-  const reads = (loop?.reads ?? 0) + subjectReads;
+  // A `propose_change` call is one of the loop's calls (A4-D8) but opens no
+  // record, so it is not a read: the answer's sources and the "made n reads"
+  // line count reads only.
+  const reads =
+    Math.max(0, (loop?.reads ?? 0) - run.proposalCalls) + subjectReads;
   const limited = loop?.limited ?? false;
   const costUsd = loop?.costUsd ?? 0;
   const tokensIn = loop?.tokensIn ?? 0;
@@ -382,7 +476,19 @@ export async function* readLiveData(
     context.workspaceId,
     memberId,
   );
-  const spent = { reads, costUsd, tokensIn, tokensOut, blocked };
+  // The tool was offered when the proposer exists and round one ran. A loop
+  // that returned null (a provider with no tools, a first round that failed)
+  // never offered it, and the caller asks the 0.8.1 way.
+  const offered = proposer !== null && (run.card !== null || Boolean(loop));
+  const proposal = offered
+    ? {
+        note: run.card
+          ? proposalNoteFor(run.card.action, run.card.preview)
+          : ({ made: false } as const),
+        proposalId: run.card?.id ?? null,
+      }
+    : null;
+  const spent = { reads, costUsd, tokensIn, tokensOut, blocked, proposal };
   if (reads === 0) {
     return { prepared, ...spent };
   }
@@ -421,8 +527,8 @@ export async function* readLiveData(
 
 /** Runs `readLiveData` to its end, telling `onStep` about each read. */
 export async function drainReading(
-  reading: AsyncGenerator<CopilotStep, ReadingOutcome | null>,
-  onStep?: (step: CopilotStep) => Promise<void> | void,
+  reading: AsyncGenerator<ReadingEvent, ReadingOutcome | null>,
+  onStep?: (step: ReadingEvent) => Promise<void> | void,
 ): Promise<ReadingOutcome | null> {
   let next = await reading.next();
   while (!next.done) {

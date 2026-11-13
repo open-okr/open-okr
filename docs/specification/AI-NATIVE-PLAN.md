@@ -62,7 +62,7 @@ Each capability accelerates an existing manual action, is independently toggleab
 | Capability | Kind | Degrades to |
 |---|---|---|
 | Decompose a key result into initiatives and tasks | write | Manual creation |
-| Grounded question answering across everything the user may see, with citations. It reads through the member's own read actions (values, health, owners, check-ins, tasks), as that member and with read scope, and cites what it read | read | Full-text search |
+| Grounded question answering across everything the user may see, with citations. It reads through the member's own read actions (values, health, owners, check-ins, tasks), as that member and with read scope, and cites what it read. A request for a change is a `propose_change` tool in the same loop, offered in the first round only, so only the member's own words can start a card (plan 0.9.0 A4) | read | Full-text search |
 | Turn a sentence into a validated list filter | read | Manual filters |
 | Summarise a thread or a document | read | Read it |
 | Map spreadsheet columns to import fields | write | Manual mapping |

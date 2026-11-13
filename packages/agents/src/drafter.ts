@@ -276,6 +276,19 @@ const READING_SYSTEM =
   "When you have enough, stop calling tools. " +
   TOOL_RESULTS_ARE_DATA;
 
+/**
+ * What the loop is told when a first-round-only tool is offered (plan 0.9.0
+ * A4). The decision not to let a read start a change is made by what the
+ * drafter sends (see `ReadingTool.firstRoundOnly`); this sentence only keeps
+ * the model from calling the tool for a question.
+ */
+const PROPOSE_NOTE =
+  "You may also have a tool that prepares a change for the person to review. " +
+  "Call it in your first reply only, at most once, and only when the " +
+  "person's latest message plainly asks for one of the changes it offers. A " +
+  "question is not a request. It only makes a card: the person applies it " +
+  "themselves. When it asks you to choose from a list, pass the number.";
+
 /** The sentence a call past the per-round limit is answered with. */
 const READ_LIMIT_REACHED =
   "Limit reached: no more reads this round. Answer from what you have.";
@@ -1602,19 +1615,39 @@ export function createProviderDrafter(
       if (!provider.capabilities(options.model).tools || tools.length === 0) {
         return null;
       }
-      const offered: ToolDefinition[] = tools.map((tool) => ({
+      const definitionOf = (tool: ReadingTool): ToolDefinition => ({
         name: tool.name,
         description: tool.description,
         parameters: tool.inputSchema,
-      }));
-      const messages: ChatMessage[] = [
+      });
+      const offered: ToolDefinition[] = tools.map(definitionOf);
+      // From round two the first-round-only tools are gone (A4-D4).
+      const offeredLater: ToolDefinition[] = tools
+        .filter((tool) => !tool.firstRoundOnly)
+        .map(definitionOf);
+      const firstRoundOnly = offeredLater.length < offered.length;
+      const turnOf = (
+        turn: ReadingContext["history"][number],
+      ): ChatMessage => ({
+        role:
+          turn.role === "member" ? ("user" as const) : ("assistant" as const),
+        content: turn.content,
+      });
+      // Round one holds the member's earlier questions and no earlier answer,
+      // because an answer may quote what a read returned (A4-D4, Q2).
+      const questionsOnly = context.history.filter(
+        (turn) => turn.role === "member",
+      );
+      const lead: ChatMessage[] = [
         { role: "system", content: READING_SYSTEM },
+        ...(firstRoundOnly
+          ? [{ role: "system" as const, content: PROPOSE_NOTE }]
+          : []),
         ...askerNote(context.asker),
-        ...context.history.map((turn) => ({
-          role:
-            turn.role === "member" ? ("user" as const) : ("assistant" as const),
-          content: turn.content,
-        })),
+      ];
+      const messages: ChatMessage[] = [
+        ...lead,
+        ...(firstRoundOnly ? questionsOnly : context.history).map(turnOf),
         ...subjectBlock(context.subject),
         { role: "user", content: context.question },
       ];
@@ -1634,6 +1667,15 @@ export function createProviderDrafter(
           limited = true;
           break;
         }
+        if (round === 2 && firstRoundOnly) {
+          // The tool is gone, so the earlier answers can come back: a read may
+          // follow up on them, and nothing can start a change from them now.
+          messages.splice(
+            lead.length,
+            questionsOnly.length,
+            ...context.history.map(turnOf),
+          );
+        }
         let reply: Awaited<ReturnType<AIProvider["chatWithTools"]>>;
         try {
           reply = await provider.chatWithTools({
@@ -1641,7 +1683,7 @@ export function createProviderDrafter(
             // What it reads is workspace content, as retrieval is.
             purpose: "retrieval",
             messages,
-            tools: offered,
+            tools: round === 1 ? offered : offeredLater,
             maxTokens: READING_ROUND_TOKENS,
           });
         } catch {

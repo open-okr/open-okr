@@ -538,12 +538,21 @@ export async function* streamAnswer(
   // The read loop: one step per read, then the records it read replace the
   // passages as the sources. It leaves the passages when it cannot run.
   // `proceed` ends the loop when the reader has gone, before the next round.
+  // What the member may propose is read first: the loop offers it as a tool
+  // (plan 0.9.0 A4), and the card is sent the moment the call finishes.
+  const offers = await offersToPropose(context);
   const readingRun = readLiveData(context, groundedFirst, {
     proceed: async () => !signal?.aborted,
+    proposal: { offers },
   });
   let readingNext = await readingRun.next();
   while (!readingNext.done) {
-    yield { kind: "step", ...readingNext.value };
+    const event = readingNext.value;
+    if (event.step === "card") {
+      yield { kind: "proposal", proposalId: event.proposalId };
+    } else {
+      yield { kind: "step", ...event };
+    }
     readingNext = await readingRun.next();
   }
   const reading = readingNext.value;
@@ -569,17 +578,22 @@ export async function* streamAnswer(
   }
 
   // The proposal first, so the answer is told whether a card exists (A2).
-  const offers = await offersToPropose(context);
-  if (offers !== null) {
-    yield { kind: "step", step: "proposing" };
-  }
-  const proposal = await proposeBeforeAnswering(
-    context,
-    { threadId: prepared.threadId, request: input.question },
-    offers,
-  );
-  if (proposal.proposalId !== null) {
-    yield { kind: "proposal", proposalId: proposal.proposalId };
+  // On the tool path the loop already decided and sent the card (A4-D5,
+  // A4-D6). Without the tool (a provider that cannot call tools, or a
+  // conversation anchored to a page, A4-D7) it is the 0.8.1 call.
+  let proposal = reading?.proposal ?? null;
+  if (proposal === null) {
+    if (offers !== null) {
+      yield { kind: "step", step: "proposing" };
+    }
+    proposal = await proposeBeforeAnswering(
+      context,
+      { threadId: prepared.threadId, request: input.question },
+      offers,
+    );
+    if (proposal.proposalId !== null) {
+      yield { kind: "proposal", proposalId: proposal.proposalId };
+    }
   }
   const ask = { ...prepared.ask, proposal: proposal.note };
   yield { kind: "step", step: "writing" };

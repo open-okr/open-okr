@@ -20,6 +20,7 @@ import { aiToolCalls, withWorkspace } from "@openokr/db";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
+import { PROPOSE_TOOL } from "./propose-tool.ts";
 import { COPILOT_READS, type ReadResult } from "./read-tools.ts";
 
 /** Tools that open one named record, so the row may say which. */
@@ -35,6 +36,10 @@ const SINGLE_RECORD_TOOLS: ReadonlySet<string> = new Set([
  *
  * `tool` is stored only when it is one of the copilot's own tools: a name the
  * model made up is the model's text, and the agent surface keeps it null too.
+ *
+ * `propose_change` (plan 0.9.0 A4-D8) is one of them, with scope `write`
+ * because it makes a proposal row, and is stored whatever its outcome,
+ * including `unknown_tool` for a call in a round where it was not offered.
  */
 export async function recordCopilotRead(
   pool: Pool,
@@ -45,7 +50,9 @@ export async function recordCopilotRead(
   },
 ): Promise<void> {
   const { result } = call;
-  const known = (COPILOT_READS as readonly string[]).includes(result.tool);
+  const proposes = result.tool === PROPOSE_TOOL;
+  const known =
+    proposes || (COPILOT_READS as readonly string[]).includes(result.tool);
   const opened =
     known && SINGLE_RECORD_TOOLS.has(result.tool)
       ? result.entities[0]?.entityId
@@ -60,7 +67,7 @@ export async function recordCopilotRead(
         memberId: call.memberId,
         source: "copilot",
         tool: known ? result.tool : null,
-        scope: known ? "read" : null,
+        scope: proposes ? "write" : known ? "read" : null,
         outcome: result.outcome,
         refusalCode: result.refusalCode ?? null,
         targetIds: opened ? [opened] : [],
