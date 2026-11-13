@@ -20,20 +20,42 @@ import {
   Button,
   Chip,
   CopyButton,
+  Tooltip,
   useTranslations,
 } from "@openokr/ui";
-import { Copy, RotateCcw } from "lucide-react";
+import {
+  CalendarCheck,
+  Circle,
+  ClipboardCheck,
+  Copy,
+  FileText,
+  Flag,
+  Gauge,
+  Rocket,
+  RotateCcw,
+  SquareCheck,
+  Target,
+} from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ReadCountLine, StepLine, StepSummary } from "./step-line";
 
-export interface Citation {
+/** A thing the copilot named: what it is, and how to read it. */
+export interface Source {
   readonly entityType: string;
   readonly entityId: string;
   readonly label: string;
 }
 
-export type Source = Citation;
+/**
+ * A citation on a recorded answer (plan 0.9.0 CP5). `n` is the `[n]` in the
+ * prose, null on an answer recorded before numbers were kept. `href` is made
+ * on the server through search's link builder, so the panel never builds one.
+ */
+export interface Citation extends Source {
+  readonly n: number | null;
+  readonly href: string | null;
+}
 
 export interface Message {
   readonly id: string;
@@ -130,20 +152,16 @@ export function stepWords(
 }
 
 /**
- * Where a cited or retrieved thing lives.
- *
- * Only the types that have a page of their own are linked. Everything else is
- * named without a link, which is honest: a retro note has no address, and a link
- * to nowhere is worse than plain text.
+ * Where a passage kept with AI off lives. Those have no link from the server,
+ * so the few types with a page that takes the id itself are linked here. A key
+ * result is not one of them: its page takes a short id (plan 0.9.0 CP5).
  */
-function hrefFor(entityType: string, entityId: string): string | null {
+function localHref(entityType: string, entityId: string): string | null {
   switch (entityType) {
     case "goal":
       return `/goals/${entityId}`;
     case "kpi":
       return `/kpis/${entityId}`;
-    case "key_result":
-      return `/key-results/${entityId}`;
     case "initiative":
       return `/initiatives/${entityId}`;
     case "task":
@@ -157,22 +175,87 @@ function hrefFor(entityType: string, entityId: string): string | null {
 const labelFor = (item: Source) =>
   item.label === "" ? item.entityType.replace("_", " ") : item.label;
 
+/** One small icon per kind of thing, so a list of sources scans by type. */
+function EntityIcon({ entityType }: { readonly entityType: string }) {
+  const className = "size-3.5 shrink-0 text-ink-3";
+  switch (entityType) {
+    case "goal":
+      return <Target className={className} aria-hidden="true" />;
+    case "key_result":
+      return <Flag className={className} aria-hidden="true" />;
+    case "kpi":
+      return <Gauge className={className} aria-hidden="true" />;
+    case "initiative":
+      return <Rocket className={className} aria-hidden="true" />;
+    case "task":
+      return <SquareCheck className={className} aria-hidden="true" />;
+    case "check_in":
+      return <ClipboardCheck className={className} aria-hidden="true" />;
+    case "session":
+      return <CalendarCheck className={className} aria-hidden="true" />;
+    case "document":
+      return <FileText className={className} aria-hidden="true" />;
+    default:
+      return <Circle className={className} aria-hidden="true" />;
+  }
+}
+
+/** A source with the number the prose cites it by, as recorded. */
+type Numbered = Citation & { readonly n: number };
+
+const isNumbered = (item: Source | Citation): item is Numbered =>
+  "n" in item && typeof item.n === "number";
+
 function SourceList({
   title,
   items,
 }: {
   readonly title: string;
-  readonly items: readonly Source[];
+  readonly items: readonly (Source | Citation)[];
 }) {
   if (items.length === 0) {
     return null;
+  }
+  const numbered = items.filter(isNumbered).sort((a, b) => a.n - b.n);
+  if (numbered.length > 0) {
+    return (
+      <div>
+        <p className="text-xs text-ink-4">{title}</p>
+        <ol className="mt-1 flex flex-col gap-1">
+          {numbered.map((item) => (
+            <li
+              key={`${item.n}:${item.entityType}:${item.entityId}`}
+              className="flex items-center gap-1.5 text-xs"
+            >
+              <span className="w-5 shrink-0 text-right tabular-nums text-ink-4">
+                {item.n}.
+              </span>
+              <EntityIcon entityType={item.entityType} />
+              {item.href ? (
+                <Link href={item.href} className="text-ink-2 underline">
+                  {labelFor(item)}
+                </Link>
+              ) : (
+                <span className="text-ink-3">{labelFor(item)}</span>
+              )}
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
   }
   return (
     <div>
       <p className="text-xs text-ink-4">{title}</p>
       <ul className="mt-1 flex flex-col gap-1">
         {items.map((item) => {
-          const href = hrefFor(item.entityType, item.entityId);
+          // A recorded answer from before numbers carries the server's link;
+          // a passage kept with AI off has none, and falls back to the few
+          // types the panel can link on its own.
+          const href =
+            "href" in item
+              ? item.href
+              : localHref(item.entityType, item.entityId);
           return (
             <li key={`${item.entityType}:${item.entityId}`} className="text-xs">
               {href ? (
@@ -187,6 +270,42 @@ function SourceList({
         })}
       </ul>
     </div>
+  );
+}
+
+/** The chip for `[n]` in the answer's prose, or null for a number nobody cites. */
+function CitationChip({
+  n,
+  citations,
+}: {
+  readonly n: number;
+  readonly citations: readonly Citation[];
+}) {
+  const { t } = useTranslations();
+  const citation = citations.find((item) => item.n === n);
+  if (!citation) {
+    return null;
+  }
+  const label = labelFor(citation);
+  const className =
+    "mx-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-raised px-1 align-baseline text-[10px] leading-4 text-ink-2 tabular-nums";
+  const name = t("copilot.copilotPanel.sourceLabel", { n, label });
+  return (
+    <Tooltip label={label}>
+      {citation.href ? (
+        <Link
+          href={citation.href}
+          aria-label={name}
+          className={`${className} hover:bg-line`}
+        >
+          {n}
+        </Link>
+      ) : (
+        <span aria-label={name} role="note" className={className}>
+          {n}
+        </span>
+      )}
+    </Tooltip>
   );
 }
 
@@ -299,6 +418,14 @@ export function AssistantTurn({
         <AnswerText
           text={text}
           className="max-w-[68ch] text-sm leading-relaxed text-ink"
+          // Numbered chips only on a recorded answer whose citations carry
+          // their numbers. While arriving, or on an older answer, the prose
+          // stays as the model wrote it (plan 0.9.0 CP5).
+          renderCitation={
+            !arriving && citations.some((item) => item.n !== null)
+              ? (n) => <CitationChip n={n} citations={citations} />
+              : undefined
+          }
           // A caret after the last word while more may come (CP9).
           trailing={
             arriving ? (

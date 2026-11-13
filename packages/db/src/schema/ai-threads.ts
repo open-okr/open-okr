@@ -25,6 +25,11 @@ export type AiMessageRole = (typeof AI_MESSAGE_ROLES)[number];
 export interface AiCitation {
   readonly entityType: string;
   readonly entityId: string;
+  /**
+   * The 1-based number the model saw for this source, which is the `[n]` in
+   * the answer's prose. Absent on answers recorded before 0.9.0.
+   */
+  readonly n?: number;
 }
 
 export const aiThreads = pgTable("ai_threads", {

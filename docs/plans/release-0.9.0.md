@@ -273,7 +273,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | L5 | done | Set `chooseReads` in `packages/agents/src/evaluation/sets.ts`, nine fixtures: tool choice, injection, two-round, the four-round and six-read limits, no tools. The runner gained `toolRounds`, `tools` and a view of the requests sent. Design in `docs/design/ai-evaluation.md` §5.1. Uncommitted. Live smoke test: yours |
 | L6 | done | Spec ran green on 12 November 2026 (Node 22). `e2e/s39d-copilot-reads.spec.ts`: a set-up step and three tests. It starts a scripted OpenAI-shaped model on this machine and points the workspace's keyless `ollama` provider at it, because the server builds its provider from the database and has no mock kind. The unreadable-objective case uses a deleted objective, since every active member holds edit and a guest cannot ask. A provider that cannot call tools cannot be configured in e2e, so the third test covers provider off. Biome does not cover `e2e/`. |
 | L7b | done | Live as Priya, 2 of 7 to 5 of 7 (`copilot-live-data.md` §8). Open: "this quarter" between two same-title objectives, and "which of my key results are behind" gives no answer |
-| CP5 | to do | |
+| CP5 | done | Numbered chips in the answer, a numbered source list with icons, links made on the server (`copilot.thread` returns `n` and `href`). Local tier only, specs not run. |
 | CP10 | to do | |
 | CP11 | to do | |
 | CP12 | to do | |

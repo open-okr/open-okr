@@ -40,6 +40,7 @@ import { aiOffSentence } from "../ai/off-reason.ts";
 import { isCitableType, readableCitations } from "../copilot/citations.ts";
 import { subjectAddress } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { hrefsInTx } from "../search/hrefs.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import {
   type ActionCallContext,
@@ -164,6 +165,8 @@ const titleFrom = (question: string) =>
 const citationSchema = z.object({
   entityType: z.string().trim().min(1).max(40),
   entityId: z.uuid(),
+  /** The `[n]` the model wrote in the prose for this source (plan 0.9.0 CP5). */
+  n: z.number().int().min(1).max(500).optional(),
 });
 
 /**
@@ -791,6 +794,10 @@ const messageOutput = z.object({
       entityType: z.string(),
       entityId: z.uuid(),
       label: z.string(),
+      /** The `[n]` in the prose, or null for an answer recorded before 0.9.0. */
+      n: z.number().int().nullable(),
+      /** Where this opens for this reader, built on the server. Null when it has no page. */
+      href: z.string().nullable(),
     }),
   ),
   model: z.string().nullable(),
@@ -875,6 +882,33 @@ function readsPerAnswer(
     return calledAt.filter((at) => at.getTime() >= from && at.getTime() <= to)
       .length;
   });
+}
+
+/**
+ * An answer's text without the `[n]` markers for sources this reader may not
+ * see (plan 0.9.0 CP5). A marker for a citation that was dropped would point at
+ * nothing. Only answers stored with numbers are touched: an older answer has
+ * no way to say which marker is which.
+ */
+function withoutHiddenMarkers(
+  row: {
+    readonly role: string;
+    readonly content: string;
+    readonly citations: readonly AiCitation[];
+  },
+  readable: readonly { readonly n: number | null }[],
+): string {
+  if (
+    row.role !== "assistant" ||
+    !row.citations.some((citation) => citation.n !== undefined)
+  ) {
+    return row.content;
+  }
+  const visible = new Set(readable.map((citation) => citation.n));
+  // The space before a removed marker goes with it, so no double space is left.
+  return row.content.replace(/[ \t]?\[(\d{1,3})\]/g, (marker, k: string) =>
+    visible.has(Number(k)) ? marker : "",
+  );
 }
 
 /** One conversation, with its citations resolved against the reader's access now. */
@@ -966,17 +1000,41 @@ export const readThread = defineReadAction({
           recorded.map((call) => call.calledAt),
         );
 
-        const messages = [];
-        for (const [index, row] of rows.entries()) {
-          messages.push({
-            id: row.id,
-            role: row.role,
-            content: row.content,
-            citations: await readableCitations(tx, {
+        const resolved = [];
+        for (const row of rows) {
+          resolved.push(
+            await readableCitations(tx, {
               workspaceId: context.workspaceId,
               memberId,
               citations: row.citations,
             }),
+          );
+        }
+        // One lookup for the whole thread, through the same builder search
+        // uses, so a link is only made for a page this reader may open (CP5).
+        const hrefs = await hrefsInTx(
+          tx,
+          context.workspaceId,
+          memberId,
+          resolved.flat().map((citation) => ({
+            entityType: citation.entityType,
+            entityId: citation.entityId,
+          })),
+        );
+
+        const messages = [];
+        for (const [index, row] of rows.entries()) {
+          const readable = resolved[index] ?? [];
+          messages.push({
+            id: row.id,
+            role: row.role,
+            content: withoutHiddenMarkers(row, readable),
+            citations: readable.map((citation) => ({
+              ...citation,
+              href:
+                hrefs.get(`${citation.entityType}:${citation.entityId}`) ??
+                null,
+            })),
             model: row.model,
             tokensIn: row.tokensIn,
             tokensOut: row.tokensOut,

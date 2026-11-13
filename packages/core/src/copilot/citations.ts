@@ -93,6 +93,8 @@ export interface ResolvedCitation {
   readonly entityId: string;
   /** The entity's own first line, which is its title for everything that has one. */
   readonly label: string;
+  /** The `[n]` in the answer's prose, or null for an answer stored without one. */
+  readonly n: number | null;
 }
 
 /** How much of an entity's text becomes its citation label. */
@@ -145,6 +147,7 @@ export async function readableCitations(
           entityType: citation.entityType,
           entityId: citation.entityId,
           label: citationLabel(title),
+          n: citation.n ?? null,
         });
       }
       continue;
@@ -175,6 +178,7 @@ export async function readableCitations(
       entityType: citation.entityType,
       entityId: citation.entityId,
       label: text ? citationLabel(text) : "",
+      n: citation.n ?? null,
     });
   }
   return resolved;

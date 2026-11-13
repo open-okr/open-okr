@@ -478,11 +478,11 @@ test("the panel says what it is reading, then answers from the stored values wit
     turn.getByText("Searched your workspace, made 2 reads"),
   ).toBeVisible();
 
-  // The source is the key result's own page.
-  await expect(turn.getByRole("link", { name: KR_TITLE })).toHaveAttribute(
-    "href",
-    `/key-results/${keyResultId}`,
-  );
+  // The source opens the key result on its goal's page, a link the server
+  // made. Exact, so a numbered chip named "Source 1: <title>" is not a second match.
+  await expect(
+    turn.getByRole("link", { name: KR_TITLE, exact: true }),
+  ).toHaveAttribute("href", `/goals/${goalId}#kr-${keyResultId}`);
 
   // Each read is a recorded row, as the member's.
   const rows = await pool.query<{ tool: string; outcome: string }>(
@@ -521,8 +521,8 @@ test("after a reload the line still says how many reads it made", async () => {
     panel.getByText(`Searched your workspace, made ${reads} reads`),
   ).toBeVisible({ timeout: 15_000 });
   await expect(
-    panel.getByRole("link", { name: KR_TITLE }),
-  ).toHaveAttribute("href", `/key-results/${keyResultId}`);
+    panel.getByRole("link", { name: KR_TITLE, exact: true }),
+  ).toHaveAttribute("href", `/goals/${goalId}#kr-${keyResultId}`);
 });
 
 test("an objective the member cannot read is not named, in a tool result or in the answer", async () => {

@@ -1965,6 +1965,7 @@
   "copilot.copilotPanel.searchForMatchingPassages": "Search your workspace for matching passages",
   "copilot.copilotPanel.sendTheQuestion": "Send the question",
   "copilot.copilotPanel.sources": "Sources",
+  "copilot.copilotPanel.sourceLabel": "Source {n}: {label}",
   "copilot.copilotPanel.step.summaryNone": "Searched your workspace, found nothing that matches",
   "copilot.copilotPanel.step.summaryOne": "Searched your workspace, found {count} passage",
   "copilot.copilotPanel.step.summaryOther": "Searched your workspace, found {count} passages",

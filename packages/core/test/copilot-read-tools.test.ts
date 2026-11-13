@@ -481,8 +481,8 @@ describe("initiatives and tasks", () => {
     expect(isCitableType("user")).toBe(false);
 
     const citations = [
-      { entityType: "initiative", entityId: initiativeId, label: "" },
-      { entityType: "task", entityId: taskId, label: "" },
+      { entityType: "initiative", entityId: initiativeId, label: "", n: 2 },
+      { entityType: "task", entityId: taskId, label: "", n: 4 },
     ];
     const wb = await workerDb();
     const asPriya = await withOperationTx(wb.appPool, workspaceId, (tx) =>
@@ -496,6 +496,8 @@ describe("initiatives and tasks", () => {
       "Rebuild the signup flow",
       "Write the first-session checklist",
     ]);
+    // The number the model saw is carried through (plan 0.9.0 CP5).
+    expect(asPriya.map((c) => c.n)).toEqual([2, 4]);
 
     const asGuest = await withOperationTx(wb.appPool, workspaceId, (tx) =>
       readableCitations(tx, {
@@ -504,6 +506,7 @@ describe("initiatives and tasks", () => {
         citations,
       }),
     );
+    // The task is dropped with its number, so only the prose's [2] keeps a source.
     expect(asGuest).toEqual([]);
 
     // Deleted since it was cited: dropped too.
@@ -518,6 +521,7 @@ describe("initiatives and tasks", () => {
       }),
     );
     expect(after.map((c) => c.entityType)).toEqual(["initiative"]);
+    expect(after.map((c) => c.n)).toEqual([2]);
   });
 });
 

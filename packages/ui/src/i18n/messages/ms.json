@@ -1965,6 +1965,7 @@
   "copilot.copilotPanel.searchForMatchingPassages": "Cari petikan yang sepadan dalam ruang kerja anda",
   "copilot.copilotPanel.sendTheQuestion": "Hantar soalan",
   "copilot.copilotPanel.sources": "Sumber",
+  "copilot.copilotPanel.sourceLabel": "Sumber {n}: {label}",
   "copilot.copilotPanel.step.summaryNone": "Mencari dalam ruang kerja anda, tiada yang sepadan ditemui",
   "copilot.copilotPanel.step.summaryOne": "Mencari dalam ruang kerja anda, {count} petikan ditemui",
   "copilot.copilotPanel.step.summaryOther": "Mencari dalam ruang kerja anda, {count} petikan ditemui",

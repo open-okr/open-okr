@@ -111,9 +111,22 @@ export const citationsFrom = (
     .filter(
       (index) => Number.isInteger(index) && index >= 0 && index < hits.length,
     )
-    .map((index) => hits[index])
-    .filter((hit): hit is NonNullable<typeof hit> => hit !== undefined)
-    .map((hit) => ({ entityType: hit.entityType, entityId: hit.entityId }));
+    .map((index) => ({ index, hit: hits[index] }))
+    .filter(
+      (
+        entry,
+      ): entry is {
+        readonly index: number;
+        readonly hit: NonNullable<(typeof hits)[number]>;
+      } => entry.hit !== undefined,
+    )
+    // `n` is the number the model saw: indexes are 0-based, the prose's `[n]`
+    // is 1-based (plan 0.9.0 CP5).
+    .map(({ index, hit }) => ({
+      entityType: hit.entityType,
+      entityId: hit.entityId,
+      n: index + 1,
+    }));
 
 export interface Prepared {
   readonly threadId: string;
