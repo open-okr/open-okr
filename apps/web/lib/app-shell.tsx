@@ -623,30 +623,34 @@ export async function AppShellLayout({
            * right now (P8-T04b). First of the three, because it is the only
            * one that is about who is looking over the reader's shoulder, and
            * the only one that cannot be dismissed. */}
-          <SupportBanner workspaceId={workspace.workspaceId} />
-          <CreditsBanner workspaceId={workspace.workspaceId} />
-          {/* What the vendor is saying, above the workspace's own state
-           * banner (P8-T03c). A site message is news from outside the
-           * organisation and the state banner is a fact about the workspace,
-           * so the outside one reads first. */}
-          <SiteMessages
-            userId={session.user.id}
-            workspaceId={workspace.workspaceId}
-          />
-          {workspace.state === "active" && level >= ACCESS_LEVELS.full ? (
-            <div className="mb-4.5 empty:hidden">
-              <TrialEndingBanner workspaceId={workspace.workspaceId} />
-            </div>
-          ) : null}
-          {workspace.state === "active" ? null : (
-            <div className="mb-4.5">
-              <WorkspaceStateBanner
-                state={workspace.state}
-                canRecover={level >= ACCESS_LEVELS.full}
-                hold={await readHold(workspace.workspaceId)}
-              />
-            </div>
-          )}
+          {/* The banners follow the content width, so under Compact they line
+              up with the page below them (docs/design/content-width.md W4). */}
+          <div data-content-width className="mx-auto w-full">
+            <SupportBanner workspaceId={workspace.workspaceId} />
+            <CreditsBanner workspaceId={workspace.workspaceId} />
+            {/* What the vendor is saying, above the workspace's own state
+             * banner (P8-T03c). A site message is news from outside the
+             * organisation and the state banner is a fact about the workspace,
+             * so the outside one reads first. */}
+            <SiteMessages
+              userId={session.user.id}
+              workspaceId={workspace.workspaceId}
+            />
+            {workspace.state === "active" && level >= ACCESS_LEVELS.full ? (
+              <div className="mb-4.5 empty:hidden">
+                <TrialEndingBanner workspaceId={workspace.workspaceId} />
+              </div>
+            ) : null}
+            {workspace.state === "active" ? null : (
+              <div className="mb-4.5">
+                <WorkspaceStateBanner
+                  state={workspace.state}
+                  canRecover={level >= ACCESS_LEVELS.full}
+                  hold={await readHold(workspace.workspaceId)}
+                />
+              </div>
+            )}
+          </div>
           {/* The version sits at the foot of the content, on the right
               (docs/design/version-footer.md §3). At least the pane's height,
               so it rests at the bottom of a short screen rather than under

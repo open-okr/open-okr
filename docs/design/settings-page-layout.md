@@ -102,7 +102,7 @@ Branding and General are done. The rest wait for their own change, one page at a
 | admin/backups | Proposed: instant actions | Pending |
 | admin/plan | Proposed: instant actions | Pending |
 | admin/roles | Instant actions; the matrix fits the card at Compact width, the member list scrolls | Done (2026-11-16) |
-| admin/support | Proposed: instant actions | Pending |
+| admin/support | Instant actions, a scrolling list for past sessions | Done (2026-11-16) |
 | admin/webhooks | Proposed: list or tool | Pending |
 | account (name, email, delete) | Footer per card (name and picture, profile details), instant actions (picture, appearance, change email), danger card for delete | Done (2026-11-16) |
 | account/ai | One card, sticky bar | Pending |

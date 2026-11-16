@@ -12,7 +12,7 @@ and a `col-span-12` field became too long on a wide monitor.
 | W1 | A third appearance preference, `width`, beside `theme` and `density` | Density is spacing. Width is a separate choice: somebody may want dense rows on a full-width screen |
 | W2 | Values `compact` and `full`. Null means the default, `compact` | The owner chose Compact as the default, so a wide screen gets a readable column without anybody opening a menu |
 | W3 | Compact caps the main content at **1152 px**, centred. Full width is today's behaviour | 1152 px holds two `col-span-6` fields of about 550 px each |
-| W4 | Applies to every screen inside the app shell. The sidebar, top bar and footer are not capped | One rule. Screens with a canvas are an open question (§6) |
+| W4 | Applies to every screen inside the app shell, and to the banners above the content (support, credits, site messages, workspace state). The sidebar, top bar and footer are not capped | One rule. Screens with a canvas are an open question (§6) |
 | W5 | Stored per member, like theme and density, and mirrored to the browser before first paint | It follows the person to another machine, and the page does not jump on load |
 | W6 | Offered in the account menu and in Your account > Appearance, the same control as theme and density | Where people already look for appearance |
 

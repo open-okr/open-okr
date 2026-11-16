@@ -1,5 +1,5 @@
 import { ACCESS_LEVELS, listSupportSessions } from "@openokr/core";
-import { Chip, type ChipProps } from "@openokr/ui";
+import { Card, CardBody, CardHeader, Chip, type ChipProps } from "@openokr/ui";
 import Link from "next/link";
 import { requireAccessLevel } from "../../../lib/access.ts";
 import { getInstanceName } from "../../../lib/instance-name";
@@ -58,111 +58,130 @@ export default async function SupportAccessPage() {
   );
   const past = sessions.filter((one) => one.endedAt !== null);
 
+  const emptyNote = "text-ink-2 text-sm";
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-4">
       <header className="flex flex-col gap-1">
         <h1 className="font-bold text-ink text-lg">
           {t("admin.support.title")}
         </h1>
-        <p className="text-ink-2 text-sm">
+        <p className="max-w-prose text-ink-3 text-sm">
           {t("admin.support.intro", { name: instanceName })}
         </p>
       </header>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">
-          {t("admin.support.waiting")}
-        </h2>
-        {pending.length === 0 ? (
-          <p className="rounded-lg border border-line bg-surface px-4 py-3 text-ink-2 text-sm">
-            {t("admin.support.nobodyAsked")}
+      <Card>
+        <CardHeader className="flex-col items-stretch gap-0.5">
+          <h2 className="font-semibold text-ink text-sm">
+            {t("admin.support.waiting")}
+          </h2>
+          <p className="text-ink-3 text-xs">
+            {t("admin.support.waitingDescription")}
           </p>
-        ) : (
-          pending.map((session) => (
-            <GrantDecision
-              key={session.id}
-              reason={session.reason}
-              requestedAt={when(session.requestedAt)}
-              sessionId={session.id}
-            />
-          ))
-        )}
-      </section>
+        </CardHeader>
+        <CardBody>
+          {pending.length === 0 ? (
+            <p className={emptyNote}>{t("admin.support.nobodyAsked")}</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {pending.map((session) => (
+                <GrantDecision
+                  key={session.id}
+                  reason={session.reason}
+                  requestedAt={when(session.requestedAt)}
+                  sessionId={session.id}
+                />
+              ))}
+            </div>
+          )}
+        </CardBody>
+      </Card>
 
       {live.length > 0 ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="font-semibold text-ink text-sm">
-            {t("admin.support.inHereNow")}
-          </h2>
-          {live.map((session) => (
-            <div
-              className="rounded-lg border border-bad-dot bg-surface px-4 py-3"
-              key={session.id}
-            >
-              <p className="text-ink text-sm">
-                {t("admin.support.grantedUntil", {
-                  Date: when(session.grantedAt as Date),
-                  Date2: when(session.expiresAt as Date),
-                  only: LEVEL_NAME[session.level] ?? "read only",
-                })}
-              </p>
-              <p className="mt-1 text-ink-2 text-sm">{session.reason}</p>
-              <p className="mt-1 text-ink-3 text-xs">
-                {t("admin.support.bannerEndsIt")}
-              </p>
-            </div>
-          ))}
-        </section>
+        <Card className="border-bad-dot">
+          <CardHeader className="flex-col items-stretch gap-0.5">
+            <h2 className="font-semibold text-bad text-sm">
+              {t("admin.support.inHereNow")}
+            </h2>
+            <p className="text-ink-3 text-xs">
+              {t("admin.support.bannerEndsIt")}
+            </p>
+          </CardHeader>
+          <CardBody className="flex flex-col gap-3">
+            {live.map((session) => (
+              <div key={session.id}>
+                <p className="text-ink text-sm">
+                  {t("admin.support.grantedUntil", {
+                    Date: when(session.grantedAt as Date),
+                    Date2: when(session.expiresAt as Date),
+                    only: LEVEL_NAME[session.level] ?? "read only",
+                  })}
+                </p>
+                <p className="mt-1 text-ink-2 text-sm">{session.reason}</p>
+              </div>
+            ))}
+          </CardBody>
+        </Card>
       ) : null}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">
-          {t("admin.support.everythingBefore")}
-        </h2>
-        {past.length === 0 ? (
-          <p className="rounded-lg border border-line bg-surface px-4 py-3 text-ink-2 text-sm">
-            {t("admin.support.nobodyHasBeen", { name: instanceName })}
+      <Card>
+        <CardHeader className="flex-col items-stretch gap-0.5">
+          <h2 className="font-semibold text-ink text-sm">
+            {t("admin.support.everythingBefore")}
+          </h2>
+          <p className="text-ink-3 text-xs">
+            {t("admin.support.pastDescription")}
           </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {past.map((session) => (
-              <li
-                className="flex flex-col gap-1 rounded-lg border border-line bg-surface px-4 py-3"
-                key={session.id}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <Chip tone={END_TONE[session.endedReason ?? ""] ?? "neutral"}>
-                    {session.endedReason}
-                  </Chip>
-                  <span className="text-ink-3 text-xs">
-                    {t("admin.support.asked", {
-                      requestedAt: when(session.requestedAt),
-                      granted: session.grantedAt
-                        ? `, in from ${when(session.grantedAt)} to ${when(session.endedAt as Date)}`
-                        : ", never granted",
-                    })}
-                  </span>
-                </div>
-                <p className="text-ink text-sm">{session.reason}</p>
-                {/* support-access.md §10 D11, plan 0.7.0 P2: what the guest
-                 * did, from the audit trail, which already filters by actor.
-                 * The guest is one member across every session (§4). */}
-                {session.grantedAt !== null && session.memberId !== null ? (
-                  <Link
-                    className="w-fit text-brand-text text-xs hover:underline"
-                    href={`/admin/audit?actorMemberId=${session.memberId}`}
-                  >
-                    {t("admin.support.whatWasDone")}
-                  </Link>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="text-ink-3 text-xs">
-          {t("admin.support.everythingAudited")}
-        </p>
-      </section>
+        </CardHeader>
+        <CardBody>
+          {past.length === 0 ? (
+            <p className={emptyNote}>
+              {t("admin.support.nobodyHasBeen", { name: instanceName })}
+            </p>
+          ) : (
+            <ul
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+              tabIndex={0}
+              aria-label={t("admin.support.pastLabel")}
+              // Scrolls inside the card at about five rows. `relative` keeps
+              // an absolute or sr-only child inside the scroll box.
+              className="relative max-h-[296px] divide-y divide-line overflow-y-auto overscroll-contain rounded-lg border border-line"
+            >
+              {past.map((session) => (
+                <li className="flex flex-col gap-2 px-3 py-3" key={session.id}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Chip
+                      tone={END_TONE[session.endedReason ?? ""] ?? "neutral"}
+                    >
+                      {session.endedReason}
+                    </Chip>
+                    <span className="text-ink-3 text-xs">
+                      {t("admin.support.asked", {
+                        requestedAt: when(session.requestedAt),
+                        granted: session.grantedAt
+                          ? `, in from ${when(session.grantedAt)} to ${when(session.endedAt as Date)}`
+                          : ", never granted",
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-ink text-sm">{session.reason}</p>
+                  {/* support-access.md §10 D11, plan 0.7.0 P2: what the guest
+                   * did, from the audit trail, which already filters by actor.
+                   * The guest is one member across every session (§4). */}
+                  {session.grantedAt !== null && session.memberId !== null ? (
+                    <Link
+                      className="w-fit text-brand-text text-xs hover:underline"
+                      href={`/admin/audit?actorMemberId=${session.memberId}`}
+                    >
+                      {t("admin.support.whatWasDone")}
+                    </Link>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
     </div>
   );
 }
