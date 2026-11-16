@@ -27,6 +27,12 @@ function bar(props: Partial<Parameters<typeof SettingsSaveBar>[0]> = {}) {
 }
 
 describe("SettingsSaveBar", () => {
+  test("uses the submit label it is given", () => {
+    bar({ saveLabel: "Connect" });
+    expect(screen.getByRole("button", { name: "Connect" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+  });
+
   test("says nothing changed when it is idle", () => {
     bar();
     expect(screen.getByText("No changes.")).not.toBeNull();

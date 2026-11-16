@@ -35,6 +35,11 @@ export interface SettingsSaveBarProps {
   readonly savePending?: boolean;
   /** Shown when nothing is unsaved, saved or refused. */
   readonly idleHint?: string;
+  /**
+   * The submit button's label when it is not "Save changes", for a bar whose
+   * press does more than save (Channels says "Connect").
+   */
+  readonly saveLabel?: string;
   /** Hides the idle hint, for a page that shows its own refusal text. */
   readonly hideIdle?: boolean;
   readonly "data-testid"?: string;
@@ -51,6 +56,7 @@ export function SettingsSaveBar({
   pending,
   savePending,
   idleHint,
+  saveLabel,
   hideIdle = false,
   "data-testid": testId,
   unsavedTestId,
@@ -114,7 +120,9 @@ export function SettingsSaveBar({
           disabled={pending}
           pending={savePending ?? pending}
         >
-          {pending ? t("common.saving") : t("common.saveChanges")}
+          {pending
+            ? t("common.saving")
+            : (saveLabel ?? t("common.saveChanges"))}
         </Button>
       </div>
     </div>

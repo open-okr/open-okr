@@ -30,17 +30,14 @@ const TEAM_ID = "T-e2e-acme";
  * The card for one provider.
  *
  * All four have drivers now, so four connect forms are on the page and every
- * locator has to say which one it means. The hint text is what distinguishes
- * them, because it is the one thing on a form that names its provider.
+ * locator has to say which one it means. Each card carries its provider's id
+ * in its test id. The Connect button sits in the card's footer bar, outside
+ * the form element, so the card is the scope rather than the form.
  */
-const slackForm = () =>
-  page.locator("form").filter({ hasText: "Bot User OAuth Token" });
-const telegramForm = () =>
-  page.locator("form").filter({ hasText: "BotFather" });
-const teamsForm = () =>
-  page.locator("form").filter({ hasText: "Azure bot registration" });
-const whatsAppForm = () =>
-  page.locator("form").filter({ hasText: "Phone number ID" });
+const slackForm = () => page.getByTestId("channel-card-slack");
+const telegramForm = () => page.getByTestId("channel-card-telegram");
+const teamsForm = () => page.getByTestId("channel-card-teams");
+const whatsAppForm = () => page.getByTestId("channel-card-whatsapp");
 
 test.describe.configure({ mode: "serial" });
 
@@ -92,7 +89,7 @@ test("connecting Slack stores it and does not claim it is verified", async () =>
   await form.getByLabel("Bot User OAuth Token").fill(BOT_TOKEN);
   await form.getByLabel("Signing Secret").fill(SIGNING_SECRET);
   await form.getByLabel("Workspace ID").fill(TEAM_ID);
-  await form.getByRole("button", { name: "Connect" }).click();
+  await form.getByRole("button", { name: "Connect", exact: true }).click();
 
   // The confirmation comes from the card, not from the form: a successful
   // connect revalidates the page and replaces the tree the form was in, so a
@@ -121,9 +118,10 @@ test("the workspace id is shown, because it is not a secret and routing needs it
 
 test("a test send writes one row into the log", async () => {
   await page.getByRole("button", { name: "Send me a test" }).click();
-  await expect(page.getByRole("status")).toContainText("Queued", {
-    timeout: 10_000,
-  });
+  // Every save bar on the page has an empty status line of its own.
+  await expect(
+    page.getByRole("status").filter({ hasText: "Queued" }),
+  ).toBeVisible({ timeout: 10_000 });
 
   await goTo(page, "/admin/channels");
   const log = page.locator("li").filter({ hasText: "email" });

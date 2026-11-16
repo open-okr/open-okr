@@ -43,6 +43,7 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "admin.branding.images.logoTitle",
   "admin.branding.mirror.part.favicon",
   "admin.branding.mirror.part.logo",
+  "admin.channels.groupWhatsapp",
   // A version number and nothing else (docs/design/version-footer.md).
   "shell.version.running",
   // A step the copilot is on, followed by an ellipsis: the step is the

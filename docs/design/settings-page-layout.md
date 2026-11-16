@@ -86,7 +86,7 @@ Branding and General are done. The rest wait for their own change, one page at a
 |---|---|---|
 | admin/branding | One card, sticky bar | Done (2026-11-16) |
 | admin/general | Footer per card, instant actions for state and close | Done (2026-11-16) |
-| admin/channels | Footer per card | Pending |
+| admin/channels | Footer per card | Done (2026-11-16) |
 | admin/sso | Footer per card; quick actions per connection are instant, the connection list scrolls | Done (2026-11-16) |
 | admin/practice | One sticky bar for the page | Done (2026-11-16) |
 | admin/rhythm | One sticky bar for the page | Done (2026-11-16) |

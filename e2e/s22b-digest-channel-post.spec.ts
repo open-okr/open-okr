@@ -51,8 +51,8 @@ let workspaceId: string;
 let spaceUrl: string;
 let sessionId: string;
 
-const slackForm = () =>
-  page.locator("form").filter({ hasText: "Bot User OAuth Token" });
+// The Connect button is in the card's footer bar, so the card is the scope.
+const slackForm = () => page.getByTestId("channel-card-slack");
 
 test.beforeAll(async ({ browser }) => {
   pool = new pg.Pool(CONNECTION);
@@ -84,7 +84,7 @@ test("once Slack is connected, the space can link a channel", async () => {
   await form.getByLabel("Bot User OAuth Token").fill("xoxb-e2e-space-post");
   await form.getByLabel("Signing Secret").fill("e2e-space-secret");
   await form.getByLabel("Workspace ID").fill(TEAM_ID);
-  await form.getByRole("button", { name: "Connect" }).click();
+  await form.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(page.getByText("connected rather than verified")).toBeVisible({
     timeout: 10_000,
   });
