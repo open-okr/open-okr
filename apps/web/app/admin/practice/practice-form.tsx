@@ -9,29 +9,25 @@ import {
   CardHeader,
   Chip,
   cn,
-  guardPress,
   MethodHint,
   SelectInput,
-  Spinner,
-  useFormDirty,
+  SettingsSaveBar,
   useKeyboardRegistry,
   useSubmitShortcut,
-  useToast,
   useTranslations,
   useUnsavedGuard,
 } from "@openokr/ui";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 import {
   useActionState,
   useCallback,
   useEffect,
-  useRef,
   useState,
   useTransition,
 } from "react";
-import { applyProfile, resetPractice, savePractice } from "./practice-actions";
-import { NOTHING_SAVED, type PracticeState } from "./practice-state.ts";
+import { applyProfile, savePractice } from "./practice-actions";
+import { NOTHING_SAVED } from "./practice-state.ts";
 import { ProfileComparison } from "./profile-comparison";
 
 /**
@@ -42,11 +38,12 @@ import { ProfileComparison } from "./profile-comparison";
  * groups, and nothing here names a setting key. A setting added to §12 appears
  * with no change to this file.
  *
- * **One form per card, each with its own save**, which is the pattern the
- * rhythm card arrived at (P8-G11) after one save at the bottom of a long page
- * left edits uncommitted ten screens away. The profile is a card of its own,
- * above the rest, because choosing one changes many settings at once and the
- * reader should see which before saying yes.
+ * **One form for the nine settings cards, one sticky save bar** (docs/design/
+ * settings-page-layout.md, "long page, one settings object"). The bar names
+ * the cards that changed. The profile is a card of its own, above the rest and
+ * outside that form, because choosing one changes many settings at once and
+ * the reader should see which before saying yes: it applies at once, with its
+ * own button, and is held off while the form has unsaved changes.
  */
 
 type Practice = Awaited<ReturnType<typeof callAction<"practice.read">>>;
@@ -65,6 +62,32 @@ const GROUP_TITLES: Record<string, string> = {
   kpi: "admin.practice.groups.kpi",
 };
 
+/** Catalogue keys for each group's one-line description under its title. */
+const GROUP_DESCRIPTIONS: Record<string, string> = {
+  writing: "admin.practice.groupDescription.writing",
+  model: "admin.practice.groupDescription.model",
+  checks: "admin.practice.groupDescription.checks",
+  gates: "admin.practice.groupDescription.gates",
+  levels: "admin.practice.groupDescription.levels",
+  scoring: "admin.practice.groupDescription.scoring",
+  rhythm: "admin.practice.groupDescription.rhythm",
+  review: "admin.practice.groupDescription.review",
+  kpi: "admin.practice.groupDescription.kpi",
+};
+
+/** Catalogue keys for each section heading and the tag beside it. */
+const SECTION_TITLES: Record<string, string> = {
+  start: "admin.practice.section.start.title",
+  writing: "admin.practice.section.writing.title",
+  checks: "admin.practice.section.checks.title",
+  levels: "admin.practice.section.levels.title",
+  review: "admin.practice.section.review.title",
+};
+const SECTION_TAGS: Record<string, string> = {
+  start: "admin.practice.section.start.tag",
+  saved: "admin.practice.section.saved.tag",
+};
+
 /** A threshold value for a sentence: a number, a word, or its parts. */
 function shown(value: unknown): string {
   if (Array.isArray(value)) {
@@ -76,27 +99,6 @@ function shown(value: unknown): string {
       .join(", ");
   }
   return String(value);
-}
-
-/** One status line per card, announced as a toast, whichever action wrote it. */
-function useOutcomeToast(
-  outcome: PracticeState,
-  title: string,
-  source: string,
-): void {
-  const toast = useToast();
-  const last = useRef<PracticeState>(NOTHING_SAVED);
-  useEffect(() => {
-    if (last.current === outcome) {
-      return;
-    }
-    last.current = outcome;
-    if (outcome.error !== null) {
-      toast.show({ tone: "bad", title, message: outcome.error, source });
-    } else if (outcome.saved !== null) {
-      toast.show({ tone: "ok", title, message: outcome.saved, source });
-    }
-  }, [outcome, title, source, toast]);
 }
 
 /**
@@ -121,6 +123,7 @@ function ProfileCard({
   comparison,
   methodLinks,
   canManage,
+  dirty,
 }: {
   readonly practice: Practice;
   readonly previews: Readonly<Record<string, ProfileSwitch>>;
@@ -129,12 +132,13 @@ function ProfileCard({
   readonly comparison: readonly ProfileComparisonRow[];
   readonly methodLinks: Readonly<Record<string, string>>;
   readonly canManage: boolean;
+  /** The settings form has unsaved changes, which a switch would discard. */
+  readonly dirty: boolean;
 }) {
   const { t } = useTranslations();
   const [state, submit, pending] = useActionState(applyProfile, NOTHING_SAVED);
   const [chosen, setChosen] = useState<string>(practice.profile);
   const title = t("admin.practice.profile.title");
-  useOutcomeToast(state, title, "practice-profile");
 
   // Back to the profile in use once a switch has landed, so the preview is
   // not left describing a change that has already happened.
@@ -153,38 +157,24 @@ function ProfileCard({
   return (
     <form action={submit} aria-busy={pending} data-testid="practice-profile">
       <Card>
-        <CardHeader className="flex-wrap justify-between">
-          <div className="flex flex-col gap-0.5">
-            <h2 className="font-semibold text-ink">{title}</h2>
-            <p className="text-sm text-ink-3">
+        <CardHeader className="flex-wrap items-start justify-between">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h3 className="text-sm font-semibold text-ink">{title}</h3>
+            <p className="text-xs text-ink-3">
               {t("admin.practice.profile.description")}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <ProfileComparison
-              rows={comparison}
-              profiles={practice.profiles}
-              inUse={practice.profile}
-              methodLinks={methodLinks}
-            />
-            {canManage ? (
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                disabled={pending || chosen === practice.profile}
-              >
-                {pending
-                  ? t("admin.practice.profile.applying")
-                  : t("admin.practice.profile.use")}
-              </Button>
-            ) : null}
-          </div>
+          <ProfileComparison
+            rows={comparison}
+            profiles={practice.profiles}
+            inUse={practice.profile}
+            methodLinks={methodLinks}
+          />
         </CardHeader>
-        <CardBody className="flex flex-col gap-3">
-          <fieldset className="flex flex-col gap-1.5">
+        <CardBody className="flex flex-col gap-4">
+          <fieldset className="grid grid-cols-12 gap-3">
             <legend className="sr-only">{title}</legend>
-            {practice.profiles.map((profile) => {
+            {practice.profiles.map((profile, index) => {
               const sets = comparison.filter((row) =>
                 row.differs.includes(profile.key),
               );
@@ -194,7 +184,8 @@ function ProfileCard({
                 <div
                   key={profile.key}
                   className={cn(
-                    "flex items-start gap-1 rounded-control border py-2 pr-2 pl-3 text-sm",
+                    "col-span-12 flex items-start gap-1 rounded-control border py-2 pr-2 pl-3 text-sm",
+                    index < 3 ? "md:col-span-4" : "md:col-span-6",
                     chosen === profile.key
                       ? "border-brand bg-brand-weak"
                       : "border-line",
@@ -249,9 +240,9 @@ function ProfileCard({
               data-testid="practice-profile-preview"
               className="flex flex-col gap-1.5 rounded-control bg-ink/[0.03] px-3 py-2.5 text-sm"
             >
-              <h3 className="font-semibold text-ink-2">
+              <h4 className="font-semibold text-ink-2">
                 {t("admin.practice.profile.changes", { profile: chosenLabel })}
-              </h3>
+              </h4>
               {preview.practice.length === 0 &&
               preview.thresholds.length === 0 ? (
                 <p className="text-ink-3">
@@ -301,57 +292,118 @@ function ProfileCard({
             </section>
           ) : null}
         </CardBody>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-3.5 py-2.5">
+          <div className="flex min-w-0 flex-col gap-0.5 text-sm">
+            {state.error === null && state.saved === null ? (
+              <p className="text-ink-3">
+                {t("admin.practice.profile.appliesAtOnce")}
+              </p>
+            ) : null}
+            {state.saved === null ? null : (
+              <p role="status" className="text-ink-2">
+                {state.saved}
+              </p>
+            )}
+            {state.error === null ? null : (
+              <p role="alert" className="text-bad">
+                {state.error}
+              </p>
+            )}
+            {canManage && dirty ? (
+              <p
+                className="text-ink-2"
+                data-testid="practice-profile-save-first"
+              >
+                {t("admin.practice.profile.saveFirst")}
+              </p>
+            ) : null}
+          </div>
+          {canManage ? (
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              disabled={pending || chosen === practice.profile || dirty}
+            >
+              {pending
+                ? t("admin.practice.profile.applying")
+                : t("admin.practice.profile.use")}
+            </Button>
+          ) : null}
+        </div>
       </Card>
     </form>
   );
 }
 
-/** "Reset to profile", for one card's settings. */
-function ResetCard({
-  keys,
-  disabled,
-  onOutcome,
-}: {
-  readonly keys: readonly string[];
-  readonly disabled: boolean;
-  readonly onOutcome: (outcome: PracticeState) => void;
-}) {
+const FORM_ID = "practice-form";
+
+/**
+ * Columns each setting takes on a desktop row of twelve, per group, in the
+ * registry's order. A group or a setting this table does not reach takes half
+ * a row, so a setting added to §12 still appears. Phones take the full row.
+ */
+const SPANS: Record<string, readonly string[]> = {
+  writing: [
+    "md:col-span-6",
+    "md:col-span-6",
+    "md:col-span-6",
+    "md:col-span-6",
+    "md:col-span-12",
+  ],
+  model: Array(6).fill("md:col-span-4"),
+  checks: Array(27).fill("md:col-span-4"),
+  gates: [
+    "md:col-span-6",
+    "md:col-span-6",
+    "md:col-span-6",
+    "md:col-span-6",
+    "md:col-span-6",
+    "md:col-span-6",
+    "md:col-span-12",
+  ],
+  levels: Array(4).fill("md:col-span-3"),
+  scoring: [
+    "md:col-span-4",
+    "md:col-span-4",
+    "md:col-span-4",
+    "md:col-span-6",
+    "md:col-span-6",
+  ],
+  rhythm: Array(3).fill("md:col-span-4"),
+  review: Array(3).fill("md:col-span-4"),
+  kpi: ["md:col-span-12"],
+};
+
+/** The page's sections, in order: catalogue id and the groups each holds. */
+const SECTIONS: readonly { id: string; groups: readonly string[] }[] = [
+  { id: "writing", groups: ["writing", "model"] },
+  { id: "checks", groups: ["checks", "gates"] },
+  { id: "levels", groups: ["levels", "scoring", "rhythm"] },
+  { id: "review", groups: ["review", "kpi"] },
+];
+
+function SectionHeading({ id, tag }: { id: string; tag: string }) {
   const { t } = useTranslations();
-  const [pending, start] = useTransition();
+  const title = SECTION_TITLES[id];
   return (
-    // Refused with `aria-disabled` while the reset is sent, not `disabled`, so
-    // the button keeps keyboard focus; see `guardPress`.
-    <button
-      type="button"
-      disabled={pending ? undefined : disabled}
-      aria-disabled={pending || undefined}
-      aria-busy={pending || undefined}
-      onClick={guardPress(pending, () => {
-        if (!window.confirm(t("admin.practice.resetConfirm"))) {
-          return;
-        }
-        start(async () => {
-          onOutcome(await resetPractice(keys));
-        });
-      })}
-      className="inline-flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 disabled:opacity-60 aria-disabled:opacity-60"
-    >
-      {pending ? <Spinner /> : null}
-      <span>
-        {pending
-          ? t("admin.practice.resetting")
-          : t("admin.practice.resetCard")}
+    <h2 className="mt-2 -mb-1 flex flex-wrap items-center gap-2 text-xs font-semibold tracking-wide text-ink-4 uppercase">
+      {title ? t(title) : id}
+      <span className="rounded-full bg-raised px-2 py-px text-[11px] font-semibold tracking-normal text-ink-3 normal-case">
+        {tag}
       </span>
-    </button>
+    </h2>
   );
 }
 
-/** One §12.1 group: a form of selects with its own save and reset. */
+/** One §12.1 group: a card of selects, on the page's one form. */
 function GroupCard({
   id,
   title,
   settings,
   practice,
+  values,
+  onChange,
   nameOf,
   methodLinks,
   canManage,
@@ -360,181 +412,107 @@ function GroupCard({
   readonly title: string;
   readonly settings: readonly Setting[];
   readonly practice: Practice;
+  readonly values: Readonly<Record<string, string>>;
+  readonly onChange: (key: string, value: string) => void;
   readonly nameOf: (setting: Setting) => string;
   readonly methodLinks: Readonly<Record<string, string>>;
   readonly canManage: boolean;
 }) {
   const { t } = useTranslations();
-  const form = useRef<HTMLFormElement>(null);
-  const [state, submit, pending] = useActionState(savePractice, NOTHING_SAVED);
-  const [reset, setReset] = useState<PracticeState>(NOTHING_SAVED);
-  // Whichever happened last is the one on screen, so a refused save does not
-  // stay above a reset that then succeeded.
-  const [showingReset, setShowingReset] = useState(false);
-  const { dirty, markSaved } = useFormDirty(form);
-  const onKeyDown = useSubmitShortcut(canManage);
-  useUnsavedGuard(`practice:${id}`, dirty);
-
   const profile = practice.profiles.find(
     (entry) => entry.key === practice.profile,
   );
   const profileValueOf = (setting: Setting): string =>
     (profile?.practice[setting.key] as string | undefined) ?? setting.default;
 
-  // **React resets a form with an `action` once the action resolves, and a
-  // select goes back to the option it was first rendered with**, not to the
-  // value the revalidated page now holds: a select's `defaultValue` is read
-  // once. So the values sent are put back afterwards, which on a save is what
-  // the server now holds and on a refusal is what somebody chose and has not
-  // finished with. The rhythm card does the same for the same reason.
-  const submitted = useRef<ReadonlyMap<string, string> | null>(null);
-  const onSubmit = useCallback(() => {
-    const element = form.current;
-    if (element === null) {
-      return;
-    }
-    const held = new Map<string, string>();
-    for (const select of element.querySelectorAll("select")) {
-      held.set(select.name, select.value);
-    }
-    submitted.current = held;
-  }, []);
-
-  const wasPending = useRef(false);
-  useEffect(() => {
-    if (wasPending.current && !pending) {
-      setShowingReset(false);
-      for (const [name, value] of submitted.current ?? []) {
-        const field = form.current?.elements.namedItem(name);
-        if (field instanceof HTMLSelectElement) {
-          field.value = value;
-        }
-      }
-      if (state.error === null) {
-        markSaved();
-      }
-    }
-    wasPending.current = pending;
-  }, [pending, state, markSaved]);
-
-  const outcome = showingReset ? reset : state;
-  useOutcomeToast(outcome, title, `practice-${id}`);
-
-  const changed = settings.filter((setting) =>
-    practice.differsFromProfile.includes(setting.key),
+  // A refill, not a write: the change joins "Not saved yet" and Discard
+  // undoes it. `savePractice` turns a value equal to the profile's on an
+  // overridden key into a cleared override.
+  const canReset = settings.some(
+    (setting) => values[setting.key] !== profileValueOf(setting),
   );
 
-  // A reset is a button, not the form's action, so nothing resets the form;
-  // the selects it returned are set to the profile's values here instead.
-  const afterReset = (next: PracticeState) => {
-    setReset(next);
-    setShowingReset(true);
-    if (next.error !== null) {
-      return;
-    }
-    for (const setting of changed) {
-      const field = form.current?.elements.namedItem(`practice:${setting.key}`);
-      if (field instanceof HTMLSelectElement) {
-        field.value = profileValueOf(setting);
-      }
-    }
-    markSaved();
-  };
-
   return (
-    <form
-      ref={form}
-      action={submit}
-      aria-busy={pending}
-      onSubmit={onSubmit}
-      onKeyDown={onKeyDown}
-      data-testid={`practice-card-${id}`}
-    >
-      <Card>
-        <CardHeader className="sticky top-0 z-10 flex-wrap justify-between rounded-t-lg bg-surface">
-          <h2 className="font-semibold text-ink">{title}</h2>
-          <div className="flex items-center gap-2">
-            {dirty && canManage ? (
-              <Chip tone="brand">{t("common.unsaved")}</Chip>
-            ) : null}
-            {changed.length > 0 ? (
-              <ResetCard
-                keys={changed.map((setting) => setting.key)}
-                disabled={!canManage}
-                onOutcome={afterReset}
-              />
-            ) : null}
-            {canManage ? (
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                disabled={pending}
-              >
-                {pending
-                  ? t("admin.rhythm.rhythmForm.saving")
-                  : t("common.save")}
-              </Button>
-            ) : null}
-          </div>
-        </CardHeader>
-        <CardBody className="flex flex-col gap-3">
-          {settings.map((setting) => {
-            const differs = practice.differsFromProfile.includes(setting.key);
-            const profileValue = profileValueOf(setting);
-            const fieldId = `practice-${setting.key}`;
-            return (
-              <div
-                key={setting.key}
-                className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
-              >
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className="flex items-start gap-0.5">
-                    <label htmlFor={fieldId} className="font-medium text-ink">
-                      {nameOf(setting)}
-                    </label>
-                    <MethodHint
-                      name={nameOf(setting)}
-                      href={methodLinks[setting.section]}
-                    >
-                      <p>{setting.summary}</p>
-                    </MethodHint>
-                  </span>
-                  {differs ? (
-                    <span className="text-xs text-ink-3">
-                      {t("admin.practice.profileValue", {
-                        value:
-                          setting.optionLabels[profileValue] ?? profileValue,
-                      })}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="flex flex-none items-center gap-2">
-                  {differs ? (
-                    <Chip tone="brand">{t("admin.practice.differs")}</Chip>
-                  ) : null}
-                  <SelectInput
-                    label={nameOf(setting)}
-                    hideLabel
-                    id={fieldId}
-                    name={`practice:${setting.key}`}
-                    disabled={!canManage}
-                    defaultValue={practice.practice[setting.key]}
-                    inputClassName="h-7 w-auto"
+    <Card data-testid={`practice-card-${id}`}>
+      <CardHeader className="flex-wrap items-start justify-between">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h3 className="text-sm font-semibold text-ink">{title}</h3>
+          <p className="text-xs text-ink-3">
+            {GROUP_DESCRIPTIONS[id] ? t(GROUP_DESCRIPTIONS[id]) : null}
+          </p>
+        </div>
+        {canReset && canManage ? (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              for (const setting of settings) {
+                onChange(setting.key, profileValueOf(setting));
+              }
+            }}
+          >
+            {t("admin.practice.resetCard")}
+          </Button>
+        ) : null}
+      </CardHeader>
+      <CardBody className="grid grid-cols-12 gap-x-6 gap-y-4">
+        {settings.map((setting, index) => {
+          const differs = practice.differsFromProfile.includes(setting.key);
+          const profileValue = profileValueOf(setting);
+          const fieldId = `practice-${setting.key}`;
+          return (
+            <div
+              key={setting.key}
+              className={cn(
+                "col-span-12 flex min-w-0 flex-col gap-1",
+                SPANS[id]?.[index] ?? "md:col-span-6",
+              )}
+            >
+              <div className="flex min-h-5 items-start justify-between gap-2">
+                <span className="flex items-start gap-0.5">
+                  <label htmlFor={fieldId} className="text-sm font-medium text-ink-2">
+                    {nameOf(setting)}
+                  </label>
+                  <MethodHint
+                    name={nameOf(setting)}
+                    href={methodLinks[setting.section]}
                   >
-                    {setting.options.map((option) => (
-                      <option key={option} value={option}>
-                        {setting.optionLabels[option] ?? option}
-                      </option>
-                    ))}
-                  </SelectInput>
-                </div>
+                    <p>{setting.summary}</p>
+                  </MethodHint>
+                </span>
+                {differs ? (
+                  <Chip tone="brand">{t("admin.practice.differs")}</Chip>
+                ) : null}
               </div>
-            );
-          })}
-        </CardBody>
-      </Card>
-    </form>
+              <SelectInput
+                label={nameOf(setting)}
+                hideLabel
+                id={fieldId}
+                name={`practice:${setting.key}`}
+                disabled={!canManage}
+                value={values[setting.key]}
+                onChange={(event) =>
+                  onChange(setting.key, event.currentTarget.value)
+                }
+              >
+                {setting.options.map((option) => (
+                  <option key={option} value={option}>
+                    {setting.optionLabels[option] ?? option}
+                  </option>
+                ))}
+              </SelectInput>
+              {differs ? (
+                <span className="text-xs text-ink-3">
+                  {t("admin.practice.profileValue", {
+                    value: setting.optionLabels[profileValue] ?? profileValue,
+                  })}
+                </span>
+              ) : null}
+            </div>
+          );
+        })}
+      </CardBody>
+    </Card>
   );
 }
 
@@ -566,8 +544,57 @@ export function PracticeForm({
 }) {
   const { t } = useTranslations();
   const nameOf = useSettingName(settingNames);
-  const groups = [...new Set(practice.registry.map((entry) => entry.group))];
   const { register, unregister } = useKeyboardRegistry();
+  const [state, formAction, pending] = useActionState(
+    savePractice,
+    NOTHING_SAVED,
+  );
+  const [, startTransition] = useTransition();
+  // Controlled, so "Reset to profile" can refill a card and Discard can put
+  // every select back. What is saved is `practice.practice`, so a value that
+  // equals it is no change.
+  const stored = practice.practice;
+  const [values, setValues] = useState<Record<string, string>>(() => ({
+    ...stored,
+  }));
+  // A profile switch starts the settings from the new profile's values. It is
+  // held off while anything is unsaved, so nothing is lost here.
+  const [seenProfile, setSeenProfile] = useState(practice.profile);
+  if (seenProfile !== practice.profile) {
+    setSeenProfile(practice.profile);
+    setValues({ ...stored });
+  }
+  const onChange = useCallback(
+    (key: string, value: string) =>
+      setValues((now) => ({ ...now, [key]: value })),
+    [],
+  );
+  const onKeyDown = useSubmitShortcut(canManage);
+
+  const settingsOf = (group: string) =>
+    practice.registry.filter((entry) => entry.group === group);
+  const knownGroups = SECTIONS.flatMap((section) => section.groups);
+  const groups = [
+    ...knownGroups,
+    ...new Set(
+      practice.registry
+        .map((entry) => entry.group)
+        .filter((group) => !knownGroups.includes(group)),
+    ),
+  ].filter((group) => settingsOf(group).length > 0);
+  const titleOf = (group: string) =>
+    GROUP_TITLES[group] ? t(GROUP_TITLES[group]) : group;
+
+  // The cards with a change, by title: sixty-one settings do not fit a line.
+  const unsaved = groups
+    .filter((group) =>
+      settingsOf(group).some(
+        (entry) => values[entry.key] !== stored[entry.key],
+      ),
+    )
+    .map(titleOf);
+  const dirty = unsaved.length > 0;
+  useUnsavedGuard("practice", dirty);
 
   useEffect(() => {
     register({
@@ -578,6 +605,16 @@ export function PracticeForm({
     });
     return () => unregister("form.save");
   }, [register, unregister, t]);
+
+  // A transition and no form `action`: React resets a form once its action
+  // resolves, which would put every controlled select back to what it was
+  // before the save landed.
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const data = new FormData(event.currentTarget, submitter);
+    startTransition(() => formAction(data));
+  };
 
   let notice: ReactNode = null;
   if (!canManage) {
@@ -590,9 +627,12 @@ export function PracticeForm({
     );
   }
 
+  const sectionTag = (id: string) => t(SECTION_TAGS[id] ?? id);
+
   return (
-    <div className="flex flex-col gap-4.5">
+    <div className="flex flex-col gap-4">
       {notice}
+      <SectionHeading id="start" tag={sectionTag("start")} />
       <ProfileCard
         practice={practice}
         previews={previews}
@@ -601,27 +641,72 @@ export function PracticeForm({
         comparison={comparison}
         methodLinks={methodLinks}
         canManage={canManage}
+        dirty={dirty}
       />
-      {groups.map((group) => (
-        // Keyed on the profile as well, so a switch mounts every card afresh
-        // with the new profile's values: a select reads its default once.
-        <GroupCard
-          key={`${group}:${practice.profile}`}
-          id={group}
-          title={GROUP_TITLES[group] ? t(GROUP_TITLES[group]) : group}
-          settings={practice.registry.filter((entry) => entry.group === group)}
-          practice={practice}
-          nameOf={nameOf}
-          methodLinks={methodLinks}
-          canManage={canManage}
-        />
-      ))}
+      <form
+        id={FORM_ID}
+        onSubmit={submit}
+        onReset={() => setValues({ ...stored })}
+        onKeyDown={onKeyDown}
+        aria-busy={pending}
+        className="flex flex-col gap-4"
+      >
+        {SECTIONS.map((section) => (
+          <div key={section.id} className="flex flex-col gap-4">
+            <SectionHeading id={section.id} tag={sectionTag("saved")} />
+            {section.groups
+              .filter((group) => settingsOf(group).length > 0)
+              .map((group) => (
+                <GroupCard
+                  key={group}
+                  id={group}
+                  title={titleOf(group)}
+                  settings={settingsOf(group)}
+                  practice={practice}
+                  values={values}
+                  onChange={onChange}
+                  nameOf={nameOf}
+                  methodLinks={methodLinks}
+                  canManage={canManage}
+                />
+              ))}
+          </div>
+        ))}
+        {groups
+          .filter((group) => !knownGroups.includes(group))
+          .map((group) => (
+            <GroupCard
+              key={group}
+              id={group}
+              title={titleOf(group)}
+              settings={settingsOf(group)}
+              practice={practice}
+              values={values}
+              onChange={onChange}
+              nameOf={nameOf}
+              methodLinks={methodLinks}
+              canManage={canManage}
+            />
+          ))}
+      </form>
       <p className="text-sm text-ink-3">
         {t("admin.practice.thresholdsLiveElsewhere")}{" "}
         <Link href="/admin/rhythm" className="text-brand-text underline">
           {t("admin.rhythm.rhythmAndThresholds")}
         </Link>
       </p>
+      {canManage ? (
+        <SettingsSaveBar
+          mode="sticky"
+          formId={FORM_ID}
+          data-testid="practice-save-bar"
+          unsavedTestId="practice-unsaved"
+          unsaved={unsaved}
+          saved={dirty ? null : state.saved}
+          error={state.error}
+          pending={pending}
+        />
+      ) : null}
     </div>
   );
 }

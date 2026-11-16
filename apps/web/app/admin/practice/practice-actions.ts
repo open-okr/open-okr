@@ -3,7 +3,7 @@
 /**
  * Saving the METHOD.md §12 practice for one workspace (P9-T05).
  *
- * Three writes, each through the action the API and the command line use, so
+ * Two writes, each through the action the API and the command line use, so
  * the screen can do nothing they cannot and is refused the same way.
  */
 
@@ -13,7 +13,7 @@ import { getPool } from "../../../lib/auth";
 import { refusalFields } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
-import { NOTHING_SAVED, type PracticeState } from "./practice-state.ts";
+import { diffPractice, type PracticeState } from "./practice-state.ts";
 
 async function context() {
   const { session, workspace } = await requireWorkspace();
@@ -42,11 +42,10 @@ async function refused(error: unknown): Promise<PracticeState> {
 /**
  * Saves what a card changed, and only that.
  *
- * A card submits every select it renders. Sending them all would record every
- * one as changed in the audit trail, so the form is compared with what the
- * workspace runs now and only the differences go. A value set back to the
- * profile's own is still a difference, and `practice.update` stores it as no
- * change at all, which is what returning a setting to its profile means.
+ * The page's one form submits every select it renders. `diffPractice` keeps
+ * the differences, and sends `null` for a value set back to the profile's own
+ * on an overridden key, which clears the override (the same write the removed
+ * per-card reset made).
  */
 export async function savePractice(
   _previous: PracticeState,
@@ -56,20 +55,16 @@ export async function savePractice(
   const ctx = await context();
   const current = await callAction(ctx, "practice.read", {});
 
-  const changed: Record<string, string> = {};
+  const submitted: [string, string][] = [];
   for (const [field, raw] of form.entries()) {
-    if (!field.startsWith("practice:")) {
-      continue;
-    }
-    const key = field.slice("practice:".length);
-    const value = String(raw);
-    if (current.practice[key] !== value) {
-      changed[key] = value;
+    if (field.startsWith("practice:")) {
+      submitted.push([field.slice("practice:".length), String(raw)]);
     }
   }
+  const changed = diffPractice(current, submitted);
   const count = Object.keys(changed).length;
   if (count === 0) {
-    return { error: null, saved: t("admin.practice.actions.nothingChanged") };
+    return { error: null, saved: t("common.noChanges") };
   }
 
   try {
@@ -84,42 +79,6 @@ export async function savePractice(
       count === 1
         ? t("admin.practice.actions.savedOne", { count })
         : t("admin.practice.actions.savedOther", { count }),
-  };
-}
-
-/**
- * Returns one card's settings to the profile.
- *
- * A button rather than a form, for the reason the rhythm card's reset gives:
- * it sits inside the card's own form, and a form inside a form is not markup a
- * browser honours. Only the settings this workspace changed are sent, so the
- * audit row names what was actually reset.
- */
-export async function resetPractice(
-  keys: readonly string[],
-): Promise<PracticeState> {
-  const { t } = await getTranslations();
-  const ctx = await context();
-  const current = await callAction(ctx, "practice.read", {});
-  const wanted = keys.filter((key) => key in current.overrides);
-  if (wanted.length === 0) {
-    return { error: t("admin.practice.actions.nothingToReset"), saved: null };
-  }
-
-  try {
-    await callAction(ctx, "practice.update", {
-      overrides: Object.fromEntries(wanted.map((key) => [key, null])),
-    });
-  } catch (error) {
-    return refused(error);
-  }
-  revalidatePath("/admin/practice");
-  return {
-    ...NOTHING_SAVED,
-    saved:
-      wanted.length === 1
-        ? t("admin.practice.actions.resetOne", { count: wanted.length })
-        : t("admin.practice.actions.resetOther", { count: wanted.length }),
   };
 }
 

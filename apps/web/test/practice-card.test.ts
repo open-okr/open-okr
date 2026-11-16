@@ -9,6 +9,7 @@ import {
   PROFILE_KEYS,
 } from "@openokr/method";
 import { describe, expect, test } from "vitest";
+import { diffPractice } from "../app/admin/practice/practice-state.ts";
 import { methodDocumentUrl, RUNNING_VERSION } from "../lib/app-version.ts";
 
 /**
@@ -26,6 +27,7 @@ const at = (path: string) =>
 
 const form = at("../app/admin/practice/practice-form.tsx");
 const actions = at("../app/admin/practice/practice-actions.ts");
+const state = at("../app/admin/practice/practice-state.ts");
 const page = at("../app/admin/practice/page.tsx");
 const comparison = at("../app/admin/practice/profile-comparison.tsx");
 const rhythmForm = at("../app/admin/rhythm/rhythm-form.tsx");
@@ -59,11 +61,43 @@ describe("the practice screen", () => {
     expect(form).toContain("setting.optionLabels[option]");
   });
 
-  test("saves only what a card changed, and resets only what differs", () => {
+  test("saves only what changed, and clears an override set back to the profile", () => {
     // Every select is submitted. Sending them all would record each one as a
     // change in the audit trail.
-    expect(actions).toContain("current.practice[key] !== value");
-    expect(actions).toContain("key in current.overrides");
+    expect(actions).toContain("diffPractice(current, submitted)");
+    expect(state).toContain("current.practice[key] === value");
+    expect(state).toContain("key in current.overrides");
+    // One form and one sticky bar, no per-card save and no confirm dialog.
+    expect(form).toContain('mode="sticky"');
+    expect(form).not.toContain("window.confirm");
+    expect(form).not.toContain("useToast");
+    expect(actions).not.toContain("resetPractice");
+  });
+
+  test("diffPractice: a value equal to the profile's on an overridden key is null", () => {
+    const current = {
+      profile: "recommended",
+      practice: { a: "x", b: "y", c: "z", d: "w" },
+      // a and b are overridden; c and d follow the profile.
+      overrides: { a: "x", b: "y" },
+      profiles: [{ key: "recommended", practice: { a: "p", b: "q", c: "z" } }],
+      registry: [
+        { key: "a", default: "p" },
+        { key: "b", default: "q" },
+        { key: "c", default: "z" },
+        { key: "d", default: "w" },
+      ],
+    };
+    expect(
+      diffPractice(current, [
+        ["a", "p"], // back to the profile on an override: clears it
+        ["b", "other"], // a different value: written as chosen
+        ["c", "z"], // equal to what it runs, no override: no change
+        ["d", "w"], // unchanged, falls back to the registry default
+      ]),
+    ).toEqual({ a: null, b: "other" });
+    // A value equal to the profile's on a key with no override is no change.
+    expect(diffPractice(current, [["c", "z"]])).toEqual({});
   });
 
   test("previews a profile with the function the write runs", () => {

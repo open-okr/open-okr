@@ -80,7 +80,11 @@ test("an admin limits writing to the planning window from its card", async () =>
   const who = card.getByLabel("Who may write OKRs, and when", { exact: true });
   await expect(who).toHaveValue("anytime");
   await who.selectOption({ label: "Planning window" });
-  await card.getByRole("button", { name: "Save" }).click();
+  // One bar for the page, naming the cards that changed.
+  await expect(page.getByTestId("practice-unsaved")).toHaveText(
+    "Not saved yet: Writing and changing",
+  );
+  await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Saved 1 setting.").first()).toBeVisible({
     timeout: 15_000,
   });
@@ -137,14 +141,32 @@ test("the audit trail records the change", async () => {
 test("the card returns the setting to its profile", async () => {
   await goTo(page, "/admin/practice");
   const card = page.getByTestId("practice-card-writing");
-  page.once("dialog", (dialog) => dialog.accept());
+  const who = card.getByLabel("Who may write OKRs, and when", { exact: true });
+  await expect(who).toHaveValue("planningWindow");
+  // The button refills the card; nothing is written until the bar saves.
   await card.getByRole("button", { name: "Reset to profile" }).click();
-  await expect(
-    page.getByText("Returned 1 setting to the profile.").first(),
-  ).toBeVisible({ timeout: 15_000 });
-  await expect(card.getByLabel("Who may write OKRs, and when", { exact: true })).toHaveValue(
-    "anytime",
+  await expect(who).toHaveValue("anytime");
+  await expect(page.getByTestId("practice-unsaved")).toHaveText(
+    "Not saved yet: Writing and changing",
   );
+  // "Use this profile" is held off while the form has unsaved changes.
+  await expect(
+    page
+      .getByTestId("practice-profile")
+      .getByRole("button", { name: "Use this profile" }),
+  ).toBeDisabled();
+  await expect(page.getByTestId("practice-profile-save-first")).toHaveText(
+    "Save or discard your changes first.",
+  );
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Saved 1 setting.").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  // The override is cleared, so the card no longer differs from its profile.
+  await expect(card.getByText("Differs from profile")).toHaveCount(0, {
+    timeout: 15_000,
+  });
+  await expect(who).toHaveValue("anytime");
 });
 
 test("every profile can be applied, and Lightweight moves the check-in frequency", async () => {

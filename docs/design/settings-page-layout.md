@@ -88,7 +88,7 @@ Branding and General are done. The rest wait for their own change, one page at a
 | admin/general | Footer per card, instant actions for state and close | Done (2026-11-16) |
 | admin/channels | Footer per card | Pending |
 | admin/sso | Footer per card; quick actions per connection are instant, the connection list scrolls | Done (2026-11-16) |
-| admin/practice | One sticky bar for the page | Pending |
+| admin/practice | One sticky bar for the page | Done (2026-11-16) |
 | admin/rhythm | One sticky bar for the page | Pending |
 | admin/nudges | One sticky bar for the page | Pending |
 | admin/connections | One card, sticky bar (per the prototype). The S-37 spec describes a list with End controls, so check before changing | Pending |
