@@ -163,7 +163,7 @@ test("the profile page loads for the signed-in member", async () => {
     INSTANCE_ACCOUNT.name,
   );
   await expect(
-    page.getByRole("heading", { name: "Edit your profile" }),
+    page.getByRole("heading", { name: "Profile details" }),
   ).toBeVisible();
 });
 
@@ -195,7 +195,7 @@ const PICTURE = Buffer.from(
  */
 test("a member sets their own picture and it shows in the header", async () => {
   await expect(
-    page.getByRole("heading", { name: "Your picture" }),
+    page.getByRole("heading", { name: "Name and picture" }),
   ).toBeVisible();
   await page
     .getByLabel("Picture (PNG, JPEG, GIF or WebP)")
@@ -225,8 +225,11 @@ test("a member writes their own bio and reads it back", async () => {
   await editor.click();
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.type("Runs the growth team from Kuala Lumpur.");
-  const form = page.locator("form").filter({ has: editor });
-  await form.getByRole("button", { name: "Save" }).click();
+  // The save bar is the card's footer, outside the form.
+  await page
+    .getByTestId("profile-card")
+    .getByRole("button", { name: "Save changes" })
+    .click();
   await expect(page.getByText("Profile updated.")).toBeVisible({
     timeout: 15_000,
   });
@@ -246,8 +249,10 @@ test("and both can be taken away again", async () => {
   await editor.click();
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.press("Backspace");
-  const form = page.locator("form").filter({ has: editor });
-  await form.getByRole("button", { name: "Save" }).click();
+  await page
+    .getByTestId("profile-card")
+    .getByRole("button", { name: "Save changes" })
+    .click();
   await expect(page.getByText("Profile updated.")).toBeVisible({
     timeout: 15_000,
   });

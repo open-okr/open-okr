@@ -7,7 +7,7 @@ import {
   isDemoAccount,
 } from "@openokr/core";
 import { listTimezones } from "@openokr/formats";
-import { Avatar, Card, CardBody, CardHeader } from "@openokr/ui";
+import { Card, CardBody, CardHeader } from "@openokr/ui";
 import Link from "next/link";
 import { AppearanceControl } from "../../lib/appearance.tsx";
 import { canSendMail, getPool } from "../../lib/auth";
@@ -100,8 +100,28 @@ export default async function AccountPage({
     ? `/api/blobs/${member.avatarBlobId}/thumbnail`
     : null;
 
+  const GROUP = "text-xs font-semibold uppercase tracking-wide text-ink-4";
+  const readOnly =
+    "flex h-7.5 items-center rounded-control bg-raised px-2.5 text-sm text-ink-2";
+
   return (
-    <div className="flex flex-col gap-4.5" data-testid="your-account">
+    <div className="flex flex-col gap-4" data-testid="your-account">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="flex flex-col gap-1">
+          <h1 className="font-bold text-ink text-lg">
+            {t("account.profile.heading")}
+          </h1>
+          <p className="max-w-prose text-ink-3 text-sm">
+            {t("account.profile.intro")}
+          </p>
+        </div>
+        <Link
+          href={`/people/${workspace.memberId}`}
+          className="font-semibold text-brand-text text-xs hover:underline"
+        >
+          {t("account.profile.seeAsOthersDo")}
+        </Link>
+      </div>
       {params.deletion === "kept" ? (
         <p
           role="status"
@@ -111,59 +131,43 @@ export default async function AccountPage({
           {t("account.delete.kept")}
         </p>
       ) : null}
-      <Card>
-        <CardHeader className="justify-between">
-          <h1 className="text-lg font-bold text-ink">
-            {t("account.profile.heading")}
-          </h1>
-          <Link
-            href={`/people/${workspace.memberId}`}
-            className="text-xs font-semibold text-brand-text hover:underline"
-          >
-            {t("account.profile.seeAsOthersDo")}
-          </Link>
-        </CardHeader>
-        <CardBody className="flex items-start gap-3">
-          <Avatar name={member.name} src={avatarUrl ?? undefined} size="lg" />
-          <div className="flex min-w-0 flex-1 flex-col gap-3">
-            {demo ? (
-              <div className="flex flex-col gap-1 text-sm">
-                <p>
-                  <span className="text-ink-3">{t("common.name")} </span>
-                  <span className="text-ink" data-testid="account-name">
-                    {member.name}
-                  </span>
-                </p>
-                <p className="text-xs text-ink-3">
-                  {t("account.profile.demoKeepsName")}
-                </p>
-              </div>
-            ) : (
-              <NameForm name={member.name} action={updateOwnName} />
-            )}
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-              <dt className="text-ink-3">{t("account.profile.jobTitle")}</dt>
-              <dd className="text-ink">
-                {member.title ?? t("account.profile.none")}
-              </dd>
-              <dt className="text-ink-3">{t("common.manager")}</dt>
-              <dd className="text-ink">
-                {manager?.name ?? t("account.profile.none")}
-              </dd>
-            </dl>
-          </div>
-        </CardBody>
-        <CardBody className="border-line border-t pt-3 text-xs text-ink-3">
-          {t("account.profile.setByAdministrator")}
-        </CardBody>
-      </Card>
 
-      <AvatarForm
+      <h2 className={GROUP}>{t("account.group.profile")}</h2>
+
+      <NameForm
         name={member.name}
-        avatarUrl={avatarUrl}
-        uploadAvatar={uploadAvatar}
-        removeAvatar={removeAvatar}
-      />
+        action={updateOwnName}
+        demo={demo}
+        picture={
+          <AvatarForm
+            name={member.name}
+            avatarUrl={avatarUrl}
+            uploadAvatar={uploadAvatar}
+            removeAvatar={removeAvatar}
+          />
+        }
+      >
+        <div className="col-span-12 flex flex-col gap-1 md:col-span-6">
+          <span className="font-semibold text-ink-2 text-sm">
+            {t("account.profile.jobTitle")}
+          </span>
+          <div className={readOnly}>
+            {member.title ?? t("account.profile.none")}
+          </div>
+        </div>
+        <div className="col-span-12 flex flex-col gap-1 md:col-span-6">
+          <span className="font-semibold text-ink-2 text-sm">
+            {t("common.manager")}
+          </span>
+          <div className={readOnly}>
+            {manager?.name ?? t("account.profile.none")}
+          </div>
+        </div>
+        <p className="col-span-12 text-ink-3 text-xs">
+          {t("account.profile.setByAdministrator")}
+        </p>
+      </NameForm>
+
       <ProfileForm
         memberId={workspace.memberId}
         timezone={member.timezone}
@@ -174,56 +178,35 @@ export default async function AccountPage({
         updateProfile={updateProfile}
       />
 
+      <h2 className={GROUP}>{t("account.group.preferences")}</h2>
+
       <Card>
-        <CardHeader>
-          <h2 className="text-sm font-bold text-ink">
-            {t("people.detail.appearance")}
-          </h2>
-          <p className="text-xs text-ink-3">
-            {t("people.detail.keptOnYouRather")}
-          </p>
+        <CardHeader className="justify-between">
+          <div className="flex flex-col gap-0.5">
+            <h2 className="font-semibold text-ink text-sm">
+              {t("people.detail.appearance")}
+            </h2>
+            <p className="text-ink-3 text-xs">
+              {t("people.detail.keptOnYouRather")}
+            </p>
+          </div>
+          <span className="rounded-full bg-raised px-2 font-semibold text-ink-3 text-xs">
+            {t("common.appliesAtOnce")}
+          </span>
         </CardHeader>
         <CardBody>
-          <AppearanceControl language={member.language} />
+          <AppearanceControl language={member.language} layout="grid" />
         </CardBody>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-sm font-bold text-ink">
-            {t("account.profile.signIn")}
-          </h2>
-        </CardHeader>
-        <CardBody className="flex flex-col gap-3 text-sm">
-          <p>
-            <span className="text-ink-3">{t("account.profile.email")} </span>
-            <span className="text-ink" data-testid="account-email">
-              {session.user.email}
-            </span>
-          </p>
-          <div role="status" aria-live="polite" className="contents">
-            {opened ? (
-              <p
-                data-testid="email-change-outcome"
-                className={
-                  opened.ok
-                    ? "max-w-prose rounded-md bg-ok-bg px-2.5 py-1.5 text-xs font-medium text-ok"
-                    : "max-w-prose rounded-md bg-bad-bg px-2.5 py-1.5 text-xs font-medium text-bad"
-                }
-              >
-                {opened.message}
-              </p>
-            ) : null}
-          </div>
-          <EmailCard card={emailCard} action={changeEmail} />
-          <Link
-            href="/account/security"
-            className="text-xs font-semibold text-brand-text hover:underline"
-          >
-            {t("account.profile.passwordAndSessions")}
-          </Link>
-        </CardBody>
-      </Card>
+      <h2 className={GROUP}>{t("account.group.signIn")}</h2>
+
+      <EmailCard
+        card={emailCard}
+        action={changeEmail}
+        email={session.user.email}
+        opened={opened}
+      />
 
       <DeleteAccountCard
         card={deletionCard}

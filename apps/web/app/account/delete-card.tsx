@@ -49,17 +49,19 @@ export function DeleteAccountCard({
 }) {
   const { t } = useTranslations();
   return (
-    <Card data-testid="delete-account-card" className="border-bad/40">
+    <Card data-testid="delete-account-card" className="border-bad/30">
       <CardHeader>
-        <h2 className="text-sm font-bold text-bad">
-          {t("account.delete.title")}
-        </h2>
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-sm font-semibold text-bad">
+            {t("account.delete.title")}
+          </h2>
+          <p className="max-w-prose text-xs text-ink-3">
+            {t("account.delete.explains", { days })}
+          </p>
+        </div>
       </CardHeader>
-      <CardBody className="flex flex-col items-start gap-3 text-sm">
-        <p className="max-w-prose text-ink-2">
-          {t("account.delete.explains", { days })}
-        </p>
-        <p className="max-w-prose text-xs text-ink-3">
+      <CardBody className="grid grid-cols-12 gap-x-6 gap-y-4 text-sm [&>ul]:col-span-12">
+        <p className="col-span-12 max-w-prose text-xs text-ink-3">
           {t("account.delete.exportFirst")}{" "}
           <Link
             href="/account/security"
@@ -104,7 +106,10 @@ function Body({
       // workspace is named with the way to reach it instead.
       const here = card.workspaceId === currentWorkspaceId;
       return (
-        <div className="flex flex-col gap-1.5" data-testid="delete-refusal">
+        <div
+          className="col-span-12 flex flex-col gap-1.5"
+          data-testid="delete-refusal"
+        >
           <p className="max-w-prose text-xs text-ink-2">
             {t("account.delete.lastOwner", { workspace: card.workspaceName })}
           </p>
@@ -137,7 +142,7 @@ function Body({
     }
     default:
       return !card.hasPassword && !card.recent ? (
-        <div className="flex flex-col items-start gap-3">
+        <div className="col-span-12 flex flex-col items-start gap-3">
           <SignInAgain
             providers={card.providers}
             intro={t("account.delete.signInAgainFirst")}
@@ -152,7 +157,10 @@ function Body({
 
 function Refusal({ children }: { readonly children: string }) {
   return (
-    <p className="max-w-prose text-xs text-ink-2" data-testid="delete-refusal">
+    <p
+      className="col-span-12 max-w-prose text-xs text-ink-2"
+      data-testid="delete-refusal"
+    >
       {children}
     </p>
   );
@@ -183,7 +191,7 @@ function Confirm({
       onSubmit={submit}
       aria-busy={pending}
       data-testid="delete-account-form"
-      className="flex w-full max-w-md flex-col items-start gap-3"
+      className="col-span-12 grid grid-cols-12 gap-x-6 gap-y-4"
     >
       {hasPassword ? (
         <SecretInput
@@ -192,29 +200,40 @@ function Confirm({
           label={t("account.delete.password")}
           autoComplete="current-password"
           required
-          className="w-full"
+          className="col-span-12 md:col-span-9"
           error={state?.field === "password" ? state.message : null}
         />
       ) : null}
-      <Button type="submit" size="sm" pending={pending}>
+      <Button
+        type="submit"
+        size="sm"
+        pending={pending}
+        className={
+          hasPassword
+            ? "col-span-12 w-full self-end md:col-span-3"
+            : "col-span-12 w-full md:col-span-3"
+        }
+      >
         {t("account.delete.confirm")}
       </Button>
-      <FormError>
-        {state?.heldMinutes !== undefined ? (
-          <>
-            {state.heldMinutes === 1
-              ? t("auth.signIn.heldForAMinute")
-              : t("auth.signIn.heldForMinutes", {
-                  minutes: state.heldMinutes,
-                })}{" "}
-            <Link href="/forgot-password" className="underline">
-              {t("auth.signIn.resetYourPassword")}
-            </Link>
-          </>
-        ) : state && !state.field ? (
-          state.message
-        ) : null}
-      </FormError>
+      <div className="col-span-12 empty:hidden">
+        <FormError>
+          {state?.heldMinutes !== undefined ? (
+            <>
+              {state.heldMinutes === 1
+                ? t("auth.signIn.heldForAMinute")
+                : t("auth.signIn.heldForMinutes", {
+                    minutes: state.heldMinutes,
+                  })}{" "}
+              <Link href="/forgot-password" className="underline">
+                {t("auth.signIn.resetYourPassword")}
+              </Link>
+            </>
+          ) : state && !state.field ? (
+            state.message
+          ) : null}
+        </FormError>
+      </div>
     </form>
   );
 }

@@ -50,9 +50,16 @@ const LANGUAGES = [
 export function AppearanceControl({
   compact = false,
   language = null,
+  layout = "stack",
 }: {
   /** Laid out for the avatar menu rather than for a settings card. */
   readonly compact?: boolean;
+  /**
+   * `grid` is the account page's: theme, language and density side by side on
+   * the 12-column grid (docs/design/settings-page-layout.md §E), each control
+   * filling its column. The default is the menu's and the old card's stack.
+   */
+  readonly layout?: "stack" | "grid";
   /**
    * The member's stored language, or null for "follow the workspace"
    * (P6-G22a). Passed in from the server, because unlike the theme there is
@@ -67,6 +74,16 @@ export function AppearanceControl({
     language,
   );
 
+  const grid = layout === "grid";
+  const fieldset = grid
+    ? "col-span-12 flex flex-col gap-1.5 lg:col-span-4"
+    : "flex flex-col gap-1";
+  const legend = grid
+    ? "text-sm font-semibold text-ink-2"
+    : "text-xs font-semibold text-ink-3";
+  const group = grid ? "flex w-full gap-1.5" : "flex gap-1.5";
+  const grow = grid ? "flex-1 justify-center" : "";
+
   const remember = (input: Parameters<typeof setAppearance>[0]) => {
     void setAppearance(input).then((result) => setProblem(result.error));
   };
@@ -74,14 +91,16 @@ export function AppearanceControl({
   return (
     <div
       className={
-        compact ? "flex flex-col gap-2 px-2 py-1.5" : "flex flex-col gap-3.5"
+        compact
+          ? "flex flex-col gap-2 px-2 py-1.5"
+          : grid
+            ? "grid grid-cols-12 gap-x-6 gap-y-4"
+            : "flex flex-col gap-3.5"
       }
     >
-      <fieldset className="flex flex-col gap-1">
-        <legend className="text-xs font-semibold text-ink-3">
-          {t("appearance.theme")}
-        </legend>
-        <div className="flex gap-1.5">
+      <fieldset className={fieldset}>
+        <legend className={legend}>{t("appearance.theme")}</legend>
+        <div className={group}>
           {THEMES.map((option) => (
             <Tooltip key={option.value} label={t(option.label)}>
               <button
@@ -95,8 +114,8 @@ export function AppearanceControl({
                 }}
                 className={
                   theme === option.value
-                    ? "flex size-8 items-center justify-center rounded-md border border-brand-600 bg-brand text-on-brand [&>svg]:size-4"
-                    : "flex size-8 items-center justify-center rounded-md border border-line text-ink-2 hover:border-ink-4 [&>svg]:size-4"
+                    ? `flex h-8 items-center justify-center rounded-md border border-brand-600 bg-brand text-on-brand [&>svg]:size-4 ${grid ? "flex-1" : "w-8"}`
+                    : `flex h-8 items-center justify-center rounded-md border border-line text-ink-2 hover:border-ink-4 [&>svg]:size-4 ${grid ? "flex-1" : "w-8"}`
                 }
               >
                 {option.icon}
@@ -116,11 +135,11 @@ export function AppearanceControl({
        * something else.
        */}
       {compact ? null : (
-        <fieldset className="flex flex-col gap-1">
-          <legend className="text-xs font-semibold text-ink-3">
+        <fieldset className={fieldset}>
+          <legend className={legend}>
             {t("admin.general.generalSettingsForm.language")}
           </legend>
-          <div className="flex gap-1.5">
+          <div className={group}>
             {LANGUAGES.map((option) => (
               <button
                 key={option.value}
@@ -133,25 +152,25 @@ export function AppearanceControl({
                 }}
                 className={
                   pendingLanguage === option.value
-                    ? "rounded-md border border-brand-600 bg-brand px-2 py-1 text-xs font-semibold text-on-brand"
-                    : "rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 hover:border-ink-4"
+                    ? `rounded-md border border-brand-600 bg-brand px-2 py-1 text-xs font-semibold text-on-brand ${grow}`
+                    : `rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 hover:border-ink-4 ${grow}`
                 }
               >
                 {t(option.label)}
               </button>
             ))}
           </div>
-          <span className="text-xs text-ink-4">
-            {t("appearance.bahasaMelayuNote")}
-          </span>
+          {grid ? null : (
+            <span className="text-xs text-ink-4">
+              {t("appearance.bahasaMelayuNote")}
+            </span>
+          )}
         </fieldset>
       )}
 
-      <fieldset className="flex flex-col gap-1">
-        <legend className="text-xs font-semibold text-ink-3">
-          {t("appearance.density")}
-        </legend>
-        <div className="flex gap-1.5">
+      <fieldset className={fieldset}>
+        <legend className={legend}>{t("appearance.density")}</legend>
+        <div className={group}>
           {DENSITIES.map((option) => (
             <button
               key={option.value}
@@ -164,8 +183,8 @@ export function AppearanceControl({
               }}
               className={
                 density === option.value
-                  ? "rounded-md border border-brand-600 bg-brand px-2 py-1 text-xs font-semibold text-on-brand"
-                  : "rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 hover:border-ink-4"
+                  ? `rounded-md border border-brand-600 bg-brand px-2 py-1 text-xs font-semibold text-on-brand ${grow}`
+                  : `rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 hover:border-ink-4 ${grow}`
               }
             >
               {t(option.label)}
@@ -174,8 +193,14 @@ export function AppearanceControl({
         </div>
       </fieldset>
 
+      {grid && !compact ? (
+        <p className="col-span-12 text-xs text-ink-3">
+          {t("appearance.bahasaMelayuNote")}
+        </p>
+      ) : null}
+
       {problem ? (
-        <span role="alert" className="text-xs text-bad">
+        <span role="alert" className="col-span-12 text-xs text-bad">
           {problem}
         </span>
       ) : null}

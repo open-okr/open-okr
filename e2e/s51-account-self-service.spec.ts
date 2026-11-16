@@ -82,16 +82,17 @@ test("the owner invites somebody, and they join", async ({
 test("they rename themselves, and the avatar menu says the new name", async () => {
   await page.goto("/account");
   const form = page.getByTestId("own-name");
+  const card = page.getByTestId("name-card");
   const name = form.getByLabel("Name");
   await expect(name).toHaveValue(PERSON.name);
 
   await name.fill("   ");
-  await form.getByRole("button", { name: "Save" }).click();
+  await card.getByRole("button", { name: "Save changes" }).click();
   await expect(form.getByText("A member needs a name.")).toBeVisible();
 
   await name.fill(PERSON.renamed);
-  await form.getByRole("button", { name: "Save" }).click();
-  await expect(form.getByRole("status")).toHaveText("Your name is saved.");
+  await card.getByRole("button", { name: "Save changes" }).click();
+  await expect(card.getByText("Your name is saved.")).toBeVisible();
   await expect(form.getByLabel("Name")).toHaveValue(PERSON.renamed);
 
   await page.getByTestId("account-menu").click();

@@ -103,7 +103,7 @@ Branding is the only page changed by the first change. General is next. The rest
 | admin/roles | Proposed: list or tool | Pending |
 | admin/support | Proposed: instant actions | Pending |
 | admin/webhooks | Proposed: list or tool | Pending |
-| account (name, email, delete) | Proposed: footer per card, danger card for delete | Pending |
+| account (name, email, delete) | Footer per card (name and picture, profile details), instant actions (picture, appearance, change email), danger card for delete | Done (2026-11-16) |
 | account/ai | One card, sticky bar | Pending |
 | account/api-tokens | Instant actions | Pending |
 | account/channels | Proposed: footer per card | Pending |

@@ -145,6 +145,13 @@ export interface TimeRangeInputProps {
   readonly error?: string | null;
   readonly disabled?: boolean;
   readonly className?: string;
+  /**
+   * `grid` draws the two times as two columns of a 12-column form (docs/
+   * design/settings-page-layout.md §E): each keeps its own visible label and
+   * the word "to" is left out, because the labels say which is which.
+   * Defaults to the inline pair with "to" between.
+   */
+  readonly layout?: "inline" | "grid";
 }
 
 const NO_TIMES: TimeRange = { start: null, end: null };
@@ -172,6 +179,7 @@ export function TimeRangeInput({
   error,
   disabled,
   className,
+  layout = "inline",
 }: TimeRangeInputProps) {
   const { t } = useTranslations();
   const [own, setOwn] = useState<TimeRange>(defaultValue ?? NO_TIMES);
@@ -192,6 +200,7 @@ export function TimeRangeInput({
   const start = shown(current.start);
   const end = shown(current.end);
   const half = left ? t("fields.timeRange.bothOrNeither") : null;
+  const grid = layout === "grid";
 
   return (
     <fieldset
@@ -205,10 +214,17 @@ export function TimeRangeInput({
     >
       <legend className="mb-1 text-sm font-medium text-ink-2">{label}</legend>
       {description ? <p className="text-xs text-ink-3">{description}</p> : null}
-      <div className="flex flex-wrap items-start gap-2">
+      <div
+        className={
+          grid
+            ? "grid grid-cols-1 items-start gap-x-6 gap-y-2 md:grid-cols-2"
+            : "flex flex-wrap items-start gap-2"
+        }
+      >
         <TimeInput
           label={startLabel}
-          hideLabel
+          hideLabel={!grid}
+          inputClassName={grid ? "w-full" : undefined}
           name={startName}
           value={start}
           disabled={disabled}
@@ -216,10 +232,13 @@ export function TimeRangeInput({
           error={start === "" && end !== "" ? half : null}
           onValueChange={(next) => change({ ...current, start: next })}
         />
-        <span className="pt-1.5 text-xs text-ink-3">{t("common.to")}</span>
+        {grid ? null : (
+          <span className="pt-1.5 text-xs text-ink-3">{t("common.to")}</span>
+        )}
         <TimeInput
           label={endLabel}
-          hideLabel
+          hideLabel={!grid}
+          inputClassName={grid ? "w-full" : undefined}
           name={endName}
           value={end}
           disabled={disabled}
