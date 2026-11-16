@@ -1,20 +1,13 @@
 import { callAction } from "@openokr/core";
 import { NOTIFICATION_REASONS } from "@openokr/db";
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  TimeRangeInput,
-} from "@openokr/ui";
+import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { saveCadence, saveDelivery, startLink, unlink } from "./actions.ts";
 import { CadenceForm } from "./cadence-form.tsx";
-import { LinkForm } from "./link-form.tsx";
+import { DeliveryForm, LinkedAccounts } from "./link-form.tsx";
 
 export const generateMetadata = pageTitle("pageTitle.accountChannels");
 
@@ -104,157 +97,93 @@ export default async function AccountChannelsPage() {
   );
   const connected = new Set(settings.connected);
 
+  const tiles = settings.connected.map((provider) => ({
+    provider,
+    linked: Boolean(
+      settings.identities.find((row) => row.provider === provider)?.verifiedAt,
+    ),
+  }));
+
   return (
-    <div className="flex flex-col gap-4.5">
-      <Card>
+    <div className="flex flex-col gap-4">
+      <header>
+        <h1 className="text-lg font-bold text-ink">
+          {t("account.channels.whereToReachYou")}
+        </h1>
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("account.channels.yourRemindersAlwaysAppear")}
+        </p>
+      </header>
+
+      <DeliveryForm
+        action={saveDelivery}
+        primaryChannel={settings.primaryChannel}
+        quietHours={settings.quietHours ?? null}
+        quietLabel={t("account.channels.quietHoursIn", {
+          timezone: settings.timezone,
+        })}
+        quietDescription={t("account.channels.aReminderDueInside")}
+        quietStartLabel={t("account.channels.quietStart")}
+        quietEndLabel={t("account.channels.quietEnd")}
+        choices={CHOICES.map((choice) => {
+          const unavailable =
+            choice.needsLink &&
+            (!connected.has(choice.id as never) ||
+              !linked.has(choice.id as never));
+          return {
+            id: choice.id,
+            label: t(choice.labelKey),
+            unavailableReason: unavailable
+              ? connected.has(choice.id as never)
+                ? t("account.channels.linkYourAccountFirst")
+                : t("account.channels.notConnectedForThisWorkspace")
+              : null,
+          };
+        })}
+      />
+
+      <Card data-testid="channels-linked-card">
         <CardHeader>
-          <h1 className="text-lg font-bold text-ink">
-            {t("account.channels.whereToReachYou")}
-          </h1>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-sm font-semibold text-ink">
+              {t("account.channels.linkedAccounts")}
+            </h2>
+            <p className="text-xs text-ink-3">
+              {t("account.channels.linkedAccountsHint")}
+            </p>
+          </div>
+          <span className="rounded-full bg-raised px-2 font-semibold text-ink-3 text-xs">
+            {t("common.appliesAtOnce")}
+          </span>
         </CardHeader>
         <CardBody>
-          <p className="text-sm text-ink-3">
-            {t("account.channels.yourRemindersAlwaysAppear")}
-          </p>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader>{t("account.channels.delivery")}</CardHeader>
-        <CardBody>
-          <LinkForm action={saveDelivery} className="flex flex-col gap-3">
-            <fieldset className="flex flex-col gap-1.5">
-              <legend className="mb-1 text-xs font-semibold text-ink-2">
-                {t("common.primaryChannel")}
-              </legend>
-              {CHOICES.map((choice) => {
-                const unavailable =
-                  choice.needsLink &&
-                  (!connected.has(choice.id as never) ||
-                    !linked.has(choice.id as never));
-                return (
-                  <label
-                    key={choice.id}
-                    className="flex items-center gap-2 text-sm text-ink"
-                  >
-                    <input
-                      type="radio"
-                      name="primaryChannel"
-                      value={choice.id}
-                      defaultChecked={settings.primaryChannel === choice.id}
-                      disabled={unavailable}
-                    />
-                    {t(choice.labelKey)}
-                    {unavailable ? (
-                      <span className="text-xs text-ink-3">
-                        {connected.has(choice.id as never)
-                          ? t("account.channels.linkYourAccountFirst")
-                          : t("account.channels.notConnectedForThisWorkspace")}
-                      </span>
-                    ) : null}
-                  </label>
-                );
-              })}
-            </fieldset>
-
-            {/* Each time is named for anybody who cannot see the heading
-                above them: two bare time inputs were announced as "time"
-                and "time" (P7-T05's `label` finding on this screen). */}
-            <TimeRangeInput
-              label={t("account.channels.quietHoursIn", {
-                timezone: settings.timezone,
-              })}
-              description={t("account.channels.aReminderDueInside")}
-              startLabel={t("account.channels.quietStart")}
-              endLabel={t("account.channels.quietEnd")}
-              startName="quietStart"
-              endName="quietEnd"
-              defaultValue={settings.quietHours}
-            />
-
-            <Button type="submit" variant="primary" size="sm" className="w-fit">
-              {t("common.save")}
-            </Button>
-          </LinkForm>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader>{t("account.channels.linkedAccounts")}</CardHeader>
-        <CardBody className="flex flex-col gap-3">
-          {settings.connected.length === 0 ? (
+          {tiles.length === 0 ? (
             <p className="text-sm text-ink-3">
               {t("account.channels.noChatProviderIs")}
             </p>
           ) : (
-            settings.connected.map((provider) => {
-              const identity = settings.identities.find(
-                (row) => row.provider === provider,
-              );
-              return (
-                <div
-                  key={provider}
-                  className="flex flex-col gap-1.5 rounded-lg border border-line p-3"
-                >
-                  <span className="flex items-center gap-2 text-sm font-medium text-ink">
-                    {provider}
-                    {identity?.verifiedAt ? (
-                      <Chip tone="ok">{t("account.channels.linked")}</Chip>
-                    ) : (
-                      <Chip tone="neutral">
-                        {t("account.channels.notLinked")}
-                      </Chip>
-                    )}
-                  </span>
-                  {identity?.verifiedAt ? (
-                    <LinkForm action={unlink}>
-                      <input type="hidden" name="provider" value={provider} />
-                      <Button type="submit" size="sm">
-                        {t("common.unlink")}
-                      </Button>
-                    </LinkForm>
-                  ) : (
-                    <LinkForm action={startLink}>
-                      <input type="hidden" name="provider" value={provider} />
-                      <Button type="submit" variant="default" size="sm">
-                        {t("account.channels.getACode")}
-                      </Button>
-                    </LinkForm>
-                  )}
-                </div>
-              );
-            })
+            <LinkedAccounts
+              startLink={startLink}
+              unlink={unlink}
+              tiles={tiles}
+            />
           )}
         </CardBody>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">
-              {t("account.channels.howOften")}
-            </h2>
-            <p className="text-xs text-ink-3">
-              {t("account.channels.theMemberHalfOf")}
-            </p>
-          </div>
-        </CardHeader>
-        <CardBody>
-          <CadenceForm
-            action={saveCadence}
-            settings={cadence}
-            timezone={settings.timezone}
-            reasons={NOTIFICATION_REASONS.map((reason) => {
-              const labelKey = REASON_LABELS[reason];
-              return { id: reason, label: labelKey ? t(labelKey) : reason };
-            })}
-            channels={CHOICES.map((choice) => ({
-              id: choice.id,
-              label: t(choice.labelKey),
-            }))}
-          />
-        </CardBody>
-      </Card>
+      <CadenceForm
+        action={saveCadence}
+        settings={cadence}
+        timezone={settings.timezone}
+        reasons={NOTIFICATION_REASONS.map((reason) => {
+          const labelKey = REASON_LABELS[reason];
+          return { id: reason, label: labelKey ? t(labelKey) : reason };
+        })}
+        channels={CHOICES.map((choice) => ({
+          id: choice.id,
+          label: t(choice.labelKey),
+        }))}
+      />
     </div>
   );
 }

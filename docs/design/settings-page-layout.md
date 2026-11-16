@@ -106,7 +106,7 @@ Branding is the only page changed by the first change. General is next. The rest
 | account (name, email, delete) | Footer per card (name and picture, profile details), instant actions (picture, appearance, change email), danger card for delete | Done (2026-11-16) |
 | account/ai | One card, sticky bar | Pending |
 | account/api-tokens | Instant actions | Pending |
-| account/channels | Proposed: footer per card | Pending |
+| account/channels | Footer per card (Delivery, How often), instant actions for linked accounts | Done (2026-11-16) |
 | account/connections | Proposed: instant actions | Pending |
 | account/device | Proposed: instant actions | Pending |
 | account/security | Instant actions | Pending |

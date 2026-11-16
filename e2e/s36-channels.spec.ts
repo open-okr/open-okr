@@ -191,13 +191,13 @@ test("quiet hours save, and the copy says a reminder waits rather than vanishes"
   // primary channel above". A prose filter is a locator that any wording
   // change can break; the field this test fills is what actually identifies
   // the form it belongs to.
-  const delivery = page
-    .locator("form")
-    .filter({ has: page.locator('input[name="quietStart"]') });
-  await delivery.getByRole("button", { name: "Save" }).click();
+  // The save bar is the card's own footer, outside the form and attached to it
+  // with `form=`, so the card is the scope.
+  const delivery = page.getByTestId("channels-delivery-card");
+  await delivery.getByRole("button", { name: "Save changes" }).click();
 
   // A refusal would be here, and a spec that only checked the value would read
-  // "the write did nothing" as "the write is slow". Scoped to the form: Next
+  // "the write did nothing" as "the write is slow". Scoped to the card: Next
   // renders its own route announcer with role="alert" on every page.
   await expect(
     delivery.getByRole("alert"),
@@ -250,9 +250,7 @@ test("saving your profile keeps the quiet hours set here", async () => {
 
 test("one time without the other is held back, and the window stays", async () => {
   await goTo(page, "/account/channels");
-  const delivery = page
-    .locator("form")
-    .filter({ has: page.locator('input[name="quietStart"]') });
+  const delivery = page.getByTestId("channels-delivery-card");
   // Retried for the same reason as the fill above: an uncontrolled input
   // filled before hydration goes back to what the server rendered.
   await expect(async () => {
@@ -261,7 +259,7 @@ test("one time without the other is held back, and the window stays", async () =
       timeout: 1_000,
     });
   }).toPass({ timeout: 20_000 });
-  await delivery.getByRole("button", { name: "Save" }).click();
+  await delivery.getByRole("button", { name: "Save changes" }).click();
 
   // guided-inputs §4.9: the empty half is required while the other is set,
   // so the browser holds the save, and the field says why under it. The

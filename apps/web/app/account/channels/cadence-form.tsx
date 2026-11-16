@@ -1,14 +1,34 @@
 "use client";
 
 import {
-  Button,
+  Card,
+  CardBody,
+  CardHeader,
   NumberInput,
   SelectInput,
+  SettingsSaveBar,
   TimeInput,
   useTranslations,
 } from "@openokr/ui";
-import { useActionState } from "react";
+import {
+  type FormEvent,
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { LinkResult } from "./link-state.ts";
+
+const FORM_ID = "channels-cadence-form";
+
+interface Values {
+  readonly mentionImmediate: boolean;
+  readonly batch: number | null;
+  readonly dailySummary: boolean;
+  readonly time: string;
+  readonly routing: Readonly<Record<string, string>>;
+}
 
 /**
  * How often the product writes to you (S-36 member card, P6-G08).
@@ -26,8 +46,14 @@ import type { LinkResult } from "./link-state.ts";
  * configured. The inputs are therefore pre-filled rather than empty with
  * placeholders.
  *
- * A client component because it is one form with a submit state, the same
- * shape `LinkForm` beside it takes.
+ * A client component because it is one form with a submit state. It owns its
+ * card so the save bar can be the card's last child (docs/design/
+ * settings-page-layout.md), and tracks what changed so the bar can name it.
+ *
+ * **The summary time is disabled while the summary is off**, and the action
+ * reads the posted time, so a disabled input (which posts nothing) is backed
+ * by a hidden one carrying the same value. Turning the summary off never
+ * drops a time somebody set.
  */
 export function CadenceForm({
   action,
@@ -54,107 +80,193 @@ export function CadenceForm({
   readonly timezone: string;
 }) {
   const { t } = useTranslations();
-
   const [state, formAction, pending] = useActionState(action, null);
 
+  const fromSettings: Values = {
+    mentionImmediate: settings.mentionImmediate,
+    batch: settings.batchWindowMinutes,
+    dailySummary: settings.dailySummary,
+    time: settings.dailySummaryTime,
+    routing: settings.routing,
+  };
+  const [baseline, setBaseline] = useState<Values>(fromSettings);
+  const [current, setCurrent] = useState<Values>(fromSettings);
+  const sent = useRef<Values>(current);
+  // The server's values are the baseline whenever they change.
+  const serverKey = JSON.stringify(fromSettings);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the serialised values on purpose.
+  useEffect(() => {
+    setBaseline(fromSettings);
+  }, [serverKey]);
+
+  const change = (patch: Partial<Values>) =>
+    setCurrent((previous) => ({ ...previous, ...patch }));
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    sent.current = current;
+    startTransition(() => formAction(new FormData(event.currentTarget)));
+  };
+
+  useEffect(() => {
+    if (state?.ok) {
+      setBaseline(sent.current);
+    }
+  }, [state]);
+
+  const unsaved: string[] = [];
+  if (current.mentionImmediate !== baseline.mentionImmediate) {
+    unsaved.push(t("account.channels.cadenceForm.tellMeTheMoment"));
+  }
+  if (current.batch !== baseline.batch) {
+    unsaved.push(t("account.channels.cadenceForm.groupEverythingElseInto"));
+  }
+  if (current.dailySummary !== baseline.dailySummary) {
+    unsaved.push(t("account.channels.cadenceForm.sendMeASummary"));
+  }
+  if (current.time !== baseline.time) {
+    unsaved.push(t("account.channels.cadenceForm.at"));
+  }
+  for (const reason of reasons) {
+    if (
+      (current.routing[reason.id] ?? "") !== (baseline.routing[reason.id] ?? "")
+    ) {
+      unsaved.push(reason.label);
+    }
+  }
+
   return (
-    <form
-      action={formAction}
-      className="flex flex-col gap-4"
-      aria-busy={pending}
-    >
-      <div className="flex flex-col gap-3">
-        <label className="flex items-center gap-2.5 text-sm text-ink">
-          <input
-            type="checkbox"
-            name="mentionImmediate"
-            defaultChecked={settings.mentionImmediate}
-            className="size-4"
-          />
-          <span>
-            {t("account.channels.cadenceForm.tellMeTheMoment")}
-            <span className="ml-1.5 text-xs text-ink-3">
-              {t("account.channels.cadenceForm.everythingElseWaitsFor")}
-            </span>
-          </span>
-        </label>
-
-        <NumberInput
-          label={t("account.channels.cadenceForm.groupEverythingElseInto")}
-          name="batchWindowMinutes"
-          min={1}
-          max={1440}
-          step={1}
-          defaultValue={settings.batchWindowMinutes}
-          description={t("account.channels.cadenceForm.minutesAShorterWindow")}
-          inputClassName="w-24"
-        />
-
-        <label className="flex items-center gap-2.5 text-sm text-ink">
-          <input
-            type="checkbox"
-            name="dailySummary"
-            defaultChecked={settings.dailySummary}
-            className="size-4"
-          />
-          <span>{t("account.channels.cadenceForm.sendMeASummary")}</span>
-        </label>
-
-        <TimeInput
-          label={t("account.channels.cadenceForm.at")}
-          name="dailySummaryTime"
-          defaultValue={settings.dailySummaryTime}
-          description={t("account.channels.cadenceForm.inYourOwnTimezone", {
-            timezone,
-          })}
-        />
-      </div>
-
-      <fieldset className="flex flex-col gap-2 rounded-lg border border-line p-3">
-        <legend className="px-1 text-xs font-bold uppercase tracking-wide text-ink-3">
-          {t("account.channels.cadenceForm.whereEachKindGoes")}
-        </legend>
-        <p className="text-xs text-ink-3">
-          {t("account.channels.cadenceForm.leaveOneOnWherever")}
-        </p>
-        {reasons.map((reason) => (
-          <SelectInput
-            label={reason.label}
-            name={`routing.${reason.id}`}
-            defaultValue={settings.routing[reason.id] ?? ""}
-            className="flex-row items-center justify-between gap-2.5"
-            inputClassName="w-auto"
-            key={reason.id}
-          >
-            <option value="">
-              {t("account.channels.cadenceForm.whereverISaid")}
-            </option>
-            {channels.map((channel) => (
-              <option key={channel.id} value={channel.id}>
-                {channel.label}
-              </option>
-            ))}
-          </SelectInput>
-        ))}
-      </fieldset>
-
-      <div className="flex items-center gap-2.5">
-        <Button type="submit" variant="default" size="sm">
-          {t("common.save")}
-        </Button>
-        {state ? (
-          <p
-            role="status"
-            className={
-              state.ok
-                ? "text-xs text-ok"
-                : "rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad"
-            }
-          >
-            {state.message}
+    <Card data-testid="channels-cadence-card">
+      <CardHeader>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2 className="text-sm font-semibold text-ink">
+            {t("account.channels.howOften")}
+          </h2>
+          <p className="text-xs text-ink-3">
+            {t("account.channels.theMemberHalfOf")}
           </p>
-        ) : null}
-      </div>
-    </form>
+        </div>
+      </CardHeader>
+      <CardBody>
+        <form
+          id={FORM_ID}
+          action={formAction}
+          onSubmit={submit}
+          onReset={() => setCurrent(baseline)}
+          aria-busy={pending}
+          className="grid grid-cols-12 gap-x-6 gap-y-4"
+        >
+          <label className="col-span-12 flex items-start gap-2.5 text-sm text-ink md:col-span-6">
+            <input
+              type="checkbox"
+              name="mentionImmediate"
+              defaultChecked={settings.mentionImmediate}
+              onChange={(event) =>
+                change({ mentionImmediate: event.currentTarget.checked })
+              }
+              className="mt-0.5 size-4"
+            />
+            <span>
+              {t("account.channels.cadenceForm.tellMeTheMoment")}
+              <span className="ml-1.5 text-xs text-ink-3">
+                {t("account.channels.cadenceForm.everythingElseWaitsFor")}
+              </span>
+            </span>
+          </label>
+
+          <NumberInput
+            label={t("account.channels.cadenceForm.groupEverythingElseInto")}
+            name="batchWindowMinutes"
+            min={1}
+            max={1440}
+            step={1}
+            defaultValue={settings.batchWindowMinutes}
+            description={t(
+              "account.channels.cadenceForm.minutesAShorterWindow",
+            )}
+            className="col-span-12 md:col-span-6"
+            onValueChange={(next) => change({ batch: next })}
+          />
+
+          <label className="col-span-12 flex items-start gap-2.5 text-sm text-ink md:col-span-6">
+            <input
+              type="checkbox"
+              name="dailySummary"
+              defaultChecked={settings.dailySummary}
+              onChange={(event) =>
+                change({ dailySummary: event.currentTarget.checked })
+              }
+              className="mt-0.5 size-4"
+            />
+            <span>{t("account.channels.cadenceForm.sendMeASummary")}</span>
+          </label>
+
+          <div className="col-span-12 md:col-span-6">
+            <TimeInput
+              label={t("account.channels.cadenceForm.at")}
+              name="dailySummaryTime"
+              value={current.time}
+              disabled={!current.dailySummary}
+              onValueChange={(next) => change({ time: next ?? "" })}
+              description={t("account.channels.cadenceForm.inYourOwnTimezone", {
+                timezone,
+              })}
+            />
+            {current.dailySummary ? null : (
+              <input
+                type="hidden"
+                name="dailySummaryTime"
+                value={current.time}
+              />
+            )}
+          </div>
+
+          <div className="col-span-12 border-line border-t" />
+
+          <fieldset className="contents">
+            <legend className="col-span-12 text-sm font-semibold text-ink">
+              {t("account.channels.cadenceForm.whereEachKindGoes")}
+            </legend>
+            <p className="col-span-12 -mt-2 text-xs text-ink-3">
+              {t("account.channels.cadenceForm.leaveOneOnWherever")}
+            </p>
+            {reasons.map((reason) => (
+              <SelectInput
+                label={reason.label}
+                name={`routing.${reason.id}`}
+                defaultValue={settings.routing[reason.id] ?? ""}
+                className="col-span-12 md:col-span-6"
+                key={reason.id}
+                onChange={(event) =>
+                  change({
+                    routing: {
+                      ...current.routing,
+                      [reason.id]: event.currentTarget.value,
+                    },
+                  })
+                }
+              >
+                <option value="">
+                  {t("account.channels.cadenceForm.whereverISaid")}
+                </option>
+                {channels.map((channel) => (
+                  <option key={channel.id} value={channel.id}>
+                    {channel.label}
+                  </option>
+                ))}
+              </SelectInput>
+            ))}
+          </fieldset>
+        </form>
+      </CardBody>
+      <SettingsSaveBar
+        mode="footer"
+        formId={FORM_ID}
+        unsaved={unsaved}
+        saved={state?.ok ? state.message : null}
+        error={state && !state.ok ? state.message : null}
+        pending={pending}
+      />
+    </Card>
   );
 }

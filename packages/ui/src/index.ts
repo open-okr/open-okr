@@ -12,6 +12,7 @@ export * from "./components/bar.tsx";
 export * from "./components/button.tsx";
 export * from "./components/button-variants.ts";
 export * from "./components/card.tsx";
+export * from "./components/channel-logo.tsx";
 export * from "./components/chip.tsx";
 export * from "./components/copy-button.tsx";
 export * from "./components/kbd.tsx";
