@@ -470,7 +470,10 @@ function GroupCard({
             >
               <div className="flex min-h-5 items-start justify-between gap-2">
                 <span className="flex items-start gap-0.5">
-                  <label htmlFor={fieldId} className="text-sm font-medium text-ink-2">
+                  <label
+                    htmlFor={fieldId}
+                    className="text-sm font-medium text-ink-2"
+                  >
                     {nameOf(setting)}
                   </label>
                   <MethodHint

@@ -227,16 +227,16 @@ test("saving your profile keeps the quiet hours set here", async () => {
   // means "off", so saving anything on the profile deleted this window.
   // Your own profile form is on Your account since plan 0.8.0 Y2.
   await goTo(page, "/account");
-  const profile = page
-    .locator("form")
-    .filter({ has: page.locator('input[name="quietStart"]') });
+  // The save bar is the card's footer, outside the form, so the card is the
+  // scope (the same test id s33-people.spec.ts uses).
+  const profile = page.getByTestId("profile-card");
   await expect(profile.locator('input[name="quietStart"]')).toHaveValue(
     "22:00",
     { timeout: 10_000 },
   );
   await expect(profile.locator('input[name="quietEnd"]')).toHaveValue("07:00");
 
-  await profile.getByRole("button", { name: "Save" }).click();
+  await profile.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Profile updated.")).toBeVisible({
     timeout: 10_000,
   });

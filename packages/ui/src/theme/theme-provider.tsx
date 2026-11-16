@@ -83,6 +83,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const resolvedTheme = resolveTheme(theme, systemDark);
 
+  // The server renders the defaults, because it has no localStorage, and
+  // React keeps the server's attributes where hydration disagrees. A member
+  // whose browser holds Full width then saw the pressed state of Compact on
+  // the controls after a reload while the page itself was Full. Reading the
+  // stored values once after mount makes the state, and so the controls,
+  // match. Equal values bail out, so a browser on the defaults re-renders
+  // nothing.
+  useLayoutEffect(() => {
+    setThemeState(readStored(THEME_STORAGE_KEY, "system", THEME_VALUES));
+    setDensityState(
+      readStored(DENSITY_STORAGE_KEY, "comfortable", DENSITY_VALUES),
+    );
+    setWidthState(readStored(WIDTH_STORAGE_KEY, "compact", WIDTH_VALUES));
+  }, []);
+
   // React Strict Mode's dev-only mount→unmount→remount cycle re-runs effects
   // but never re-executes the inline <head> script, so the attributes it set
   // can be wiped on the phantom unmount. Re-applying on every mount (and

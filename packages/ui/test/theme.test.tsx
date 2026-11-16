@@ -105,13 +105,13 @@ describe("ThemeProvider: theme and density persistence end to end", () => {
   });
 
   test("choosing a density persists to localStorage and updates the DOM attribute", async () => {
-    const { getByText } = render(
+    const { getByRole } = render(
       <ThemeProvider>
         <Probe />
       </ThemeProvider>,
     );
     await act(async () => {
-      getByText("compact").click();
+      getByRole("button", { name: "compact" }).click();
     });
     expect(window.localStorage.getItem(DENSITY_STORAGE_KEY)).toBe("compact");
     expect(document.documentElement.getAttribute("data-density")).toBe(

@@ -72,7 +72,9 @@ describe("SettingsSaveBar", () => {
         .disabled,
     ).toBe(true);
     const save = screen.getByRole("button", { name: /Saving/ });
-    expect((save as HTMLButtonElement).disabled).toBe(true);
+    // Button refuses the press with aria-disabled while sending, so the
+    // focused button keeps focus (button.tsx guardPress).
+    expect(save.getAttribute("aria-disabled")).toBe("true");
     expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
   });
 

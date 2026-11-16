@@ -145,7 +145,7 @@ export function RoleMatrix({
          * choices do not fit a phone, and shrinking the cells would make the
          * words unreadable before it made the table fit. */}
         <div className="relative overflow-x-auto">
-          <table className="w-full min-w-[52rem] table-fixed border-collapse">
+          <table className="w-full min-w-[60rem] table-fixed border-collapse">
             <thead>
               <tr className="border-b border-line">
                 <th
