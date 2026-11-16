@@ -65,16 +65,16 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
-    "@biomejs/biome": "2.6.6",
+    "@biomejs/biome": "2.6.7",
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
     "@openokr/db": "workspace:*",
     "@openokr/test-support": "workspace:*",
     "@playwright/test": "1.65.0",
     "@types/pg": "catalog:",
-    "knip": "6.44.1",
+    "knip": "6.45.1",
     "pg": "catalog:",
-    "turbo": "2.11.10",
+    "turbo": "2.11.11",
     "typescript5": "catalog:",
     "vitest": "catalog:"
   }
