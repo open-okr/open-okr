@@ -307,6 +307,12 @@
           "required": false
         },
         {
+          "name": "width",
+          "field": "width",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "language",
           "field": "language",
           "type": "string",

@@ -1,7 +1,7 @@
 "use server";
 
 /**
- * A member's theme and density, stored on the member (P6-G23).
+ * A member's theme, density and content width, stored on the member (P6-G23).
  *
  * The theme provider has exposed `setTheme` and `setDensity` since P2-T10 and
  * nothing has ever called them, so both lived in `localStorage` only: a
@@ -21,6 +21,8 @@ import { requireWorkspace } from "./workspace";
 export async function setAppearance(input: {
   theme?: "light" | "dark" | "system";
   density?: "comfortable" | "compact";
+  /** Compact caps the content column at 1152 px, Full width does not. */
+  width?: "compact" | "full";
   /** Which catalogue renders for this member (P6-G22a). */
   language?: "en" | "ms";
 }): Promise<{ error: string | null }> {

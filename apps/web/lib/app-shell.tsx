@@ -446,7 +446,11 @@ export async function AppShellLayout({
          * you back to has to outlive that move.
          */}
 
-        <AppearanceSync theme={me.theme} density={me.density} />
+        <AppearanceSync
+          theme={me.theme}
+          density={me.density}
+          width={me.width}
+        />
         <AppShell
           skipToContentLabel={t("common.skipToContent")}
           sidebar={
@@ -648,7 +652,11 @@ export async function AppShellLayout({
               so it rests at the bottom of a short screen rather than under
               its last line. */}
           <div className="flex min-h-full flex-col">
-            <div className="flex-1">{children}</div>
+            {/* Compact caps the content only. The footer, sidebar and top bar stay
+                full width (docs/design/content-width.md W4). */}
+            <div data-content-width className="mx-auto w-full flex-1">
+              {children}
+            </div>
             <AppFooter
               level={level}
               instanceName={await getInstanceName()}

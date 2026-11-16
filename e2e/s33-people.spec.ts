@@ -509,6 +509,32 @@ test("a theme follows the member to another browser", async ({ browser }) => {
 });
 
 /**
+ * Content width (docs/design/content-width.md A2, A3): Full width is kept on
+ * the member and survives a reload.
+ */
+test("the content width is kept after a reload", async () => {
+  await goTo(page, "/account");
+  await page.getByTestId("width-full").first().click();
+  await expect(page.getByTestId("width-full").first()).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator("html")).toHaveAttribute("data-width", "full");
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-width", "full");
+  await expect(page.getByTestId("width-full").first()).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  // Back to the default, so every spec after this one meets the layout it
+  // expects.
+  await page.getByTestId("width-compact").first().click();
+  await expect(page.locator("html")).toHaveAttribute("data-width", "compact");
+});
+
+/**
  * The feed's live insert (S-31, P6-G11c).
  *
  * `workspaceFeedChannel` shipped at P2-T07 and nothing ever published on it,

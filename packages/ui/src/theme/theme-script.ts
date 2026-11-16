@@ -12,9 +12,11 @@
 
 export const THEME_STORAGE_KEY = "openokr:theme";
 export const DENSITY_STORAGE_KEY = "openokr:density";
+export const WIDTH_STORAGE_KEY = "openokr:width";
 
 export type ThemePreference = "light" | "dark" | "system";
 export type Density = "comfortable" | "compact";
+export type ContentWidth = "compact" | "full";
 
 export function resolveTheme(
   preference: ThemePreference,
@@ -36,8 +38,10 @@ export function themeInitScript(): string {
   return `(function(){try{
 var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)})||"system";
 var d=localStorage.getItem(${JSON.stringify(DENSITY_STORAGE_KEY)})||"comfortable";
+var w=localStorage.getItem(${JSON.stringify(WIDTH_STORAGE_KEY)})||"compact";
 var dark=t==="dark"||(t==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);
 document.documentElement.setAttribute("data-theme",dark?"dark":"light");
 document.documentElement.setAttribute("data-density",d);
+document.documentElement.setAttribute("data-width",w);
 }catch(e){}})();`;
 }

@@ -65,7 +65,7 @@ The seat limit still applies: a full workspace refuses the join and says so.
 
 ## Member
 
-Their own, not yours: theme, density, language, primary channel, quiet hours,
+Their own, not yours: theme, density, content width, language, primary channel, quiet hours,
 notification routing, whether a mention interrupts, the batch window, and the
 daily summary and its hour.
 

@@ -28,6 +28,11 @@ const THEMES = [
   { value: "system", label: "appearance.system", icon: <Monitor /> },
 ] as const;
 
+const WIDTHS = [
+  { value: "compact", label: "appearance.widthCompact" },
+  { value: "full", label: "appearance.widthFull" },
+] as const;
+
 const DENSITIES = [
   { value: "comfortable", label: "appearance.comfortable" },
   { value: "compact", label: "appearance.compact" },
@@ -68,7 +73,7 @@ export function AppearanceControl({
   readonly language?: "en" | "ms" | null;
 }) {
   const { t } = useTranslations();
-  const { theme, density, setTheme, setDensity } = useTheme();
+  const { theme, density, width, setTheme, setDensity, setWidth } = useTheme();
   const [problem, setProblem] = useState<string | null>(null);
   const [pendingLanguage, setPendingLanguage] = useState<"en" | "ms" | null>(
     language,
@@ -76,13 +81,16 @@ export function AppearanceControl({
 
   const grid = layout === "grid";
   const fieldset = grid
-    ? "col-span-12 flex flex-col gap-1.5 lg:col-span-4"
+    ? "col-span-12 flex flex-col gap-1.5 md:col-span-6 lg:col-span-3"
     : "flex flex-col gap-1";
   const legend = grid
     ? "text-sm font-semibold text-ink-2"
     : "text-xs font-semibold text-ink-3";
   const group = grid ? "flex w-full gap-1.5" : "flex gap-1.5";
-  const grow = grid ? "flex-1 justify-center" : "";
+  const grow = grid
+    ? "h-7.5 flex-1 inline-flex items-center justify-center"
+    : "";
+  const pad = grid ? "px-2" : "px-2 py-1";
 
   const remember = (input: Parameters<typeof setAppearance>[0]) => {
     void setAppearance(input).then((result) => setProblem(result.error));
@@ -114,8 +122,8 @@ export function AppearanceControl({
                 }}
                 className={
                   theme === option.value
-                    ? `flex h-8 items-center justify-center rounded-md border border-brand-600 bg-brand text-on-brand [&>svg]:size-4 ${grid ? "flex-1" : "w-8"}`
-                    : `flex h-8 items-center justify-center rounded-md border border-line text-ink-2 hover:border-ink-4 [&>svg]:size-4 ${grid ? "flex-1" : "w-8"}`
+                    ? `flex items-center justify-center rounded-md border border-brand-600 bg-brand text-on-brand [&>svg]:size-4 ${grid ? "h-7.5 flex-1" : "h-8 w-8"}`
+                    : `flex items-center justify-center rounded-md border border-line text-ink-2 hover:border-ink-4 [&>svg]:size-4 ${grid ? "h-7.5 flex-1" : "h-8 w-8"}`
                 }
               >
                 {option.icon}
@@ -152,8 +160,8 @@ export function AppearanceControl({
                 }}
                 className={
                   pendingLanguage === option.value
-                    ? `rounded-md border border-brand-600 bg-brand px-2 py-1 text-xs font-semibold text-on-brand ${grow}`
-                    : `rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 hover:border-ink-4 ${grow}`
+                    ? `rounded-md border border-brand-600 bg-brand ${pad} text-xs font-semibold text-on-brand ${grow}`
+                    : `rounded-md border border-line ${pad} text-xs font-semibold text-ink-2 hover:border-ink-4 ${grow}`
                 }
               >
                 {t(option.label)}
@@ -183,8 +191,33 @@ export function AppearanceControl({
               }}
               className={
                 density === option.value
-                  ? `rounded-md border border-brand-600 bg-brand px-2 py-1 text-xs font-semibold text-on-brand ${grow}`
-                  : `rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 hover:border-ink-4 ${grow}`
+                  ? `rounded-md border border-brand-600 bg-brand ${pad} text-xs font-semibold text-on-brand ${grow}`
+                  : `rounded-md border border-line ${pad} text-xs font-semibold text-ink-2 hover:border-ink-4 ${grow}`
+              }
+            >
+              {t(option.label)}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className={fieldset}>
+        <legend className={legend}>{t("appearance.width")}</legend>
+        <div className={group}>
+          {WIDTHS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              data-testid={`width-${option.value}`}
+              aria-pressed={width === option.value}
+              onClick={() => {
+                setWidth(option.value);
+                remember({ width: option.value });
+              }}
+              className={
+                width === option.value
+                  ? `rounded-md border border-brand-600 bg-brand ${pad} text-xs font-semibold text-on-brand ${grow}`
+                  : `rounded-md border border-line ${pad} text-xs font-semibold text-ink-2 hover:border-ink-4 ${grow}`
               }
             >
               {t(option.label)}
@@ -221,11 +254,13 @@ export function AppearanceControl({
 export function AppearanceSync({
   theme: stored,
   density: storedDensity,
+  width: storedWidth,
 }: {
   readonly theme: "light" | "dark" | "system" | null;
   readonly density: "comfortable" | "compact" | null;
+  readonly width: "compact" | "full" | null;
 }) {
-  const { theme, density, setTheme, setDensity } = useTheme();
+  const { theme, density, width, setTheme, setDensity, setWidth } = useTheme();
   const applied = useRef(false);
 
   useEffect(() => {
@@ -239,7 +274,20 @@ export function AppearanceSync({
     if (storedDensity && storedDensity !== density) {
       setDensity(storedDensity);
     }
-  }, [stored, storedDensity, theme, density, setTheme, setDensity]);
+    if (storedWidth && storedWidth !== width) {
+      setWidth(storedWidth);
+    }
+  }, [
+    stored,
+    storedDensity,
+    storedWidth,
+    theme,
+    density,
+    width,
+    setTheme,
+    setDensity,
+    setWidth,
+  ]);
 
   return null;
 }

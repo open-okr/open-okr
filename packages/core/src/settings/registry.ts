@@ -598,6 +598,17 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     schema: z.enum(["comfortable", "compact"]).nullable(),
   },
   {
+    key: "width",
+    scope: "member",
+    home: "workspace_members",
+    why:
+      "Null, which the shell reads as compact: the main content is capped at " +
+      "1152 px and centred, so a wide screen gets a readable column without " +
+      "anybody choosing it (docs/design/content-width.md).",
+    resolve: () => null,
+    schema: z.enum(["compact", "full"]).nullable(),
+  },
+  {
     key: "primaryChannel",
     scope: "member",
     home: "workspace_members",

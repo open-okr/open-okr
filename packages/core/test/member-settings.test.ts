@@ -118,6 +118,7 @@ describe("the member scope of the settings registry", () => {
       "primaryChannel",
       "quietHours",
       "theme",
+      "width",
     ]);
   });
 

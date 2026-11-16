@@ -21,21 +21,25 @@ import {
   useState,
 } from "react";
 import {
+  type ContentWidth,
   DENSITY_STORAGE_KEY,
   type Density,
   resolveTheme,
   THEME_STORAGE_KEY,
   type ThemePreference,
+  WIDTH_STORAGE_KEY,
 } from "./theme-script.ts";
 
-export type { Density, ThemePreference };
+export type { ContentWidth, Density, ThemePreference };
 
 interface ThemeContextValue {
   readonly theme: ThemePreference;
   readonly resolvedTheme: "light" | "dark";
   readonly density: Density;
+  readonly width: ContentWidth;
   setTheme(theme: ThemePreference): void;
   setDensity(density: Density): void;
+  setWidth(width: ContentWidth): void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -63,6 +67,7 @@ function readStored<T extends string>(
 
 const THEME_VALUES: readonly ThemePreference[] = ["light", "dark", "system"];
 const DENSITY_VALUES: readonly Density[] = ["comfortable", "compact"];
+const WIDTH_VALUES: readonly ContentWidth[] = ["compact", "full"];
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemePreference>(() =>
@@ -70,6 +75,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
   const [density, setDensityState] = useState<Density>(() =>
     readStored(DENSITY_STORAGE_KEY, "comfortable", DENSITY_VALUES),
+  );
+  const [width, setWidthState] = useState<ContentWidth>(() =>
+    readStored(WIDTH_STORAGE_KEY, "compact", WIDTH_VALUES),
   );
   const [systemDark, setSystemDark] = useState(systemPrefersDark);
 
@@ -87,6 +95,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     document.documentElement.setAttribute("data-density", density);
   }, [density]);
+
+  useLayoutEffect(() => {
+    document.documentElement.setAttribute("data-width", width);
+  }, [width]);
 
   useLayoutEffect(() => {
     if (theme !== "system") {
@@ -108,9 +120,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(DENSITY_STORAGE_KEY, next);
   }, []);
 
+  const setWidth = useCallback((next: ContentWidth) => {
+    setWidthState(next);
+    window.localStorage.setItem(WIDTH_STORAGE_KEY, next);
+  }, []);
+
   const value = useMemo<ThemeContextValue>(
-    () => ({ theme, resolvedTheme, density, setTheme, setDensity }),
-    [theme, resolvedTheme, density, setTheme, setDensity],
+    () => ({
+      theme,
+      resolvedTheme,
+      density,
+      width,
+      setTheme,
+      setDensity,
+      setWidth,
+    }),
+    [theme, resolvedTheme, density, width, setTheme, setDensity, setWidth],
   );
 
   return (

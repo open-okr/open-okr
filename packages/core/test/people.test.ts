@@ -749,6 +749,41 @@ describe("a member's theme and density (P6-G23)", () => {
   });
 });
 
+describe("a member's content width (docs/design/content-width.md)", () => {
+  it("is null until chosen, then kept on the member", async () => {
+    const wb = await workerDb();
+    const before = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    expect(before.width).toBeNull();
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { width: "full" },
+    );
+    const after = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    expect(after.width).toBe("full");
+  });
+
+  it("refuses a width the shell has no rule for (A6)", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(OWNER) },
+        "people.updateOwnProfile",
+        { width: "wide" } as never,
+      ),
+    ).rejects.toThrow();
+  });
+});
+
 /**
  * A member's own language (UIUX-PLAN §8, P6-G22a).
  *
