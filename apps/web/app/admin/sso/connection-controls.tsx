@@ -224,7 +224,7 @@ export function ConnectionControls({
       ) : null}
 
       {mode === "editing" ? (
-        <div className="border-t border-line pt-3">
+        <div className="border-t border-line">
           <SSOForm
             connection={connection}
             verifiedDomains={verifiedDomains}

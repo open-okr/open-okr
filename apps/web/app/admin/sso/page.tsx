@@ -61,16 +61,22 @@ export default async function SSOPage() {
   const baseUrl = loadEnv().BETTER_AUTH_URL;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.sso.singleSignOn")}
+        </h1>
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("admin.sso.connectAnIdentityProvider")}
+        </p>
+      </header>
+
       <Card>
-        <CardHeader>
-          <h2 className="text-base font-semibold text-ink">
-            {t("admin.sso.singleSignOn")}
+        <CardHeader className="flex-col items-stretch gap-0.5">
+          <h2 className="text-sm font-semibold text-ink">
+            {t("admin.sso.connections")}
           </h2>
-          <p className="text-sm text-ink-3">
-            {t("admin.sso.connectAnIdentityProvider")}
-          </p>
-          <p className="text-sm text-ink-3">
+          <p className="text-xs text-ink-3">
             {t("admin.sso.aChangeTakesEffect")}
           </p>
         </CardHeader>
@@ -80,7 +86,14 @@ export default async function SSOPage() {
               {t("admin.sso.noSsoProvidersConfigured")}
             </p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+              tabIndex={0}
+              aria-label={t("admin.sso.connectionsList")}
+              // Scrolls inside the card after about five rows, so a long list
+              // never pushes the add card out of reach.
+              className="relative flex max-h-[296px] flex-col gap-2 overflow-y-auto overscroll-contain"
+            >
               {connections.map((c) => {
                 const urls = samlServiceProviderUrls(baseUrl, c.signInId);
                 return (
@@ -179,17 +192,15 @@ export default async function SSOPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <h2 className="text-base font-semibold text-ink">
+        <CardHeader className="flex-col items-stretch gap-0.5">
+          <h2 className="text-sm font-semibold text-ink">
             {t("admin.sso.addProvider")}
           </h2>
-          <p className="text-sm text-ink-3">
+          <p className="text-xs text-ink-3">
             {t("admin.sso.aNewConnectionTakesEffect")}
           </p>
         </CardHeader>
-        <CardBody>
-          <SSOForm verifiedDomains={verifiedDomains} />
-        </CardBody>
+        <SSOForm verifiedDomains={verifiedDomains} />
       </Card>
     </div>
   );
