@@ -92,7 +92,7 @@ Branding and General are done. The rest wait for their own change, one page at a
 | admin/rhythm | One sticky bar for the page | Pending |
 | admin/nudges | One sticky bar for the page | Pending |
 | admin/connections | One card, sticky bar (per the prototype). The S-37 spec describes a list with End controls, so check before changing | Pending |
-| admin/audit | List or tool | Pending |
+| admin/audit | List or tool: three cards (Check the chain, Browse and export, the rows with a sticky header scrolling at 420 px) | Done (2026-11-16) |
 | admin/deleted | List or tool | Pending |
 | admin/invitations | List or tool | Pending |
 | admin/imports | List or tool | Pending |

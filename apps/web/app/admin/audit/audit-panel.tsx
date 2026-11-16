@@ -2,6 +2,9 @@
 
 import {
   Button,
+  Card,
+  CardBody,
+  CardHeader,
   DateRangeInput,
   EntityPicker,
   useTranslations,
@@ -214,81 +217,89 @@ export function AuditPanel({
     }
   };
 
+  const cardHeader = "flex-col items-stretch gap-0.5";
+  const footer =
+    "flex flex-wrap items-center justify-between gap-3 border-t border-line px-3.5 py-2.5";
+
   return (
-    <div className="flex flex-col gap-6">
-      <section className="flex flex-col items-start gap-3">
-        <h3 className="text-sm font-bold text-ink">
-          {t("admin.audit.checkTheChain")}
-        </h3>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          pending={checking}
-          onClick={check}
-        >
-          {checking ? t("admin.audit.checking") : t("admin.audit.verify")}
-        </Button>
-
-        {verdict ? (
-          <p
-            role="status"
-            data-testid="chain-verdict"
-            className={
-              verdict.ok && !verdict.error
-                ? "rounded-md bg-ok-bg px-2.5 py-1.5 text-sm font-medium text-ok"
-                : "rounded-md bg-red-50 px-2.5 py-1.5 text-sm font-medium text-red-700"
-            }
+    <>
+      <Card>
+        <CardHeader className="items-center justify-between gap-3">
+          <h2 className="font-semibold text-ink text-sm">
+            {t("admin.audit.checkTheChain")}
+          </h2>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            pending={checking}
+            onClick={check}
           >
-            {verdict.error
-              ? verdict.error
-              : verdict.ok
-                ? t("admin.audit.chainIntact", {
-                    rows: rowsPhrase(verdict.checked),
-                    pending: verdict.pending,
-                  })
-                : verdict.brokenAtSeq === null
-                  ? t("admin.audit.chainBrokenUnknown", {
-                      reason: verdict.reason ?? "",
+            {checking ? t("admin.audit.checking") : t("admin.audit.verify")}
+          </Button>
+        </CardHeader>
+        {verdict ? (
+          <CardBody>
+            <p
+              role="status"
+              data-testid="chain-verdict"
+              className={
+                verdict.ok && !verdict.error
+                  ? "rounded-md bg-ok-bg px-2.5 py-1.5 text-sm font-medium text-ok"
+                  : "rounded-md bg-red-50 px-2.5 py-1.5 text-sm font-medium text-red-700"
+              }
+            >
+              {verdict.error
+                ? verdict.error
+                : verdict.ok
+                  ? t("admin.audit.chainIntact", {
+                      rows: rowsPhrase(verdict.checked),
+                      pending: verdict.pending,
                     })
-                  : t("admin.audit.chainBroken", {
-                      position: verdict.brokenAtSeq,
-                      reason: verdict.reason ?? "",
-                    })}
-          </p>
-        ) : null}
-      </section>
-
-      <section className="flex flex-col gap-3 border-t border-line pt-4">
-        <h3 className="text-sm font-bold text-ink">
-          {t("admin.audit.browseAndExport")}
-        </h3>
-        <p className="max-w-prose text-sm text-ink-3">
-          {t("admin.audit.browseIntro")}
-        </p>
-        <p className="max-w-prose text-sm text-ink-3">
-          {t("admin.audit.exportIntro")}
-        </p>
-
-        <form onSubmit={show} className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <DateRangeInput
-              startLabel={t("admin.audit.from")}
-              endLabel={t("admin.audit.to")}
-              startName="from"
-              endName="to"
-              startId="audit-from"
-              endId="audit-to"
-            />
-            {/* The server reads the two days in this zone, which is the one
-                the rows below are stamped in. */}
-            <p className="text-xs text-ink-3">
-              {t("admin.audit.daysIn", { zone: timeZone })}
+                  : verdict.brokenAtSeq === null
+                    ? t("admin.audit.chainBrokenUnknown", {
+                        reason: verdict.reason ?? "",
+                      })
+                    : t("admin.audit.chainBroken", {
+                        position: verdict.brokenAtSeq,
+                        reason: verdict.reason ?? "",
+                      })}
             </p>
-          </div>
+          </CardBody>
+        ) : null}
+      </Card>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <Card>
+        <CardHeader className={cardHeader}>
+          <h2 className="font-semibold text-ink text-sm">
+            {t("admin.audit.browseAndExport")}
+          </h2>
+          <p className="text-ink-3 text-xs">
+            {t("admin.audit.browseIntro")} {t("admin.audit.exportIntro")}
+          </p>
+        </CardHeader>
+        <form onSubmit={show}>
+          <CardBody className="grid grid-cols-12 gap-x-6 gap-y-4">
+            <div className="col-span-12 flex flex-col gap-1">
+              <DateRangeInput
+                startLabel={t("admin.audit.from")}
+                endLabel={t("admin.audit.to")}
+                startName="from"
+                endName="to"
+                startId="audit-from"
+                endId="audit-to"
+                className="[&>span]:grid [&>span]:grid-cols-1 [&>span]:gap-x-6 [&>span]:gap-y-4 md:[&>span]:grid-cols-2"
+                inputClassName="w-full"
+              />
+              {/* The server reads the two days in this zone, which is the one
+                  the rows below are stamped in. */}
+              <p className="text-xs text-ink-3">
+                {t("admin.audit.daysIn", { zone: timeZone })}
+              </p>
+            </div>
+
             <EntityPicker
+              className="col-span-12 lg:col-span-4"
               id="audit-action"
               label={t("admin.audit.action")}
               name="action"
@@ -297,6 +308,7 @@ export function AuditPanel({
               noneLabel={t("admin.audit.anyAction")}
             />
             <EntityPicker
+              className="col-span-12 lg:col-span-4"
               id="audit-actor"
               label={t("admin.audit.actor")}
               name="actorMemberId"
@@ -310,6 +322,7 @@ export function AuditPanel({
               noneLabel={t("admin.audit.anyone")}
             />
             <EntityPicker
+              className="col-span-12 lg:col-span-4"
               id="audit-target-type"
               label={t("admin.audit.targetType")}
               name="targetType"
@@ -317,61 +330,64 @@ export function AuditPanel({
               options={nameOptions(names.targetTypes)}
               noneLabel={t("admin.audit.anyTargetType")}
             />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              disabled={log.busy !== null}
-              pending={log.busy === "replace"}
-            >
-              {t("admin.audit.show")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              pending={exporting}
-              onClick={(event) => {
-                const form = event.currentTarget.form;
-                if (form) {
-                  void download(form);
-                }
-              }}
-            >
-              {exporting
-                ? t("admin.audit.building")
-                : t("admin.audit.exportAsCsv")}
-            </Button>
-            {note ? (
-              <p
-                role="status"
-                data-testid="export-note"
-                className="text-sm text-ink-3"
+          </CardBody>
+          <div className={footer}>
+            <div className="flex flex-col gap-1">
+              {note ? (
+                <p
+                  role="status"
+                  data-testid="export-note"
+                  className="text-sm text-ink-3"
+                >
+                  {note}
+                </p>
+              ) : null}
+              {error ? (
+                <p role="alert" className="text-sm text-red-600">
+                  {error}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Button
+                type="button"
+                size="sm"
+                pending={exporting}
+                onClick={(event) => {
+                  const form = event.currentTarget.form;
+                  if (form) {
+                    void download(form);
+                  }
+                }}
               >
-                {note}
-              </p>
-            ) : null}
-            {error ? (
-              <p role="alert" className="text-sm text-red-600">
-                {error}
-              </p>
-            ) : null}
+                {exporting
+                  ? t("admin.audit.building")
+                  : t("admin.audit.exportAsCsv")}
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={log.busy !== null}
+                pending={log.busy === "replace"}
+              >
+                {t("admin.audit.show")}
+              </Button>
+            </div>
           </div>
         </form>
+      </Card>
 
-        <AuditLog
-          state={log}
-          members={members}
-          timeZone={timeZone}
-          filtered={Object.keys(applied).length > 0}
-          onOlder={() => void load(applied, "append")}
-          onRetry={() =>
-            void load(lastLoad.current.filter, lastLoad.current.mode)
-          }
-        />
-      </section>
-    </div>
+      <AuditLog
+        state={log}
+        members={members}
+        timeZone={timeZone}
+        filtered={Object.keys(applied).length > 0}
+        onOlder={() => void load(applied, "append")}
+        onRetry={() =>
+          void load(lastLoad.current.filter, lastLoad.current.mode)
+        }
+      />
+    </>
   );
 }

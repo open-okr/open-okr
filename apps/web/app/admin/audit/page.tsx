@@ -40,18 +40,20 @@ export default async function AuditPage() {
   // whichever layout happens to wrap it.
   if (level < ACCESS_LEVELS.full) {
     return (
-      <Card>
-        <CardHeader>
-          <h1 className="text-base font-semibold text-ink">
+      <div className="flex flex-col gap-4">
+        <header className="flex flex-col gap-1">
+          <h1 className="font-bold text-ink text-lg">
             {t("admin.audit.title")}
           </h1>
-        </CardHeader>
-        <CardBody>
-          <p className="text-sm text-ink-3" data-testid="audit-log-denied">
-            {t("admin.audit.log.denied")}
-          </p>
-        </CardBody>
-      </Card>
+        </header>
+        <Card>
+          <CardBody>
+            <p className="text-sm text-ink-3" data-testid="audit-log-denied">
+              {t("admin.audit.log.denied")}
+            </p>
+          </CardBody>
+        </Card>
+      </div>
     );
   }
 
@@ -77,27 +79,24 @@ export default async function AuditPage() {
   const timeZone = String(settings.settings.timezone ?? "UTC");
 
   return (
-    <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <h1 className="text-base font-semibold text-ink">
-            {t("admin.audit.title")}
-          </h1>
-          <p className="text-sm text-ink-3">{t("admin.audit.intro")}</p>
-        </CardHeader>
-        <CardBody>
-          <AuditPanel
-            members={members}
-            names={names}
-            timeZone={timeZone}
-            initial={first}
-          />
-        </CardBody>
-      </Card>
+    <div className="flex flex-col gap-4">
+      <header className="flex flex-col gap-1">
+        <h1 className="font-bold text-ink text-lg">{t("admin.audit.title")}</h1>
+        <p className="max-w-prose text-ink-3 text-sm">
+          {t("admin.audit.intro")}
+        </p>
+      </header>
+
+      <AuditPanel
+        members={members}
+        names={names}
+        timeZone={timeZone}
+        initial={first}
+      />
 
       <Card>
-        <CardHeader>
-          <h2 className="text-base font-semibold text-ink">
+        <CardHeader className="flex-col items-stretch gap-0.5">
+          <h2 className="font-semibold text-ink text-sm">
             {t("admin.audit.whatVerificationProves")}
           </h2>
         </CardHeader>

@@ -92,7 +92,7 @@ describe("a page of rows", () => {
       '<caption class="sr-only">The audit trail, newest first</caption>',
     );
     for (const header of ["When (UTC)", "Who", "Action", "Target", "Chain"]) {
-      expect(html).toContain(`<th scope="col" class="py-1`);
+      expect(html).toContain(`<th scope="col" class="sticky top-0 z-10 bg-surface py-1`);
       expect(html).toContain(`>${header}</th>`);
     }
     expect(html.match(/<th scope="col"/g)).toHaveLength(5);
