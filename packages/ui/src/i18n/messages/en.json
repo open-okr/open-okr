@@ -791,6 +791,7 @@
   "admin.directory.configureThisUrl": "Configure this URL in your identity provider's SCIM settings. The provider sends a bearer token with every request.",
   "admin.directory.directoryForm.copied": "Copied",
   "admin.directory.directoryForm.copy": "Copy",
+  "admin.directory.directoryForm.copyEndpoint": "Copy SCIM endpoint",
   "admin.directory.directoryForm.copyThisTokenNow": "Copy this token now. It will not be shown again.",
   "admin.directory.directoryForm.failedToGenerate": "Failed to generate token ({status})",
   "admin.directory.directoryForm.generateScimToken": "Generate SCIM token",

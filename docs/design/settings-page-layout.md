@@ -96,7 +96,7 @@ Branding and General are done. The rest wait for their own change, one page at a
 | admin/deleted | List or tool | Pending |
 | admin/invitations | List or tool | Pending |
 | admin/imports | List or tool | Pending |
-| admin/directory | List or tool | Pending |
+| admin/directory | Instant action (Generate SCIM token in the card footer); the endpoint is a `CopyField` | Done (2026-11-16) |
 | admin/agents | Proposed: footer per card, instant actions for run controls | Pending |
 | admin/ai | Proposed: footer per card | Pending |
 | admin/backups | Proposed: instant actions | Pending |

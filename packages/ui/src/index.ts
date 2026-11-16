@@ -26,6 +26,7 @@ export * from "./fields/code-input.tsx";
 export * from "./fields/colour-input.tsx";
 export * from "./fields/confidence-format.ts";
 export * from "./fields/confidence-input.tsx";
+export * from "./fields/copy-field.tsx";
 export * from "./fields/date-format.ts";
 export * from "./fields/date-input.tsx";
 export * from "./fields/date-range-input.tsx";

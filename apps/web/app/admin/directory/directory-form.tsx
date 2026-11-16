@@ -1,7 +1,7 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
-import { useState } from "react";
+import { Button, CardBody, CopyField, useTranslations } from "@openokr/ui";
+import { useEffect, useState } from "react";
 
 /**
  * SCIM token generation form (P8-T08).
@@ -9,8 +9,18 @@ import { useState } from "react";
  * Generates a bearer token, shows it once, and never again. The identity
  * provider copies it into its SCIM configuration.
  */
-export function DirectoryTokenForm() {
+export function DirectoryTokenForm({
+  scimPath,
+}: {
+  readonly scimPath: string;
+}) {
   const { t } = useTranslations();
+  // The origin is only known in the browser, so the server render shows the
+  // path and the full URL replaces it once mounted.
+  const [endpoint, setEndpoint] = useState(scimPath);
+  useEffect(() => {
+    setEndpoint(`${window.location.origin}${scimPath}`);
+  }, [scimPath]);
   const [pending, setPending] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -61,34 +71,61 @@ export function DirectoryTokenForm() {
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      {token ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-medium text-amber-800">
-            {t("admin.directory.directoryForm.copyThisTokenNow")}
-          </p>
-          <div className="mt-2 flex items-center gap-2">
-            <code
-              data-testid="scim-token"
-              className="flex-1 rounded bg-white px-3 py-2 font-mono text-xs text-ink break-all"
-            >
-              {token}
-            </code>
-            <Button type="button" variant="default" onClick={copyToClipboard}>
-              {copied
-                ? t("admin.directory.directoryForm.copied")
-                : t("admin.directory.directoryForm.copy")}
-            </Button>
-          </div>
-          <p className="mt-2 text-xs text-amber-700">
-            {t("admin.directory.directoryForm.previousTokenRevoked")}
-          </p>
+    <>
+      <CardBody>
+        <div className="grid grid-cols-12 gap-x-6 gap-y-4">
+          <CopyField
+            className="col-span-12"
+            label={t("admin.directory.scimEndpoint")}
+            copyLabel={t("admin.directory.directoryForm.copyEndpoint")}
+            value={endpoint}
+          />
+
+          {token ? (
+            <div className="col-span-12 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-medium text-amber-800">
+                {t("admin.directory.directoryForm.copyThisTokenNow")}
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <code
+                  data-testid="scim-token"
+                  className="flex-1 rounded bg-white px-3 py-2 font-mono text-xs text-ink break-all"
+                >
+                  {token}
+                </code>
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={copyToClipboard}
+                >
+                  {copied
+                    ? t("admin.directory.directoryForm.copied")
+                    : t("admin.directory.directoryForm.copy")}
+                </Button>
+              </div>
+              <p className="mt-2 text-xs text-amber-700">
+                {t("admin.directory.directoryForm.previousTokenRevoked")}
+              </p>
+            </div>
+          ) : null}
+
+          {error && (
+            <p className="col-span-12 text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          )}
         </div>
-      ) : (
-        <div className="flex items-center gap-3">
+      </CardBody>
+
+      {token ? null : (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-3.5 py-2.5">
+          <p className="text-sm text-ink-3">
+            {t("admin.directory.directoryForm.replacesExistingToken")}
+          </p>
           <Button
             type="button"
             variant="primary"
+            size="sm"
             pending={pending}
             onClick={generate}
           >
@@ -96,17 +133,8 @@ export function DirectoryTokenForm() {
               ? t("admin.directory.directoryForm.generating")
               : t("admin.directory.directoryForm.generateScimToken")}
           </Button>
-          <p className="text-xs text-ink-3">
-            {t("admin.directory.directoryForm.replacesExistingToken")}
-          </p>
         </div>
       )}
-
-      {error && (
-        <p className="text-sm text-red-600" role="alert">
-          {error}
-        </p>
-      )}
-    </div>
+    </>
   );
 }

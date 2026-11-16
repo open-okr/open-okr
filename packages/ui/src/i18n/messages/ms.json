@@ -791,6 +791,7 @@
   "admin.directory.configureThisUrl": "Konfigurasikan URL ini dalam tetapan SCIM penyedia identiti anda. Penyedia menghantar token pembawa bersama setiap permintaan.",
   "admin.directory.directoryForm.copied": "Disalin",
   "admin.directory.directoryForm.copy": "Salin",
+  "admin.directory.directoryForm.copyEndpoint": "Salin titik akhir SCIM",
   "admin.directory.directoryForm.copyThisTokenNow": "Salin token ini sekarang. Ia tidak akan ditunjukkan lagi.",
   "admin.directory.directoryForm.failedToGenerate": "Gagal menjana token ({status})",
   "admin.directory.directoryForm.generateScimToken": "Jana token SCIM",
