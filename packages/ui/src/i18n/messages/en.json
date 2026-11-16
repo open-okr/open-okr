@@ -1197,6 +1197,8 @@
   "admin.roles.namePlaceholder": "What is this role called?",
   "admin.roles.noRole": "No role",
   "admin.roles.ownerIsFixed": "Owner cannot be changed. A workspace that can lower its own last administrator cannot be repaired.",
+  "admin.roles.permissions": "Permissions",
+  "admin.roles.permissionsHint": "One row per role and one choice per domain. Every change applies at once.",
   "admin.roles.role": "Role",
   "admin.roles.roleFor": "Role for {name}",
   "admin.roles.rowActions": "What can be done to this role",

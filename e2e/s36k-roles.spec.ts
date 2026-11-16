@@ -204,7 +204,7 @@ test("a role is added, held, refused removal, then removed", async () => {
   await page.getByRole("button", { name: "Add role" }).click();
   const name = page.getByRole("textbox", { name: "Add role" });
   await name.fill(ADDED_ROLE);
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Add role" }).click();
   await expect(page.getByRole("rowheader", { name: added })).toBeVisible({
     timeout: 15_000,
   });

@@ -1197,6 +1197,8 @@
   "admin.roles.namePlaceholder": "Apa nama peranan ini?",
   "admin.roles.noRole": "Tiada peranan",
   "admin.roles.ownerIsFixed": "Pemilik tidak boleh diubah. Ruang kerja yang boleh menurunkan pentadbir terakhirnya sendiri tidak dapat dipulihkan.",
+  "admin.roles.permissions": "Kebenaran",
+  "admin.roles.permissionsHint": "Satu baris bagi setiap peranan dan satu pilihan bagi setiap domain. Setiap perubahan berkuat kuasa serta-merta.",
   "admin.roles.role": "Peranan",
   "admin.roles.roleFor": "Peranan untuk {name}",
   "admin.roles.rowActions": "Apa yang boleh dilakukan pada peranan ini",
