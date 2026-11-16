@@ -6,11 +6,12 @@ import {
   type SettingSource,
   setRegistrationPolicy,
 } from "@openokr/core";
-import { Button, Card, CardBody, CardHeader } from "@openokr/ui";
+import { CardHeader } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { requireAccessLevel } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
+import { SettingsFormCard } from "../../../lib/settings-form-card";
 import { getTranslations } from "../../../lib/translations";
 
 /**
@@ -81,59 +82,58 @@ export async function RegistrationCard({
   const { t } = await getTranslations();
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <h2 className="text-sm font-bold text-ink">
-            {t("admin.general.registration.title")}
-          </h2>
-          <p className="text-xs text-ink-3">
-            {t("admin.general.registration.lead")}
-          </p>
-        </div>
-      </CardHeader>
-      <CardBody>
-        <form action={save} className="flex flex-col gap-3">
-          <fieldset
-            aria-label={t("admin.general.registration.title")}
-            className="flex flex-col gap-2.5"
-          >
-            {CHOICES.map((choice) => (
-              <label
-                key={choice.value}
-                className="flex cursor-pointer items-start gap-2.5 rounded-control border border-line px-3 py-2.5 has-[:checked]:border-brand-line has-[:checked]:bg-brand-weak/40 hover:border-line-2"
-              >
-                <input
-                  type="radio"
-                  name="registrationPolicy"
-                  value={choice.value}
-                  defaultChecked={choice.value === policy}
-                  data-testid={`registration-${choice.value}`}
-                  className="mt-0.5 size-4 flex-none accent-brand"
-                />
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="text-sm font-semibold text-ink">
-                    {t(choice.title)}
-                  </span>
-                  <span className="text-xs text-ink-3">{t(choice.hint)}</span>
-                </span>
-              </label>
-            ))}
-          </fieldset>
-          <p className="text-xs text-ink-3" data-testid="registration-source">
-            {source === "database"
-              ? t("admin.general.registration.fromHere")
-              : source === "environment"
-                ? t("admin.general.registration.fromVariable")
-                : t("admin.general.registration.fromDefault")}
-          </p>
-          <div className="flex flex-wrap items-center gap-2.5 border-t border-line pt-3">
-            <Button type="submit" variant="primary" size="sm">
-              {t("common.save")}
-            </Button>
+    <SettingsFormCard
+      formId="registration-form"
+      testId="registration-card"
+      unsavedLabel={t("admin.general.registration.title")}
+      action={save}
+      header={
+        <CardHeader>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-sm font-semibold text-ink">
+              {t("admin.general.registration.title")}
+            </h2>
+            <p className="text-xs text-ink-3">
+              {t("admin.general.registration.lead")}
+            </p>
           </div>
-        </form>
-      </CardBody>
-    </Card>
+        </CardHeader>
+      }
+    >
+      <fieldset className="contents">
+        <legend className="sr-only">
+          {t("admin.general.registration.title")}
+        </legend>
+        {CHOICES.map((choice) => (
+          <label
+            key={choice.value}
+            className="col-span-12 flex cursor-pointer items-start gap-2.5 rounded-control border border-line p-3 text-sm text-ink hover:border-line-2 has-[:checked]:border-brand-line has-[:checked]:bg-brand-weak md:col-span-4"
+          >
+            <input
+              type="radio"
+              name="registrationPolicy"
+              value={choice.value}
+              defaultChecked={choice.value === policy}
+              data-testid={`registration-${choice.value}`}
+              className="mt-0.5 size-4 flex-none accent-brand"
+            />
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="font-semibold text-ink">{t(choice.title)}</span>
+              <span className="text-xs text-ink-3">{t(choice.hint)}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      <p
+        className="col-span-12 text-xs text-ink-3"
+        data-testid="registration-source"
+      >
+        {source === "database"
+          ? t("admin.general.registration.fromHere")
+          : source === "environment"
+            ? t("admin.general.registration.fromVariable")
+            : t("admin.general.registration.fromDefault")}
+      </p>
+    </SettingsFormCard>
   );
 }

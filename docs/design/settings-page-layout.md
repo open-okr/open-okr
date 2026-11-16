@@ -79,12 +79,12 @@ Sections inside one grid row are separated below `lg` by `border-t border-line p
 
 ## Rollout
 
-Branding is the only page changed by the first change. General is next. The rest wait for their own change, one page at a time. "Proposed" marks a model the prototype does not name.
+Branding and General are done. The rest wait for their own change, one page at a time. "Proposed" marks a model the prototype does not name.
 
 | Page | Save model | Status |
 |---|---|---|
 | admin/branding | One card, sticky bar | Done (2026-11-16) |
-| admin/general | Footer per card, instant actions for state and close | Next |
+| admin/general | Footer per card, instant actions for state and close | Done (2026-11-16) |
 | admin/channels | Footer per card | Pending |
 | admin/sso | Footer per card | Pending |
 | admin/practice | One sticky bar for the page | Pending |

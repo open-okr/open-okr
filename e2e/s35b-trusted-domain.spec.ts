@@ -124,9 +124,8 @@ test("the owner trusts a domain on the general card, which says what that does",
 
   await page.getByLabel(DOMAIN_FIELD).fill(DOMAIN);
   await page
-    .locator("form")
-    .filter({ has: page.getByLabel(DOMAIN_FIELD) })
-    .getByRole("button", { name: "Save", exact: true })
+    .getByTestId("general-defaults-card")
+    .getByRole("button", { name: "Save changes", exact: true })
     .click();
 
   await expect

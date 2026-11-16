@@ -137,11 +137,23 @@ export default async function GeneralSettingsPage() {
     />
   );
 
+  const instanceCards =
+    instanceName || registration || emailConfirmation || updateCheck;
+  const groupHeading =
+    "text-xs font-semibold uppercase tracking-wide text-ink-4";
+  const chip =
+    "rounded-full bg-raised px-2 text-xs font-semibold normal-case tracking-normal text-ink-3";
+
   return (
-    <div className="flex flex-col gap-4.5">
-      <h1 className="text-lg font-bold text-ink">
-        {t("admin.general.general")}
-      </h1>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.general.general")}
+        </h1>
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("admin.general.intro")}
+        </p>
+      </div>
       {/*
        * **Shown whenever the transport is console, with no grace period**
        * (P7-T08d). A threshold was the first design and it was wrong: an
@@ -160,40 +172,56 @@ export default async function GeneralSettingsPage() {
       {mail.transport === "console" ? (
         <ConsoleMailNotice revealsContent={consoleMailRevealsContent()} />
       ) : null}
+      <h2 className={groupHeading}>{t("admin.general.group.workspace")}</h2>
       <GeneralSettingsForm settings={read.settings} zones={listTimezones()} />
       <LimitsCard
         limits={limits}
         providerSetsTwo={cloud}
         canManage={canManage}
       />
-      {instanceName ? (
-        <InstanceNameCard
-          name={instanceName.value}
-          source={instanceName.source}
-          deploymentName={deploymentInstanceName()}
-        />
+      {instanceCards ? (
+        <>
+          <h2 className={`flex items-center gap-2 ${groupHeading}`}>
+            {t("admin.general.group.instance")}
+            <span className={chip}>
+              {t("admin.general.group.selfHostedOnly")}
+            </span>
+          </h2>
+          {instanceName ? (
+            <InstanceNameCard
+              name={instanceName.value}
+              source={instanceName.source}
+              deploymentName={deploymentInstanceName()}
+            />
+          ) : null}
+          {registration ? (
+            <RegistrationCard
+              policy={registration.value}
+              source={registration.source}
+            />
+          ) : null}
+          {emailConfirmation ? (
+            <EmailConfirmationCard
+              confirmation={emailConfirmation}
+              save={saveEmailConfirmation}
+              settingsLayout
+            />
+          ) : null}
+          {updateCheck ? <UpdateCheckCard enabled={updateCheck.value} /> : null}
+        </>
       ) : null}
-      {registration ? (
-        <RegistrationCard
-          policy={registration.value}
-          source={registration.source}
-        />
-      ) : null}
-      {emailConfirmation ? (
-        <EmailConfirmationCard
-          confirmation={emailConfirmation}
-          save={saveEmailConfirmation}
-        />
-      ) : null}
-      {updateCheck ? <UpdateCheckCard enabled={updateCheck.value} /> : null}
+      <h2 className={`flex items-center gap-2 ${groupHeading}`}>
+        {t("admin.general.group.actions")}
+        <span className={chip}>{t("common.appliesAtOnce")}</span>
+      </h2>
       {/*
        * S-34 offered again (completeness review L-08). The registry's default
        * for `onboardingDone` is true, so only a stored `false` is pending.
        */}
       <SetupCard done={read.settings.onboardingDone !== false} />
       {/*
-       * The freeze switch (P6-G25). `workspace.setState` shipped at P2-T09
-       * and no screen ever called it, so P6-T07's rehearsal runbook asked an
+       * The freeze switch (P6-G25). `workspace.setState` shipped at P2-T09 and
+       * no screen ever called it, so P6-T07's rehearsal runbook asked an
        * operator to press something that did not exist.
        */}
       <WorkspaceStateCard state={workspace.state} heldBy={hold?.kind ?? null} />

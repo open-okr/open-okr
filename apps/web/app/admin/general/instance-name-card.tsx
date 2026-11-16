@@ -6,11 +6,12 @@ import {
   renameInstance,
   type SettingSource,
 } from "@openokr/core";
-import { Button, Card, CardBody, CardHeader, TextInput } from "@openokr/ui";
+import { CardHeader, TextInput } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { requireAccessLevel } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
+import { SettingsFormCard } from "../../../lib/settings-form-card";
 import { getTranslations } from "../../../lib/translations";
 
 /**
@@ -74,41 +75,41 @@ export async function InstanceNameCard({
   const { t } = await getTranslations();
 
   return (
-    <Card>
-      <CardHeader>
-        <h2 className="text-sm font-bold text-ink">
-          {t("admin.general.instanceName.title")}
-        </h2>
-      </CardHeader>
-      <CardBody>
-        <form action={rename} className="flex flex-col gap-3">
-          <TextInput
-            label={t("admin.general.instanceName.label")}
-            id="instanceName"
-            name="instanceName"
-            defaultValue={name}
-            maxLength={INSTANCE_NAME_MAX_LENGTH}
-            className="max-w-sm"
-            autoComplete="off"
-          />
-          <p className="text-xs text-ink-3">
-            {t("admin.general.instanceName.hint")}
-          </p>
-          <p className="text-xs text-ink-3">
-            {source === "database"
-              ? t("admin.general.instanceName.fromHere", { deploymentName })
-              : t("admin.general.instanceName.fromDeployment")}
-          </p>
-          <p className="text-xs text-ink-3">
-            {t("admin.general.instanceName.restart")}
-          </p>
-          <div className="flex flex-wrap items-center gap-2.5 border-t border-line pt-3">
-            <Button type="submit" variant="primary" size="sm">
-              {t("common.save")}
-            </Button>
+    <SettingsFormCard
+      formId="instance-name-form"
+      testId="instance-name-card"
+      unsavedLabel={t("admin.general.instanceName.label")}
+      action={rename}
+      header={
+        <CardHeader>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-sm font-semibold text-ink">
+              {t("admin.general.instanceName.title")}
+            </h2>
+            <p className="text-xs text-ink-3">
+              {t("admin.general.instanceName.hint")}
+            </p>
           </div>
-        </form>
-      </CardBody>
-    </Card>
+        </CardHeader>
+      }
+    >
+      <TextInput
+        label={t("admin.general.instanceName.label")}
+        id="instanceName"
+        name="instanceName"
+        defaultValue={name}
+        maxLength={INSTANCE_NAME_MAX_LENGTH}
+        className="col-span-12"
+        autoComplete="off"
+      />
+      <p className="col-span-12 text-xs text-ink-3">
+        {source === "database"
+          ? t("admin.general.instanceName.fromHere", { deploymentName })
+          : t("admin.general.instanceName.fromDeployment")}
+      </p>
+      <p className="col-span-12 text-xs text-ink-3">
+        {t("admin.general.instanceName.restart")}
+      </p>
+    </SettingsFormCard>
   );
 }

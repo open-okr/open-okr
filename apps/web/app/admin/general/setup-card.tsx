@@ -28,7 +28,7 @@ export async function SetupCard({ done }: { readonly done: boolean }) {
     <Card>
       <CardHeader>
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">
+          <h2 className="text-sm font-semibold text-ink">
             {t("admin.setup.title")}
           </h2>
           <p className="text-xs text-ink-3">{t("admin.setup.explains")}</p>

@@ -285,14 +285,14 @@ test("an administrator renames the instance, and can hand the name back", async 
   // Said on the card, because a restart is the one thing a rename needs.
   await expect(page.getByText(/after the next restart/)).toBeVisible();
 
-  const card = page.locator("form").filter({ has: field });
+  const card = page.getByTestId("instance-name-card");
   await field.fill("Acme OKR");
-  await card.getByRole("button", { name: "Save" }).click();
+  await card.getByRole("button", { name: "Save changes" }).click();
   await expect(page).toHaveTitle("General settings · Acme OKR");
   await expect(field).toHaveValue("Acme OKR");
 
   await field.fill("");
-  await card.getByRole("button", { name: "Save" }).click();
+  await card.getByRole("button", { name: "Save changes" }).click();
   await expect(page).toHaveTitle("General settings · OKR Goal");
   await expect(field).toHaveValue("OKR Goal");
 });

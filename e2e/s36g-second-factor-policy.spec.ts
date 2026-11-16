@@ -77,10 +77,10 @@ async function setPolicy(on: boolean): Promise<void> {
   if ((await box.isChecked()) !== on) {
     await box.setChecked(on);
   }
-  // The general form's own Save: the instance card has one too (M-33).
+  // The defaults card's own save bar.
   await page
-    .locator("form", { has: box })
-    .getByRole("button", { name: "Save" })
+    .getByTestId("general-defaults-card")
+    .getByRole("button", { name: "Save changes" })
     .click();
   await page.waitForLoadState("networkidle");
 }

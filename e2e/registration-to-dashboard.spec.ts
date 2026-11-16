@@ -212,11 +212,10 @@ test("hydrates, so a write happens without loading a new document", async () => 
   // A picker since completeness review M-15, which offers the languages the
   // catalogue has rather than taking any text.
   await page.getByLabel("Language").selectOption("en");
-  // The general form's own Save: the instance card beside it has one too
-  // since completeness review M-33.
+  // The defaults card's own save bar: every card on the page has one.
   await page
-    .locator("form", { has: page.getByLabel("Language") })
-    .getByRole("button", { name: "Save" })
+    .getByTestId("general-defaults-card")
+    .getByRole("button", { name: "Save changes" })
     .click();
 
   await expect(page.getByLabel("Language")).toBeVisible();
