@@ -70,26 +70,23 @@ const DENSITY_VALUES: readonly Density[] = ["comfortable", "compact"];
 const WIDTH_VALUES: readonly ContentWidth[] = ["compact", "full"];
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemePreference>(() =>
-    readStored(THEME_STORAGE_KEY, "system", THEME_VALUES),
-  );
-  const [density, setDensityState] = useState<Density>(() =>
-    readStored(DENSITY_STORAGE_KEY, "comfortable", DENSITY_VALUES),
-  );
-  const [width, setWidthState] = useState<ContentWidth>(() =>
-    readStored(WIDTH_STORAGE_KEY, "compact", WIDTH_VALUES),
-  );
+  // Start from the defaults on the client too, never from storage. The
+  // server renders the defaults, and hydration does not patch an attribute
+  // that differs (React keeps the server's `aria-pressed`). Starting equal and
+  // reading storage in the effect below is a real state change, so the
+  // controls re-render with the stored choice before the first paint.
+  const [theme, setThemeState] = useState<ThemePreference>("system");
+  const [density, setDensityState] = useState<Density>("comfortable");
+  const [width, setWidthState] = useState<ContentWidth>("compact");
   const [systemDark, setSystemDark] = useState(systemPrefersDark);
 
   const resolvedTheme = resolveTheme(theme, systemDark);
 
-  // The server renders the defaults, because it has no localStorage, and
-  // React keeps the server's attributes where hydration disagrees. A member
-  // whose browser holds Full width then saw the pressed state of Compact on
-  // the controls after a reload while the page itself was Full. Reading the
-  // stored values once after mount makes the state, and so the controls,
-  // match. Equal values bail out, so a browser on the defaults re-renders
-  // nothing.
+  // A member whose browser holds Full width saw Compact pressed after a
+  // reload while the page itself was Full. Reading the stored values once
+  // after mount makes the state, and so the controls, match. A browser on the
+  // defaults bails out and re-renders nothing. The attribute effects below
+  // run in the same commit, so the page does not flash the default.
   useLayoutEffect(() => {
     setThemeState(readStored(THEME_STORAGE_KEY, "system", THEME_VALUES));
     setDensityState(
