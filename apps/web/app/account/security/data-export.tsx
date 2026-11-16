@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  useTranslations,
-} from "@openokr/ui";
+import { Button, Card, CardHeader, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { exportMyData } from "./data-actions";
 
@@ -44,25 +38,36 @@ export function DataExport() {
   return (
     <Card>
       <CardHeader>
-        <h2 className="text-sm font-bold text-ink">
-          {t("account.security.data.title")}
-        </h2>
-      </CardHeader>
-      <CardBody className="flex flex-col items-start gap-2.5">
-        <p className="text-sm text-ink-2">
-          {t("account.security.data.explains")}
-        </p>
-        <Button pending={pending} onClick={download} variant="default">
-          {pending
-            ? t("account.security.data.preparing")
-            : t("account.security.data.download")}
-        </Button>
-        {problem ? (
-          <p className="text-bad text-sm" role="alert">
-            {problem}
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2 className="text-sm font-semibold text-ink">
+            {t("account.security.data.title")}
+          </h2>
+          <p className="text-xs text-ink-3">
+            {t("account.security.data.explains")}
           </p>
-        ) : null}
-      </CardBody>
+        </div>
+      </CardHeader>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-line border-t px-3.5 py-2.5">
+        <div className="min-w-0 text-sm">
+          {pending ? (
+            <span className="text-ink-3">
+              {t("account.security.data.preparing")}
+            </span>
+          ) : problem ? (
+            <p className="text-bad text-sm" role="alert">
+              {problem}
+            </p>
+          ) : null}
+        </div>
+        <Button
+          pending={pending}
+          onClick={download}
+          variant="default"
+          size="sm"
+        >
+          {t("account.security.data.download")}
+        </Button>
+      </div>
     </Card>
   );
 }

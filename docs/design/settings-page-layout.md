@@ -42,6 +42,7 @@ Rules for all models:
 | Field | A kit component with label and hint. Width comes from the grid (§E), never from its own max width | `col-span-*` |
 | Save footer | Status on the left, Discard and Save changes on the right. Last child of the card, under `CardBody` | `SettingsSaveBar mode="footer"` |
 | Sticky save bar | Same as the footer, stuck to the bottom of the window | `SettingsSaveBar mode="sticky"` (`sticky bottom-3`) |
+| Long list | A list that can grow without bound (sessions) scrolls inside its card at about five rows | `max-h-[296px] overflow-y-auto`, `tabIndex={0}` and an aria-label |
 | Danger card | Red title, light red line, the risky button in the body, confirmation by typing | `border-bad/30` |
 
 `SettingsSaveBar` lives in `packages/ui/src/forms/settings-save-bar.tsx`. The page owns the form state. The bar gets the form id, the list of unsaved parts, the saved and error text, and whether the form is being sent. Discard is `type="reset"` and Save is `type="submit" name="intent" value="save"`, both attached with `form={formId}`.
@@ -109,4 +110,4 @@ Branding and General are done. The rest wait for their own change, one page at a
 | account/channels | Footer per card (Delivery, How often), instant actions for linked accounts | Done (2026-11-16) |
 | account/connections | Proposed: instant actions | Pending |
 | account/device | Proposed: instant actions | Pending |
-| account/security | Instant actions | Pending |
+| account/security | Instant actions, a scrolling list for sessions | Done (2026-11-16) |

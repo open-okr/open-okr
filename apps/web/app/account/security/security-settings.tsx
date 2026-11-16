@@ -9,6 +9,7 @@ import {
   SecretInput,
   useTranslations,
 } from "@openokr/ui";
+import { KeyRound } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { FormError } from "../../(auth)/auth-card";
@@ -217,56 +218,25 @@ export function SecuritySettings({
     );
   };
 
+  const footerNote = (scope: Note["scope"]) => {
+    const node = noteFor(scope);
+    return node === null ? null : (
+      <div className="border-line border-t px-3.5 py-2.5">{node}</div>
+    );
+  };
+
   return (
     <>
       <Card>
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">
-            {t("account.security.securitySettings.passkeys")}
-          </h2>
-        </CardHeader>
-        <CardBody className="flex flex-col items-start gap-3">
-          <p className="max-w-prose text-sm text-ink-3">
-            {t("account.security.securitySettings.aPasskeySignsYou")}
-          </p>
-          {passkeys === null ? null : passkeys.length === 0 ? (
-            <p className="text-sm text-ink-3">
-              {t("account.security.securitySettings.noPasskeysYet")}
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-sm font-semibold text-ink">
+              {t("account.security.securitySettings.passkeys")}
+            </h2>
+            <p className="text-xs text-ink-3">
+              {t("account.security.securitySettings.aPasskeySignsYou")}
             </p>
-          ) : (
-            <ul
-              className="flex w-full max-w-md flex-col divide-y divide-line rounded-control border border-line"
-              aria-label={t("account.security.securitySettings.passkeys")}
-            >
-              {passkeys.map((passkey) => (
-                <li
-                  key={passkey.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2"
-                >
-                  <span className="flex flex-col">
-                    <span className="text-sm font-medium text-ink">
-                      {passkey.name ||
-                        t("account.security.securitySettings.unnamedPasskey")}
-                    </span>
-                    <span className="text-xs text-ink-3">
-                      {t("account.security.securitySettings.passkeyAdded", {
-                        date: added(passkey.createdAt),
-                      })}
-                    </span>
-                  </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={acting !== null}
-                    pending={acting === `remove:${passkey.id}`}
-                    onClick={() => removePasskey(passkey)}
-                  >
-                    {t("account.security.securitySettings.removePasskey")}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
+          </div>
           <Button
             type="button"
             size="sm"
@@ -276,51 +246,113 @@ export function SecuritySettings({
           >
             {t("account.security.securitySettings.addAPasskey")}
           </Button>
-          {noteFor("passkey")}
-        </CardBody>
+        </CardHeader>
+        {passkeys === null ? null : (
+          <CardBody>
+            {passkeys.length === 0 ? (
+              <p className="text-sm text-ink-3">
+                {t("account.security.securitySettings.noPasskeysYet")}
+              </p>
+            ) : (
+              <ul
+                className="flex flex-col rounded-lg border border-line"
+                aria-label={t("account.security.securitySettings.passkeys")}
+              >
+                {passkeys.map((passkey, index) => (
+                  <li
+                    key={passkey.id}
+                    className={`flex items-center gap-3 px-3 py-2.5 ${index === 0 ? "" : "border-line border-t"}`}
+                  >
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-raised text-ink-3">
+                      <KeyRound className="size-4" aria-hidden="true" />
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-sm font-medium text-ink">
+                        {passkey.name ||
+                          t("account.security.securitySettings.unnamedPasskey")}
+                      </span>
+                      <span className="text-xs text-ink-3">
+                        {t("account.security.securitySettings.passkeyAdded", {
+                          date: added(passkey.createdAt),
+                        })}
+                      </span>
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={acting !== null}
+                      pending={acting === `remove:${passkey.id}`}
+                      onClick={() => removePasskey(passkey)}
+                    >
+                      {t("account.security.securitySettings.removePasskey")}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardBody>
+        )}
+        {footerNote("passkey")}
       </Card>
 
       <Card>
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">
-            {t("account.security.securitySettings.oneTimeCodes")}
-          </h2>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-sm font-semibold text-ink">
+              {t("account.security.securitySettings.oneTimeCodes")}
+            </h2>
+            <p className="text-xs text-ink-3">
+              {t("account.security.securitySettings.oneTimeCodesHint")}
+            </p>
+          </div>
+          <span
+            className={`rounded-full px-2 font-semibold text-xs ${
+              twoFactorEnabled ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn"
+            }`}
+          >
+            {twoFactorEnabled
+              ? t("account.security.securitySettings.statusOn")
+              : t("account.security.securitySettings.statusOff")}
+          </span>
         </CardHeader>
-        <CardBody className="flex flex-col items-start gap-3">
+        <CardBody className="grid grid-cols-12 gap-x-6 gap-y-4">
           {twoFactorEnabled ? (
-            <p className="max-w-prose text-sm text-ink-3">
+            <p className="col-span-12 max-w-prose text-sm text-ink-3">
               {t("account.security.securitySettings.oneTimeCodesAre")}
             </p>
           ) : demo ? (
-            <p className="max-w-prose text-sm text-ink-3">
+            <p className="col-span-12 max-w-prose text-sm text-ink-3">
               {t("account.security.securitySettings.demoKeepsSignIn")}
             </p>
           ) : totpUri ? (
             <>
-              <p className="max-w-prose text-sm text-ink-3">
-                {t("account.security.securitySettings.addThisToYour")}
-              </p>
-              <code className="w-full break-all rounded-md bg-raised px-2.5 py-2 font-mono text-xs text-ink-2">
-                {totpUri}
-              </code>
+              <div className="col-span-12 flex flex-col gap-2">
+                <p className="max-w-prose text-sm text-ink-3">
+                  {t("account.security.securitySettings.addThisToYour")}
+                </p>
+                <code className="w-full break-all rounded-md bg-raised px-2.5 py-2 font-mono text-xs text-ink-2">
+                  {totpUri}
+                </code>
+              </div>
 
               {backupCodes.length > 0 ? (
-                <div className="flex w-full flex-col gap-1.5 rounded-lg border border-line p-3">
+                <div className="col-span-12 flex flex-col gap-1.5">
                   <h3 className="text-xs font-bold text-ink">
                     {t("account.security.securitySettings.backupCodes")}
                   </h3>
-                  <p className="max-w-prose text-xs text-ink-3">
-                    {t("account.security.securitySettings.saveTheseNowEach")}
-                  </p>
-                  <ul className="flex flex-wrap gap-1.5">
+                  <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-5">
                     {backupCodes.map((backupCode) => (
                       <li key={backupCode}>
-                        <code className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-ink">
+                        <code className="block rounded bg-raised px-1.5 py-0.5 text-center font-mono text-xs text-ink">
                           {backupCode}
                         </code>
                       </li>
                     ))}
                   </ul>
+                  <p className="max-w-prose text-xs text-ink-3">
+                    {t("account.security.securitySettings.saveTheseNowEach")}
+                  </p>
                 </div>
               ) : null}
 
@@ -329,24 +361,29 @@ export function SecuritySettings({
                   event.preventDefault();
                   confirmTwoFactor(code);
                 }}
-                className="flex flex-col items-start gap-3"
+                className="col-span-12 grid grid-cols-12 gap-x-6 gap-y-4"
               >
-                <CodeInput
-                  id="totp-code"
-                  label={t("account.security.securitySettings.codeFromYourApp")}
-                  groups={[6]}
-                  characters="digits"
-                  autoComplete="one-time-code"
-                  value={code}
-                  onChange={setCode}
-                  onComplete={confirmTwoFactor}
-                  busy={confirming}
-                  error={codeError}
-                />
+                <div className="col-span-12 md:col-span-9">
+                  <CodeInput
+                    id="totp-code"
+                    label={t(
+                      "account.security.securitySettings.codeFromYourApp",
+                    )}
+                    groups={[6]}
+                    characters="digits"
+                    autoComplete="one-time-code"
+                    value={code}
+                    onChange={setCode}
+                    onComplete={confirmTwoFactor}
+                    busy={confirming}
+                    error={codeError}
+                  />
+                </div>
                 <Button
                   type="submit"
                   variant="primary"
                   size="sm"
+                  className="col-span-12 w-full self-end md:col-span-3"
                   disabled={code.length < 6}
                   pending={confirming}
                 >
@@ -357,7 +394,7 @@ export function SecuritySettings({
           ) : (
             <form
               onSubmit={startTwoFactor}
-              className="flex flex-col items-start gap-3"
+              className="col-span-12 grid grid-cols-12 gap-x-6 gap-y-4"
             >
               <SecretInput
                 label={t(
@@ -366,6 +403,7 @@ export function SecuritySettings({
                 id="confirm-password"
                 autoComplete="current-password"
                 required
+                className="col-span-12 md:col-span-9"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
@@ -373,6 +411,7 @@ export function SecuritySettings({
                 type="submit"
                 variant="primary"
                 size="sm"
+                className="col-span-12 w-full self-end md:col-span-3"
                 disabled={acting !== null}
                 pending={acting === "enable-totp"}
               >
@@ -380,8 +419,8 @@ export function SecuritySettings({
               </Button>
             </form>
           )}
-          {noteFor("totp")}
         </CardBody>
+        {footerNote("totp")}
       </Card>
     </>
   );
