@@ -8,17 +8,14 @@ import {
   CardBody,
   CardHeader,
   Chip,
-  guardPress,
   MethodHint,
   NumberInput,
   SelectInput,
-  Spinner,
+  SettingsSaveBar,
   TextInput,
   TokenInput,
-  useFormDirty,
   useKeyboardRegistry,
   useSubmitShortcut,
-  useToast,
   useTranslations,
   useUnsavedGuard,
 } from "@openokr/ui";
@@ -26,7 +23,6 @@ import Link from "next/link";
 import type { FormEvent, ReactNode } from "react";
 import {
   createContext,
-  Fragment,
   startTransition,
   useActionState,
   useCallback,
@@ -35,11 +31,15 @@ import {
   useMemo,
   useRef,
   useState,
-  useTransition,
 } from "react";
 import { checkInFrequencyOptions } from "./check-in-options.ts";
-import { resetGroup, saveRhythm } from "./rhythm-actions.ts";
-import { NOTHING_SAVED, type RhythmState } from "./rhythm-state.ts";
+import { saveRhythm } from "./rhythm-actions.ts";
+import {
+  changedFields,
+  type FieldValue,
+  NOTHING_SAVED,
+  type RhythmState,
+} from "./rhythm-state.ts";
 
 /**
  * Editing the §11 registry for one workspace (P3-T02, widened at P6-G20).
@@ -60,20 +60,28 @@ import { NOTHING_SAVED, type RhythmState } from "./rhythm-state.ts";
  * **A refusal is read.** The save caught `OperationError` and returned, so an
  * out-of-range value looked exactly like a successful save: the page came back
  * unchanged and said nothing at all. `rhythm.update` names the key and the
- * bound; that sentence now lands above the button.
+ * bound; that sentence now lands under the field it is about and in the bar.
  *
- * **A card returns to the canon.** Reset sends nulls rather than the canon's
- * current numbers, which is the difference between having no opinion and
+ * **A card returns to the canon.** "Reset to defaults" blanks the card's
+ * fields, which the save then sends as nulls rather than as the canon's
+ * current numbers. That is the difference between having no opinion and
  * having chosen today's default and keeping it after the canon moves.
  *
- * Still read-only: the six §11 word lists. They are arrays of words rather
- * than numbers, editing them is a different control, and P6-G20's deliverables
- * name clocks, ladders, bands, corridors, caps, boundaries and timings. Their
- * resolved value is shown so an admin can see what the Coach is matching on.
+ * **One form, one sticky save bar** (docs/design/settings-page-layout.md,
+ * "long page, one settings object"). The page used to save per card, with a
+ * sticky header and a toast each. It is now one object: one Save sends every
+ * card at once and is refused as a whole, and the bar names the cards that
+ * changed. Every field is controlled, so Discard and Reset are plain state.
+ *
+ * Still read-only: the built-in words of the six §11 word lists. A workspace
+ * may add terms and may not take the method's away.
  */
 
 type Rhythm = Awaited<ReturnType<typeof callAction<"rhythm.read">>>;
 type RegistryEntry = Rhythm["registry"][number];
+
+/** The id of the page's one form, which the save bar's buttons act on. */
+const FORM_ID = "rhythm-form";
 
 /** One threshold's hint, worked out on the server by the page. */
 export interface ThresholdHint {
@@ -144,6 +152,44 @@ const GROUP_TITLES: Record<string, string> = {
   sessions: "common.sessions",
 };
 
+/** Catalogue keys for each group's one-line description under its title. */
+const GROUP_DESCRIPTIONS: Record<string, string> = {
+  cadence: "admin.rhythm.groupDescription.cadence",
+  scoring: "admin.rhythm.groupDescription.scoring",
+  quality: "admin.rhythm.groupDescription.quality",
+  sessions: "admin.rhythm.groupDescription.sessions",
+  alignment: "admin.rhythm.groupDescription.alignment",
+  kpi: "admin.rhythm.groupDescription.kpi",
+};
+
+/**
+ * The page's sections, in the order they read. A registry group this list
+ * does not know is drawn at the end of "alignment", so a group added to §11
+ * still appears.
+ */
+const SECTIONS = [
+  {
+    id: "rhythm",
+    title: "admin.rhythm.section.rhythm.title",
+    cards: ["check-in", "cadence", "sessions"],
+  },
+  {
+    id: "scoring",
+    title: "admin.rhythm.section.scoring.title",
+    cards: ["scoring", "quality"],
+  },
+  {
+    id: "alignment",
+    title: "admin.rhythm.section.alignment.title",
+    cards: ["alignment", "kpi"],
+  },
+  {
+    id: "language",
+    title: "admin.rhythm.section.language.title",
+    cards: ["terminology"],
+  },
+] as const;
+
 const WEEKDAYS = [
   [1, "sessions.schedule.weekday.monday"],
   [2, "sessions.schedule.weekday.tuesday"],
@@ -204,23 +250,102 @@ function wordLists(value: unknown): WordListMap | null {
 }
 
 /**
- * The six §11 quality word lists, read-only, as lists of words (P8-G08).
+ * The fields one registry row draws, by the name the save reads each under,
+ * with what this workspace has stored in each.
  *
- * **They were `JSON.stringify` of the whole map in one paragraph.** 148 terms
- * across six lists, rendered as a single unbroken string of quotes, brackets
- * and commas that ran past the right edge of the card. It was also styled
- * `tabular`, which is the numeral variant and belongs to the figures on this
- * screen rather than to prose.
+ * One place for the names, so the initial values, a card's reset and the
+ * unsaved list cannot disagree about which fields a row has. A scalar is
+ * `threshold:<key>`, a composite's parts are `composite:<key>:<part>` and a
+ * list's are `list:<key>:<part>`, a word list's are `words:<key>:<list>`.
+ */
+function entryFields(
+  key: string,
+  resolved: unknown,
+  override: unknown,
+): ReadonlyArray<readonly [string, FieldValue]> {
+  const overrideParts =
+    override && typeof override === "object"
+      ? (override as Record<string, unknown>)
+      : null;
+  if (typeof resolved === "number") {
+    return [
+      [`threshold:${key}`, typeof override === "number" ? override : null],
+    ];
+  }
+  const parts = numericParts(resolved);
+  if (parts) {
+    const prefix = Array.isArray(resolved) ? "list" : "composite";
+    return parts.map(([part]) => {
+      const stored = overrideParts?.[part];
+      return [
+        `${prefix}:${key}:${part}`,
+        typeof stored === "number" ? stored : null,
+      ];
+    });
+  }
+  const words = wordLists(resolved);
+  if (words) {
+    return Object.keys(words).map((name) => {
+      const ours = overrideParts?.[name];
+      return [
+        `words:${key}:${name}`,
+        Array.isArray(ours) ? (ours as string[]) : [],
+      ];
+    });
+  }
+  return [];
+}
+
+/** A field left blank, which is how a card goes back to the canon. */
+function blank(value: FieldValue): FieldValue {
+  return Array.isArray(value) ? [] : null;
+}
+
+/** The page's field values, and how one is changed. */
+interface Fields {
+  readonly values: Readonly<Record<string, FieldValue>>;
+  readonly set: (name: string, value: FieldValue) => void;
+}
+
+const FieldsContext = createContext<Fields>({ values: {}, set: () => {} });
+
+/** The number a field holds, or null for a blank one. */
+function numberAt(values: Fields["values"], name: string): number | null {
+  const held = values[name];
+  return typeof held === "number" ? held : null;
+}
+
+/** How many columns of a twelve-column row each part takes (up to four per row). */
+const PART_SPANS: Record<number, string> = {
+  12: "md:col-span-12",
+  6: "md:col-span-6",
+  4: "md:col-span-4",
+  3: "md:col-span-3",
+};
+
+/** The span of each of `count` parts: rows of at most four, filled evenly. */
+function partSpans(count: number): string[] {
+  const rows = Math.ceil(count / 4);
+  const spans: string[] = [];
+  let left = count;
+  for (let row = 0; row < rows; row++) {
+    const inRow = Math.ceil(left / (rows - row));
+    spans.push(...Array(inRow).fill(PART_SPANS[12 / inRow]));
+    left -= inRow;
+  }
+  return spans;
+}
+
+/**
+ * The six §11 quality word lists (P8-G08).
  *
- * **A workspace may now add to them, and may not take from them (P8-G11b).**
+ * **A workspace may add to them, and may not take from them (P8-G11b).**
  * That asymmetry is METHOD.md's, not this screen's: §11 words the parameter as
  * "a workspace may add terms; the canon terms remain", and
  * `resolveThresholds` merges rather than replaces for the reason its own
  * comment gives, which is that replacing would let a workspace switch a
  * quality rule off by storing an empty list. So the built-in terms are shown
  * and cannot be edited, and the box beside them holds this workspace's own.
- * Agung asked on 23 September 2026 whether the values could be changed; this
- * is the half of that question the method allows answering yes to.
  */
 function WordLists({
   lists,
@@ -231,57 +356,63 @@ function WordLists({
   /** The resolved map: this workspace's terms already merged over the rest. */
   readonly lists: WordListMap;
   readonly entryKey: string;
-  /** What this workspace stored, which is what the box holds. */
+  /** What this workspace stored, which is what the built-in terms exclude. */
   readonly added: Record<string, unknown> | null;
   readonly canManage: boolean;
 }) {
   const { t } = useTranslations();
+  const { values, set } = useContext(FieldsContext);
   return (
-    <dl className="flex flex-col gap-2.5">
+    <>
       {Object.entries(lists).map(([name, terms]) => {
-        const ours = Array.isArray(added?.[name])
+        const field = `words:${entryKey}:${name}`;
+        const held = values[field];
+        const ours = Array.isArray(held) ? (held as readonly string[]) : [];
+        const stored = Array.isArray(added?.[name])
           ? (added[name] as readonly string[])
           : [];
-        const theirs = terms.filter((term) => !ours.includes(term));
+        const theirs = terms.filter((term) => !stored.includes(term));
         const spaced = name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
         return (
-          <div key={name} className="flex flex-col gap-0.5">
-            <dt className="text-xs font-semibold text-ink-2">
+          <div
+            key={name}
+            className="col-span-12 flex min-w-0 flex-col gap-1 md:col-span-6"
+          >
+            <span className="text-sm font-medium text-ink-2">
               {/* The registry's own camelCase key, spaced out. Renaming these
                   would mean renaming them in `packages/method`, and they are
                   the method's names rather than this screen's. */}
               {spaced}
               <span className="ml-1.5 font-normal text-ink-4">
                 {theirs.length}
-                {ours.length > 0 ? ` + ${ours.length}` : ""}
+                {stored.length > 0 ? ` + ${stored.length}` : ""}
               </span>
-            </dt>
+            </span>
             {/* `wrap-break-word` because a single list is long and a term can
                 be two words: without it the row sets the card's width and the
                 whole page scrolls sideways. */}
-            <dd className="wrap-break-word text-xs text-ink-3">
+            <p className="wrap-break-word text-xs text-ink-3">
               {theirs.join(", ")}
-            </dd>
-            <dd>
-              {/* A chip each, split on commas only, because a term can be two
-                  words (guided-inputs §4.11). Named with its list, where six
-                  boxes all answered to "Your own terms". */}
-              <TokenInput
-                label={t("admin.rhythm.rhythmForm.yourOwnTermsIn", {
-                  list: spaced,
-                })}
-                name={`words:${entryKey}:${name}`}
-                separators="commas"
-                normalise={(term) => term.toLowerCase()}
-                disabled={!canManage}
-                defaultValue={ours}
-                placeholder={t("admin.rhythm.rhythmForm.noneAdded")}
-              />
-            </dd>
+            </p>
+            {/* A chip each, split on commas only, because a term can be two
+                words (guided-inputs §4.11). Named with its list, where six
+                boxes all answered to "Your own terms". */}
+            <TokenInput
+              label={t("admin.rhythm.rhythmForm.yourOwnTermsIn", {
+                list: spaced,
+              })}
+              name={field}
+              separators="commas"
+              normalise={(term) => term.toLowerCase()}
+              disabled={!canManage}
+              value={ours}
+              onValueChange={(next) => set(field, next)}
+              placeholder={t("admin.rhythm.rhythmForm.noneAdded")}
+            />
           </div>
         );
       })}
-    </dl>
+    </>
   );
 }
 
@@ -300,6 +431,7 @@ function Parameter({
   readonly canManage: boolean;
 }) {
   const { t } = useTranslations();
+  const { values, set } = useContext(FieldsContext);
 
   // The refusal, if this is the parameter it was about (P8-G11a).
   const refused = useContext(RefusedContext);
@@ -316,11 +448,11 @@ function Parameter({
       ? (override as Record<string, unknown>)
       : null;
 
-  return (
-    <div className="flex flex-col gap-1">
+  const heading = (
+    <>
       <div className="flex items-baseline justify-between gap-3">
         <span className="flex items-center gap-0.5">
-          <span className="font-medium text-ink">{entry.label}</span>
+          <span className="text-sm font-medium text-ink-2">{entry.label}</span>
           <ThresholdHintButton name={entry.label} hint={hint} />
         </span>
         <span className="flex items-center gap-2">
@@ -338,85 +470,109 @@ function Parameter({
           )}
         </span>
       </div>
-      <p className="text-sm text-ink-3">{entry.why}</p>
+      <p className="text-xs text-ink-3">{entry.why}</p>
+    </>
+  );
 
+  return (
+    <div
+      data-parameter={entry.key}
+      className="col-span-12 grid grid-cols-12 gap-x-6 gap-y-3 border-t border-line pt-4 first:border-t-0 first:pt-0"
+    >
       {typeof resolved === "number" ? (
-        <div className="flex items-center gap-2 text-sm">
-          {/* No min or max: the field would pull an out-of-range number back
-              to the nearest bound without a word, where the server refuses
-              it in words under the box (guided-inputs §6, 10c). */}
-          <NumberInput
-            label={entry.label}
-            hideLabel
-            name={`threshold:${entry.key}`}
-            step={Number.isInteger(resolved) ? 1 : 0.01}
-            disabled={!canManage}
-            defaultValue={typeof override === "number" ? override : null}
-            placeholder={String(resolved)}
-            invalid={refusal !== null}
-            aria-describedby={refusal === null ? undefined : errorId}
-            inputClassName="w-28"
-          />
-          <span className="text-ink-3">
-            {t("admin.rhythm.rhythmForm.inForceLeaveBlankFor", {
-              resolved: String(resolved),
-            })}
-          </span>
-        </div>
-      ) : parts ? (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex flex-wrap gap-2.5">
-            {parts.map(([part, inForce]) => (
-              <NumberInput
-                key={part}
-                label={part}
-                name={`${prefix}:${entry.key}:${part}`}
-                step={Number.isInteger(inForce) ? 1 : 0.01}
-                disabled={!canManage}
-                defaultValue={
-                  overrideParts && typeof overrideParts[part] === "number"
-                    ? overrideParts[part]
-                    : null
-                }
-                placeholder={String(inForce)}
-                invalid={refusal !== null}
-                aria-describedby={refusal === null ? undefined : errorId}
-                inputClassName="w-24"
-              />
-            ))}
+        <>
+          <div className="col-span-12 flex min-w-0 flex-col gap-1 md:col-span-8">
+            {heading}
           </div>
-          <span className="text-xs text-ink-4">
+          <div className="col-span-12 flex min-w-0 flex-col gap-1 md:col-span-4 md:self-end">
+            {/* No min or max: the field would pull an out-of-range number back
+                to the nearest bound without a word, where the server refuses
+                it in words under the box (guided-inputs §6, 10c). */}
+            <NumberInput
+              label={entry.label}
+              hideLabel
+              name={`threshold:${entry.key}`}
+              step={Number.isInteger(resolved) ? 1 : 0.01}
+              disabled={!canManage}
+              value={numberAt(values, `threshold:${entry.key}`)}
+              onValueChange={(next) => set(`threshold:${entry.key}`, next)}
+              placeholder={String(resolved)}
+              invalid={refusal !== null}
+              aria-describedby={refusal === null ? undefined : errorId}
+            />
+            <span className="text-xs text-ink-3">
+              {t("admin.rhythm.rhythmForm.inForceLeaveBlankFor", {
+                resolved: String(resolved),
+              })}
+            </span>
+          </div>
+        </>
+      ) : parts ? (
+        <>
+          <div className="col-span-12 flex min-w-0 flex-col gap-1">
+            {heading}
+          </div>
+          {parts.map(([part, inForce], index) => {
+            const field = `${prefix}:${entry.key}:${part}`;
+            return (
+              <div
+                key={part}
+                className={`col-span-12 min-w-0 ${partSpans(parts.length)[index]}`}
+              >
+                <NumberInput
+                  label={part}
+                  name={field}
+                  step={Number.isInteger(inForce) ? 1 : 0.01}
+                  disabled={!canManage}
+                  value={numberAt(values, field)}
+                  onValueChange={(next) => set(field, next)}
+                  placeholder={String(inForce)}
+                  invalid={refusal !== null}
+                  aria-describedby={refusal === null ? undefined : errorId}
+                />
+              </div>
+            );
+          })}
+          <span className="col-span-12 text-xs text-ink-4">
             {t("admin.rhythm.rhythmForm.fillInEveryPart")}
           </span>
-        </div>
+        </>
       ) : words ? (
-        <WordLists
-          lists={words}
-          entryKey={entry.key}
-          added={overrideParts as Record<string, unknown> | null}
-          canManage={canManage}
-        />
+        <>
+          <div className="col-span-12 flex min-w-0 flex-col gap-1">
+            {heading}
+          </div>
+          <WordLists
+            lists={words}
+            entryKey={entry.key}
+            added={overrideParts as Record<string, unknown> | null}
+            canManage={canManage}
+          />
+        </>
       ) : (
-        <p className="text-sm text-ink-3">
-          {t("admin.rhythm.rhythmForm.inForce", {
-            resolved: JSON.stringify(resolved),
-          })}
-          <span className="ml-1.5 text-ink-4">
-            {t("admin.rhythm.rhythmForm.shownAsItStands")}
-          </span>
-        </p>
+        <div className="col-span-12 flex min-w-0 flex-col gap-1">
+          {heading}
+          <p className="text-sm text-ink-3">
+            {t("admin.rhythm.rhythmForm.inForce", {
+              resolved: JSON.stringify(resolved),
+            })}
+            <span className="ml-1.5 text-ink-4">
+              {t("admin.rhythm.rhythmForm.shownAsItStands")}
+            </span>
+          </p>
+        </div>
       )}
 
       {/*
        * The method's own sentence, under the box it is about. Deliberately not
-       * a live region: the toast carries the announcement, and two of them
+       * a live region: the bar carries the announcement, and two of them
        * would read one refusal out twice.
        */}
       {refusal === null ? null : (
         <p
           id={errorId}
           data-testid="rhythm-field-error"
-          className="text-sm text-bad"
+          className="col-span-12 text-sm text-bad"
         >
           {refusal}
         </p>
@@ -442,9 +598,8 @@ interface Refusal {
  * is written to match. So the key is the text before the first colon, and
  * nothing new had to be carried back from the server to find it.
  *
- * Null when the sentence is about the card rather than a parameter, which is
- * the "nothing on this card to save" case. The toast still shows; there is
- * simply no field to go to.
+ * Null when the sentence is about the page rather than a parameter. The bar
+ * still shows it; there is simply no field to go to.
  */
 function refusedParameter(message: string): Refusal | null {
   const split = message.indexOf(": ");
@@ -465,11 +620,10 @@ const RefusedContext = createContext<Refusal | null>(null);
 /**
  * Brings the refused field into view and puts the caret in it.
  *
- * A scalar is `threshold:<key>`; a composite's parts are
- * `composite:<key>:<part>` and a list's are `list:<key>:<part>`, so the first
- * match of any of the three is the field to go to. `block: "center"` rather
- * than the default, because the card header is sticky and would otherwise sit
- * over a field aligned to the top.
+ * A parameter's row carries `data-parameter`, and its first visible input is
+ * the field to go to: a number field posts through a hidden input of its own,
+ * so the box a person types in is the first one that is not hidden.
+ * `block: "center"` so the field is not left under the sticky bar.
  */
 function focusRefused(
   element: HTMLFormElement | null,
@@ -478,275 +632,62 @@ function focusRefused(
   if (element === null || refusal === null) {
     return;
   }
-  const escaped = CSS.escape(refusal.key);
-  const field = element.querySelector<HTMLInputElement>(
-    `input[name="threshold:${escaped}"], input[name^="composite:${escaped}:"], input[name^="list:${escaped}:"]`,
+  const row = element.querySelector(
+    `[data-parameter="${CSS.escape(refusal.key)}"]`,
   );
-  if (field === null) {
+  const field = row?.querySelector<HTMLInputElement>(
+    "input:not([type='hidden'])",
+  );
+  if (!field) {
     return;
   }
   field.scrollIntoView({ block: "center", behavior: "smooth" });
   field.focus({ preventScroll: true });
 }
 
-/**
- * "Return this card to its defaults", for one group.
- *
- * Reports its outcome upward rather than printing it, so the card shows one
- * status line whether it came from a save or a reset. Two of them side by side
- * in the header would be two places to look for the same kind of sentence.
- */
-function ResetCard({
-  keys,
-  disabled,
-  onOutcome,
-}: {
-  readonly keys: readonly string[];
-  readonly disabled: boolean;
-  readonly onOutcome: (outcome: RhythmState, cleared: boolean) => void;
-}) {
-  const { t } = useTranslations();
-  const [pending, start] = useTransition();
-
-  return (
-    // Refused with `aria-disabled` while the reset is sent, not `disabled`, so
-    // the button keeps keyboard focus; see `guardPress`.
-    <button
-      type="button"
-      disabled={pending ? undefined : disabled}
-      aria-disabled={pending || undefined}
-      aria-busy={pending || undefined}
-      onClick={guardPress(pending, () => {
-        if (!window.confirm(t("admin.rhythm.rhythmForm.resetCardConfirm"))) {
-          return;
-        }
-        start(async () => {
-          const outcome = await resetGroup(keys);
-          onOutcome(outcome, outcome.error === null);
-        });
-      })}
-      className="inline-flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 disabled:opacity-60 aria-disabled:opacity-60"
-    >
-      {pending ? <Spinner /> : null}
-      <span>
-        {pending
-          ? t("admin.rhythm.rhythmForm.resetting")
-          : t("common.resetToDefaults")}
-      </span>
-    </button>
-  );
-}
-
-/**
- * One card, which is one form, which saves itself (P8-G11).
- *
- * **This screen had a single Save at the bottom of 8,001 pixels**, governing
- * 123 fields across eight cards. Measured on 22 September 2026: the button sat
- * 7,785px below the first field it controlled, which is 9.6 viewports on a
- * 814px-tall page. Change the check-in grace at the top and the way to commit
- * it was ten screens away, with nothing in between to say the edit was still
- * uncommitted.
- *
- * Nothing about the saving needed to change to fix it. `rhythm.update` already
- * takes every field as optional and merges `overrides` rather than replacing
- * them, which `resetGroup` has relied on since P6-G20. So a card can send its
- * own thresholds and no others, and eight small saves do what one large one
- * did.
- *
- * **The pattern is the product's own, not a new one.** `/admin/ai` is 6.7
- * viewports tall with 35 forms and its worst field-to-button distance is
- * 126px; `/admin/nudges` is 6.1 viewports and saves per rule card. Those two
- * are why a long settings page is not by itself the problem.
- */
+/** A card on the page's one form. It has no save of its own. */
 function SettingsCard({
   id,
   title,
   description,
-  canManage,
-  resetKeys,
+  action,
   children,
 }: {
-  /** Distinguishes this card's unsaved state from its siblings'. */
+  /** The card's test id suffix. */
   readonly id: string;
   readonly title: string;
   readonly description?: string;
-  readonly canManage: boolean;
-  /** The §11 keys "Reset to defaults" returns, for a group card. */
-  readonly resetKeys?: readonly string[];
+  /** "Reset to defaults", for a group card. */
+  readonly action?: ReactNode;
   readonly children: ReactNode;
 }) {
-  const { t } = useTranslations();
-  const toast = useToast();
-  const form = useRef<HTMLFormElement>(null);
-  const [state, submit, pending] = useActionState(saveRhythm, NOTHING_SAVED);
-  const [resetOutcome, setResetOutcome] = useState<RhythmState>(NOTHING_SAVED);
-  // Which of the two produced the sentence on screen. Whichever happened last
-  // wins: without this, a save that was refused would leave its refusal above
-  // a reset that then succeeded, and the card would be showing an error about
-  // something it no longer holds.
-  const [showingReset, setShowingReset] = useState(false);
-  const { dirty, markSaved } = useFormDirty(form);
-  const onKeyDown = useSubmitShortcut(canManage);
-
-  // **Sent through a transition, not the form's own action**, because React
-  // resets a form with an `action` as soon as that action resolves. For a
-  // refusal that was wrong twice over: the value somebody typed was gone
-  // before they had read why (500 typed, refused as "<=200", and the box
-  // already back to 200 within 500ms, measured on 23 September 2026), and the
-  // message then described a number no longer on screen. The card used to put
-  // the typed values back by name afterwards, which a kit field holding its
-  // own value (a number field, a word list) never hears (guided-inputs 10c).
-  // Not reset, everything stays where it was typed, refused or saved.
-  const onSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const data = new FormData(
-        event.currentTarget,
-        (event.nativeEvent as SubmitEvent).submitter,
-      );
-      startTransition(() => submit(data));
-    },
-    [submit],
-  );
-  // Bumped when a reset clears the card, so its fields are drawn again on
-  // what the server now holds.
-  const [generation, setGeneration] = useState(0);
-
-  useUnsavedGuard(`rhythm:${id}`, dirty);
-
-  // Watched on the edge of `pending` rather than on the message, because two
-  // saves in a row produce the same sentence and an effect keyed on the text
-  // would not run the second time. The form would then keep reporting unsaved
-  // work it had already committed.
-  const wasPending = useRef(false);
-  useEffect(() => {
-    if (wasPending.current && !pending) {
-      // Either way round, the save is the newer of the two.
-      setShowingReset(false);
-      if (state.error === null && state.saved) {
-        markSaved();
-      }
-    }
-    wasPending.current = pending;
-  }, [pending, state, markSaved]);
-
-  const afterReset = useCallback(
-    (outcome: RhythmState, cleared: boolean) => {
-      setResetOutcome(outcome);
-      setShowingReset(true);
-      if (!cleared) {
-        return;
-      }
-      // Drawn again rather than blanked by hand. The reset's own response
-      // carries the page as the server now holds it, and every field, a kit
-      // field holding its own value included, starts again from that: blank,
-      // with the canon's number as its placeholder.
-      setGeneration((one) => one + 1);
-      markSaved();
-    },
-    [markSaved],
-  );
-
-  const outcome = showingReset ? resetOutcome : state;
-  const { error: message, saved: confirmation } = outcome;
-
-  // Which parameter the refusal is about, for the message under its own field.
-  // Memoised on the sentence rather than recomputed, so the context value is
-  // the same object between renders and the card's parameters are not all
-  // re-rendered on every keystroke.
-  const refused = useMemo<Refusal | null>(
-    () => (message === null ? null : refusedParameter(message)),
-    [message],
-  );
-
-  // **The refusal used to render here and be invisible.** It sat above the
-  // card body, and a card runs to 1,700px with its Save in a header that stays
-  // on screen, so pressing Save at the bottom of twenty parameters put the
-  // sentence off the top of the window with nothing to suggest it existed.
-  // Three things now carry it: a toast that comes to the reader, a message
-  // under the field the method named, and the field itself brought into view.
-  const shown = useRef<RhythmState>(NOTHING_SAVED);
-  useEffect(() => {
-    if (shown.current === outcome) {
-      return;
-    }
-    shown.current = outcome;
-    if (message !== null) {
-      toast.show({ tone: "bad", title, message, source: id });
-      focusRefused(form.current, refused);
-      return;
-    }
-    if (confirmation !== null) {
-      toast.show({ tone: "ok", title, message: confirmation, source: id });
-    }
-  }, [outcome, message, confirmation, title, toast, refused, id]);
-
   return (
-    <form
-      ref={form}
-      action={submit}
-      aria-busy={pending}
-      onSubmit={onSubmit}
-      onKeyDown={onKeyDown}
-      data-testid={`rhythm-card-${id}`}
-    >
-      <Card>
-        {/*
-         * Stuck to the top of the scrollport while this card is the one on
-         * screen. Per-card forms took the worst field-to-button distance from
-         * 7,785px to 1,701px, and four of the eight cards were still over one
-         * viewport, which is the same complaint at a quarter of the size.
-         * Sticky closes the rest: whichever card you are inside, its own Save
-         * is in view, and the next card's header takes over as you reach it.
-         * `bg-surface` because a sticky header with no background of its own
-         * would have the card's fields scroll through it.
-         */}
-        <CardHeader className="sticky top-0 z-10 flex-wrap justify-between rounded-t-lg bg-surface">
-          <div className="flex flex-col gap-0.5">
-            <h2 className="font-semibold text-ink">{title}</h2>
-            {description ? (
-              <p className="text-sm text-ink-3">{description}</p>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-2">
-            {dirty && canManage ? (
-              <Chip tone="brand">{t("common.unsaved")}</Chip>
-            ) : null}
-            {resetKeys ? (
-              <ResetCard
-                keys={resetKeys}
-                disabled={!canManage}
-                onOutcome={afterReset}
-              />
-            ) : null}
-            {canManage ? (
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                disabled={pending}
-              >
-                {pending
-                  ? t("admin.rhythm.rhythmForm.saving")
-                  : t("common.save")}
-              </Button>
-            ) : null}
-          </div>
-        </CardHeader>
+    <Card data-testid={`rhythm-card-${id}`}>
+      <CardHeader className="flex-wrap items-start justify-between">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h3 className="text-sm font-semibold text-ink">{title}</h3>
+          {description ? (
+            <p className="text-xs text-ink-3">{description}</p>
+          ) : null}
+        </div>
+        {action}
+      </CardHeader>
+      <CardBody className="grid grid-cols-12 gap-x-6 gap-y-4">
+        {children}
+      </CardBody>
+    </Card>
+  );
+}
 
-        <CardBody className="flex flex-col gap-3.5">
-          {/*
-           * The offending parameter reads its own message from here rather
-           * than being handed one, because the cards' children are built in
-           * `RhythmForm` and threading a prop through would mean every card
-           * knowing about refusals it cannot produce.
-           */}
-          <RefusedContext.Provider value={refused}>
-            <Fragment key={generation}>{children}</Fragment>
-          </RefusedContext.Provider>
-        </CardBody>
-      </Card>
-    </form>
+/** The heading of a run of cards, with the tag that says they save together. */
+function SectionHeading({ title, tag }: { title: string; tag: string }) {
+  return (
+    <h2 className="mt-2 -mb-1 flex flex-wrap items-center gap-2 text-xs font-semibold tracking-wide text-ink-4 uppercase">
+      {title}
+      <span className="rounded-full bg-raised px-2 py-px text-[11px] font-semibold tracking-normal text-ink-3 normal-case">
+        {tag}
+      </span>
+    </h2>
   );
 }
 
@@ -775,12 +716,126 @@ export function RhythmForm({
   readonly canManage: boolean;
 }) {
   const { t } = useTranslations();
-  const groups = [...new Set(rhythm.registry.map((entry) => entry.group))];
   const { register, unregister } = useKeyboardRegistry();
+  const form = useRef<HTMLFormElement>(null);
+  const [state, formAction, pending] = useActionState(
+    saveRhythm,
+    NOTHING_SAVED,
+  );
+  // Said by the page itself when Save is pressed with nothing changed, which
+  // sends nothing: a save of unchanged values would still write every field.
+  const [notice, setNotice] = useState<string | null>(null);
 
-  // Registered once for the page rather than once per card. The registry
-  // dedupes by id, but a card unmounting would then take the entry away from
-  // the seven still on screen.
+  const rowsOf = useCallback(
+    (group: string) =>
+      rhythm.registry.filter(
+        (entry) => entry.group === group && !entry.columnBacked,
+      ),
+    [rhythm.registry],
+  );
+
+  // Every field by the name the save reads it under, as stored: the
+  // comparison for what is unsaved, and what Discard goes back to.
+  const stored = useMemo(() => {
+    const fields: Record<string, FieldValue> = {
+      defaultCheckInFrequency: rhythm.defaultCheckInFrequency,
+      checkInAnchorDay: String(rhythm.checkInAnchorDay),
+    };
+    for (const entry of rhythm.registry) {
+      if (entry.columnBacked) {
+        continue;
+      }
+      for (const [name, value] of entryFields(
+        entry.key,
+        rhythm.thresholds[entry.key],
+        rhythm.overrides[entry.key],
+      )) {
+        fields[name] = value;
+      }
+    }
+    for (const [term, label] of Object.entries(rhythm.terminology)) {
+      const words = label as { singular: string; plural: string };
+      fields[`label:${term}:singular`] = words.singular;
+      fields[`label:${term}:plural`] = words.plural;
+    }
+    return fields;
+  }, [rhythm]);
+  const [values, setValues] = useState<Record<string, FieldValue>>(() => ({
+    ...stored,
+  }));
+  const set = useCallback((name: string, value: FieldValue) => {
+    setNotice(null);
+    setValues((now) => ({ ...now, [name]: value }));
+  }, []);
+  const fields = useMemo<Fields>(() => ({ values, set }), [values, set]);
+
+  const knownGroups = SECTIONS.flatMap((section) => section.cards);
+  const extraGroups = [
+    ...new Set(
+      rhythm.registry
+        .map((entry) => entry.group)
+        .filter((group) => !knownGroups.some((known) => known === group)),
+    ),
+  ];
+  const cardsOf = (section: (typeof SECTIONS)[number]): string[] => [
+    ...section.cards,
+    ...(section.id === "alignment" ? extraGroups : []),
+  ];
+
+  const groupTitle = (group: string) =>
+    GROUP_TITLES[group] ? t(GROUP_TITLES[group]) : group;
+  const cardTitle = (card: string): string =>
+    card === "check-in"
+      ? t("admin.rhythm.rhythmForm.theCheckInRhythm")
+      : card === "terminology"
+        ? t("admin.rhythm.rhythmForm.terminology")
+        : groupTitle(card);
+  // The fields each card holds, so the bar can name a card rather than listing
+  // every parameter: sixty-odd fields do not fit a line.
+  const fieldsOfCard = (card: string): string[] =>
+    card === "check-in"
+      ? ["defaultCheckInFrequency", "checkInAnchorDay"]
+      : card === "terminology"
+        ? Object.keys(stored).filter((name) => name.startsWith("label:"))
+        : rowsOf(card).flatMap((entry) =>
+            entryFields(
+              entry.key,
+              rhythm.thresholds[entry.key],
+              rhythm.overrides[entry.key],
+            ).map(([name]) => name),
+          );
+
+  const changed = new Set(changedFields(stored, values));
+  const unsaved = SECTIONS.flatMap(cardsOf)
+    .filter((card) => fieldsOfCard(card).some((name) => changed.has(name)))
+    .map(cardTitle);
+  const dirty = unsaved.length > 0;
+  useUnsavedGuard("rhythm", dirty);
+  const onKeyDown = useSubmitShortcut(canManage);
+
+  // Which parameter the refusal is about, for the message under its own field.
+  // Memoised on the sentence rather than recomputed, so the context value is
+  // the same object between renders and the parameters are not all re-rendered
+  // on every keystroke.
+  const refused = useMemo<Refusal | null>(
+    () => (state.error === null ? null : refusedParameter(state.error)),
+    [state.error],
+  );
+  // **The refusal used to be invisible.** It sat at the top of a card that ran
+  // to 1,700px. It is now in the bar, under the field the method named, and
+  // the field is brought into view.
+  const shown = useRef<RhythmState>(NOTHING_SAVED);
+  useEffect(() => {
+    if (shown.current === state) {
+      return;
+    }
+    shown.current = state;
+    if (state.error !== null) {
+      focusRefused(form.current, refused);
+    }
+  }, [state, refused]);
+
+  // Registered once for the page, which is one form.
   useEffect(() => {
     register({
       id: "form.save",
@@ -791,184 +846,314 @@ export function RhythmForm({
     return () => unregister("form.save");
   }, [register, unregister, t]);
 
-  return (
-    <div className="flex flex-col gap-4.5">
-      {canManage ? null : (
-        <Card>
-          <CardBody>
-            <p className="text-sm text-ink-2">
-              {t("admin.rhythm.rhythmForm.youCanReadEvery")}
-            </p>
-          </CardBody>
-        </Card>
-      )}
+  // **Sent through a transition, not the form's own action**, because React
+  // resets a form with an `action` as soon as that action resolves. For a
+  // refusal that was wrong twice over: the value somebody typed was gone
+  // before they had read why, and the message then described a number no
+  // longer on screen. Nothing is reset, refused or saved.
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!dirty) {
+      setNotice(t("common.noChanges"));
+      return;
+    }
+    setNotice(null);
+    const data = new FormData(
+      event.currentTarget,
+      (event.nativeEvent as SubmitEvent).submitter,
+    );
+    startTransition(() => formAction(data));
+  };
 
+  // "Reset to defaults": blanks the card's fields. A refill, not a write: the
+  // change joins "Not saved yet", Discard undoes it, and the save sends each
+  // blank as a null.
+  const resetCard = (group: string) => {
+    setNotice(null);
+    setValues((now) => {
+      const next = { ...now };
+      for (const name of fieldsOfCard(group)) {
+        next[name] = blank(now[name] ?? null);
+      }
+      return next;
+    });
+  };
+
+  const groupCard = (group: string) => {
+    const rows = rowsOf(group);
+    if (rows.length === 0) {
+      return null;
+    }
+    return (
       <SettingsCard
-        id="check-in"
-        title={t("admin.rhythm.rhythmForm.theCheckInRhythm")}
-        description={t("admin.rhythm.rhythmForm.theseTwoHaveTheir")}
-        canManage={canManage}
-      >
-        <div className="flex flex-col gap-3 text-sm">
-          {/* The hint sits beside the field rather than in its label, so
-              opening it does not move focus to the dropdown. */}
-          <div className="flex items-center gap-1">
-            <SelectInput
-              label={t("admin.rhythm.rhythmForm.checkInFrequency")}
-              name="defaultCheckInFrequency"
-              disabled={!canManage}
-              defaultValue={rhythm.defaultCheckInFrequency}
-              className="flex-1 flex-row items-center justify-between gap-3"
-              inputClassName="w-auto"
-            >
-              {checkInFrequencyOptions(rhythm.defaultCheckInFrequency).map(
-                (option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ),
-              )}
-            </SelectInput>
-            <ThresholdHintButton
-              name={t("admin.rhythm.rhythmForm.checkInFrequency")}
-              hint={checkInHints.defaultCheckInFrequency}
-              withReason
-            />
-          </div>
-          <div className="flex items-center gap-1">
-            <SelectInput
-              label={t("admin.rhythm.rhythmForm.anchorDay")}
-              name="checkInAnchorDay"
-              disabled={!canManage}
-              defaultValue={String(rhythm.checkInAnchorDay)}
-              className="flex-1 flex-row items-center justify-between gap-3"
-              inputClassName="w-auto"
-            >
-              {WEEKDAYS.map(([value, labelKey]) => (
-                <option key={value} value={value}>
-                  {t(labelKey)}
-                </option>
-              ))}
-            </SelectInput>
-            <ThresholdHintButton
-              name={t("admin.rhythm.rhythmForm.anchorDay")}
-              hint={checkInHints.checkInAnchorDay}
-              withReason
-            />
-          </div>
-          {/*
-           * **Coach strictness left this card at P9-T05.** Every check now has
-           * its own level (METHOD.md §4), and strict mode, which raises them
-           * all to block, is one setting among the practice's. Two switches
-           * for one behaviour is two places for an admin to look, and data
-           * change 0015 carried every workspace that had chosen strict across.
-           */}
-          <p className="text-sm text-ink-3">
-            {t("admin.rhythm.rhythmForm.strictModeIsOnThe")}{" "}
-            <Link href="/admin/practice" className="text-brand-text underline">
-              {t("admin.practice.title")}
-            </Link>
-          </p>
-        </div>
-      </SettingsCard>
-
-      {groups.map((group) => {
-        const rows = rhythm.registry.filter(
-          (entry) => entry.group === group && !entry.columnBacked,
-        );
-        return (
-          <SettingsCard
-            key={group}
-            id={group}
-            title={GROUP_TITLES[group] ? t(GROUP_TITLES[group]) : group}
-            canManage={canManage}
-            resetKeys={rows.map((entry) => entry.key)}
+        key={group}
+        id={group}
+        title={groupTitle(group)}
+        {...(GROUP_DESCRIPTIONS[group]
+          ? { description: t(GROUP_DESCRIPTIONS[group]) }
+          : {})}
+        action={
+          <Button
+            type="button"
+            size="sm"
+            disabled={!canManage}
+            onClick={() => resetCard(group)}
           >
-            {rows.map((entry) => (
-              <Parameter
-                key={entry.key}
-                entry={entry}
-                resolved={rhythm.thresholds[entry.key]}
-                override={rhythm.overrides[entry.key]}
-                hint={hints[entry.key]}
-                canManage={canManage}
-              />
-            ))}
-          </SettingsCard>
-        );
-      })}
-
-      <SettingsCard
-        id="terminology"
-        title={t("admin.rhythm.rhythmForm.terminology")}
-        description={t("admin.rhythm.rhythmForm.renameAConceptThe")}
-        canManage={canManage}
+            {t("common.resetToDefaults")}
+          </Button>
+        }
       >
-        <div className="flex flex-col gap-2 text-sm">
-          {Object.entries(rhythm.terminology).map(([term, label]) => {
-            const value = label as { singular: string; plural: string };
-            const suggested = isTermKey(term) ? suggestedTerm(term) : undefined;
-            return (
-              <div key={term} className="flex flex-wrap items-center gap-2">
-                <span className="w-32 text-ink-3">{term}</span>
+        {rows.map((entry) => (
+          <Parameter
+            key={entry.key}
+            entry={entry}
+            resolved={rhythm.thresholds[entry.key]}
+            override={rhythm.overrides[entry.key]}
+            hint={hints[entry.key]}
+            canManage={canManage}
+          />
+        ))}
+      </SettingsCard>
+    );
+  };
+
+  const checkInCard = (
+    <SettingsCard
+      key="check-in"
+      id="check-in"
+      title={t("admin.rhythm.rhythmForm.theCheckInRhythm")}
+      description={t("admin.rhythm.rhythmForm.theseTwoHaveTheir")}
+    >
+      <div className="col-span-12 flex min-w-0 flex-col gap-1 md:col-span-6">
+        {/* The hint sits beside the label rather than in it, so opening it
+            does not move focus to the dropdown. */}
+        <span className="flex items-start gap-0.5">
+          <label
+            htmlFor="rhythm-check-in-frequency"
+            className="text-sm font-medium text-ink-2"
+          >
+            {t("admin.rhythm.rhythmForm.checkInFrequency")}
+          </label>
+          <ThresholdHintButton
+            name={t("admin.rhythm.rhythmForm.checkInFrequency")}
+            hint={checkInHints.defaultCheckInFrequency}
+            withReason
+          />
+        </span>
+        <SelectInput
+          label={t("admin.rhythm.rhythmForm.checkInFrequency")}
+          hideLabel
+          id="rhythm-check-in-frequency"
+          name="defaultCheckInFrequency"
+          disabled={!canManage}
+          value={String(values.defaultCheckInFrequency ?? "")}
+          onChange={(event) =>
+            set("defaultCheckInFrequency", event.currentTarget.value)
+          }
+        >
+          {checkInFrequencyOptions(rhythm.defaultCheckInFrequency).map(
+            (option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ),
+          )}
+        </SelectInput>
+      </div>
+      <div className="col-span-12 flex min-w-0 flex-col gap-1 md:col-span-6">
+        <span className="flex items-start gap-0.5">
+          <label
+            htmlFor="rhythm-anchor-day"
+            className="text-sm font-medium text-ink-2"
+          >
+            {t("admin.rhythm.rhythmForm.anchorDay")}
+          </label>
+          <ThresholdHintButton
+            name={t("admin.rhythm.rhythmForm.anchorDay")}
+            hint={checkInHints.checkInAnchorDay}
+            withReason
+          />
+        </span>
+        <SelectInput
+          label={t("admin.rhythm.rhythmForm.anchorDay")}
+          hideLabel
+          id="rhythm-anchor-day"
+          name="checkInAnchorDay"
+          disabled={!canManage}
+          value={String(values.checkInAnchorDay ?? "")}
+          onChange={(event) =>
+            set("checkInAnchorDay", event.currentTarget.value)
+          }
+        >
+          {WEEKDAYS.map(([value, labelKey]) => (
+            <option key={value} value={value}>
+              {t(labelKey)}
+            </option>
+          ))}
+        </SelectInput>
+      </div>
+      {/*
+       * **Coach strictness left this card at P9-T05.** Every check now has
+       * its own level (METHOD.md §4), and strict mode, which raises them
+       * all to block, is one setting among the practice's. Two switches
+       * for one behaviour is two places for an admin to look, and data
+       * change 0015 carried every workspace that had chosen strict across.
+       */}
+      <p className="col-span-12 text-sm text-ink-3">
+        {t("admin.rhythm.rhythmForm.strictModeIsOnThe")}{" "}
+        <Link href="/admin/practice" className="text-brand-text underline">
+          {t("admin.practice.title")}
+        </Link>
+      </p>
+    </SettingsCard>
+  );
+
+  const terminologyCard = (
+    <SettingsCard
+      key="terminology"
+      id="terminology"
+      title={t("admin.rhythm.rhythmForm.terminology")}
+      description={t("admin.rhythm.rhythmForm.renameAConceptThe")}
+    >
+      <div className="col-span-12 hidden grid-cols-12 gap-x-6 text-xs font-semibold text-ink-3 md:grid">
+        <span className="col-span-4">
+          {t("admin.rhythm.rhythmForm.termColumnConcept")}
+        </span>
+        <span className="col-span-4">
+          {t("admin.rhythm.rhythmForm.termColumnSingular")}
+        </span>
+        <span className="col-span-4">
+          {t("admin.rhythm.rhythmForm.termColumnPlural")}
+        </span>
+      </div>
+      {Object.keys(rhythm.terminology).map((term, index) => {
+        const singular = String(values[`label:${term}:singular`] ?? "");
+        const suggested = isTermKey(term) ? suggestedTerm(term) : undefined;
+        return (
+          <div
+            key={term}
+            className={`col-span-12 grid grid-cols-12 gap-x-6 gap-y-3 border-line ${
+              index === 0
+                ? "border-t-0 pt-0 md:border-t md:pt-4"
+                : "border-t pt-4"
+            }`}
+          >
+            <div className="col-span-12 flex min-w-0 flex-col items-start gap-1.5 md:col-span-4 md:pt-1.5">
+              <span className="text-sm text-ink-2">{term}</span>
+              {suggested && canManage && singular !== suggested.singular ? (
+                // METHOD.md's terms name a common alternative (D6, P9-T21).
+                // Offered rather than applied: it fills both fields and the
+                // page's own Save decides.
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    set(`label:${term}:singular`, suggested.singular);
+                    set(`label:${term}:plural`, suggested.plural);
+                  }}
+                >
+                  {t("admin.rhythm.rhythmForm.useSuggested", {
+                    singular: suggested.singular,
+                  })}
+                </Button>
+              ) : null}
+            </div>
+            {(["singular", "plural"] as const).map((shape) => (
+              <div
+                key={shape}
+                className="col-span-12 flex min-w-0 flex-col gap-1 md:col-span-4"
+              >
+                {/* The column heading is not on a phone, where the rows
+                    stack: this says which box is which. */}
+                <span
+                  aria-hidden="true"
+                  className="text-xs font-semibold text-ink-3 md:hidden"
+                >
+                  {shape === "singular"
+                    ? t("admin.rhythm.rhythmForm.termColumnSingular")
+                    : t("admin.rhythm.rhythmForm.termColumnPlural")}
+                </span>
                 {/* Each named, where the two boxes had no label, and held
                     to the method's 40 (termLabelSchema). */}
                 <TextInput
-                  label={t("admin.rhythm.rhythmForm.termSingular", { term })}
+                  label={t(
+                    shape === "singular"
+                      ? "admin.rhythm.rhythmForm.termSingular"
+                      : "admin.rhythm.rhythmForm.termPlural",
+                    { term },
+                  )}
                   hideLabel
-                  name={`label:${term}:singular`}
+                  name={`label:${term}:${shape}`}
                   maxLength={40}
                   disabled={!canManage}
-                  defaultValue={value.singular}
-                  className="w-40"
+                  value={String(values[`label:${term}:${shape}`] ?? "")}
+                  onChange={(event) =>
+                    set(`label:${term}:${shape}`, event.currentTarget.value)
+                  }
                 />
-                <TextInput
-                  label={t("admin.rhythm.rhythmForm.termPlural", { term })}
-                  hideLabel
-                  name={`label:${term}:plural`}
-                  maxLength={40}
-                  disabled={!canManage}
-                  defaultValue={value.plural}
-                  className="w-40"
-                />
-                {suggested &&
-                canManage &&
-                value.singular !== suggested.singular ? (
-                  // METHOD.md's terms name a common alternative (D6, P9-T21).
-                  // Offered rather than applied: it fills both fields and the
-                  // card's own Save decides.
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={(event) => {
-                      const form = event.currentTarget.form;
-                      for (const [form_, word] of [
-                        ["singular", suggested.singular],
-                        ["plural", suggested.plural],
-                      ] as const) {
-                        const field = form?.elements.namedItem(
-                          `label:${term}:${form_}`,
-                        );
-                        if (field instanceof HTMLInputElement) {
-                          field.value = word;
-                          // The unsaved-changes tracker listens for input.
-                          field.dispatchEvent(
-                            new Event("input", { bubbles: true }),
-                          );
-                        }
-                      }
-                    }}
-                  >
-                    {t("admin.rhythm.rhythmForm.useSuggested", {
-                      singular: suggested.singular,
-                    })}
-                  </Button>
-                ) : null}
               </div>
-            );
-          })}
+            ))}
+          </div>
+        );
+      })}
+    </SettingsCard>
+  );
+
+  return (
+    <FieldsContext.Provider value={fields}>
+      <RefusedContext.Provider value={refused}>
+        <div className="flex flex-col gap-4">
+          {canManage ? null : (
+            <Card>
+              <CardBody>
+                <p className="text-sm text-ink-2">
+                  {t("admin.rhythm.rhythmForm.youCanReadEvery")}
+                </p>
+              </CardBody>
+            </Card>
+          )}
+          <form
+            ref={form}
+            id={FORM_ID}
+            onSubmit={submit}
+            onReset={() => {
+              setNotice(null);
+              setValues({ ...stored });
+            }}
+            onKeyDown={onKeyDown}
+            aria-busy={pending}
+            className="flex flex-col gap-4"
+          >
+            {SECTIONS.map((section) => (
+              <div key={section.id} className="flex flex-col gap-4">
+                <SectionHeading
+                  title={t(section.title)}
+                  tag={t("admin.practice.section.saved.tag")}
+                />
+                {cardsOf(section).map((card) =>
+                  card === "check-in"
+                    ? checkInCard
+                    : card === "terminology"
+                      ? terminologyCard
+                      : groupCard(card),
+                )}
+              </div>
+            ))}
+          </form>
+          {canManage ? (
+            <SettingsSaveBar
+              mode="sticky"
+              formId={FORM_ID}
+              data-testid="rhythm-save-bar"
+              unsavedTestId="rhythm-unsaved"
+              unsaved={unsaved}
+              saved={dirty ? null : (notice ?? state.saved)}
+              error={state.error}
+              pending={pending}
+            />
+          ) : null}
         </div>
-      </SettingsCard>
-    </div>
+      </RefusedContext.Provider>
+    </FieldsContext.Provider>
   );
 }

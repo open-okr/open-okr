@@ -19,19 +19,17 @@
  * successful save looked exactly alike: the page came back, unchanged, saying
  * nothing.
  *
- * **Every assertion here is scoped to one card since P8-G11.** The screen used
- * to be one form with a single Save at the bottom of 8,001 pixels; it is now
- * eight forms, one per card, each saving its own thresholds. So "the Save
- * button" is no longer a thing that exists on this page, and a page-level
- * `getByRole("button", { name: "Save" })` matches eight elements and fails
- * Playwright's strict mode rather than picking one.
+ * **The page is one form with one sticky save bar.** Until the settings
+ * layout standard it was eight forms, each with its own Save and its own
+ * toast. "Save changes" in the bar sends every card at once and is refused as
+ * a whole, so a refusal means nothing was written on any card.
  *
- * **The outcome is a toast since P8-G11a, and that is the point of it.** The
- * sentence used to render at the top of the card, which on a card 1,700px tall
- * with a sticky Save meant pressing the button at the bottom of twenty
- * parameters and seeing nothing at all. A refusal now also names its parameter
- * under that parameter's own field, and this file asserts both, because the
- * toast alone would not prove the reader is taken to the box that was refused.
+ * **The outcome is in the bar, and a refusal also names its parameter under
+ * that parameter's own field.** This file asserts both, because the bar alone
+ * would not prove the reader is taken to the box that was refused.
+ *
+ * "Reset to defaults" writes nothing by itself: it blanks the card's fields,
+ * the bar lists the card as not saved yet, and Save changes writes the nulls.
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
@@ -58,26 +56,19 @@ const LADDER_OWNER =
   "input[name='composite:cadence.checkInLadderDays:championRepeat']";
 
 /**
- * The card both fields live in. Every save, refusal and reset below belongs to
- * this one form, and scoping to it is what keeps the assertions unambiguous
- * now that seven sibling cards carry the same controls.
+ * The card both fields live in. Reset belongs to a card, and scoping to it is
+ * what keeps that button unambiguous now that six sibling cards carry one.
  */
 const cadenceCard = (page: Page) => page.getByTestId("rhythm-card-cadence");
+const bar = (page: Page) => page.getByTestId("rhythm-save-bar");
 const save = (page: Page) =>
-  cadenceCard(page).getByRole("button", { name: "Save" });
+  bar(page).getByRole("button", { name: "Save changes" });
 
 /**
- * The toast, which is where a save says what happened.
- *
- * **Named by tone rather than just by test id.** A confirmation runs for six
- * seconds, so a test that saves and a test that is refused a moment later can
- * have both on screen at once, and an unscoped `getByTestId("toast")` then
- * matches two and fails strict mode. Saying which one is expected is also a
- * sharper assertion: it is the difference between "something was said" and
- * "it was refused".
+ * What the bar says. A save, a refusal and "not saved yet" all land in it, so
+ * "it was refused" is `alert` and "it was saved" is the confirmation text.
  */
-const outcome = (page: Page, tone: "ok" | "bad") =>
-  page.locator(`[data-testid="toast"][data-tone="${tone}"]`);
+const refusalIn = (page: Page) => bar(page).getByRole("alert");
 
 test.beforeAll(async ({ browser }) => {
   context = await browser.newContext();
@@ -138,7 +129,7 @@ test("an impossible value is refused in words", async () => {
   await grace().fill("99999");
   await save(page).click();
 
-  const refusal = outcome(page, "bad");
+  const refusal = refusalIn(page);
   await expect(refusal).toBeVisible({ timeout: 15_000 });
   await expect(refusal).toContainText("cadence.stalenessGraceDays");
 
@@ -149,7 +140,7 @@ test("an impossible value is refused in words", async () => {
   // the one the comment here used to claim and never checked.
   // Shown as the reader's locale writes it, grouped.
   await expect(grace()).toHaveValue(/^99,?999$/);
-  await expect(refusal).not.toContainText("Saved.");
+  await expect(bar(page)).not.toContainText("Saved.");
 
   // **The half a toast cannot carry.** The method named a parameter, so the
   // sentence is under that parameter's own field and the field says it is the
@@ -168,7 +159,7 @@ test("an impossible value is refused in words", async () => {
 test("a grace this workspace asked for is written, and nothing else moves", async () => {
   await grace().fill("5");
   await save(page).click();
-  await expect(outcome(page, "ok")).toContainText("Saved.", {
+  await expect(bar(page)).toContainText("Saved.", {
     timeout: 15_000,
   });
 
@@ -188,7 +179,7 @@ test("a ladder can be moved, which it could not before", async () => {
     .locator("input[name='composite:cadence.checkInLadderDays:sponsor']")
     .fill("20");
   await save(page).click();
-  await expect(outcome(page, "ok")).toContainText("Saved.", {
+  await expect(bar(page)).toContainText("Saved.", {
     timeout: 15_000,
   });
 
@@ -202,23 +193,23 @@ test("a half-written set is refused rather than stored", async () => {
     .fill("");
   await save(page).click();
 
-  const refusal = outcome(page, "bad");
+  const refusal = refusalIn(page);
   await expect(refusal).toBeVisible({ timeout: 15_000 });
   await expect(refusal).toContainText("every part");
 });
 
 test("reset puts the whole card back to its defaults", async () => {
   await goTo(page, "/admin/rhythm");
-  page.once("dialog", (dialog) => {
-    void dialog.accept();
-  });
   await cadenceCard(page)
     .getByRole("button", { name: "Reset to defaults" })
     .click();
 
-  await expect(outcome(page, "ok")).toContainText("Returned", {
-    timeout: 15_000,
-  });
+  // Nothing is written yet: the reset is in the bar as an unsaved change, and
+  // the fields are blank with the method's number as their placeholder.
+  await expect(bar(page)).toContainText("Not saved yet");
+  await expect(grace()).toHaveValue("");
+  await save(page).click();
+  await expect(bar(page)).toContainText("Saved.", { timeout: 15_000 });
 
   await goTo(page, "/admin/rhythm");
   // Blank means "no opinion", and the placeholder is the method's number.
@@ -247,11 +238,8 @@ test("a word list takes this workspace's own terms, and keeps the method's", asy
   expect(before).toContain("launch");
 
   await setTokens(field, ["luncurkan", "terbitkan"]);
-  await page
-    .getByTestId("rhythm-card-quality")
-    .getByRole("button", { name: "Save" })
-    .click();
-  await expect(outcome(page, "ok")).toContainText("Saved.", {
+  await save(page).click();
+  await expect(bar(page)).toContainText("Saved.", {
     timeout: 15_000,
   });
 
@@ -262,11 +250,8 @@ test("a word list takes this workspace's own terms, and keeps the method's", asy
 
   // Put it back, so no later spec inherits this workspace's vocabulary.
   await setTokens(field, []);
-  await page
-    .getByTestId("rhythm-card-quality")
-    .getByRole("button", { name: "Save" })
-    .click();
-  await expect(outcome(page, "ok")).toContainText("Saved.", {
+  await save(page).click();
+  await expect(bar(page)).toContainText("Saved.", {
     timeout: 15_000,
   });
 });
@@ -289,8 +274,8 @@ test("a renamed term is what every screen calls it, and the canon comes back", a
     await goTo(page, "/admin/rhythm");
     await terminology.locator("input[name='label:space:singular']").fill(singular);
     await terminology.locator("input[name='label:space:plural']").fill(plural);
-    await terminology.getByRole("button", { name: "Save" }).click();
-    await expect(outcome(page, "ok")).toContainText("Saved.", {
+    await save(page).click();
+    await expect(bar(page)).toContainText("Saved.", {
       timeout: 15_000,
     });
   };

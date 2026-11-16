@@ -81,49 +81,54 @@ describe("the rhythm and thresholds card", () => {
 
   test("the refusal comes to the reader, and names its own field", () => {
     // **It used to render at the top of the card and be invisible.** A card
-    // runs to 1,700px with its Save in a header that stays on screen, so a
-    // refusal raised from the bottom of twenty parameters was off the top of
-    // the window with nothing to suggest it existed. Agung reported it.
-    expect(form).toContain("useToast");
-    expect(form).toContain('tone: "bad"');
-    // And the sentence lands under the parameter the method named, with the
-    // field brought into view and marked invalid.
+    // runs to 1,700px, so a refusal raised from the bottom of twenty
+    // parameters was off the top of the window with nothing to suggest it
+    // existed. It is now in the save bar, under the field the method named,
+    // and the field is brought into view and marked invalid.
+    expect(form).toContain("SettingsSaveBar");
+    expect(form).toContain("error={state.error}");
     expect(form).toContain("refusedParameter");
     expect(form).toContain("focusRefused");
     expect(form).toContain("invalid={refusal !== null}");
     expect(form).toContain(
       "aria-describedby={refusal === null ? undefined : errorId}",
     );
-    // The card no longer carries a status strip of its own, because two
-    // places saying the same thing is how one of them goes stale.
-    expect(form).not.toContain('data-testid="rhythm-save"');
+    expect(form).toContain('data-testid="rhythm-field-error"');
+    // One bar says it, so no toast says it a second time.
+    expect(form).not.toContain("useToast");
   });
 
-  test("reset sends nulls, not the canon's current numbers", () => {
+  test("reset blanks the card in the browser, and the save sends the blanks as nulls", () => {
     // Storing today's default is not the same as having no opinion: the
-    // stored copy keeps winning after the canon itself moves.
-    expect(actions).toContain("wanted.map((key) => [key, null])");
-    expect(form).toContain("Reset to defaults");
+    // stored copy keeps winning after the canon itself moves. A blank field
+    // is a null in the save, and the reset is no server call of its own.
+    expect(actions).toContain('value === "" ? null : Number(value)');
+    expect(actions).not.toContain("resetGroup");
+    expect(form).toContain('t("common.resetToDefaults")');
+    expect(form).toContain("resetCard(group)");
+    expect(form).not.toContain("window.confirm");
   });
 
-  test("each card is its own form, so the save is beside what it saves", () => {
+  test("the page is one form with one save bar, so every card saves together", () => {
     // Measured on 22 September 2026: one Save sat 7,785px below the first of
-    // the 123 fields it governed, which is 9.6 viewports on an 814px page.
-    // Every other long screen in this product already saves per card, so this
-    // was the one outlier rather than a pattern.
+    // the 123 fields it governed. Per-card saves fixed the distance and cost
+    // eight buttons, a sticky header on each and a toast apiece. The settings
+    // layout standard is one object with one bar, which names the cards that
+    // changed.
     expect(form).toContain("function SettingsCard");
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the needle is source text, matched literally
     expect(form).toContain("data-testid={`rhythm-card-${id}`}");
-    // And the page itself no longer wraps everything in one form.
-    expect(form).not.toContain("<form action={submit} aria-busy={pending}");
+    expect(form).toContain("id={FORM_ID}");
+    expect(form).toContain("unsaved={unsaved}");
+    // A card has no Save of its own.
+    expect(form.match(/<form\b/g)).toHaveLength(1);
+    expect(form).not.toContain("sticky top-0");
   });
 
-  test("a card sends only its own fields, and the action sends only what arrived", () => {
-    // `rhythm.update` takes every field as optional and merges `overrides`,
-    // which is what lets eight small saves replace one large one. Reading
-    // `form.get("checkInAnchorDay")` unconditionally, as the single form did,
-    // would send null for the cadence settings on every save from any card
-    // that does not hold them.
+  test("the action sends only what arrived", () => {
+    // `rhythm.update` takes every field as optional and merges `overrides`.
+    // Reading `form.get("checkInAnchorDay")` unconditionally would send null
+    // for the cadence settings from any form that does not hold them.
     expect(actions).toContain('form.has("checkInAnchorDay")');
     expect(actions).toContain("sawThreshold");
     expect(actions).toContain("Object.keys(patch).length === 0");
@@ -135,7 +140,7 @@ describe("the rhythm and thresholds card", () => {
     // that UIUX-PLAN.md §4 lists.
     expect(form).toContain("useUnsavedGuard");
     expect(form).toContain("useSubmitShortcut");
-    expect(form).toContain("useFormDirty");
+    expect(form).toContain("changedFields");
   });
 
   test("every threshold explains what its reason cites and where the method sets it out", () => {
