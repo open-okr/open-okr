@@ -108,6 +108,6 @@ Branding and General are done. The rest wait for their own change, one page at a
 | account/ai | One card, one sticky bar (one Save changes stores every key field that was filled), Remove my key stays instant | Done (2026-11-17) |
 | account/api-tokens | Instant actions (Create token in the New token footer, Revoke per row), a scrolling list | Done (2026-11-17) |
 | account/channels | Footer per card (Delivery, How often), instant actions for linked accounts | Done (2026-11-16) |
-| account/connections | Proposed: instant actions | Pending |
+| account/connections | Instant actions (Revoke per row), no save bar, one card without a header, a scrolling list | Done (2026-11-17) |
 | account/device | Proposed: instant actions | Pending |
 | account/security | Instant actions, a scrolling list for sessions | Done (2026-11-16) |

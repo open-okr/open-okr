@@ -117,6 +117,7 @@
   "account.connections.connectedAgents": "Connected agents",
   "account.connections.externalAgentsYouAllowed": "External agents you allowed to act as you. Each one holds your own\n            access, narrowed to what you granted it, in the one workspace you\n            picked.",
   "account.connections.lastUsedConnected": "Last used {lastUsed} · connected {connected}",
+  "account.connections.listLabel": "Connected agents",
   "account.connections.neverUsedConnected": "Never used · connected {connected}",
   "account.connections.nothingConnectedAnAgent": "Nothing connected. An agent starts this itself, by sending you\n              here.",
   "account.delete.closeIt": "Close the workspace",

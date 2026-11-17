@@ -117,6 +117,7 @@
   "account.connections.connectedAgents": "Ejen yang disambungkan",
   "account.connections.externalAgentsYouAllowed": "Ejen luaran yang anda benarkan bertindak sebagai anda. Setiap satu memegang akses anda sendiri, disempitkan kepada apa yang anda berikan, dalam satu ruang kerja yang anda pilih.",
   "account.connections.lastUsedConnected": "Terakhir digunakan {lastUsed} · disambungkan {connected}",
+  "account.connections.listLabel": "Ejen yang disambungkan",
   "account.connections.neverUsedConnected": "Tidak pernah digunakan · disambungkan {connected}",
   "account.connections.nothingConnectedAnAgent": "Tiada yang disambungkan. Ejen memulakannya sendiri, dengan menghantar anda ke sini.",
   "account.delete.closeIt": "Tutup ruang kerja",

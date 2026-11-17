@@ -25,7 +25,11 @@ export function RevokeForm({
 
   const [state, formAction, pending] = useActionState(action, NOTHING_YET);
   return (
-    <form action={formAction} className="w-fit" aria-busy={pending}>
+    <form
+      action={formAction}
+      className="flex shrink-0 flex-col items-end"
+      aria-busy={pending}
+    >
       <input type="hidden" name="id" value={id} />
       <Button type="submit" size="sm">
         {t("common.revoke")}
