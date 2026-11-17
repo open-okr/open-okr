@@ -37,12 +37,13 @@ import {
   removeBudget,
   restoreDefaultPrompt,
   saveBudget,
-  saveFeature,
   savePrivacy,
   savePrompt,
 } from "./actions.ts";
+import { AddCard } from "./add-card.tsx";
 import { AIForm } from "./ai-form.tsx";
 import { budgetOwnerValue } from "./choices.ts";
+import { FeaturesForm } from "./features-form.tsx";
 
 /**
  * The AI console's second half: features, prompts, budgets and usage
@@ -319,19 +320,15 @@ export async function BudgetsCard({
       : people.find((person) => person.id === ref)?.name) ?? ref.slice(0, 8);
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">
-            {t("admin.ai.governance.budgetsAndCaps")}
-          </h2>
-          <p className="text-xs text-ink-3">
-            {t("admin.ai.governance.crossingOneStopsThe")}
-          </p>
-        </div>
-      </CardHeader>
-      <CardBody className="flex flex-col gap-2.5">
-        {budgets.length === 0 ? (
+    <AddCard
+      data-testid="ai-budgets-card"
+      title={t("admin.ai.governance.budgetsAndCaps")}
+      intro={t("admin.ai.governance.crossingOneStopsThe")}
+      addLabel={t("admin.ai.setABudget")}
+      submitLabel={t("common.set")}
+      action={saveBudget}
+      list={
+        budgets.length === 0 ? (
           <p className="text-xs text-ink-3">
             {t("admin.ai.governance.noneSetSoNothing")}
           </p>
@@ -384,50 +381,52 @@ export async function BudgetsCard({
               </tbody>
             </table>
           </div>
-        )}
-
-        <AIForm
-          action={saveBudget}
-          className="flex flex-wrap items-end gap-2 border-t border-line pt-3"
+        )
+      }
+    >
+      <div className="grid grid-cols-12 gap-x-6 gap-y-4">
+        <EntityPicker
+          label={t("admin.ai.governance.whoseForAUser")}
+          name="owner"
+          defaultValue={null}
+          options={owners}
+          noneLabel={t("admin.ai.governance.wholeWorkspace")}
+          className="col-span-12 md:col-span-6"
+        />
+        <SelectInput
+          label={t("admin.ai.governance.metric")}
+          name="metric"
+          className="col-span-6 md:col-span-2"
         >
-          <EntityPicker
-            label={t("admin.ai.governance.whoseForAUser")}
-            name="owner"
-            defaultValue={null}
-            options={owners}
-            noneLabel={t("admin.ai.governance.wholeWorkspace")}
-            className="w-64"
-          />
-          <SelectInput label={t("admin.ai.governance.metric")} name="metric">
-            {BUDGET_METRICS.map((metric) => (
-              <option key={metric} value={metric}>
-                {metric}
-              </option>
-            ))}
-          </SelectInput>
-          <SelectInput label={t("common.period")} name="period">
-            {BUDGET_PERIODS.map((period) => (
-              <option key={period} value={period}>
-                {period}
-              </option>
-            ))}
-          </SelectInput>
-          {/* Above 0, as the server holds it: a budget of nothing would
-              stop every call (guided-inputs §4.11). */}
-          <NumberInput
-            label={t("admin.ai.governance.limit")}
-            name="limitValue"
-            min={0.01}
-            step={0.01}
-            required
-            inputClassName="w-32"
-          />
-          <Button type="submit" variant="default" size="sm">
-            {t("common.set")}
-          </Button>
-        </AIForm>
-      </CardBody>
-    </Card>
+          {BUDGET_METRICS.map((metric) => (
+            <option key={metric} value={metric}>
+              {metric}
+            </option>
+          ))}
+        </SelectInput>
+        <SelectInput
+          label={t("common.period")}
+          name="period"
+          className="col-span-6 md:col-span-2"
+        >
+          {BUDGET_PERIODS.map((period) => (
+            <option key={period} value={period}>
+              {period}
+            </option>
+          ))}
+        </SelectInput>
+        {/* Above 0, as the server holds it: a budget of nothing would
+            stop every call (guided-inputs §4.11). */}
+        <NumberInput
+          label={t("admin.ai.governance.limit")}
+          name="limitValue"
+          min={0.01}
+          step={0.01}
+          required
+          className="col-span-12 md:col-span-2"
+        />
+      </div>
+    </AddCard>
   );
 }
 
@@ -439,7 +438,7 @@ export async function FeaturesCard({
   const { t } = await getTranslations();
 
   return (
-    <Card>
+    <Card data-testid="ai-features-card">
       <CardHeader>
         <div className="flex min-w-0 flex-col">
           <h2 className="text-sm font-bold text-ink">
@@ -450,56 +449,25 @@ export async function FeaturesCard({
           </p>
         </div>
       </CardHeader>
-      <CardBody className="flex flex-col gap-1.5">
-        {FEATURE_KEYS.map((featureKey) => {
+      <FeaturesForm
+        rows={FEATURE_KEYS.map((featureKey) => {
           const setting = features.find((one) => one.featureKey === featureKey);
           const named = ASSIST_NAME_KEYS[featureKey];
-          return (
-            <AIForm
-              key={featureKey}
-              action={saveFeature}
-              className="flex flex-wrap items-center gap-2.5 border-t border-line pt-2 first:border-0 first:pt-0"
-            >
-              <input type="hidden" name="featureKey" value={featureKey} />
-              <label className="flex min-w-64 items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  name="enabled"
-                  defaultChecked={setting?.enabled ?? true}
-                  className="size-4"
-                />
-                {/*
-                 * The assist's name, not its key (P8-G11d). The key is still
-                 * the hidden field this form posts, so nothing about what is
-                 * stored or authorised changed.
-                 */}
-                <span className="text-sm">
-                  {named === undefined ? featureKey : t(named)}
-                </span>
-              </label>
-              <SelectInput
-                label={t("admin.ai.governance.tier")}
-                name="tierOverride"
-                defaultValue={setting?.tierOverride ?? ""}
-                className="flex-row items-center gap-1.5"
-                inputClassName="w-auto"
-              >
-                <option value="">
-                  {t("admin.ai.governance.whateverTheAssistAsks")}
-                </option>
-                {MODEL_TIERS.map((tier) => (
-                  <option key={tier} value={tier}>
-                    {TIER_WORDS[tier] ?? tier}
-                  </option>
-                ))}
-              </SelectInput>
-              <Button type="submit" size="sm">
-                {t("common.save")}
-              </Button>
-            </AIForm>
-          );
+          return {
+            featureKey,
+            // The assist's name, not its key (P8-G11d). The key is still
+            // what the save posts, so nothing about what is stored or
+            // authorised changed.
+            label: named === undefined ? featureKey : t(named),
+            enabled: setting?.enabled ?? true,
+            tier: setting?.tierOverride ?? "",
+          };
         })}
-      </CardBody>
+        tiers={MODEL_TIERS.map((tier) => ({
+          value: tier,
+          label: TIER_WORDS[tier] ?? tier,
+        }))}
+      />
     </Card>
   );
 }
