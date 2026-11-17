@@ -1,12 +1,11 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip, SecretInput } from "@openokr/ui";
+import { Card, CardBody } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
-import { removePersonalKey, savePersonalKey } from "./actions.ts";
-import { KeyForm } from "./key-form.tsx";
+import { KeysCard } from "./keys-card.tsx";
 import { providerWord, STATUS_WORDS } from "./words.ts";
 
 export const generateMetadata = pageTitle("pageTitle.accountAi");
@@ -61,25 +60,15 @@ export default async function PersonalAIKeysPage() {
   const canStore = level >= ACCESS_LEVELS.edit;
 
   return (
-    <div className="flex flex-col gap-4.5">
-      <Card>
-        <CardHeader>
-          <h1 className="text-lg font-bold text-ink">
-            {t("account.aiKeys.title")}
-          </h1>
-        </CardHeader>
-        <CardBody className="flex flex-col gap-2">
-          <p className="max-w-prose text-sm text-ink-3">
-            {t("account.aiKeys.intro")}
-          </p>
-          <p className="max-w-prose text-sm text-ink-3">
-            {t("account.aiKeys.whichProvider")}
-          </p>
-          <p className="max-w-prose text-sm text-ink-3">
-            {t("account.aiKeys.neverShown")}
-          </p>
-        </CardBody>
-      </Card>
+    <div className="flex flex-col gap-4">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("account.aiKeys.title")}
+        </h1>
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("account.aiKeys.intro")}
+        </p>
+      </header>
 
       {keys.length === 0 ? (
         <Card>
@@ -93,107 +82,38 @@ export default async function PersonalAIKeysPage() {
           </CardBody>
         </Card>
       ) : (
-        <section
-          aria-label={t("account.aiKeys.providers")}
-          className="flex flex-col gap-1.5"
-        >
-          {canStore ? null : (
+        <KeysCard
+          canStore={canStore}
+          title={t("account.aiKeys.providers")}
+          description={t("account.aiKeys.whichProvider")}
+          neverShown={t("account.aiKeys.neverShown")}
+          denied={
             <p
               className="max-w-prose rounded-md bg-raised px-2.5 py-1.5 text-xs text-ink-2"
               data-testid="personal-keys-denied"
             >
               {t("account.aiKeys.cannotStore")}
             </p>
-          )}
-          {keys.map((key) => {
+          }
+          rows={keys.map((key) => {
             const name = providerWord(t, key.provider);
-            return (
-              <Card key={key.provider} data-testid="personal-key">
-                <CardHeader className="justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-sm font-bold text-ink">{name}</h2>
-                    {key.hasPersonalCredential ? (
-                      <Chip tone="ok">{t("account.aiKeys.set")}</Chip>
-                    ) : (
-                      <Chip tone="neutral">{t("account.aiKeys.notSet")}</Chip>
-                    )}
-                    {key.status ? (
-                      <Chip tone={STATUS_TONE[key.status] ?? "warn"}>
-                        {t(STATUS_WORDS[key.status])}
-                      </Chip>
-                    ) : null}
-                  </div>
-                  {key.keyHint ? (
-                    <code className="font-mono text-xs text-ink-3">
-                      {key.keyHint}
-                    </code>
-                  ) : null}
-                </CardHeader>
-                <CardBody className="flex flex-col gap-3">
-                  {key.setAt ? (
-                    <p className="text-xs text-ink-3">
-                      {t("account.aiKeys.setOn", {
-                        date: key.setAt.slice(0, 10),
-                      })}
-                    </p>
-                  ) : null}
-
-                  {canStore ? (
-                    <KeyForm
-                      action={savePersonalKey}
-                      submitLabel={
-                        key.hasPersonalCredential
-                          ? t("admin.ai.replace")
-                          : t("admin.ai.store")
-                      }
-                      busyLabel={t("account.aiKeys.storing")}
-                      className="flex flex-col gap-2"
-                    >
-                      <input
-                        type="hidden"
-                        name="provider"
-                        value={key.provider}
-                      />
-                      <SecretInput
-                        label={
-                          key.hasPersonalCredential
-                            ? t("account.aiKeys.replaceHelp", {
-                                provider: name,
-                              })
-                            : t("account.aiKeys.pasteHelp", { provider: name })
-                        }
-                        name="apiKey"
-                        autoComplete="off"
-                        required
-                        maxLength={4096}
-                        className="max-w-sm"
-                      />
-                    </KeyForm>
-                  ) : null}
-
-                  {/* Only where there is something to remove. The chip above
-                      turning to "Not stored" is the confirmation, because the
-                      render that proves the removal also takes this form away
-                      with any message inside it. */}
-                  {canStore && key.hasPersonalCredential ? (
-                    <KeyForm
-                      action={removePersonalKey}
-                      submitLabel={t("account.aiKeys.remove")}
-                      busyLabel={t("account.aiKeys.removing")}
-                      className="flex flex-col gap-2 border-t border-line pt-3"
-                    >
-                      <input
-                        type="hidden"
-                        name="provider"
-                        value={key.provider}
-                      />
-                    </KeyForm>
-                  ) : null}
-                </CardBody>
-              </Card>
-            );
+            return {
+              provider: key.provider,
+              name,
+              hasKey: key.hasPersonalCredential,
+              statusLabel: key.status ? t(STATUS_WORDS[key.status]) : null,
+              statusTone: STATUS_TONE[key.status ?? ""] ?? "warn",
+              keyHint: key.keyHint,
+              storedOn: key.setAt
+                ? t("account.aiKeys.setOn", { date: key.setAt.slice(0, 10) })
+                : null,
+              fieldLabel: key.hasPersonalCredential
+                ? t("account.aiKeys.replaceHelp", { provider: name })
+                : t("account.aiKeys.pasteHelp", { provider: name }),
+              unsavedLabel: t("account.aiKeys.keyOf", { provider: name }),
+            };
           })}
-        </section>
+        />
       )}
     </div>
   );

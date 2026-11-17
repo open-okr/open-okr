@@ -105,7 +105,7 @@ Branding and General are done. The rest wait for their own change, one page at a
 | admin/support | Instant actions, a scrolling list for past sessions | Done (2026-11-16) |
 | admin/webhooks | Proposed: list or tool | Pending |
 | account (name, email, delete) | Footer per card (name and picture, profile details), instant actions (picture, appearance, change email), danger card for delete | Done (2026-11-16) |
-| account/ai | One card, sticky bar | Pending |
+| account/ai | One card, one sticky bar (one Save changes stores every key field that was filled), Remove my key stays instant | Done (2026-11-17) |
 | account/api-tokens | Instant actions | Pending |
 | account/channels | Footer per card (Delivery, How often), instant actions for linked accounts | Done (2026-11-16) |
 | account/connections | Proposed: instant actions | Pending |
