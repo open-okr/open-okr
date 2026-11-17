@@ -1,6 +1,5 @@
 import { callAction, TEMPLATES } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
-import Link from "next/link";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
 import { pageTitle } from "../../../lib/page-title.ts";
@@ -49,9 +48,14 @@ export default async function ImportsPage() {
 
   return (
     <>
-      <h1 className="mb-4 text-lg font-bold text-ink">
-        {t("admin.imports.import")}
-      </h1>
+      <header className="mb-4 flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.imports.import")}
+        </h1>
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("admin.imports.intro")}
+        </p>
+      </header>
       <div className="flex flex-col gap-4">
         <ImportWizard entities={entities} aiOn={drafter !== null} />
 
@@ -73,13 +77,16 @@ export default async function ImportsPage() {
               </p>
             ) : (
               <ul
-                className="flex flex-col divide-y divide-line"
+                // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+                tabIndex={0}
+                aria-label={t("common.recentRuns")}
+                className="relative max-h-[296px] divide-y divide-line overflow-y-auto overscroll-contain rounded-lg border border-line"
                 data-testid="import-runs"
               >
                 {runs.runs.map((run) => (
                   <li
                     key={run.id}
-                    className="flex items-center gap-3 py-2 text-sm"
+                    className="flex items-center gap-3 px-3 py-2 text-sm"
                   >
                     <Chip tone={run.mode === "real" ? "info" : "neutral"}>
                       {run.mode === "real"
@@ -115,18 +122,6 @@ export default async function ImportsPage() {
         </Card>
         {/* Workspace archive import (P6-T05c). Taking an archive moved to
             Backups, one place to take a copy (backups-screen.md U2). */}
-        <h2 className="mt-2 text-base font-bold text-ink">
-          {t("admin.imports.workspaceArchive")}
-        </h2>
-        <p className="text-sm text-ink-2">
-          {t("admin.imports.takeArchiveOnBackups")}{" "}
-          <Link
-            className="font-medium text-brand-text hover:underline"
-            href="/admin/backups"
-          >
-            {t("admin.backups.title")}
-          </Link>
-        </p>
         <ArchiveImportCard />
       </div>
     </>

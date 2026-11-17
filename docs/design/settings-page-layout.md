@@ -95,7 +95,7 @@ Branding and General are done. The rest wait for their own change, one page at a
 | admin/audit | List or tool: three cards (Check the chain, Browse and export, the rows with a sticky header scrolling at 420 px) | Done (2026-11-16) |
 | admin/deleted | List or tool: intro under the title, one card with a scrolling list, Restore is an instant action per row | Done (2026-11-17) |
 | admin/invitations | List or tool: intro under the title, no group headings, three create cards with a footer button each (Create the invitation, Invite the guest, Create the link; each applies at once), a scrolling Issued list with an instant Revoke that still asks first | Done (2026-11-17) |
-| admin/imports | List or tool | Pending |
+| admin/imports | List or tool: intro under the title, no group heading (the archive card says where to take an archive), a wizard whose card footers use small buttons, the column mapping list and Recent runs scrolling at about five rows | Done (2026-11-17) |
 | admin/directory | Instant action (Generate SCIM token in the card footer); the endpoint is a `CopyField` | Done (2026-11-16) |
 | admin/agents | Proposed: footer per card, instant actions for run controls | Pending |
 | admin/ai | Proposed: footer per card | Pending |
