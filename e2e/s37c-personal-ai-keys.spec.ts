@@ -45,7 +45,10 @@ const slot = (page: Page): Locator =>
 
 async function allowPersonalKeys(page: Page, allow: boolean): Promise<void> {
   await goTo(page, "/admin/ai");
+  // One tab per provider, one card visible: open OpenRouter's.
+  await page.getByRole("tab", { name: /OpenRouter/ }).click();
   const form = providerForm(page);
+  const card = page.getByTestId("ai-provider-openrouter");
   const box = form.getByLabel("Let members supply their own key");
   if (allow) {
     await box.check();
@@ -55,10 +58,10 @@ async function allowPersonalKeys(page: Page, allow: boolean): Promise<void> {
   // Left off: a provider that takes personal keys and is not in use keeps AI
   // off for every other spec.
   await expect(form.getByLabel("Use this provider")).not.toBeChecked();
-  await form.getByRole("button", { name: "Save" }).click();
-  await expect(form.getByRole("status")).toHaveText("Saved.", {
-    timeout: 15_000,
-  });
+  await card.getByRole("button", { name: "Save changes" }).click();
+  await expect(card.getByRole("status").filter({ hasText: "Saved." })).toBeVisible(
+    { timeout: 15_000 },
+  );
 }
 
 test.beforeAll(async ({ browser }) => {

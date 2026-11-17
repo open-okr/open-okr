@@ -330,7 +330,9 @@ describe("where it lives", () => {
 
   it("is where the AI console sends an administrator who allows personal keys", () => {
     const aiConsole = readScreen(
-      fileURLToPath(new URL("../app/admin/ai/page.tsx", import.meta.url)),
+      fileURLToPath(
+        new URL("../app/admin/ai/provider-settings-form.tsx", import.meta.url),
+      ),
     );
     expect(aiConsole).toContain(
       "Each member stores their own under Your AI keys, in their account.",
