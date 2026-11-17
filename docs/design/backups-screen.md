@@ -41,6 +41,7 @@ Authority: REQUIREMENTS §4 Pillar F ("backups" in Admin) and §7's reliability 
 | U6 | **The same card on a cloud** says the provider backs up the service, and links `instance.supportEmail` when it is set. Nothing else about the provider's backups | How a provider keeps backups is theirs to state in their terms, not this screen's |
 | U7 | **It works in a suspended or closed workspace.** The closed-workspace banner links here | That is when an administrator most needs the archive, and the export is already allowed then |
 | U8 | No migration, no setting | The archive and its run rows exist |
+| U9 | **Layout, 2026-11-17.** An intro sentence under the title. Each card's explanation is its header description. Export is a button in the first card's footer, enabled at 12 characters of passphrase, with no Discard. Download and Clear sit in the footer of the result. Archives taken scrolls after about five rows. Restoring and This instance's backups are header-only cards with the guide link at the header right | The settings page layout standard; same words, nothing dropped |
 
 ## 3. Open question
 

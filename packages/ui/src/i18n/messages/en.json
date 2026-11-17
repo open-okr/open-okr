@@ -593,6 +593,7 @@
   "admin.backups.instanceGuide": "How the server is backed up and restored",
   "admin.backups.instanceSelfHosted": "The person who runs this server backs it up with ./openokr backup, or the Helm chart's backup job. Each backup holds every workspace on the server, so it is taken and restored on the server, never from a workspace's screen.",
   "admin.backups.instanceTitle": "This instance's backups",
+  "admin.backups.intro": "Export this workspace, see the archives already taken and find how a restore works.",
   "admin.backups.noneTaken": "No archive of this workspace has been taken yet.",
   "admin.backups.restoreBody": "An archive is restored into a new, empty workspace, through Import on that workspace's admin. Importing it into the workspace it came from would add a second copy of everything, so nothing here offers that.",
   "admin.backups.restoreGuide": "The restore and cutover guide",

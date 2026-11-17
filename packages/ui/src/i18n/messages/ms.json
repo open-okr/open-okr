@@ -593,6 +593,7 @@
   "admin.backups.instanceGuide": "Bagaimana pelayan disandarkan dan dipulihkan",
   "admin.backups.instanceSelfHosted": "Orang yang menjalankan pelayan ini membuat sandarannya dengan ./openokr backup, atau tugas sandaran carta Helm. Setiap sandaran mengandungi setiap ruang kerja pada pelayan, jadi ia diambil dan dipulihkan pada pelayan, tidak sekali-kali dari skrin ruang kerja.",
   "admin.backups.instanceTitle": "Sandaran instans ini",
+  "admin.backups.intro": "Eksport ruang kerja ini, lihat arkib yang telah diambil dan ketahui cara pemulihan berfungsi.",
   "admin.backups.noneTaken": "Belum ada arkib ruang kerja ini yang diambil.",
   "admin.backups.restoreBody": "Arkib dipulihkan ke dalam ruang kerja baharu yang kosong, melalui Import pada pentadbiran ruang kerja itu. Mengimportnya ke ruang kerja asalnya akan menambah salinan kedua bagi semuanya, jadi tiada apa di sini yang menawarkan itu.",
   "admin.backups.restoreGuide": "Panduan pemulihan dan peralihan",
