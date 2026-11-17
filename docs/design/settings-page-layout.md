@@ -91,7 +91,7 @@ Branding and General are done. The rest wait for their own change, one page at a
 | admin/practice | One sticky bar for the page | Done (2026-11-16) |
 | admin/rhythm | One sticky bar for the page | Done (2026-11-16) |
 | admin/nudges | One sticky bar for the page | Pending |
-| admin/connections | One card, sticky bar (per the prototype). The S-37 spec describes a list with End controls, so check before changing | Pending |
+| admin/connections | List or tool; End is an instant action per row (inline confirmation), no save bar, a scrolling list | Done (2026-11-17) |
 | admin/audit | List or tool: three cards (Check the chain, Browse and export, the rows with a sticky header scrolling at 420 px) | Done (2026-11-16) |
 | admin/deleted | List or tool: intro under the title, one card with a scrolling list, Restore is an instant action per row | Done (2026-11-17) |
 | admin/invitations | List or tool: intro under the title, no group headings, three create cards with a footer button each (Create the invitation, Invite the guest, Create the link; each applies at once), a scrolling Issued list with an instant Revoke that still asks first | Done (2026-11-17) |
