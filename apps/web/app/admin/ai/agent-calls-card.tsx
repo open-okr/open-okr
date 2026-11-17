@@ -66,9 +66,12 @@ export async function AgentCallsCard({
   return (
     <Card>
       <CardHeader>
-        <h2 className="text-sm font-bold text-ink">
-          {t("admin.ai.agentCalls.title")}
-        </h2>
+        <div className="flex min-w-0 flex-col">
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.ai.agentCalls.title")}
+          </h2>
+          <p className="text-xs text-ink-3">{t("admin.ai.agentCalls.about")}</p>
+        </div>
       </CardHeader>
       <CardBody className="flex flex-col gap-2 text-sm">
         {summary.calls === 0 ? (
@@ -106,7 +109,13 @@ export async function AgentCallsCard({
                 refused: summary.copilot.refused,
               })}
             </p>
-            <ul className="flex flex-col gap-1 text-xs text-ink-3">
+            <ul
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+              tabIndex={0}
+              aria-label={t("admin.ai.agentCalls.copilotTitle")}
+              // Scrolls inside the card at about five rows.
+              className="relative flex max-h-[200px] flex-col gap-1 overflow-y-auto overscroll-contain rounded-lg border border-line px-3 py-2 text-xs text-ink-3"
+            >
               {summary.copilot.recent.map((read, index) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: a read has no id of its own here; the list is fixed per render.
                 <li key={index}>

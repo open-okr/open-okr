@@ -71,9 +71,12 @@ export async function RatingsCard({
   return (
     <Card>
       <CardHeader className="justify-between">
-        <h2 id="ratings" className="text-sm font-bold text-ink">
-          {t("admin.ai.ratings.title")}
-        </h2>
+        <div className="flex min-w-0 flex-col">
+          <h2 id="ratings" className="text-sm font-bold text-ink">
+            {t("admin.ai.ratings.title")}
+          </h2>
+          <p className="text-xs text-ink-3">{t("admin.ai.ratings.about")}</p>
+        </div>
         <nav
           aria-label={t("admin.ai.ratings.filter")}
           className="flex items-center gap-2 text-xs"
@@ -95,11 +98,16 @@ export async function RatingsCard({
         </nav>
       </CardHeader>
       <CardBody className="flex flex-col gap-2 text-sm">
-        <p className="text-xs text-ink-3">{t("admin.ai.ratings.about")}</p>
         {rows.length === 0 ? (
           <p className="text-xs text-ink-3">{t("admin.ai.ratings.none")}</p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+            tabIndex={0}
+            aria-label={t("admin.ai.ratings.title")}
+            // Scrolls inside the card at about five rows.
+            className="relative flex max-h-[296px] flex-col gap-2 overflow-y-auto overscroll-contain"
+          >
             {rows.map((row) => (
               <li
                 key={row.id}

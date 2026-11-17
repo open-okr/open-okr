@@ -23,8 +23,6 @@ import {
   EntityPicker,
   NumberInput,
   SelectInput,
-  TextArea,
-  TokenInput,
 } from "@openokr/ui";
 import { type MemberLike, memberOption } from "../../../lib/entity-options.ts";
 import {
@@ -33,17 +31,13 @@ import {
 } from "../../../lib/identifier-names.ts";
 import type { PromptEvaluationRow } from "../../../lib/prompt-evaluation.ts";
 import { getTranslations } from "../../../lib/translations";
-import {
-  removeBudget,
-  restoreDefaultPrompt,
-  saveBudget,
-  savePrivacy,
-  savePrompt,
-} from "./actions.ts";
+import { removeBudget, saveBudget } from "./actions.ts";
 import { AddCard } from "./add-card.tsx";
 import { AIForm } from "./ai-form.tsx";
 import { budgetOwnerValue } from "./choices.ts";
 import { FeaturesForm } from "./features-form.tsx";
+import { PrivacyForm } from "./privacy-form.tsx";
+import { PromptCard } from "./prompt-card.tsx";
 
 /**
  * The AI console's second half: features, prompts, budgets and usage
@@ -174,7 +168,13 @@ async function EvaluationResults({
         {t("admin.ai.evaluation.title")}
       </h3>
       <p className="text-xs text-ink-3">{t("admin.ai.evaluation.what")}</p>
-      <ul className="flex flex-col gap-1.5">
+      <ul
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+        tabIndex={0}
+        aria-label={t("admin.ai.evaluation.title")}
+        // Scrolls inside the card at about five rows.
+        className="relative flex max-h-[296px] flex-col gap-1.5 overflow-y-auto overscroll-contain"
+      >
         {evaluations.map((row) => {
           const failed = row.fixtures - row.passed;
           return (
@@ -480,92 +480,25 @@ export async function PromptsCard({
   const { t } = await getTranslations();
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">
-            {t("admin.ai.governance.prompts")}
-          </h2>
-          <p className="text-xs text-ink-3">
-            {t("admin.ai.governance.everyEditIsA")}
-          </p>
-          <p className="text-xs text-ink-3">
-            {t("admin.ai.governance.checkedBeforeSaving")}
-          </p>
-        </div>
-      </CardHeader>
-      <CardBody className="flex flex-col gap-3">
-        {prompts.map((prompt) => (
-          <div
-            key={prompt.promptKey}
-            className="flex flex-col gap-1.5 border-t border-line pt-3 first:border-0 first:pt-0"
-          >
-            <span className="flex items-center gap-2 text-sm text-ink">
-              {/*
-               * A prompt is a row a workspace stores rather than a fixed list,
-               * so an unknown key is normal here and falls back to itself.
-               */}
-              <span className="font-medium">
-                {promptName(prompt.promptKey, t)}
-              </span>
-              {prompt.isDefault ? (
-                <Chip tone="neutral">{t("admin.ai.governance.builtIn")}</Chip>
-              ) : (
-                <Chip tone="info">
-                  {t("admin.ai.governance.version", {
-                    version: prompt.version,
-                  })}
-                </Chip>
-              )}
-            </span>
-            <AIForm action={savePrompt} className="flex flex-col gap-1.5">
-              <input type="hidden" name="promptKey" value={prompt.promptKey} />
-              <TextArea
-                label={t("admin.ai.governance.systemPromptFor", {
-                  prompt: promptName(prompt.promptKey, t),
-                })}
-                hideLabel
-                name="systemPrompt"
-                rows={4}
-                defaultValue={prompt.systemPrompt}
-                inputClassName="font-mono text-xs"
-              />
-              <Button type="submit" size="sm">
-                {t("admin.ai.governance.saveANewVersion")}
-              </Button>
-            </AIForm>
-            {prompt.isDefault ? null : (
-              <AIForm action={restoreDefaultPrompt}>
-                <input
-                  type="hidden"
-                  name="promptKey"
-                  value={prompt.promptKey}
-                />
-                <Button type="submit" variant="ghost" size="sm">
-                  {t("admin.ai.governance.restoreTheBuiltIn")}
-                </Button>
-              </AIForm>
-            )}
-            {prompt.history.length > 0 ? (
-              <details className="text-xs text-ink-3">
-                <summary className="cursor-pointer">
-                  {t("admin.ai.governance.earlierVersionS", {
-                    length: prompt.history.length,
-                  })}
-                </summary>
-                <ul className="mt-1 flex flex-col gap-1">
-                  {prompt.history.map((entry) => (
-                    <li key={entry.version}>
-                      v{entry.version}, {entry.createdAt.slice(0, 10)}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
-          </div>
-        ))}
-      </CardBody>
-    </Card>
+    <>
+      <div className="flex flex-col gap-1 text-xs text-ink-3">
+        <p className="max-w-prose">{t("admin.ai.governance.everyEditIsA")}</p>
+        <p className="max-w-prose">
+          {t("admin.ai.governance.checkedBeforeSaving")}
+        </p>
+      </div>
+      {prompts.map((prompt) => (
+        <PromptCard
+          key={prompt.promptKey}
+          promptKey={prompt.promptKey}
+          name={promptName(prompt.promptKey, t)}
+          isDefault={prompt.isDefault}
+          version={prompt.version}
+          systemPrompt={prompt.systemPrompt}
+          history={prompt.history}
+        />
+      ))}
+    </>
   );
 }
 
@@ -664,7 +597,7 @@ export async function PrivacyCard({
   const local = egress === "local";
 
   return (
-    <Card>
+    <Card data-testid="ai-privacy-card">
       <CardHeader>
         <div className="flex min-w-0 flex-col">
           <h2 className="text-sm font-bold text-ink">
@@ -675,112 +608,44 @@ export async function PrivacyCard({
           </p>
         </div>
       </CardHeader>
-      <CardBody className="flex flex-col gap-3">
-        {egress === "unconfigured" ? (
-          <p className="text-xs text-ink-3">
-            {t("admin.ai.governance.withNoProviderConfigured")}
-          </p>
-        ) : null}
-        {local ? (
-          <p className="rounded-md border border-info-dot bg-info-bg px-2.5 py-1.5 text-xs text-info">
-            {t("admin.ai.privacy.zeroEgress")}
-          </p>
-        ) : null}
-
-        <AIForm action={savePrivacy}>
-          {/* Greyed out rather than hidden on a local provider: the settings
-              are still stored and apply the moment a remote one is routed. */}
-          <fieldset
-            disabled={local}
-            className="flex flex-col gap-3 disabled:opacity-60"
-          >
-            <fieldset className="flex flex-col gap-1.5">
-              <legend className="mb-1 text-xs font-semibold text-ink-2">
-                {t("admin.ai.privacy.contextLevel")}
-              </legend>
-              {AI_CONTEXT_EGRESS_LEVELS.map((level) => (
-                <label key={level} className="flex items-start gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="contextEgress"
-                    value={level}
-                    defaultChecked={privacy.contextEgress === level}
-                    className="mt-0.5 size-4"
-                  />
-                  <span className="flex flex-col">
-                    <span className="text-ink">
-                      {t(LEVEL_WORDS[level].label)}
-                    </span>
-                    <span className="text-xs text-ink-3">
-                      {t(LEVEL_WORDS[level].help)}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
-
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="redactPersonalData"
-                defaultChecked={privacy.redactPersonalData}
-                className="mt-0.5 size-4"
-              />
-              <span className="flex flex-col">
-                <span className="text-ink">{t("admin.ai.privacy.redact")}</span>
-                <span className="text-xs text-ink-3">
-                  {t("admin.ai.privacy.redactHelp")}
-                </span>
-              </span>
-            </label>
-
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="noTraining"
-                defaultChecked={privacy.noTraining}
-                className="mt-0.5 size-4"
-              />
-              <span className="flex flex-col">
-                <span className="text-ink">
-                  {t("admin.ai.privacy.noTraining")}
-                </span>
-                <span className="text-xs text-ink-3">
-                  {t("admin.ai.privacy.noTrainingHelp")}
-                </span>
-              </span>
-            </label>
-
-            {/* A chip each, checked as it is made by the rule the action
-                applies, a pasted address reduced to its host (§4.11). */}
-            <TokenInput
-              id="ai-privacy-hosts"
-              label={t("admin.ai.privacy.allowedHosts")}
-              name="allowedHosts"
-              joiner={"\n"}
-              rule="host"
-              max={MAX_ALLOWED_HOSTS}
-              defaultValue={privacy.allowedHosts}
-              placeholder={t("admin.ai.privacy.allowedHostsPlaceholder")}
-              description={t("admin.ai.privacy.allowedHostsHelp")}
-            />
-
-            <div>
-              <Button type="submit" variant="default" size="sm">
-                {t("common.save")}
-              </Button>
-            </div>
-          </fieldset>
-        </AIForm>
-
-        <div className="flex flex-col gap-1.5 border-t border-line pt-3 text-xs text-ink-3">
-          <p>{t("admin.ai.privacy.localExempt")}</p>
-          <p>{t("admin.ai.privacy.fromNowOn")}</p>
-          <p>{t("admin.ai.privacy.recorded")}</p>
-          <p>{t("admin.ai.privacy.keysAtRest")}</p>
-          <p>{t("admin.ai.governance.aBaseUrlOn")}</p>
-        </div>
-      </CardBody>
+      <PrivacyForm
+        initial={{
+          contextEgress: privacy.contextEgress,
+          redactPersonalData: privacy.redactPersonalData,
+          noTraining: privacy.noTraining,
+          allowedHosts: privacy.allowedHosts,
+        }}
+        levels={AI_CONTEXT_EGRESS_LEVELS.map((level) => ({
+          value: level,
+          label: t(LEVEL_WORDS[level].label),
+          help: t(LEVEL_WORDS[level].help),
+        }))}
+        local={local}
+        maxHosts={MAX_ALLOWED_HOSTS}
+        banners={
+          <>
+            {egress === "unconfigured" ? (
+              <p className="text-xs text-ink-3">
+                {t("admin.ai.governance.withNoProviderConfigured")}
+              </p>
+            ) : null}
+            {local ? (
+              <p className="rounded-md border border-info-dot bg-info-bg px-2.5 py-1.5 text-xs text-info">
+                {t("admin.ai.privacy.zeroEgress")}
+              </p>
+            ) : null}
+          </>
+        }
+        notes={
+          <>
+            <p>{t("admin.ai.privacy.localExempt")}</p>
+            <p>{t("admin.ai.privacy.fromNowOn")}</p>
+            <p>{t("admin.ai.privacy.recorded")}</p>
+            <p>{t("admin.ai.privacy.keysAtRest")}</p>
+            <p>{t("admin.ai.governance.aBaseUrlOn")}</p>
+          </>
+        }
+      />
     </Card>
   );
 }

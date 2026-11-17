@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Button } from "../components/button.tsx";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
@@ -42,6 +43,12 @@ export interface SettingsSaveBarProps {
   readonly saveLabel?: string;
   /** Hides the idle hint, for a page that shows its own refusal text. */
   readonly hideIdle?: boolean;
+  /**
+   * A control that sits at the start of the bar, before the status, for an
+   * action that applies at once beside the save (Prompts: "Restore the
+   * built-in").
+   */
+  readonly leading?: ReactNode;
   readonly "data-testid"?: string;
   /** Test id of the status line that lists the unsaved parts. */
   readonly unsavedTestId?: string;
@@ -58,6 +65,7 @@ export function SettingsSaveBar({
   idleHint,
   saveLabel,
   hideIdle = false,
+  leading,
   "data-testid": testId,
   unsavedTestId,
 }: SettingsSaveBarProps) {
@@ -74,7 +82,8 @@ export function SettingsSaveBar({
         mode === "sticky" && unsaved.length > 0 && "border-brand-line",
       )}
     >
-      <div className="flex min-w-0 flex-col gap-0.5">
+      {leading ? <div className="flex flex-none">{leading}</div> : null}
+      <div className={cn("flex min-w-0 flex-col gap-0.5", leading && "flex-1")}>
         {idle && !hideIdle ? (
           <p className="text-sm text-ink-3">
             {idleHint ?? t("common.noChanges")}

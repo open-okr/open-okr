@@ -680,6 +680,13 @@ export default async function AdminAIPage({
           )}
           agents={agents.map((agent) => ({ id: agent.id, name: agent.name }))}
         />
+      </section>
+
+      <section
+        aria-label={t("admin.ai.usageByAgents")}
+        className="flex flex-col gap-3"
+      >
+        <GroupHeading title={t("admin.ai.usageByAgents")} />
         {/* Plan 0.7.0 A2: external agents' calls, totals only. */}
         <AgentCallsCard
           summary={await callAction(context, "ai.readToolCallSummary", {})}
