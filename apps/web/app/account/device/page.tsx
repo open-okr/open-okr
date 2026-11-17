@@ -50,31 +50,27 @@ export default async function DevicePage({
       : null;
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-4.5">
-      <Card>
-        <CardHeader>
-          <h1 className="text-lg font-bold text-ink">
-            {t("account.device.authoriseATerminal")}
-          </h1>
-        </CardHeader>
-        <CardBody className="flex flex-col gap-2">
-          <p className="text-sm text-ink-3">
-            {t("account.device.aTerminalAskedToActAsYou", {
-              command: "okr",
-              workspace: workspace.name,
-            })}
-          </p>
-        </CardBody>
-      </Card>
+    <div className="mx-auto flex max-w-xl flex-col gap-4">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("account.device.authoriseATerminal")}
+        </h1>
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("account.device.aTerminalAskedToActAsYou", {
+            command: "okr",
+            workspace: workspace.name,
+          })}
+        </p>
+      </header>
 
       {request === null ? (
         <Card>
-          <CardBody className="flex flex-col gap-2">
-            <p className="text-sm text-ink">
+          <CardHeader className="flex-col items-stretch gap-0.5">
+            <h2 className="text-sm font-semibold text-ink">
               {code
                 ? t("account.device.nothingToAuthoriseForThatCode")
                 : t("account.device.openTheLinkYourTerminalPrinted")}
-            </p>
+            </h2>
             <p className="text-xs text-ink-3">
               {code
                 ? t("account.device.itMayHaveExpired")
@@ -82,9 +78,11 @@ export default async function DevicePage({
                     command: "okr login",
                   })}
             </p>
+          </CardHeader>
+          <CardBody className="flex flex-col gap-3">
             {/* The link is the easy way, and a typed code the way when the
                 terminal is on another machine or its link would not copy. */}
-            <p className="pt-1 text-sm text-ink">
+            <p className="text-sm text-ink">
               {t("account.device.codeEntry.youCanAlsoType")}
             </p>
             <DeviceCodeEntry />
@@ -92,9 +90,13 @@ export default async function DevicePage({
         </Card>
       ) : (
         <Card>
-          <CardHeader>{t("account.device.whatIsAsking")}</CardHeader>
-          <CardBody className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1">
+          <CardHeader>
+            <h2 className="text-sm font-semibold text-ink">
+              {t("account.device.whatIsAsking")}
+            </h2>
+          </CardHeader>
+          <CardBody className="grid grid-cols-12 gap-x-6 gap-y-4">
+            <div className="col-span-12 flex flex-col gap-1 md:col-span-6">
               <span className="text-xs font-semibold text-ink-2">
                 {t("account.device.theTerminalCallsItself")}
               </span>
@@ -103,7 +105,7 @@ export default async function DevicePage({
               </span>
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="col-span-12 flex flex-col gap-1.5 md:col-span-6">
               <span className="text-xs font-semibold text-ink-2">
                 {t("account.device.scopesItAskedFor")}
               </span>
@@ -117,17 +119,13 @@ export default async function DevicePage({
                   </Chip>
                 ))}
               </span>
-              <span className="text-xs text-ink-3">
-                {t("account.device.readSeesWhatYou")}
-              </span>
             </div>
 
-            <DecisionForm action={decide} userCode={code?.trim() ?? ""} />
-
-            <p className="text-xs text-ink-3">
-              {t("account.device.ifYouDidNot")}
+            <p className="col-span-12 rounded-md bg-raised px-2.5 py-1.5 text-xs text-ink-3">
+              {t("account.device.readSeesWhatYou")}
             </p>
           </CardBody>
+          <DecisionForm action={decide} userCode={code?.trim() ?? ""} />
         </Card>
       )}
     </div>

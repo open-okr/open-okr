@@ -109,5 +109,5 @@ Branding and General are done. The rest wait for their own change, one page at a
 | account/api-tokens | Instant actions (Create token in the New token footer, Revoke per row), a scrolling list | Done (2026-11-17) |
 | account/channels | Footer per card (Delivery, How often), instant actions for linked accounts | Done (2026-11-16) |
 | account/connections | Instant actions (Revoke per row), no save bar, one card without a header, a scrolling list | Done (2026-11-17) |
-| account/device | Proposed: instant actions | Pending |
+| account/device | Instant actions (Authorise this terminal and Refuse in the card footer, Refuse on the left), narrow 576 px page kept | Done (2026-11-17) |
 | account/security | Instant actions, a scrolling list for sessions | Done (2026-11-16) |

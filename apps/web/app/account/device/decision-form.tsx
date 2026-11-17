@@ -32,34 +32,35 @@ export function DecisionForm({
 
   if (state.decided) {
     return (
-      <p
-        role="status"
-        className={`rounded-md px-2.5 py-2 text-sm ${
-          state.approved ? "bg-ok-bg text-ok" : "bg-raised text-ink-2"
-        }`}
-      >
-        {state.message}
-      </p>
+      <div className="border-line border-t px-3.5 py-3">
+        <p
+          role="status"
+          className={`rounded-md px-2.5 py-2 text-sm ${
+            state.approved ? "bg-ok-bg text-ok" : "bg-raised text-ink-2"
+          }`}
+        >
+          {state.message}
+        </p>
+      </div>
     );
   }
 
   return (
     <form
       action={formAction}
-      className="flex flex-col gap-3"
+      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 border-line border-t bg-raised/40 px-3.5 py-2.5"
       aria-busy={pending}
     >
       <input type="hidden" name="userCode" value={userCode} />
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="submit"
-          name="approve"
-          value="yes"
-          variant="primary"
-          size="sm"
-        >
-          {t("account.device.decisionForm.authoriseThisTerminal")}
-        </Button>
+      <div className="flex min-w-0 max-w-xs flex-col gap-1 text-xs">
+        <span className="text-ink-3">{t("account.device.ifYouDidNot")}</span>
+        {state.message === "" ? null : (
+          <span className="text-bad" role="alert">
+            {state.message}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
         <Button
           type="submit"
           name="approve"
@@ -69,15 +70,16 @@ export function DecisionForm({
         >
           {t("common.refuse")}
         </Button>
-      </div>
-      {state.message === "" ? null : (
-        <p
-          className="rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad"
-          role="alert"
+        <Button
+          type="submit"
+          name="approve"
+          value="yes"
+          variant="primary"
+          size="sm"
         >
-          {state.message}
-        </p>
-      )}
+          {t("account.device.decisionForm.authoriseThisTerminal")}
+        </Button>
+      </div>
     </form>
   );
 }
