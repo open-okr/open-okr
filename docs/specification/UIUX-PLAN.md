@@ -358,7 +358,7 @@ get out; a trial that ended the same way reads the same, and Settle works for ei
 naming both numbers, because the product never picks who loses access. With
 `cloud.enabled` false, or no plans in the catalogue, the section is absent from the
 navigation and the route is not-found: P8-T05 asks that no billing surface appears, and a
-disabled control is an appearance.
+disabled control is an appearance. **As built (2026-11-17):** the page follows the settings page layout standard: the intro sits under the title and the cards fall under three headings, Your plan (Current plan, Seats), Usage (AI credits, This workspace) and Change plan (Plans). The seat holders list scrolls at about five rows, Monthly and Yearly is a segmented control at the right of the Plans header, and Buy credits, Upgrade, Move to this plan, Manage billing and Move to Free each apply at once, with no Save or Discard.
 
 **S-50 New workspace.** A signed-in person starting another workspace, reached from
 the avatar menu where sign-up is open to them and not-found anywhere else. A name, and

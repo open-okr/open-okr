@@ -10,6 +10,7 @@ import {
   resolveSupportEmail,
   seatState,
 } from "@openokr/core";
+import { Card, CardBody, CardHeader } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAccessLevel } from "../../../lib/access.ts";
@@ -124,82 +125,105 @@ export default async function PlanPage({
         ? t("admin.plan.seatCountOne", { count })
         : t("admin.plan.seatCountOther", { count });
 
+  const bigFigure = "font-semibold text-ink text-xl tabular-nums";
+  const listBox =
+    "divide-y divide-line rounded-lg border border-line bg-surface";
+
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-4">
       <header className="flex flex-col gap-1">
         <h1 className="font-bold text-ink text-lg">{t("admin.plan.title")}</h1>
-        <p className="text-ink-2 text-sm">{t("admin.plan.intro")}</p>
+        <p className="max-w-prose text-ink-3 text-sm">
+          {t("admin.plan.intro")}
+        </p>
       </header>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">
-          {t("admin.plan.current")}
-        </h2>
-        <p className="font-semibold text-ink text-xl">{currentName}</p>
-        {summary && checkout === "done" ? (
-          <p className="text-ok text-sm" role="status">
-            {t("admin.billing.checkoutDone")}
+      <GroupHeading title={t("admin.plan.groupPlan")} />
+
+      <Card>
+        <CardHeader className="flex-col items-stretch gap-0.5">
+          <h2 className="font-semibold text-ink text-sm">
+            {t("admin.plan.current")}
+          </h2>
+          <p className="text-ink-3 text-xs">
+            {t("admin.plan.currentDescription")}
           </p>
-        ) : null}
-        {summary?.status === "past_due" ? (
-          <p
-            className="rounded-md bg-bad-bg px-2.5 py-1.5 text-bad text-sm"
-            role="alert"
-          >
-            {t("admin.billing.paymentFailed")}
-          </p>
-        ) : null}
-        {summary?.suspendedByBilling ? (
-          <div className="flex flex-col gap-2 rounded-md bg-warn-bg px-2.5 py-2 text-sm text-warn">
-            <p role="alert">
-              {t("admin.billing.readOnly", {
-                plan: planName(summary.defaultPlanKey),
+        </CardHeader>
+        <CardBody className="flex flex-col gap-3">
+          <p className="font-semibold text-ink text-xl">{currentName}</p>
+          {summary && checkout === "done" ? (
+            <p className="text-ok text-sm" role="status">
+              {t("admin.billing.checkoutDone")}
+            </p>
+          ) : null}
+          {summary?.status === "past_due" ? (
+            <p
+              className="rounded-md bg-bad-bg px-2.5 py-1.5 text-bad text-sm"
+              role="alert"
+            >
+              {t("admin.billing.paymentFailed")}
+            </p>
+          ) : null}
+          {summary?.suspendedByBilling ? (
+            <div className="flex flex-col items-start gap-2 rounded-md bg-warn-bg px-2.5 py-2 text-sm text-warn">
+              <p role="alert">
+                {t("admin.billing.readOnly", {
+                  plan: planName(summary.defaultPlanKey),
+                })}
+              </p>
+              <SettleButton
+                action={settleEndedAction}
+                label={t("admin.billing.settle", {
+                  plan: planName(summary.defaultPlanKey),
+                })}
+              />
+            </div>
+          ) : null}
+          {summary?.cancelAtPeriodEnd ? (
+            <p className="text-ink-2 text-sm">
+              {t("admin.billing.endsOn", { date: periodEnd })}
+            </p>
+          ) : null}
+          {summary?.scheduledPlanKey ? (
+            <p className="text-ink-2 text-sm">
+              {t("admin.billing.movesOn", {
+                plan: planName(summary.scheduledPlanKey),
+                date: periodEnd,
               })}
             </p>
-            <SettleButton
-              action={settleEndedAction}
-              label={t("admin.billing.settle", {
-                plan: planName(summary.defaultPlanKey),
-              })}
-            />
-          </div>
-        ) : null}
-        {summary?.cancelAtPeriodEnd ? (
-          <p className="text-ink-2 text-sm">
-            {t("admin.billing.endsOn", { date: periodEnd })}
-          </p>
-        ) : null}
-        {summary?.scheduledPlanKey ? (
-          <p className="text-ink-2 text-sm">
-            {t("admin.billing.movesOn", {
-              plan: planName(summary.scheduledPlanKey),
-              date: periodEnd,
-            })}
-          </p>
-        ) : null}
-        {/* With billing on, the plans below are how it changes. */}
-        {own && !summary ? (
-          <p className="text-ink-2 text-sm">
-            {supportEmail ? (
-              <a
-                className="text-brand-text hover:underline"
-                href={`mailto:${supportEmail}`}
-              >
-                {t("admin.plan.changedByProvider", { name: instanceName })}
-              </a>
-            ) : (
-              t("admin.plan.changedByProvider", { name: instanceName })
-            )}
-          </p>
-        ) : null}
-      </section>
+          ) : null}
+          {/* With billing on, the plans below are how it changes. */}
+          {own && !summary ? (
+            <p className="text-ink-2 text-sm">
+              {supportEmail ? (
+                <a
+                  className="text-brand-text hover:underline"
+                  href={`mailto:${supportEmail}`}
+                >
+                  {t("admin.plan.changedByProvider", { name: instanceName })}
+                </a>
+              ) : (
+                t("admin.plan.changedByProvider", { name: instanceName })
+              )}
+            </p>
+          ) : null}
+        </CardBody>
+      </Card>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">
-          {t("admin.plan.seats")}
-        </h2>
-        <div className="rounded-lg border border-line bg-surface px-4 py-3">
-          <p className="font-semibold text-ink text-xl tabular-nums">
+      <Card>
+        <CardHeader className="flex items-baseline justify-between gap-x-4">
+          <h2 className="font-semibold text-ink text-sm">
+            {t("admin.plan.seats")}
+          </h2>
+          <Link
+            className="text-brand-text text-sm hover:underline"
+            href="/people"
+          >
+            {t("admin.plan.manageMembers")}
+          </Link>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-3">
+          <p className={bigFigure}>
             {seats.limit === null
               ? seats.used === 1
                 ? t("common.count.personOne", { count: seats.used })
@@ -209,7 +233,7 @@ export default async function PlanPage({
                   limit: seats.limit,
                 })}
           </p>
-          <p className="mt-1 text-ink-2 text-sm">
+          <p className="text-ink-2 text-sm">
             {seats.limit === null
               ? t("admin.plan.noSeatLimit")
               : seats.full
@@ -220,55 +244,71 @@ export default async function PlanPage({
           </p>
           {/* Said here rather than left to surprise somebody: an invitation
            * holds a seat from the moment it is sent. */}
-          <p className="mt-2 text-ink-3 text-xs">
+          <p className="text-ink-3 text-xs">
             {t("admin.plan.invitedHoldsSeat")}
           </p>
-        </div>
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-          <h3 className="font-medium text-ink text-sm">
-            {t("admin.plan.holders")}
-          </h3>
-          <Link
-            className="text-brand-text text-sm hover:underline"
-            href="/people"
-          >
-            {t("admin.plan.manageMembers")}
-          </Link>
-        </div>
-        {holders.length === 0 ? (
-          <p className="text-ink-2 text-sm">{t("admin.plan.noHolders")}</p>
-        ) : (
-          <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
-            {holders.map((holder) => (
-              <li
-                className="flex items-baseline justify-between gap-3 px-4 py-2 text-sm"
-                key={holder.id}
+          <div className="border-t border-line pt-3">
+            <h3 className="mb-2 font-medium text-ink text-sm">
+              {t("admin.plan.holders")}
+            </h3>
+            {holders.length === 0 ? (
+              <p className="text-ink-2 text-sm">{t("admin.plan.noHolders")}</p>
+            ) : (
+              <ul
+                // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+                tabIndex={0}
+                aria-label={t("admin.plan.holders")}
+                // Scrolls inside the card at about five rows, since the list
+                // grows with the members.
+                className={`relative max-h-[296px] overflow-y-auto overscroll-contain ${listBox}`}
               >
-                <span className="text-ink">{holder.name}</span>
-                {holder.status === "invited" ? (
-                  <span className="text-ink-3 text-xs">
-                    {t("admin.plan.holderInvited")}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                {holders.map((holder) => (
+                  <li
+                    className="flex items-baseline justify-between gap-3 px-3 py-2 text-sm"
+                    key={holder.id}
+                  >
+                    <span className="text-ink">{holder.name}</span>
+                    {holder.status === "invited" ? (
+                      <span className="text-ink-3 text-xs">
+                        {t("admin.plan.holderInvited")}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </CardBody>
+      </Card>
+
+      {credits || usage ? (
+        <GroupHeading title={t("admin.plan.groupUsage")} />
+      ) : null}
 
       {credits ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="font-semibold text-ink text-sm">
-            {t("admin.credits.title")}
-          </h2>
-          <div className="rounded-lg border border-line bg-surface px-4 py-3">
-            <p className="font-semibold text-ink text-xl tabular-nums">
+        <Card>
+          <CardHeader className="flex items-center justify-between gap-x-4 gap-y-2">
+            <h2 className="font-semibold text-ink text-sm">
+              {t("admin.credits.title")}
+            </h2>
+            {summary?.creditPack ? (
+              <BuyCreditsButton
+                action={buyCreditsAction}
+                amountMinor={summary.creditPack.amountMinor}
+                credits={summary.creditPack.credits}
+                currency={summary.creditPack.currency}
+                locale={locale}
+              />
+            ) : null}
+          </CardHeader>
+          <CardBody className="flex flex-col gap-3">
+            <p className={bigFigure}>
               {t("admin.credits.usedOf", {
                 used: credits.used.toLocaleString(locale),
                 allowance: credits.allowance.toLocaleString(locale),
               })}
             </p>
-            <p className="mt-1 text-ink-2 text-sm">
+            <p className="text-ink-2 text-sm">
               {t("admin.credits.resets", {
                 date: new Intl.DateTimeFormat(locale, {
                   dateStyle: "long",
@@ -277,7 +317,7 @@ export default async function PlanPage({
               })}
             </p>
             {credits.purchased > 0 ? (
-              <p className="mt-1 text-ink-2 text-sm">
+              <p className="text-ink-2 text-sm">
                 {credits.expiring
                   ? t("admin.credits.purchasedExpiring", {
                       count: credits.purchased.toLocaleString(locale),
@@ -292,44 +332,33 @@ export default async function PlanPage({
                     })}
               </p>
             ) : null}
-            <p className="mt-2 text-ink-3 text-xs">
-              {t("admin.credits.ownKey")}
-            </p>
-          </div>
-          {summary?.creditPack ? (
-            <BuyCreditsButton
-              action={buyCreditsAction}
-              amountMinor={summary.creditPack.amountMinor}
-              credits={summary.creditPack.credits}
-              currency={summary.creditPack.currency}
-              locale={locale}
-            />
-          ) : null}
-          {credits.bySource.length > 0 ? (
-            <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
-              {credits.bySource.map((row) => (
-                <li
-                  className="flex items-baseline justify-between gap-3 px-4 py-2 text-sm"
-                  key={row.source}
-                >
-                  <span className="text-ink">
-                    {SOURCE_WORDS[row.source]
-                      ? t(SOURCE_WORDS[row.source] as string)
-                      : row.source}
-                  </span>
-                  <span className="text-ink-2 tabular-nums">
-                    {row.credits.toLocaleString(locale)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
+            <p className="text-ink-3 text-xs">{t("admin.credits.ownKey")}</p>
+            {credits.bySource.length > 0 ? (
+              <ul className={listBox}>
+                {credits.bySource.map((row) => (
+                  <li
+                    className="flex items-baseline justify-between gap-3 px-3 py-2 text-sm"
+                    key={row.source}
+                  >
+                    <span className="text-ink">
+                      {SOURCE_WORDS[row.source]
+                        ? t(SOURCE_WORDS[row.source] as string)
+                        : row.source}
+                    </span>
+                    <span className="text-ink-2 tabular-nums">
+                      {row.credits.toLocaleString(locale)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </CardBody>
+        </Card>
       ) : null}
 
       {usage ? (
-        <section className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+        <Card>
+          <CardHeader className="flex flex-wrap items-baseline justify-between gap-x-4">
             <h2 className="font-semibold text-ink text-sm">
               {t("admin.plan.thisWorkspace")}
             </h2>
@@ -341,8 +370,8 @@ export default async function PlanPage({
                   .slice(0, 16),
               })}
             </span>
-          </div>
-          <div className="grid grid-cols-2 divide-x divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface sm:grid-cols-3 sm:divide-y-0">
+          </CardHeader>
+          <CardBody className="grid grid-cols-12 gap-4">
             {(
               [
                 ["admin.plan.usageGoals", usage.goalCount],
@@ -350,58 +379,78 @@ export default async function PlanPage({
                 ["admin.plan.usageMembers", usage.memberCount],
               ] as const
             ).map(([labelKey, value]) => (
-              <div className="flex flex-col gap-0.5 px-4 py-3" key={labelKey}>
-                <span className="font-semibold text-ink text-2xl tabular-nums leading-none">
+              <div
+                className="col-span-12 flex flex-col gap-0.5 rounded-lg border border-line px-3.5 py-3 sm:col-span-4"
+                key={labelKey}
+              >
+                <span className="font-semibold text-2xl text-ink tabular-nums leading-none">
                   {value}
                 </span>
                 <span className="text-ink-3 text-xs">{t(labelKey)}</span>
               </div>
             ))}
-          </div>
-        </section>
+          </CardBody>
+        </Card>
       ) : null}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">
-          {t("admin.plan.plans")}
-        </h2>
-        {summary ? (
-          <BillingPanel
-            changePlan={changePlanAction}
-            currentPlanKey={summary.currentPlanKey}
-            hasAccount={summary.hasAccount}
-            hasLiveSubscription={summary.hasLiveSubscription}
-            locale={locale}
-            openPortal={openPortalAction}
-            plans={summary.plans}
-            pricesAvailable={summary.pricesAvailable}
-            startCheckout={startCheckoutAction}
-          />
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {plans.map((plan) => (
-              <li
-                className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-line bg-surface px-4 py-3"
-                key={plan.key}
-              >
-                <span className="font-medium text-ink text-sm">
-                  {plan.name}
-                </span>
-                <span className="text-ink-2 text-sm">
-                  {plan.aiCredits
-                    ? t("admin.plan.seatsWithCredits", {
-                        seats: seatsOf(plan.seats),
-                        credits: plan.aiCredits.toLocaleString(locale),
-                      })
-                    : seatsOf(plan.seats)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {/* The one sentence that matters most on this screen. */}
-        <p className="text-ink-3 text-xs">{t("admin.plan.noFeatureGate")}</p>
-      </section>
+      <GroupHeading title={t("admin.plan.groupChange")} />
+
+      {summary ? (
+        <BillingPanel
+          changePlan={changePlanAction}
+          currentPlanKey={summary.currentPlanKey}
+          hasAccount={summary.hasAccount}
+          hasLiveSubscription={summary.hasLiveSubscription}
+          locale={locale}
+          openPortal={openPortalAction}
+          plans={summary.plans}
+          pricesAvailable={summary.pricesAvailable}
+          startCheckout={startCheckoutAction}
+        />
+      ) : (
+        <Card>
+          <CardHeader>
+            <h2 className="font-semibold text-ink text-sm">
+              {t("admin.plan.plans")}
+            </h2>
+          </CardHeader>
+          <CardBody className="flex flex-col gap-3">
+            <ul className={listBox}>
+              {plans.map((plan) => (
+                <li
+                  className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-2.5"
+                  key={plan.key}
+                >
+                  <span className="font-medium text-ink text-sm">
+                    {plan.name}
+                  </span>
+                  <span className="text-ink-2 text-sm">
+                    {plan.aiCredits
+                      ? t("admin.plan.seatsWithCredits", {
+                          seats: seatsOf(plan.seats),
+                          credits: plan.aiCredits.toLocaleString(locale),
+                        })
+                      : seatsOf(plan.seats)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {/* The one sentence that matters most on this screen. */}
+            <p className="text-ink-3 text-xs">
+              {t("admin.plan.noFeatureGate")}
+            </p>
+          </CardBody>
+        </Card>
+      )}
     </div>
+  );
+}
+
+/** The heading of a run of cards. */
+function GroupHeading({ title }: { readonly title: string }) {
+  return (
+    <h2 className="mt-2 -mb-1 font-semibold text-ink-4 text-xs uppercase tracking-wide">
+      {title}
+    </h2>
   );
 }

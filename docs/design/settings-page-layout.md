@@ -100,7 +100,7 @@ Branding and General are done. The rest wait for their own change, one page at a
 | admin/agents | Proposed: footer per card, instant actions for run controls | Pending |
 | admin/ai | Proposed: footer per card | Pending |
 | admin/backups | Instant actions: intro under the title, Export workspace in its own card footer (enabled at 12 characters, no Discard), Download and Clear on the result, a scrolling Archives taken list, Restoring and This instance's backups as header-only cards with the guide link at the header right | Done (2026-11-17) |
-| admin/plan | Proposed: instant actions | Pending |
+| admin/plan | Instant actions: intro under the title, three group headings (Your plan, Usage, Change plan), a seat holders list that scrolls at about five rows, Monthly and Yearly as a segmented control in the Plans header, Buy credits, Upgrade, Move to this plan, Manage billing and Move to Free each apply at once | Done (2026-11-17) |
 | admin/roles | Instant actions; the matrix fits the card at Compact width, the member list scrolls | Done (2026-11-16) |
 | admin/support | Instant actions, a scrolling list for past sessions | Done (2026-11-16) |
 | admin/webhooks | List or tool: intro under the title, an All webhooks list that scrolls at about five rows, an add card and a Settings card with a footer each (Discard and the submit); Send test, Turn on or off, Take it over, Rotate secret and Remove are instant actions in an Actions card, and Rotate secret and Remove ask first in an inline panel; deliveries scroll at about five rows | Done (2026-11-17) |
