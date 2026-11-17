@@ -67,6 +67,12 @@ function ruleName(ruleKey: string, t: (key: string) => string): string {
   return named === undefined ? ruleKey : t(named);
 }
 
+/** The group headings, in the shape the other settings pages use. */
+const GROUP_HEADING =
+  "text-xs font-semibold uppercase tracking-wide text-ink-4";
+const GROUP_CHIP =
+  "rounded-full bg-raised px-2 text-xs font-semibold normal-case tracking-normal text-ink-3";
+
 export default async function NudgeVolumePage() {
   const { t } = await getTranslations();
 
@@ -124,6 +130,10 @@ export default async function NudgeVolumePage() {
         </p>
       </div>
 
+      <h2 className={GROUP_HEADING}>
+        {t("admin.nudges.group.lastDays", { windowDays: volume.windowDays })}
+      </h2>
+
       <Card>
         <CardHeader className="justify-between">
           <h2 className="text-sm font-bold text-ink">
@@ -137,7 +147,14 @@ export default async function NudgeVolumePage() {
               {t("admin.nudges.nothingHasFiredYet")}
             </p>
           ) : (
-            <ul className="flex flex-col">
+            <ul
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+              tabIndex={0}
+              aria-label={t("admin.nudges.theNoisiestRules")}
+              // Scrolls inside the card after about five rows, because it
+              // lists every rule that has ever fired.
+              className="relative flex max-h-[220px] flex-col overflow-y-auto overscroll-contain"
+            >
               {volume.rules.map((rule) => (
                 <li
                   key={rule.ruleKey}
@@ -231,6 +248,10 @@ export default async function NudgeVolumePage() {
           )}
         </CardBody>
       </Card>
+      <h2 className={`flex items-center gap-2 ${GROUP_HEADING}`}>
+        {t("admin.nudges.group.controls")}
+        <span className={GROUP_CHIP}>{t("common.appliesAtOnce")}</span>
+      </h2>
       <NudgeRuleCards
         rules={rules.rules}
         quietMode={rules.quietMode}

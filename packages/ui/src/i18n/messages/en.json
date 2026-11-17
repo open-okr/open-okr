@@ -1036,6 +1036,8 @@
   "admin.layout.admin": "Admin",
   "admin.layout.adminSections": "Admin sections",
   "admin.nudges.aRuleThatFires": "A rule that fires often and is held most of the time is not a quiet\n            rule. It is one that would be unbearable if a guard were relaxed.",
+  "admin.nudges.group.controls": "Controls",
+  "admin.nudges.group.lastDays": "The last {windowDays} days",
   "admin.nudges.howOftenTheProduct": "How often the product speaks, and to whom, is behind the coaching\n              permission. Ask a workspace administrator.",
   "admin.nudges.inTheWindow": "{total} in the window",
   "admin.nudges.nobodyIsOverThe": "Nobody is over the ceiling. The limit is doing its job before\n              anybody has to notice.",

@@ -1036,6 +1036,8 @@
   "admin.layout.admin": "Pentadbiran",
   "admin.layout.adminSections": "Bahagian pentadbiran",
   "admin.nudges.aRuleThatFires": "Peraturan yang kerap tercetus dan ditahan pada kebanyakan masa bukanlah peraturan yang senyap. Ia peraturan yang akan menjadi tidak tertanggung jika satu kawalan dilonggarkan.",
+  "admin.nudges.group.controls": "Kawalan",
+  "admin.nudges.group.lastDays": "{windowDays} hari lepas",
   "admin.nudges.howOftenTheProduct": "Kekerapan produk bersuara, dan kepada siapa, terletak di sebalik kebenaran bimbingan. Minta pentadbir ruang kerja.",
   "admin.nudges.inTheWindow": "{total} dalam tempoh ini",
   "admin.nudges.nobodyIsOverThe": "Tiada sesiapa melebihi siling. Had ini menjalankan tugasnya sebelum sesiapa perlu perasan.",

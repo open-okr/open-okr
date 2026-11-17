@@ -90,7 +90,7 @@ Branding and General are done. The rest wait for their own change, one page at a
 | admin/sso | Footer per card; quick actions per connection are instant, the connection list scrolls | Done (2026-11-16) |
 | admin/practice | One sticky bar for the page | Done (2026-11-16) |
 | admin/rhythm | One sticky bar for the page | Done (2026-11-16) |
-| admin/nudges | One sticky bar for the page | Pending |
+| admin/nudges | Instant actions per rule; the noisiest list scrolls | Done (2026-11-17) |
 | admin/connections | List or tool; End is an instant action per row (inline confirmation), no save bar, a scrolling list | Done (2026-11-17) |
 | admin/audit | List or tool: three cards (Check the chain, Browse and export, the rows with a sticky header scrolling at 420 px) | Done (2026-11-16) |
 | admin/deleted | List or tool: intro under the title, one card with a scrolling list, Restore is an instant action per row | Done (2026-11-17) |
