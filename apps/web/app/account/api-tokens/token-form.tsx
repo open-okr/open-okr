@@ -30,6 +30,8 @@ export function TokenForm({
   agentEndpoint,
   setupUrl,
   className,
+  bodyClassName,
+  submit,
   children,
 }: {
   readonly action: (
@@ -41,56 +43,85 @@ export function TokenForm({
   /** Where the agent's setup instructions are served, for the pasted line. */
   readonly setupUrl?: string;
   readonly className?: string;
+  /**
+   * With `submit`, the form draws its own card body and footer: the fields
+   * (and a minted token) in the body, the refusal or outcome on the left of
+   * the footer and the button on the right. Without it, the form is bare.
+   */
+  readonly bodyClassName?: string;
+  readonly submit?: React.ReactNode;
   readonly children: React.ReactNode;
 }) {
   const { t } = useTranslations();
   const instanceName = useInstanceName();
   const [state, formAction, pending] = useActionState(action, NOTHING_YET);
+  const minted = state.token ? (
+    <div className="flex flex-col gap-1.5 rounded-md bg-brand-weak px-2.5 py-2 text-xs text-brand-text">
+      <code
+        data-testid="minted-token"
+        className="break-all font-mono text-sm font-bold"
+      >
+        {state.token}
+      </code>
+      <span>{state.message}</span>
+      {state.audience === "mcp" && setupUrl ? (
+        <CopyButton
+          text={agentSetupLine({
+            instanceName,
+            setupUrl,
+            token: state.token,
+          })}
+          variant="primary"
+          size="sm"
+        >
+          {t("account.apiTokens.copyTokenPrompt")}
+        </CopyButton>
+      ) : null}
+      {state.audience === "mcp" && agentEndpoint ? (
+        <pre
+          data-testid="minted-agent-configuration"
+          className="whitespace-pre-wrap break-all rounded-md bg-surface px-2.5 py-2 font-mono text-xs text-ink"
+        >
+          {agentConfiguration(agentEndpoint, state.token)}
+        </pre>
+      ) : null}
+    </div>
+  ) : null;
+  const outcome =
+    !state.token && state.message ? (
+      <p
+        role={state.ok ? "status" : "alert"}
+        className={`rounded-md px-2.5 py-1.5 text-xs ${
+          state.ok ? "bg-ok-bg text-ok" : "bg-bad-bg text-bad"
+        }`}
+      >
+        {state.message}
+      </p>
+    ) : null;
+  if (submit) {
+    return (
+      <form action={formAction} aria-busy={pending}>
+        <div className="p-3.5">
+          <RefusedFields fields={state.fields}>
+            <div className={bodyClassName}>
+              {children}
+              {minted ? <div className="col-span-12">{minted}</div> : null}
+            </div>
+          </RefusedFields>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-3 border-line border-t px-3.5 py-2.5">
+          <div className="mr-auto min-w-0">{outcome}</div>
+          {submit}
+        </div>
+      </form>
+    );
+  }
   return (
     <form action={formAction} className={className} aria-busy={pending}>
       {/* The name and the expiry show what was refused about them (U1b). */}
       <RefusedFields fields={state.fields}>{children}</RefusedFields>
-      {state.token ? (
-        <div className="mt-1.5 flex flex-col gap-1.5 rounded-md bg-brand-weak px-2.5 py-2 text-xs text-brand-text">
-          <code
-            data-testid="minted-token"
-            className="break-all font-mono text-sm font-bold"
-          >
-            {state.token}
-          </code>
-          <span>{state.message}</span>
-          {state.audience === "mcp" && setupUrl ? (
-            <CopyButton
-              text={agentSetupLine({
-                instanceName,
-                setupUrl,
-                token: state.token,
-              })}
-              variant="primary"
-              size="sm"
-            >
-              {t("account.apiTokens.copyTokenPrompt")}
-            </CopyButton>
-          ) : null}
-          {state.audience === "mcp" && agentEndpoint ? (
-            <pre
-              data-testid="minted-agent-configuration"
-              className="whitespace-pre-wrap break-all rounded-md bg-surface px-2.5 py-2 font-mono text-xs text-ink"
-            >
-              {agentConfiguration(agentEndpoint, state.token)}
-            </pre>
-          ) : null}
-        </div>
-      ) : state.message ? (
-        <p
-          role={state.ok ? "status" : "alert"}
-          className={`mt-1.5 rounded-md px-2.5 py-1.5 text-xs ${
-            state.ok ? "bg-ok-bg text-ok" : "bg-bad-bg text-bad"
-          }`}
-        >
-          {state.message}
-        </p>
-      ) : null}
+      {minted ? <div className="mt-1.5">{minted}</div> : null}
+      {outcome ? <div className="mt-1.5">{outcome}</div> : null}
     </form>
   );
 }
