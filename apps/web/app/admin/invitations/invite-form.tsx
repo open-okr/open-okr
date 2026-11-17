@@ -23,10 +23,13 @@ import type { InviteResult } from "./actions";
 export function InviteForm({
   action,
   submitLabel,
+  bodyClassName,
   children,
 }: {
   readonly action: (formData: FormData) => Promise<InviteResult>;
   readonly submitLabel: string;
+  /** The grid the fields sit on, inside the card body. */
+  readonly bodyClassName?: string;
   readonly children: React.ReactNode;
 }) {
   const { t } = useTranslations();
@@ -37,56 +40,61 @@ export function InviteForm({
     null,
   );
 
-  return (
-    <form
-      action={formAction}
-      className="flex flex-col gap-2"
-      aria-busy={pending}
-    >
-      {/* Each field shows what was refused about it (U1b). */}
-      <RefusedFields fields={state?.fields}>{children}</RefusedFields>
-      <SubmitButton
-        bare
-        className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand disabled:opacity-60 aria-disabled:opacity-60"
+  const result = state?.link ? (
+    <div className="flex flex-col gap-1.5 rounded-md bg-brand-weak px-2.5 py-2 text-xs text-brand-text">
+      <span className="font-semibold">
+        {t("admin.invitations.inviteForm.copyThisNowIt")}
+      </span>
+      <code
+        data-testid="invite-link"
+        className="break-all font-mono text-sm font-bold"
       >
-        {pending ? t("admin.invitations.inviteForm.working") : submitLabel}
-      </SubmitButton>
+        {state.link.url}
+      </code>
+      <span className="text-xs">
+        {t("admin.invitations.inviteForm.theTokenOnIts")}{" "}
+        <code data-testid="invite-token" className="break-all font-mono">
+          {state.link.token}
+        </code>
+      </span>
+      {state.link.email ? (
+        <span>
+          {t("admin.invitations.inviteForm.onlyMayUseItOnce", {
+            email: state.link.email,
+          })}
+        </span>
+      ) : (
+        <span>{t("admin.invitations.inviteForm.anyoneHoldingItMay")}</span>
+      )}
+    </div>
+  ) : null;
 
-      {state?.link ? (
-        <div className="flex flex-col gap-1.5 rounded-md bg-brand-weak px-2.5 py-2 text-xs text-brand-text">
-          <span className="font-semibold">
-            {t("admin.invitations.inviteForm.copyThisNowIt")}
-          </span>
-          <code
-            data-testid="invite-link"
-            className="break-all font-mono text-sm font-bold"
-          >
-            {state.link.url}
-          </code>
-          <span className="text-xs">
-            {t("admin.invitations.inviteForm.theTokenOnIts")}{" "}
-            <code data-testid="invite-token" className="break-all font-mono">
-              {state.link.token}
-            </code>
-          </span>
-          {state.link.email ? (
-            <span>
-              {t("admin.invitations.inviteForm.onlyMayUseItOnce", {
-                email: state.link.email,
-              })}
-            </span>
-          ) : (
-            <span>{t("admin.invitations.inviteForm.anyoneHoldingItMay")}</span>
-          )}
+  return (
+    <form action={formAction} aria-busy={pending}>
+      <div className="p-3.5">
+        {/* Each field shows what was refused about it (U1b). */}
+        <RefusedFields fields={state?.fields}>
+          <div className={bodyClassName}>
+            {children}
+            {result ? <div className="col-span-12">{result}</div> : null}
+          </div>
+        </RefusedFields>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-3 border-line border-t px-3.5 py-2.5">
+        <div className="mr-auto min-w-0">
+          {!state?.link && state?.error ? (
+            <p
+              role="alert"
+              className="rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad"
+            >
+              {state.error}
+            </p>
+          ) : null}
         </div>
-      ) : state?.error ? (
-        <p
-          role="alert"
-          className="rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad"
-        >
-          {state.error}
-        </p>
-      ) : null}
+        <SubmitButton variant="primary" size="sm">
+          {pending ? t("admin.invitations.inviteForm.working") : submitLabel}
+        </SubmitButton>
+      </div>
     </form>
   );
 }
