@@ -192,7 +192,7 @@ export function WebhookAction({
   return (
     <form
       action={formAction}
-      className={`flex min-w-0 flex-col gap-2 ${
+      className={`flex min-w-0 flex-col items-start gap-2 ${
         asking || state.secret ? "w-full" : ""
       } ${className ?? ""}`}
       aria-busy={pending}
@@ -217,7 +217,7 @@ export function WebhookAction({
       {asking && confirm ? (
         <fieldset
           aria-labelledby={questionId}
-          className="flex min-w-0 flex-col gap-2 rounded-control border border-line-2 bg-raised p-3"
+          className="flex w-full min-w-0 flex-col gap-2 rounded-control border border-line-2 bg-raised p-3"
         >
           <p id={questionId} className="text-sm font-medium text-ink">
             {confirm}

@@ -73,7 +73,7 @@ export default async function BackupsPage() {
               tabIndex={0}
               aria-label={t("admin.backups.historyTitle")}
               // Scrolls inside the card after about five rows.
-              className="flex max-h-[296px] flex-col divide-y divide-line overflow-y-auto overscroll-contain"
+              className="flex max-h-[296px] flex-col divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain"
               data-testid="archive-history"
             >
               {history.archives.map((archive) => (

@@ -114,7 +114,7 @@ export async function AgentCallsCard({
               tabIndex={0}
               aria-label={t("admin.ai.agentCalls.copilotTitle")}
               // Scrolls inside the card at about five rows.
-              className="relative flex max-h-[200px] flex-col gap-1 overflow-y-auto overscroll-contain rounded-lg border border-line px-3 py-2 text-xs text-ink-3"
+              className="relative flex max-h-[200px] flex-col gap-1 overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line px-3 py-2 text-xs text-ink-3"
             >
               {summary.copilot.recent.map((read, index) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: a read has no id of its own here; the list is fixed per render.

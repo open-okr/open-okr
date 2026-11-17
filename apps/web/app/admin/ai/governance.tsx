@@ -173,7 +173,7 @@ async function EvaluationResults({
         tabIndex={0}
         aria-label={t("admin.ai.evaluation.title")}
         // Scrolls inside the card at about five rows.
-        className="relative flex max-h-[296px] flex-col gap-1.5 overflow-y-auto overscroll-contain"
+        className="relative flex max-h-[296px] flex-col gap-1.5 overflow-y-auto pr-1.5 overscroll-contain"
       >
         {evaluations.map((row) => {
           const failed = row.fixtures - row.passed;

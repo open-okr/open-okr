@@ -104,7 +104,7 @@ export default async function DeletedItemsPage() {
             </p>
           ) : (
             <ul
-              className="relative max-h-[420px] divide-y divide-line overflow-y-auto overscroll-contain rounded-lg border border-line"
+              className="relative max-h-[420px] divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line"
               data-testid="deleted-items"
             >
               {items.map((item) => {

@@ -145,7 +145,7 @@ export default async function SupportAccessPage() {
               aria-label={t("admin.support.pastLabel")}
               // Scrolls inside the card at about five rows. `relative` keeps
               // an absolute or sr-only child inside the scroll box.
-              className="relative max-h-[296px] divide-y divide-line overflow-y-auto overscroll-contain rounded-lg border border-line"
+              className="relative max-h-[296px] divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line"
             >
               {past.map((session) => (
                 <li className="flex flex-col gap-2 px-3 py-3" key={session.id}>

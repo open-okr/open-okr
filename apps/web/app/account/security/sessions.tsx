@@ -91,7 +91,7 @@ export async function Sessions({ userId }: { userId: string }) {
             // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
             tabIndex={0}
             aria-label={t("account.security.sessions.listLabel")}
-            className="max-h-[296px] overflow-y-auto overscroll-contain rounded-lg border border-line"
+            className="max-h-[296px] overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line"
           >
             {sessions.map((session, index) => {
               const device = session.userAgent ?? "";

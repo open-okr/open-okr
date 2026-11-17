@@ -340,7 +340,7 @@ export default async function ChannelsPage() {
                   // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
                   tabIndex={0}
                   aria-label={t("admin.channels.whatsappTemplates")}
-                  className="flex max-h-[296px] flex-col gap-2 overflow-y-auto overscroll-contain"
+                  className="flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain"
                 >
                   {templates.map((template) => (
                     <li
@@ -410,7 +410,7 @@ export default async function ChannelsPage() {
                   // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
                   tabIndex={0}
                   aria-label={t("admin.channels.whichTemplateAnswersWhich")}
-                  className="flex max-h-[296px] flex-col gap-2 overflow-y-auto overscroll-contain"
+                  className="flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain"
                 >
                   {mappings.map((mapping) => (
                     <li
@@ -510,7 +510,7 @@ export default async function ChannelsPage() {
               tabIndex={0}
               aria-label={t("admin.channels.recentMessages")}
               // About seven rows, then it scrolls inside the card.
-              className="flex max-h-52 flex-col gap-1.5 overflow-y-auto overscroll-contain"
+              className="flex max-h-52 flex-col gap-1.5 overflow-y-auto pr-1.5 overscroll-contain"
             >
               {messages.map((message, index) => (
                 <li

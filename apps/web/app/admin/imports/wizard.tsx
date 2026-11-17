@@ -244,7 +244,7 @@ export function ImportWizard({
               // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
               tabIndex={0}
               aria-label={t("admin.imports.wizard.columns")}
-              className="relative max-h-[296px] divide-y divide-line overflow-y-auto overscroll-contain rounded-lg border border-line"
+              className="relative max-h-[296px] divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line"
               data-testid="import-columns"
             >
               {columns.map((column, index) => (

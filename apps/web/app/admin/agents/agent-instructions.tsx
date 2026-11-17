@@ -188,7 +188,7 @@ function StageCard({
             })}
             // biome-ignore lint/a11y/noNoninteractiveTabindex: a list that scrolls has to be reachable from the keyboard.
             tabIndex={0}
-            className="flex max-h-[296px] flex-col gap-1 overflow-y-auto"
+            className="flex max-h-[296px] flex-col gap-1 overflow-y-auto pr-1.5"
           >
             {history.map((version, index) => (
               <li

@@ -260,7 +260,7 @@ export default async function PlanPage({
                 aria-label={t("admin.plan.holders")}
                 // Scrolls inside the card at about five rows, since the list
                 // grows with the members.
-                className={`relative max-h-[296px] overflow-y-auto overscroll-contain ${listBox}`}
+                className={`relative max-h-[296px] overflow-y-auto pr-1.5 overscroll-contain ${listBox}`}
               >
                 {holders.map((holder) => (
                   <li
