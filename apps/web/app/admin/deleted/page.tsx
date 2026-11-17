@@ -83,17 +83,19 @@ export default async function DeletedItemsPage() {
 
   return (
     <>
-      <h1 className="mb-4 text-lg font-bold text-ink">
-        {t("admin.deleted.title")}
-      </h1>
+      <header className="mb-4 flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.deleted.title")}
+        </h1>
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("admin.deleted.intro")}
+        </p>
+      </header>
       <Card>
         <CardHeader>
-          <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">
-              {t("admin.deleted.whatCanComeBack")}
-            </h2>
-            <p className="text-xs text-ink-3">{t("admin.deleted.intro")}</p>
-          </div>
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.deleted.whatCanComeBack")}
+          </h2>
         </CardHeader>
         <CardBody>
           {items.length === 0 ? (
@@ -101,14 +103,17 @@ export default async function DeletedItemsPage() {
               {t("admin.deleted.nothingDeleted")}
             </p>
           ) : (
-            <ul className="flex flex-col gap-2" data-testid="deleted-items">
+            <ul
+              className="relative max-h-[420px] divide-y divide-line overflow-y-auto overscroll-contain rounded-lg border border-line"
+              data-testid="deleted-items"
+            >
               {items.map((item) => {
                 const at = when.format(new Date(item.deletedAt));
                 return (
                   <li
                     key={`${item.subjectType}-${item.id}`}
                     data-testid="deleted-item"
-                    className="flex flex-wrap items-start justify-between gap-2.5 border-line border-b pb-2 last:border-0 last:pb-0"
+                    className="flex flex-wrap items-start justify-between gap-2.5 px-3 py-2.5"
                   >
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <div className="flex min-w-0 items-center gap-2">
