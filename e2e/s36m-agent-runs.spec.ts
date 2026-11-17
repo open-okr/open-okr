@@ -199,7 +199,8 @@ test("a scope names a goal found by typing, not a pasted id", async () => {
   const title = goal?.title as string;
 
   await goTo(page, "/admin/agents");
-  const runner = page.getByRole("listitem").filter({ hasText: "E2E runner" }).first();
+  await page.getByRole("tab", { name: /E2E runner/ }).click();
+  const runner = page.getByRole("tabpanel", { name: /E2E runner/ });
   await runner.getByRole("button", { name: "Bind a scope" }).click();
   await runner.locator("select[name='resourceType']").selectOption("goal");
   await choose(runner.getByLabel("Which one"), title);
@@ -219,12 +220,10 @@ test("a scope names a goal found by typing, not a pasted id", async () => {
  */
 test("each agent wears its own face, and the general one follows the theme", async () => {
   await goTo(page, "/admin/agents");
-  const agents = page.getByRole("list", { name: "The agents" });
+  const agents = page.getByRole("tablist", { name: "The agents" });
   const faceOf = (name: string) =>
     agents
-      .getByRole("listitem")
-      .filter({ hasText: name })
-      .first()
+      .getByRole("tab", { name: new RegExp(name) })
       .locator("svg.agent-face")
       .first();
   await expect(faceOf("OKR Coach")).toHaveAttribute("data-agent", "coach");

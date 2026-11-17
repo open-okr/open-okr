@@ -16,8 +16,9 @@ import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { AgentInstructions } from "./agent-instructions";
-import { AgentPolicy } from "./agent-policy.tsx";
+import { ScopeCard, WritePolicyCard } from "./agent-policy.tsx";
 import { AgentSwitch, CancelRun } from "./agent-switch";
+import { AgentTabs } from "./agent-tabs.tsx";
 import { ProposalQueue } from "./proposal-queue";
 import { RunControls } from "./run-controls";
 import { AgentRunsLive } from "./runs-live.tsx";
@@ -179,13 +180,26 @@ export default async function AgentsPage() {
     (entry) => entry.enabled && entry.hasWorkspaceCredential,
   );
 
+  // The chips an agent wears on its tab and above its cards.
+  const chipsOf = (agent: (typeof agents)[number]) => (
+    <>
+      <Chip tone={agent.enabled ? "ok" : "neutral"}>
+        {agent.enabled ? t("admin.agents.on") : t("admin.agents.off")}
+      </Chip>
+      <Chip tone="neutral">{scheduleLabel(agent.schedule, t)}</Chip>
+      <Chip tone="agent">{agent.autonomy}</Chip>
+    </>
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h1 className="text-lg font-bold text-ink">
           {t("admin.agents.agentsAndRuns")}
         </h1>
-        <p className="text-sm text-ink-3">{t("admin.agents.everyAgentIsA")}</p>
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("admin.agents.everyAgentIsA")}
+        </p>
       </div>
 
       {/* The runs below move as they run (A11). Each run's version, so an
@@ -202,6 +216,7 @@ export default async function AgentsPage() {
         )}
       />
 
+      <GroupHeading title={t("admin.agents.groupRunAndReview")} />
       <RunControls drafting={drafting} />
 
       {/* Above the agents and the runs on purpose. A proposal is the one thing
@@ -209,63 +224,59 @@ export default async function AgentsPage() {
           record of what already happened (P6-G13a). */}
       <ProposalQueue proposals={proposals} />
 
-      <Card>
-        <CardHeader>
-          <h2 id="agents-list-heading" className="text-sm font-bold text-ink">
-            {t("admin.agents.theAgents")}
-          </h2>
-        </CardHeader>
-        <CardBody className="p-0">
-          {agents.length === 0 ? (
-            <p className="p-3 text-sm text-ink-3">
-              {t("admin.agents.thisWorkspaceHasNo")}
-            </p>
-          ) : (
-            // Named by its heading, so "the agents" and "the runs" are two
-            // lists a reader can tell apart: a run row carries the agent's
-            // name too.
-            <ul aria-labelledby="agents-list-heading" className="flex flex-col">
-              {agents.map((agent) => (
-                <li
-                  key={agent.id}
-                  className="flex flex-col gap-1 border-line border-b px-3 py-2 last:border-b-0"
-                >
-                  <span className="flex flex-wrap items-center gap-2">
-                    {/* Asleep while switched off, so the row says it before
-                        the chip does. */}
-                    <AgentFace
-                      agent={agentFaceKind(agent.kind)}
-                      mood={agent.enabled ? "idle" : "sleeping"}
-                    />
-                    <span className="text-sm font-medium text-ink">
-                      {agent.name}
-                    </span>
-                    <Chip tone={agent.enabled ? "ok" : "neutral"}>
-                      {agent.enabled
-                        ? t("admin.agents.on")
-                        : t("admin.agents.off")}
-                    </Chip>
-                    <Chip tone="neutral">
-                      {scheduleLabel(agent.schedule, t)}
-                    </Chip>
-                    <Chip tone="agent">{agent.autonomy}</Chip>
-                    <span className="ml-auto">
+      <GroupHeading title={t("admin.agents.theAgents")} />
+      {agents.length === 0 ? (
+        <p className="text-sm text-ink-3">
+          {t("admin.agents.thisWorkspaceHasNo")}
+        </p>
+      ) : (
+        // One agent at a time. Each tab carries the agent's chips, so the
+        // list of who is on and what they may write stays readable.
+        <AgentTabs
+          label={t("admin.agents.theAgents")}
+          tabs={agents.map((agent) => {
+            const read = instructions.get(agent.id);
+            return {
+              id: agent.id,
+              label: agent.name,
+              // Asleep while switched off, so the tab says it before the chip
+              // does.
+              face: (
+                <AgentFace
+                  agent={agentFaceKind(agent.kind)}
+                  mood={agent.enabled ? "idle" : "sleeping"}
+                />
+              ),
+              chips: chipsOf(agent),
+              panel: (
+                <>
+                  <Card>
+                    <CardHeader className="justify-between">
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <h3 className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
+                          {agent.name}
+                          {chipsOf(agent)}
+                        </h3>
+                        {agent.persona === "" ? null : (
+                          <p className="text-xs text-ink-3">{agent.persona}</p>
+                        )}
+                      </div>
                       <AgentSwitch
                         id={agent.id}
                         enabled={agent.enabled}
                         name={agent.name}
                       />
-                    </span>
-                  </span>
-                  {agent.persona === "" ? null : (
-                    <span className="text-xs text-ink-3">{agent.persona}</span>
-                  )}
+                    </CardHeader>
+                  </Card>
                   {/* The write policy and the scope binder (P6-G13b). */}
-                  <AgentPolicy
+                  <WritePolicyCard
                     agentId={agent.id}
                     autonomy={agent.autonomy}
                     name={agent.name}
                     autonomies={[...AGENT_AUTONOMIES]}
+                  />
+                  <ScopeCard
+                    agentId={agent.id}
                     levels={BINDING_LEVELS.map((one) => ({
                       value: one.value,
                       label: t(one.labelKey),
@@ -274,34 +285,35 @@ export default async function AgentsPage() {
                     trees={bindable.trees}
                   />
                   {/* What it is told, by stage, and a planned run (A7). */}
-                  {(() => {
-                    const read = instructions.get(agent.id);
-                    return read ? (
-                      <AgentInstructions
-                        agentId={agent.id}
-                        agentName={agent.name}
-                        editable={read.editable}
-                        currentStage={read.currentStage}
-                        stages={read.stages}
-                        canPlan={
-                          agent.kind === "custom" && agent.enabled && drafting
-                        }
-                        tier={agent.tier}
-                      />
-                    ) : null;
-                  })()}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardBody>
-      </Card>
+                  {read ? (
+                    <AgentInstructions
+                      agentId={agent.id}
+                      agentName={agent.name}
+                      editable={read.editable}
+                      currentStage={read.currentStage}
+                      stages={read.stages}
+                      canPlan={
+                        agent.kind === "custom" && agent.enabled && drafting
+                      }
+                      tier={agent.tier}
+                    />
+                  ) : null}
+                </>
+              ),
+            };
+          })}
+        />
+      )}
 
+      <GroupHeading title={t("admin.agents.groupHistory")} />
       <Card>
         <CardHeader className="justify-between">
-          <h2 className="text-sm font-bold text-ink">
-            {t("common.recentRuns")}
-          </h2>
+          <div className="flex min-w-0 flex-col">
+            <h2 className="text-sm font-bold text-ink">
+              {t("common.recentRuns")}
+            </h2>
+            <p className="text-xs text-ink-3">{t("admin.agents.runsAbout")}</p>
+          </div>
           <Chip tone="neutral">
             {t("admin.agents.shown", { length: runs.length })}
           </Chip>
@@ -312,7 +324,12 @@ export default async function AgentsPage() {
               {t("admin.agents.noRunYetNothing")}
             </p>
           ) : (
-            <ul className="flex flex-col">
+            <ul
+              aria-label={t("common.recentRuns")}
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: a list that scrolls has to be reachable from the keyboard.
+              tabIndex={0}
+              className="flex max-h-[420px] flex-col overflow-y-auto"
+            >
               {runs.map((run) => (
                 <li
                   key={run.id}
@@ -390,5 +407,14 @@ export default async function AgentsPage() {
         </CardBody>
       </Card>
     </div>
+  );
+}
+
+/** A group heading: it names a run of cards and is not a card itself. */
+function GroupHeading({ title }: { readonly title: string }) {
+  return (
+    <h2 className="text-xs font-semibold tracking-wide text-ink-4 uppercase">
+      {title}
+    </h2>
   );
 }

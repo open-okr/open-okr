@@ -52,8 +52,18 @@ describe("the agent policy card", () => {
   });
 
   test("confirms before widening an agent to direct writes", () => {
-    expect(card).toContain('option === "scoped_direct" &&');
+    expect(card).toContain('chosen === "scoped_direct" &&');
     expect(card).toContain("window.confirm");
+  });
+
+  test("sends the choice only when Save changes is pressed", () => {
+    // A radio tile changes what is chosen, not what is stored: the footer's
+    // Save changes calls the action, and Discard puts the saved policy back.
+    expect(card).toContain("<SettingsSaveBar");
+    expect(card).toContain('type="radio"');
+    expect(card).toContain("onSubmit={(event) =>");
+    expect(card).toContain("setAgentAutonomyAction(");
+    expect(card).not.toContain("onClick={() => {\n                  if (\n");
   });
 
   test("does not offer the workspace as a binding target", () => {
@@ -78,6 +88,7 @@ describe("the agent policy card", () => {
   test("calls the action that did not exist before this task", () => {
     expect(actions).toContain('"agents.setAutonomy"');
     expect(actions).toContain('"agents.bindScope"');
-    expect(page).toContain("<AgentPolicy");
+    expect(page).toContain("<WritePolicyCard");
+    expect(page).toContain("<ScopeCard");
   });
 });

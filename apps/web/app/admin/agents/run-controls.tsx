@@ -67,27 +67,26 @@ export function RunControls({ drafting }: { drafting: boolean }) {
 
   return (
     <Card>
-      <CardHeader>
-        <span className="flex flex-wrap items-center gap-2">
+      <CardHeader className="justify-between">
+        <div className="flex min-w-0 flex-col">
           <h2 className="text-sm font-bold text-ink">
             {t("admin.agents.runControls.runOneNow")}
           </h2>
-          {drafting ? (
-            <Chip tone="agent">{t("admin.agents.runControls.draftingOn")}</Chip>
-          ) : (
-            <Chip tone="neutral">
-              {t("admin.agents.runControls.deterministicOnly")}
-            </Chip>
-          )}
-        </span>
+          <p className="text-xs text-ink-3">
+            {drafting
+              ? t("admin.agents.runControls.draftingExplained")
+              : t("admin.agents.runControls.deterministicExplained")}
+          </p>
+        </div>
+        {drafting ? (
+          <Chip tone="agent">{t("admin.agents.runControls.draftingOn")}</Chip>
+        ) : (
+          <Chip tone="neutral">
+            {t("admin.agents.runControls.deterministicOnly")}
+          </Chip>
+        )}
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
-        <p className="text-sm text-ink-2">
-          {drafting
-            ? t("admin.agents.runControls.draftingExplained")
-            : t("admin.agents.runControls.deterministicExplained")}
-        </p>
-
         <span className="flex flex-wrap gap-2">
           {CHAMPION_RUNS.map((entry) => (
             <Button
@@ -115,7 +114,9 @@ export function RunControls({ drafting }: { drafting: boolean }) {
         </span>
 
         {problem === null ? null : (
-          <p className="text-sm text-bad">{problem}</p>
+          <p role="alert" className="text-sm text-bad">
+            {problem}
+          </p>
         )}
       </CardBody>
     </Card>
