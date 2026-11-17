@@ -32,7 +32,7 @@ import {
   outcomeLabel,
   stateLabel,
 } from "./labels";
-import { WebhookForm } from "./webhook-form.tsx";
+import { WebhookAction, WebhookForm } from "./webhook-form.tsx";
 
 export const generateMetadata = pageTitle("pageTitle.adminWebhooks");
 
@@ -98,7 +98,7 @@ function EventsField({
   );
 }
 
-/** Name, address, events and space: the fields a create and an edit share. */
+/** Name, space, address and events: the fields a create and an edit share. */
 function HookFields({
   t,
   spaces,
@@ -117,29 +117,20 @@ function HookFields({
   };
 }) {
   return (
-    <>
+    <div className="grid grid-cols-12 gap-x-6 gap-y-4">
       <TextInput
+        className="col-span-12 md:col-span-6"
         label={t("admin.webhooks.field.name")}
         name="name"
         required
         maxLength={80}
         defaultValue={hook?.name}
       />
-      <UrlInput
-        label={t("admin.webhooks.field.url")}
-        description={t("admin.webhooks.field.urlDescription")}
-        name="url"
-        required
-        maxLength={2000}
-        secure={secure}
-        defaultValue={hook?.url}
-      />
-      <EventsField t={t} checked={hook?.events ?? []} />
       <SelectInput
+        className="col-span-12 md:col-span-6"
         label={t("admin.webhooks.field.space")}
         name="spaceId"
         defaultValue={hook?.spaceId ?? ""}
-        className="max-w-sm"
       >
         <option value="">{t("admin.webhooks.field.everySpace")}</option>
         {spaces.map((space) => (
@@ -148,7 +139,20 @@ function HookFields({
           </option>
         ))}
       </SelectInput>
-    </>
+      <UrlInput
+        className="col-span-12"
+        label={t("admin.webhooks.field.url")}
+        description={t("admin.webhooks.field.urlDescription")}
+        name="url"
+        required
+        maxLength={2000}
+        secure={secure}
+        defaultValue={hook?.url}
+      />
+      <div className="col-span-12">
+        <EventsField t={t} checked={hook?.events ?? []} />
+      </div>
+    </div>
   );
 }
 
@@ -198,112 +202,132 @@ export default async function AdminWebhooksPage({
           ? offReasonLabel(t, hook.offReason)
           : null;
 
+  const cardHead = "flex-col items-stretch gap-0.5";
+  const scroll =
+    "relative flex max-h-[296px] flex-col gap-2 overflow-y-auto overscroll-contain";
+
   return (
-    <div className="flex w-full flex-col gap-3.5">
+    <div className="flex w-full flex-col gap-4">
       {selected ? (
         <>
+          <header className="flex min-w-0 flex-col gap-0.5">
+            <Link
+              href="/admin/webhooks"
+              className="text-xs text-brand-text hover:underline"
+            >
+              {t("admin.webhooks.back")}
+            </Link>
+            <h1 className="flex flex-wrap items-center gap-2 text-lg font-bold text-ink">
+              {selected.name}
+              <Chip tone={STATE_TONE[selected.state]}>{stateOf(selected)}</Chip>
+            </h1>
+            <p className="text-xs text-ink-3">
+              {t("admin.webhooks.owner", { name: selected.owner.name })}
+            </p>
+            {offWhy(selected) ? (
+              <p className="text-xs text-ink-2" data-testid="webhook-why">
+                {offWhy(selected)}
+              </p>
+            ) : null}
+          </header>
+
           <Card>
-            <CardHeader>
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <Link
-                  href="/admin/webhooks"
-                  className="text-xs text-brand-text hover:underline"
-                >
-                  {t("admin.webhooks.back")}
-                </Link>
-                <h1 className="flex flex-wrap items-center gap-2 text-lg font-bold text-ink">
-                  {selected.name}
-                  <Chip tone={STATE_TONE[selected.state]}>
-                    {stateOf(selected)}
-                  </Chip>
-                </h1>
-                <p className="text-xs text-ink-3">
-                  {t("admin.webhooks.owner", { name: selected.owner.name })}
-                </p>
-                {offWhy(selected) ? (
-                  <p className="text-xs text-ink-2" data-testid="webhook-why">
-                    {offWhy(selected)}
-                  </p>
-                ) : null}
-              </div>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-start gap-3">
-                <WebhookForm
-                  action={webhookCommandAction}
-                  hidden={{ id: selected.id, command: "test" }}
-                  submitLabel={t("admin.webhooks.test")}
-                />
-                <WebhookForm
-                  action={webhookCommandAction}
-                  hidden={{
-                    id: selected.id,
-                    command: selected.state === "off" ? "on" : "off",
-                  }}
-                  submitLabel={
-                    selected.state === "off"
-                      ? t("admin.webhooks.turnOn")
-                      : t("admin.webhooks.turnOff")
-                  }
-                />
-                {selected.owner.active ? null : (
-                  <WebhookForm
-                    action={webhookCommandAction}
-                    hidden={{ id: selected.id, command: "takeOver" }}
-                    submitLabel={t("admin.webhooks.takeOver")}
-                  />
-                )}
-                <WebhookForm
-                  action={rotateSecretAction}
-                  hidden={{ id: selected.id }}
-                  confirm={t("admin.webhooks.rotateConfirm", {
-                    name: selected.name,
-                  })}
-                  submitLabel={t("admin.webhooks.rotate")}
-                />
-                <WebhookForm
-                  action={webhookCommandAction}
-                  hidden={{ id: selected.id, command: "remove" }}
-                  confirm={t("admin.webhooks.removeConfirm", {
-                    name: selected.name,
-                  })}
-                  submitLabel={t("admin.webhooks.remove")}
-                />
-              </div>
-              <h2 className="text-sm font-bold text-ink">
-                {t("admin.webhooks.settings")}
+            <CardHeader className={cardHead}>
+              <h2 className="text-sm font-semibold text-ink">
+                {t("admin.webhooks.actions.title")}
               </h2>
-              <WebhookForm
-                action={updateWebhookAction}
-                hidden={{ id: selected.id }}
-                submitLabel={t("admin.webhooks.save")}
-              >
-                <HookFields
-                  t={t}
-                  spaces={spaceOptions}
-                  secure={!allowPrivate}
-                  hook={selected}
+              <p className="text-xs text-ink-3">
+                {t("admin.webhooks.actions.lead")}
+              </p>
+            </CardHeader>
+            <CardBody className="flex flex-wrap items-start gap-2">
+              <WebhookAction
+                action={webhookCommandAction}
+                hidden={{ id: selected.id, command: "test" }}
+                label={t("admin.webhooks.test")}
+              />
+              <WebhookAction
+                action={webhookCommandAction}
+                hidden={{
+                  id: selected.id,
+                  command: selected.state === "off" ? "on" : "off",
+                }}
+                label={
+                  selected.state === "off"
+                    ? t("admin.webhooks.turnOn")
+                    : t("admin.webhooks.turnOff")
+                }
+              />
+              {selected.owner.active ? null : (
+                <WebhookAction
+                  action={webhookCommandAction}
+                  hidden={{ id: selected.id, command: "takeOver" }}
+                  label={t("admin.webhooks.takeOver")}
                 />
-              </WebhookForm>
+              )}
+              <WebhookAction
+                action={rotateSecretAction}
+                hidden={{ id: selected.id }}
+                confirm={t("admin.webhooks.rotateConfirm", {
+                  name: selected.name,
+                })}
+                label={t("admin.webhooks.rotate")}
+              />
+              <WebhookAction
+                action={webhookCommandAction}
+                hidden={{ id: selected.id, command: "remove" }}
+                confirm={t("admin.webhooks.removeConfirm", {
+                  name: selected.name,
+                })}
+                label={t("admin.webhooks.remove")}
+                className="[&>button]:text-bad"
+              />
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader>
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <h2 className="text-sm font-bold text-ink">
-                  {t("admin.webhooks.deliveries.title")}
-                </h2>
-                <p className="text-xs text-ink-3">
-                  {t("admin.webhooks.deliveries.lead", {
-                    days: DELIVERY_LOG_DAYS,
-                  })}
-                </p>
-              </div>
+            <CardHeader className={cardHead}>
+              <h2 className="text-sm font-semibold text-ink">
+                {t("admin.webhooks.settings")}
+              </h2>
+              <p className="text-xs text-ink-3">
+                {t("admin.webhooks.settings.lead")}
+              </p>
+            </CardHeader>
+            <WebhookForm
+              action={updateWebhookAction}
+              hidden={{ id: selected.id }}
+              submitLabel={t("admin.webhooks.save")}
+            >
+              <HookFields
+                t={t}
+                spaces={spaceOptions}
+                secure={!allowPrivate}
+                hook={selected}
+              />
+            </WebhookForm>
+          </Card>
+
+          <Card>
+            <CardHeader className={cardHead}>
+              <h2 className="text-sm font-semibold text-ink">
+                {t("admin.webhooks.deliveries.title")}
+              </h2>
+              <p className="text-xs text-ink-3">
+                {t("admin.webhooks.deliveries.lead", {
+                  days: DELIVERY_LOG_DAYS,
+                })}
+              </p>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
               {deliveries && deliveries.items.length > 0 ? (
-                <ul className="flex flex-col gap-2">
+                <ul
+                  // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+                  tabIndex={0}
+                  aria-label={t("admin.webhooks.deliveries.title")}
+                  // Scrolls inside the card after about five rows.
+                  className={scroll}
+                >
                   {deliveries.items.map((item) => (
                     <li
                       key={item.id}
@@ -354,10 +378,10 @@ export default async function AdminWebhooksPage({
                       ) : null}
                       {item.outcome === "failed" ||
                       item.outcome === "refused" ? (
-                        <WebhookForm
+                        <WebhookAction
                           action={webhookCommandAction}
                           hidden={{ id: item.id, command: "redeliver" }}
-                          submitLabel={t("admin.webhooks.deliveries.redeliver")}
+                          label={t("admin.webhooks.deliveries.redeliver")}
                         />
                       ) : null}
                     </li>
@@ -398,14 +422,23 @@ export default async function AdminWebhooksPage({
         </>
       ) : (
         <>
+          <header className="flex flex-col gap-1">
+            <h1 className="text-lg font-bold text-ink">
+              {t("admin.webhooks.title")}
+            </h1>
+            <p className="max-w-prose text-sm text-ink-3">
+              {t("admin.webhooks.lead")}
+            </p>
+          </header>
+
           <Card>
-            <CardHeader>
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <h1 className="text-lg font-bold text-ink">
-                  {t("admin.webhooks.title")}
-                </h1>
-                <p className="text-xs text-ink-3">{t("admin.webhooks.lead")}</p>
-              </div>
+            <CardHeader className={cardHead}>
+              <h2 className="text-sm font-semibold text-ink">
+                {t("admin.webhooks.list.title")}
+              </h2>
+              <p className="text-xs text-ink-3">
+                {t("admin.webhooks.list.lead")}
+              </p>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
               {params.hook ? (
@@ -426,7 +459,14 @@ export default async function AdminWebhooksPage({
                   </p>
                 </div>
               ) : (
-                <ul className="flex flex-col gap-2">
+                <ul
+                  // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+                  tabIndex={0}
+                  aria-label={t("admin.webhooks.list.title")}
+                  // Scrolls inside the card after about five rows, so a long
+                  // list never pushes the add card out of reach.
+                  className={scroll}
+                >
                   {webhooks.map((hook) => (
                     <li
                       key={hook.id}
@@ -483,31 +523,23 @@ export default async function AdminWebhooksPage({
           </Card>
 
           <Card>
-            <CardHeader>
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <h2 className="text-sm font-bold text-ink">
-                  {t("admin.webhooks.create.title")}
-                </h2>
-                <p className="text-xs text-ink-3">
-                  {allowPrivate
-                    ? t("admin.webhooks.create.leadPrivate")
-                    : t("admin.webhooks.create.lead")}
-                </p>
-              </div>
+            <CardHeader className={cardHead}>
+              <h2 className="text-sm font-semibold text-ink">
+                {t("admin.webhooks.create.title")}
+              </h2>
+              <p className="text-xs text-ink-3">
+                {allowPrivate
+                  ? t("admin.webhooks.create.leadPrivate")
+                  : t("admin.webhooks.create.lead")}
+              </p>
             </CardHeader>
-            <CardBody>
-              <WebhookForm
-                action={createWebhookAction}
-                submitLabel={t("admin.webhooks.create.submit")}
-                testId="webhook-create"
-              >
-                <HookFields
-                  t={t}
-                  spaces={spaceOptions}
-                  secure={!allowPrivate}
-                />
-              </WebhookForm>
-            </CardBody>
+            <WebhookForm
+              action={createWebhookAction}
+              submitLabel={t("admin.webhooks.create.submit")}
+              testId="webhook-create"
+            >
+              <HookFields t={t} spaces={spaceOptions} secure={!allowPrivate} />
+            </WebhookForm>
           </Card>
         </>
       )}

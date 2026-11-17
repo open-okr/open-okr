@@ -103,7 +103,7 @@ Branding and General are done. The rest wait for their own change, one page at a
 | admin/plan | Proposed: instant actions | Pending |
 | admin/roles | Instant actions; the matrix fits the card at Compact width, the member list scrolls | Done (2026-11-16) |
 | admin/support | Instant actions, a scrolling list for past sessions | Done (2026-11-16) |
-| admin/webhooks | Proposed: list or tool | Pending |
+| admin/webhooks | List or tool: intro under the title, an All webhooks list that scrolls at about five rows, an add card and a Settings card with a footer each (Discard and the submit); Send test, Turn on or off, Take it over, Rotate secret and Remove are instant actions in an Actions card, and Rotate secret and Remove ask first in an inline panel; deliveries scroll at about five rows | Done (2026-11-17) |
 | account (name, email, delete) | Footer per card (name and picture, profile details), instant actions (picture, appearance, change email), danger card for delete | Done (2026-11-16) |
 | account/ai | One card, one sticky bar (one Save changes stores every key field that was filled), Remove my key stays instant | Done (2026-11-17) |
 | account/api-tokens | Instant actions (Create token in the New token footer, Revoke per row), a scrolling list | Done (2026-11-17) |
