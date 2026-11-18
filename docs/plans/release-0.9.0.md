@@ -305,7 +305,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | G2 | done | Built 13 November 2026 as designed, with the differences listed under "As built" in `work-layer.md` §5.1 (one recorder in the shell instead of a hook per page). New read `search.recent`, not offered to agents. Tests written, not run |
 | G3 | to do | Built in 0.7.0. Design corrected; browser check of `/admin/connections` still to do |
 | G4 | design written | 13 November 2026: nothing reads a binding on one KPI (human KPI access is the role alone), so Agung chose per-KPI access first (G4-Q3). `docs/design/kpi-access.md`, waiting for "design approved"; Q1 asks whether to ship only the import report in 0.9.0 |
-| G5 | yours | G5-Q2: wait for `feat/profile-source-links` to be pushed from the machine that kept it |
+| G5 | done | Rebuilt 18 November 2026, because the original branch was lost (G5-Q2). METHOD.md §12.2 lists the two links, `PROFILES` carries an optional `source`, `method:check` compares both word for word, and the profile tiles link them. No contract change |
 | G6 | done | 13 November 2026. Eleven mockups draw agents as faces (`.af`), 12b shows the guided fields, PNGs re-rendered with Google Chrome |
 | G7 | done | 13 November 2026. `.claude/settings.json` with `attribution` empty and `includeCoAuthoredBy: false` |
 | G8 | done | 13 November 2026. `mayChangeInputPack` guards both pack writes in their `load` step, `workflow.read` returns `packAccess`, the screen is read only for everybody else. Local tier not yet run. The end-to-end case checks the Owner only, because the suite has no second account to sign in as |
@@ -313,6 +313,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | G10 | done | 13 November 2026. The row has no id, so the key is the position plus time and provider, as Obed's fix. `origin/obed` can go on Akmal's word |
 | G11 | done | 12 November 2026. okr-goal took the copy with open-okr's three later edits merged in (four conflicts settled against the live site) and 40 links pointed at GitHub, by pull request in that repository; the folder is removed here in this pull request |
 | U1 | done | 13 November 2026. "0.8 to 0.9" in `docs/runbooks/upgrade.md`: 0168 to 0170, no new data change, setup code, copilot, input pack, smaller changes. G4 and G5 left out |
+| S1 | done | Not in this plan when it was written: requested directly by Akmal on 16 November 2026. Every settings page follows `docs/design/settings-page-layout.md` (16 and 17 November), plus a per-member content width with migration 0171 (`docs/design/content-width.md`). One commit per page, listed in pull request #215 |
 | X1 | done | 12 November 2026, by Akmal |
 | X2 | done | 12 November 2026, by Akmal |
 | X3 | done | 12 November 2026: nothing was pinned |
