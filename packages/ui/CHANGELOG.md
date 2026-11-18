@@ -1,5 +1,38 @@
 # @openokr/ui
 
+## 0.9.0
+
+### Patch Changes
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`d63fcc6`](https://github.com/open-okr/open-okr/commit/d63fcc6d87313ab30f33aa14b342ff996fd001cb) Thanks [@agungksidik](https://github.com/agungksidik)! - The Your AI keys page follows the settings layout. All providers sit in one card with one sticky bar, and Save changes stores every key field that was filled. The bar lists the keys not saved yet and has Discard. Remove my key stays an instant action on each stored provider.
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`e58f86c`](https://github.com/open-okr/open-okr/commit/e58f86ce25a8c5b1ddc71a0604d489ca10b88507) Thanks [@agungksidik](https://github.com/agungksidik)! - The API tokens page follows the settings layout. New token comes first, with Create token and any refusal in its footer. Your tokens is one list that scrolls inside the card, with a count of active tokens and Revoke on each row. Connect an agent that cannot sign in comes last. Create token and Revoke still apply at once.
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`b6f85e2`](https://github.com/open-okr/open-okr/commit/b6f85e2d9d11896c61d827e3de2d7d03bfe0a383) Thanks [@agungksidik](https://github.com/agungksidik)! - Where to reach you follows the settings page layout. Delivery and How often each have a "Save changes" bar that names what is unsaved and a Discard, the primary channel is a set of tiles, linked accounts are tiles with their button beside the name, and the daily summary time is off until the summary is on.
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`3fcb905`](https://github.com/open-okr/open-okr/commit/3fcb905694584968fca581a870a3b228cfef1e11) Thanks [@agungksidik](https://github.com/agungksidik)! - Your account now follows the settings page layout: grouped cards on a 12-column grid, a "Save changes" bar in the name and profile cards that lists what is unsaved, and a danger card for deleting the account.
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`d60f6b0`](https://github.com/open-okr/open-okr/commit/d60f6b01b53120a36e6d5775dc7c8340096593c4) Thanks [@agungksidik](https://github.com/agungksidik)! - On the AI page, each prompt is its own card with its own footer: Discard, Save a new version, and Restore the built-in on the left. A new version that fails its evaluation set is still refused, and the footer names the checks it failed. Privacy and egress saves through its own footer with Discard. The external agent calls and ratings lists scroll inside their cards, and they sit under a new Usage by agents and members heading. Nothing about how prompts, privacy settings or usage are stored has changed.
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`b600620`](https://github.com/open-okr/open-okr/commit/b6006206f94927aeebe3718923eb95c9449bd4fb) Thanks [@agungksidik](https://github.com/agungksidik)! - Backups has a short intro under its title. The explanations now sit under each card's title, and the guide links sit at the right of the Restoring and This instance's backups headers. The passphrase and Include files each take a full row, and Export workspace is a button in the card footer. The Archives taken list scrolls inside its card.
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`4db69fc`](https://github.com/open-okr/open-okr/commit/4db69fc3bde7f437a003d62b75ce98ed801e7fb3) Thanks [@agungksidik](https://github.com/agungksidik)! - The Notifications and channels page follows the settings layout. Each provider is one card with its logo and status, the credential boxes sit on the 12-column grid, and a footer says what is not saved yet, with a Discard button and the Connect button. WhatsApp templates and the reminder mapping are two cards, and the long lists scroll inside their cards. The shared save bar accepts a custom button label. The browser no longer offers saved passwords or earlier entries in the provider credential boxes. Connecting, testing, syncing and mapping work as before.
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`2074b11`](https://github.com/open-okr/open-okr/commit/2074b11f148b2f54403cf840f4796ff4ee864eef) Thanks [@agungksidik](https://github.com/agungksidik)! - The Directory sync page follows the settings layout. The title and intro sit above the cards, SCIM endpoint is a card of its own, and Generate SCIM token sits in the card footer beside the sentence that it replaces any existing token. The endpoint address now has a copy button at its right end, from a new `CopyField` in the interface kit: a check mark shows when it is copied, and where the browser refuses the clipboard the address is selected for copying by hand. Nothing about SCIM tokens or provisioning has changed.
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`90b8d35`](https://github.com/open-okr/open-okr/commit/90b8d3532dc6194604641537f2da997e6cba2969) Thanks [@agungksidik](https://github.com/agungksidik)! - The Import page has an intro sentence under its title. The "Workspace archive" heading is gone and the archive card says where to take an archive. The wizard buttons are smaller, and the column list and Recent runs scroll after about five rows. Every step and message is unchanged.
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`af20c59`](https://github.com/open-okr/open-okr/commit/af20c59d4294ea7b7e16912cd09959333125ff0b) Thanks [@agungksidik](https://github.com/agungksidik)! - The Webhooks page puts its explanation under the title and keeps the list of webhooks in a card that scrolls after about five rows. The add form and a webhook's Settings each end in a footer with Discard and the save button.
+  
+  On a webhook's page, Send test, Turn on or off, Take it over, Rotate secret and Remove sit in an Actions card and apply at once. Rotate secret and Remove ask on the page instead of in a browser dialog. The signing secret still shows once after it is made.
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`14a99fd`](https://github.com/open-okr/open-okr/commit/14a99fd3193834996d891c71ce5ea87064f49327) Thanks [@agungksidik](https://github.com/agungksidik)! - After a reload, the theme, density and width controls show the stored choice as selected rather than the defaults. The role matrix is wide enough for its longest level name in English and Malay.
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`e6f8399`](https://github.com/open-okr/open-okr/commit/e6f839933f8bf3d8c74aa55080d2d04b2c501bec) Thanks [@agungksidik](https://github.com/agungksidik)! - Branding's save bar becomes a shared settings component and its fields follow a 12-column grid.
+- Updated dependencies [[`3a8e7a0`](https://github.com/open-okr/open-okr/commit/3a8e7a002a9142115f634437328af24cc3769f8b)]:
+  - @openokr/method@0.9.0
+  - @openokr/formats@0.9.0
+
 ## 0.8.1
 
 ### Patch Changes

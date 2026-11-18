@@ -1,5 +1,13 @@
 # @openokr/test-support
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @openokr/core@0.9.0
+  - @openokr/db@0.9.0
+
 ## 0.8.1
 
 ### Patch Changes

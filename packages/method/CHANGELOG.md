@@ -1,5 +1,11 @@
 # @openokr/method
 
+## 0.9.0
+
+### Patch Changes
+
+- [#215](https://github.com/open-okr/open-okr/pull/215) [`3a8e7a0`](https://github.com/open-okr/open-okr/commit/3a8e7a002a9142115f634437328af24cc3769f8b) Thanks [@agungksidik](https://github.com/agungksidik)! - The Google-style and Radical Focus profiles on the practice screen link to the work they follow, and METHOD.md section 12.2 lists the same two links. No rule, threshold or setting changes.
+
 ## 0.8.1
 
 No changes in this release.
