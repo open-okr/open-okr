@@ -145,13 +145,13 @@ root key, and refuses to finish without it rather than report them sealed.
 
 ## 0.8 to 0.9
 
-Three migrations, **0168 to 0170**, all additive. No data change is new, and
+Four migrations, **0168 to 0171**, all additive. No data change is new, and
 nothing needs setting on an instance that is already set up. A new install
 has one extra step, the [setup code](#the-setup-code).
 
 ### Migrations
 
-None of the three drops, renames or rewrites anything. Each adds something the
+None of the four drops, renames or rewrites anything. Each adds something the
 0.8 release never reads or writes, so a rolling upgrade is safe: pods still on
 0.8 keep working against the new schema. Nothing is lost on the way up. Going
 back is the [restore](#going-back), as always.
@@ -161,6 +161,7 @@ back is the [restore](#going-back), as always.
 | 0168 | Adds `proposed_changes.reverse_payload` (jsonb, null). It holds what undoing an applied copilot edit needs. Null on every existing row. No new table, so the row's own tenant policy covers it | Nothing |
 | 0169 | Widens two checks on `ai_tool_calls`: `source` admits `copilot` beside `mcp`, and a copilot row carries a member and no grant or token. Every existing row still satisfies both checks and none changes | Nothing |
 | 0170 | Creates `ai_answer_ratings`, the thumbs up and down on copilot answers, with row-level security and its tenant policy in the same migration | Nothing |
+| 0171 | Adds `workspace_members.width` (text, null), the member's content width. [The design](../design/content-width.md) has the detail. Null on every existing row, and null means Compact | Nothing. See [content width](#content-width) |
 
 ### Data changes
 
@@ -221,6 +222,24 @@ read only, with a line naming who may change it. The same rule holds through
 the API, the command line and agents. Marks already made stay as they are.
 Nothing to do, except to name a facilitator on a cycle where somebody else has
 been changing the pack.
+
+### Content width
+
+After the upgrade every member sees Compact: the main content is capped at
+1152 px and centred, so on a wide screen the column is narrower than in 0.8.
+Each member can switch to Full width in the account menu (avatar, top right) or
+in Your account > Appearance. The choice is stored per member and follows them
+to another machine. There is no workspace-wide setting. Nothing to do.
+
+### Settings pages and the AI console
+
+| Change | What you do |
+|---|---|
+| Admin and account settings pages share one layout. A bar shows "Not saved yet" with the changed parts, and Discard puts the form back. Actions that apply at once (revoke, test, delete, generate a token) keep their own button and are not part of Save | Nothing |
+| Admin, AI shows one provider at a time, as tabs with their on and verified chips. A provider's key is stored with its own button, and the other provider settings save through the footer. The key stays disabled until the provider is turned on | Nothing |
+| Agent connections and Webhooks ask for confirmation in the card, not in a browser dialog | Nothing |
+| Nudge volume controls still save at once | Nothing |
+| The Google-style and Radical Focus practice profiles link to their sources | Nothing |
 
 ### Smaller changes
 
