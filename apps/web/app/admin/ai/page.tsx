@@ -344,6 +344,18 @@ export default async function AdminAIPage({
                         {t("common.appliesAtOnce")}
                       </span>
                     </div>
+                    {/* The server refuses a key for a provider with no
+                        configuration row, and the row is made by saving the
+                        settings below. Say so instead of offering a Store that
+                        can only fail. */}
+                    {config ? null : (
+                      <p
+                        id={`ai-key-needs-provider-${kind}`}
+                        className="text-xs text-ink-3"
+                      >
+                        {t("admin.ai.keyNeedsProvider")}
+                      </p>
+                    )}
                     <AIForm
                       action={saveWorkspaceKey}
                       className="grid grid-cols-12 items-end gap-x-6 gap-y-2"
@@ -366,6 +378,7 @@ export default async function AdminAIPage({
                         data-form-type="other"
                         required
                         maxLength={4096}
+                        disabled={!config}
                       />
                       <div className="col-span-12 md:col-span-3">
                         <Button
@@ -373,6 +386,10 @@ export default async function AdminAIPage({
                           variant="default"
                           size="sm"
                           className="w-full"
+                          disabled={!config}
+                          aria-describedby={
+                            config ? undefined : `ai-key-needs-provider-${kind}`
+                          }
                         >
                           {config?.hasWorkspaceCredential
                             ? t("admin.ai.replace")
