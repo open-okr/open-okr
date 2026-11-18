@@ -32,7 +32,16 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { and, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -52,6 +61,23 @@ import {
   defineReadAction,
   defineWriteAction,
 } from "./define.ts";
+
+/**
+ * The order a thread is read in (0.9.0 UAT F-01).
+ *
+ * A question and its answer are written in one transaction, so they share
+ * `created_at`. The id cannot break that tie: ids are random inside one
+ * millisecond. The role does, the question before its answer, and the id comes
+ * last only to keep the order stable. Each turn has its own transaction, so a
+ * tie never crosses turns. No column is added.
+ */
+const roleRank = sql`case ${aiMessages.role} when 'member' then 0 else 1 end`;
+const threadOrder = [aiMessages.createdAt, roleRank, aiMessages.id] as const;
+const threadOrderDesc = [
+  desc(aiMessages.createdAt),
+  desc(roleRank),
+  desc(aiMessages.id),
+] as const;
 
 /**
  * The feature key the copilot's own switch and budgets hang off.
@@ -654,7 +680,7 @@ export const recordAnswer = defineWriteAction({
             eq(aiMessages.threadId, input.threadId),
           ),
         )
-        .orderBy(desc(aiMessages.createdAt), desc(aiMessages.id))
+        .orderBy(...threadOrderDesc)
         .limit(1);
       // One answer per question. A retry that lost its first response would
       // otherwise leave two answers to one question and no way to tell which
@@ -1214,7 +1240,7 @@ export async function answerContextsInTx(
         eq(aiMessages.threadId, threadId),
       ),
     )
-    .orderBy(aiMessages.createdAt, aiMessages.id);
+    .orderBy(...threadOrder);
   const first = rows[0]?.createdAt;
   const recorded = first
     ? await tx
@@ -1349,7 +1375,7 @@ export const readThread = defineReadAction({
               eq(aiMessages.threadId, input.threadId),
             ),
           )
-          .orderBy(aiMessages.createdAt, aiMessages.id);
+          .orderBy(...threadOrder);
 
         // This member's recorded reads since the conversation began, which
         // the answers' windows are counted from (plan 0.9.0 L3).
