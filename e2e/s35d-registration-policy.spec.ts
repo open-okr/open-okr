@@ -82,9 +82,8 @@ test("the owner chooses company email addresses on General", async () => {
 
   await page.getByTestId("registration-company_domains").check();
   await page
-    .locator("form")
-    .filter({ has: page.getByTestId("registration-company_domains") })
-    .getByRole("button", { name: "Save", exact: true })
+    .getByTestId("registration-card")
+    .getByRole("button", { name: "Save changes", exact: true })
     .click();
 
   await expect

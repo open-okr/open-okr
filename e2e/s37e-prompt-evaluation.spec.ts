@@ -32,11 +32,9 @@ const PROMPT = "Objective drafting";
 let context: BrowserContext;
 let page: Page;
 
-/** The objective prompt's save form, not one of the console's other forms. */
+/** The objective prompt's card: its field, its footer and its restore button. */
 const promptForm = (page: Page): Locator =>
-  page.locator("form").filter({
-    has: page.getByLabel(`System prompt for ${PROMPT}`),
-  });
+  page.getByTestId("ai-prompt-draft.objective");
 
 /** The usage card's line for the objective prompt. */
 const resultLine = (page: Page): Locator =>
@@ -53,16 +51,15 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(async () => {
   await goTo(page, "/admin/ai");
-  // The restore form sits beside the save form, in the same prompt's row,
-  // and only while that prompt has a stored version.
-  const row = promptForm(page).locator("xpath=..");
-  const restore = row.locator("form").filter({
-    has: page.getByRole("button", { name: "Restore the built-in" }),
+  // The restore button is at the left of the card's footer, and only while
+  // that prompt has a stored version.
+  const restore = promptForm(page).getByRole("button", {
+    name: "Restore the built-in",
   });
   if ((await restore.count()) > 0) {
-    await restore.getByRole("button", { name: "Restore the built-in" }).click();
-    // The form is drawn only while a stored version exists, so a restore
-    // that worked takes it away, status line and all.
+    await restore.click();
+    // The button is drawn only while a stored version exists, so a restore
+    // that worked takes it away.
     await expect(restore).toHaveCount(0, { timeout: 15_000 });
   }
   await context?.close();
@@ -112,10 +109,9 @@ test("a version that passes is saved, and the usage card reads it", async () => 
       "Draft one objective that names a change, with two or three measures. Use only numbers the writer gave.",
     );
   await form.getByRole("button", { name: "Save a new version" }).click();
-  await expect(form.getByRole("status")).toHaveText(
-    /^Saved as version \d+\.$/,
-    { timeout: 15_000 },
-  );
+  await expect(form.getByText(/^Saved as version \d+\.$/)).toBeVisible({
+    timeout: 15_000,
+  });
 
   await goTo(page, "/admin/ai");
   await expect(resultLine(page)).toContainText(/version \d+/);

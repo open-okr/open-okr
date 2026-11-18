@@ -1,5 +1,4 @@
 import { isDemoAccount, passwordCardFor } from "@openokr/core";
-import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { getPool } from "../../../lib/auth";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { requireSession } from "../../../lib/session";
@@ -30,20 +29,23 @@ export default async function SecurityPage() {
     sessionCreatedAt: session.session.createdAt,
   });
 
+  const GROUP = "text-xs font-semibold uppercase tracking-wide text-ink-4";
   return (
-    <div className="flex flex-col gap-4.5">
-      <Card>
-        <CardHeader>
-          <h1 className="text-lg font-bold text-ink">
-            {t("account.security.security")}
-          </h1>
-        </CardHeader>
-        <CardBody>
-          <p className="text-sm text-ink-3">
-            {t("account.security.signedInAs", { email: session.user.email })}
-          </p>
-        </CardBody>
-      </Card>
+    <div className="flex flex-col gap-4">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("account.security.security")}
+        </h1>
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("account.security.signedInAs", { email: session.user.email })}
+        </p>
+      </header>
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className={GROUP}>{t("account.security.group.signIn")}</h2>
+        <span className="rounded-full bg-raised px-2 font-semibold text-ink-3 text-xs">
+          {t("account.security.group.appliesAtOnce")}
+        </span>
+      </div>
       <PasswordCard card={password} setPassword={setPassword} />
       {/*
        * Both draw their own cards, one per heading, rather than being wrapped
@@ -54,6 +56,7 @@ export default async function SecurityPage() {
         twoFactorEnabled={session.user.twoFactorEnabled === true}
         demo={isDemoAccount(session.user.email)}
       />
+      <h2 className={GROUP}>{t("account.security.group.devicesAndData")}</h2>
       <Sessions userId={session.user.id} />
       <DataExport />
     </div>

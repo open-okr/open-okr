@@ -104,13 +104,10 @@ export function ladderProblem(
 /**
  * The ladder in force for one rule: the workspace's own, or §11's.
  *
- * `stored` is whatever the row holds, which may be null, may be a shape an
- * older release wrote, and is never trusted.
+ * `stored` is a ladder the row holds. It may be a shape an older release
+ * wrote and is never trusted. The caller skips a row with no ladder.
  */
 function resolveLadder<T>(owner: LadderOwner, stored: unknown, canon: T): T {
-  if (stored === null || stored === undefined) {
-    return canon;
-  }
   if (ladderProblem(owner, stored) !== null) {
     return canon;
   }

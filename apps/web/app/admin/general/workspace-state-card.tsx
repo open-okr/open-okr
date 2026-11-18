@@ -110,7 +110,7 @@ export async function WorkspaceStateCard({
     <Card>
       <CardHeader>
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">
+          <h2 className="text-sm font-semibold text-ink">
             {t("admin.state.title")}
           </h2>
           <p className="text-xs text-ink-3">{t("admin.state.explains")}</p>

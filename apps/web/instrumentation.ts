@@ -25,6 +25,7 @@ export async function register(): Promise<void> {
     resolveSSO,
     checkTenantFloor,
     recordCallerAddress,
+    ensureSetupCode,
   } = await import("./instrumentation.node");
   // First of all, before any step that can fail (plan 0.8.0 H10a). The image
   // sets NEXT_MANUAL_SIG_HANDLE, so Next registers no handler, and a Node
@@ -52,6 +53,9 @@ export async function register(): Promise<void> {
   // Which caller address every per-address limit counts, in the log and, when
   // it changed, on the instance chain (docs/design/trusted-proxies.md D10).
   await recordCallerAddress();
+  // Before the first request, so the wizard never renders on an unclaimed
+  // instance with no code in force (docs/design/setup-code.md D2).
+  await ensureSetupCode();
   startOutboxRelay();
   startRecurringWork();
   // Before the first request, so the first sign-in finds the SSO providers

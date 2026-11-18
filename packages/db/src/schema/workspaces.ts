@@ -97,6 +97,12 @@ export const workspaceMembers = pgTable("workspace_members", {
   theme: text("theme", { enum: ["light", "dark", "system"] }),
   density: text("density", { enum: ["comfortable", "compact"] }),
   /**
+   * How wide the main content is (docs/design/content-width.md). Null reads
+   * as `compact`, the default, so a wide screen gets a readable column
+   * without anybody choosing it.
+   */
+  width: text("width", { enum: ["compact", "full"] }),
+  /**
    * The member's own language (P6-G22a).
    *
    * Null means "follow the workspace", which is what a member who has never

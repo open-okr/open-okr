@@ -4,6 +4,7 @@ import {
   methodSectionAnchor,
   PRACTICE_KEYS,
   PROFILE_KEYS,
+  PROFILES,
   practiceSettingName,
   switchProfile,
 } from "@openokr/method";
@@ -74,6 +75,14 @@ export default async function PracticeSettingsPage() {
     PRACTICE_KEYS.map((key) => [key, practiceSettingName(key)]),
   );
   const comparison = compareProfiles();
+  // §12.2's links to the work two profiles follow, from the package the
+  // conformance suite holds to the document.
+  const profileSources = Object.fromEntries(
+    PROFILE_KEYS.flatMap((key) => {
+      const source = PROFILES[key].source;
+      return source ? [[key, source]] : [];
+    }),
+  );
   const sectionLink = (section: string) =>
     methodDocumentUrl(methodSectionAnchor(section) ?? undefined);
   const methodLinks = Object.fromEntries(
@@ -111,6 +120,7 @@ export default async function PracticeSettingsPage() {
         settingNames={settingNames}
         comparison={comparison}
         methodLinks={methodLinks}
+        profileSources={profileSources}
         canManage={level >= ACCESS_LEVELS.full}
       />
     </>

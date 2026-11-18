@@ -65,7 +65,7 @@ test.afterAll(async () => {
 
 test("adds a webhook and shows its signing secret once", async () => {
   await goTo(page, "/admin/webhooks");
-  await expect(page.getByRole("heading", { name: "Webhooks" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Webhooks", exact: true })).toBeVisible();
 
   const form = page.getByTestId("webhook-create");
   await form.getByLabel("Name").fill(NAME);

@@ -18,6 +18,7 @@ import {
   SecretInput,
   useTranslations,
 } from "@openokr/ui";
+import Link from "next/link";
 import { useCallback, useState, useTransition } from "react";
 import { type ImportResult, importWorkspaceArchive } from "./actions.ts";
 
@@ -118,9 +119,20 @@ export function ArchiveImportCard() {
   return (
     <Card>
       <CardHeader>
-        <h3 className="text-sm font-bold text-ink">
-          {t("admin.imports.archiveImportCard.importWorkspaceArchive")}
-        </h3>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.imports.archiveImportCard.importWorkspaceArchive")}
+          </h2>
+          <p className="text-xs text-ink-3">
+            {t("admin.imports.takeArchiveOnBackups")}{" "}
+            <Link
+              className="font-medium text-brand-text hover:underline"
+              href="/admin/backups"
+            >
+              {t("admin.backups.title")}
+            </Link>
+          </p>
+        </div>
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
         <p className="text-sm text-ink-3">
@@ -269,6 +281,7 @@ export function ArchiveImportCard() {
             <div className="flex gap-2">
               {!preview.alreadyImported && (
                 <Button
+                  size="sm"
                   variant="primary"
                   onClick={handleConfirm}
                   pending={pending}
@@ -278,7 +291,7 @@ export function ArchiveImportCard() {
                     : t("admin.imports.archiveImportCard.confirmImport")}
                 </Button>
               )}
-              <Button variant="ghost" onClick={handleReset}>
+              <Button size="sm" variant="ghost" onClick={handleReset}>
                 {t("common.cancel")}
               </Button>
             </div>
@@ -308,7 +321,7 @@ export function ArchiveImportCard() {
                     })}
               </span>
             </div>
-            <Button onClick={handleReset}>
+            <Button size="sm" onClick={handleReset}>
               {t("admin.imports.archiveImportCard.importAnother")}
             </Button>
           </div>

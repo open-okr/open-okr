@@ -10,15 +10,24 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { setAppearance } from "../../lib/appearance-action.ts";
-import { paletteRelatedAction, paletteSearchAction } from "./actions.ts";
+import { pruneRecents, readRecents } from "../../lib/recent-store.ts";
+import {
+  paletteRecentAction,
+  paletteRelatedAction,
+  paletteSearchAction,
+} from "./actions.ts";
 import {
   EMPTY_ANSWER,
+  PALETTE_TABS,
   type PaletteAnswer,
   type PaletteCommand,
+  type PaletteEntry,
   type PaletteGroupId,
   type PaletteHit,
   type PaletteRow,
+  type PaletteTabId,
   paletteGroups,
+  paletteTab,
 } from "./palette-groups.ts";
 
 /**
@@ -32,10 +41,17 @@ import {
  * named to assistive technology through `aria-activedescendant`, which is the
  * combobox pattern rather than a list of buttons to tab through.
  *
- * **Four groups** (`palette-groups.ts` says what each holds): Go to, which
+ * **Five groups** (`palette-groups.ts` says what each holds): Recent, which
+ * is what this member opened lately and is first before anything is typed;
+ * Go to, which
  * jumps to a thing of any kind by its name or short code; the search results;
  * Related, only when an AI provider found something; and Actions, which run a
  * command or open a page and are all there is before anything is typed.
+ *
+ * **Scoped tabs** (work-layer.md §5.1, G2-D6). A tablist under the field
+ * narrows every group to one kind. Focus stays in the field, so Ctrl+Tab and
+ * Ctrl+Shift+Tab move between the tabs and a click does too. A browser may
+ * keep Ctrl+Tab for its own tabs, which is why a click always works.
  *
  * **Every result is a link the server decided on.** The rows carry an `href`
  * from `search.entities`, `search.jump` and `search.query`, each filtered by
@@ -62,6 +78,7 @@ export interface PaletteDestination {
 const DEBOUNCE_MS = 150;
 
 const GROUP_HEADING: Readonly<Record<PaletteGroupId, string>> = {
+  recent: "search.palette.groupRecent",
   goTo: "search.palette.groupGoTo",
   results: "search.palette.groupResults",
   related: "search.related",
@@ -78,6 +95,7 @@ export function CommandPalette({
   destinations = [],
   canCreateObjective = false,
   semantic = false,
+  workspaceId,
 }: {
   readonly destinations?: readonly PaletteDestination[];
   /** Whether the reader may draft an objective, which the first command opens. */
@@ -88,6 +106,8 @@ export function CommandPalette({
    * at all. The server action checks again, because this is only a hint.
    */
   readonly semantic?: boolean;
+  /** Whose recents the palette reads, since they are kept per workspace. */
+  readonly workspaceId?: string;
 }) {
   const { t } = useTranslations();
   const { resolvedTheme, setTheme } = useTheme();
@@ -97,6 +117,8 @@ export function CommandPalette({
   const [text, setText] = useState("");
   const [answer, setAnswer] = useState<PaletteAnswer>(EMPTY_ANSWER);
   const [related, setRelated] = useState<readonly PaletteHit[]>([]);
+  const [recent, setRecent] = useState<readonly PaletteEntry[]>([]);
+  const [tabId, setTabId] = useState<PaletteTabId>("all");
   const [pending, setPending] = useState(false);
   /** The request itself failed, as opposed to the server refusing it. */
   const [failed, setFailed] = useState(false);
@@ -110,6 +132,9 @@ export function CommandPalette({
    * that are no longer in the box.
    */
   const latest = useRef(0);
+  /** The same guard for the Recent request, which is asked once per opening. */
+  const latestRecent = useRef(0);
+  const tab = paletteTab(tabId);
 
   // Through the registry, so `?` lists it beside every other key (plan 0.7.0,
   // U2), and in a field too, because the palette is where a person types.
@@ -145,8 +170,39 @@ export function CommandPalette({
       // an axe scan cannot see at all.
       returnFocusTo.current = document.activeElement as HTMLElement | null;
       input.current?.focus();
+      // Asked on every opening, so a thing opened a moment ago is there. The
+      // list in the browser is only a hint: the server says which of it this
+      // member may still open, and what it dropped is pruned from the store
+      // (G2-D3). An empty store asks with nothing and gets the member's own
+      // last changes (G2-D4), which are not written back.
+      if (workspaceId) {
+        const request = ++latestRecent.current;
+        const asked = readRecents(workspaceId);
+        paletteRecentAction(asked)
+          .then((found) => {
+            if (request !== latestRecent.current || found === null) {
+              return;
+            }
+            setRecent(found);
+            if (asked.length > 0) {
+              pruneRecents(
+                workspaceId,
+                asked,
+                found.map((one) => ({
+                  kind: one.entityType,
+                  id: one.entityId,
+                })),
+              );
+            }
+          })
+          // No Recent group is the answer a failure gets.
+          .catch(() => undefined);
+      }
     } else {
       latest.current += 1;
+      latestRecent.current += 1;
+      setRecent([]);
+      setTabId("all");
       setText("");
       setAnswer(EMPTY_ANSWER);
       setRelated([]);
@@ -161,7 +217,7 @@ export function CommandPalette({
         previous.focus();
       }
     }
-  }, [open]);
+  }, [open, workspaceId]);
 
   // Asked once typing pauses, and twice when there is a model: the fast
   // answer and the Related group separately, so a slow provider holds back
@@ -180,7 +236,7 @@ export function CommandPalette({
     }
     setPending(true);
     const timer = window.setTimeout(() => {
-      paletteSearchAction(phrase)
+      paletteSearchAction(phrase, tabId)
         .then((found) => {
           if (request === latest.current) {
             setAnswer(found);
@@ -202,7 +258,7 @@ export function CommandPalette({
       if (!semantic) {
         return;
       }
-      paletteRelatedAction(phrase)
+      paletteRelatedAction(phrase, tabId)
         .then((found) => {
           if (request === latest.current) {
             setRelated(found);
@@ -213,7 +269,7 @@ export function CommandPalette({
         .catch(() => undefined);
     }, DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [text, semantic]);
+  }, [text, semantic, tabId]);
 
   const commands = useMemo<readonly PaletteCommand[]>(() => {
     const phrase = text.trim();
@@ -259,7 +315,14 @@ export function CommandPalette({
 
   // The last answer stays on screen while the next one is asked, with the
   // Looking note beside it, rather than blanking the list on every letter.
-  const groups = paletteGroups(text, answer, related, commands);
+  const groups = paletteGroups(
+    text,
+    answer,
+    related,
+    commands,
+    recent,
+    tab.kinds,
+  );
   const rows = groups.flatMap((group) => group.rows);
   const current = rows[Math.min(active, rows.length - 1)];
   const currentId = current?.id;
@@ -381,15 +444,61 @@ export function CommandPalette({
               }
               // The dialog is modal and the input is the one place focus
               // belongs in it, so Tab stays here rather than wandering to the
-              // page underneath.
+              // page underneath. With Ctrl it moves between the tabs, and
+              // Shift reverses it (G2-D6).
               if (event.key === "Tab") {
                 event.preventDefault();
+                if (event.ctrlKey) {
+                  const at = PALETTE_TABS.findIndex((one) => one.id === tabId);
+                  const step = event.shiftKey ? -1 : 1;
+                  const next =
+                    PALETTE_TABS[
+                      (at + step + PALETTE_TABS.length) % PALETTE_TABS.length
+                    ];
+                  if (next) {
+                    setTabId(next.id);
+                  }
+                }
               }
             }}
             className="min-w-0 flex-1"
             inputClassName="h-auto border-0 bg-transparent px-0 focus:ring-0"
           />
           <Kbd>{t("common.esc")}</Kbd>
+        </div>
+
+        <div
+          role="tablist"
+          aria-label={t("search.palette.tabs")}
+          data-testid="palette-tabs"
+          className="flex gap-1 overflow-x-auto border-line border-b px-2 py-1.5"
+        >
+          {PALETTE_TABS.map((one) => {
+            const selected = one.id === tabId;
+            return (
+              <button
+                key={one.id}
+                type="button"
+                role="tab"
+                id={`palette-tab-${one.id}`}
+                aria-selected={selected}
+                // Out of the tab order on purpose: focus stays in the field,
+                // and the keyboard reaches these with Ctrl+Tab.
+                tabIndex={-1}
+                data-testid={`palette-tab-${one.id}`}
+                // Keeps focus in the input, as a click on a row does.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => setTabId(one.id)}
+                className={
+                  selected
+                    ? "shrink-0 rounded-md bg-brand-weak px-2 py-1 text-xs font-semibold text-ink"
+                    : "shrink-0 rounded-md px-2 py-1 text-xs text-ink-3 hover:text-ink"
+                }
+              >
+                {t(one.label)}
+              </button>
+            );
+          })}
         </div>
 
         <div className="max-h-80 overflow-y-auto">

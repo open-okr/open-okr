@@ -1,9 +1,11 @@
 import { EnvironmentError, loadEnv } from "@openokr/config";
+import { prepareSetupCode } from "@openokr/core";
 import { quietAbandonedResponses } from "./lib/abandoned-responses";
 import { installAdmission } from "./lib/admission";
 import { resolveSignupPolicy } from "./lib/auth";
 import { announceCallerAddress } from "./lib/caller-address";
 import { installErrorReports } from "./lib/error-reporting";
+import { getPool } from "./lib/pool";
 import { installPromptEvaluator } from "./lib/prompt-evaluation";
 import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
@@ -290,6 +292,53 @@ export async function resolveSSO(): Promise<void> {
   } catch (error) {
     process.stderr.write(
       `sso: could not load SSO connections: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
+}
+
+/**
+ * Makes the setup code a new instance is claimed with, when the deployment
+ * gave none (docs/design/setup-code.md D2, D3, plan 0.9.0 G1).
+ *
+ * With `OPENOKR_SETUP_CODE` set there is nothing to make, and an instance
+ * that is already claimed gets nothing either, so an upgrade never writes a
+ * file. Otherwise the code goes to a file under the storage root and only a
+ * keyed hash of it to the database.
+ *
+ * **Never logs the code** (D4): the line names the file. Logs are shipped to
+ * places the deployment's secrets are not.
+ *
+ * Not fatal, and it fails closed: if the code cannot be made, the unclaimed
+ * sign-up is refused as missing its code, which an operator sees in this log
+ * line and fixes by setting `OPENOKR_SETUP_CODE`. Awaited before the first
+ * request, so the wizard never renders without one.
+ *
+ * A build worker has the placeholder `DATABASE_URL` and no database.
+ */
+export async function ensureSetupCode(): Promise<void> {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  try {
+    const env = loadEnv();
+    const result = await prepareSetupCode(getPool(), {
+      secret: env.BETTER_AUTH_SECRET,
+      ...(env.OPENOKR_SETUP_CODE
+        ? { environmentCode: env.OPENOKR_SETUP_CODE }
+        : {}),
+    });
+    if (result.outcome === "made") {
+      process.stdout.write(
+        `A setup code is waiting in ${result.path}. The setup wizard asks for it.\n`,
+      );
+    } else if (result.outcome === "exists") {
+      process.stdout.write(
+        `A setup code was already made for this instance. It is in ${result.path} if that process shares this storage.\n`,
+      );
+    }
+  } catch (error) {
+    process.stderr.write(
+      `setup code: could not make one, so the first account cannot be created until OPENOKR_SETUP_CODE is set: ${error instanceof Error ? error.message : String(error)}\n`,
     );
   }
 }

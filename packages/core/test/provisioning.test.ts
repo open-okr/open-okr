@@ -176,6 +176,21 @@ describe("the workspace timezone comes from the registering browser", () => {
     });
   });
 
+  it("gives the Coach and the Champion the workspace's zone too", async () => {
+    // Data change 0001 found both agents with no zone on every fresh workspace.
+    await registerFrom(
+      `${BROWSER_TIMEZONE_COOKIE}=${encodeURIComponent("Asia/Kuala_Lumpur")}`,
+    );
+    const wb = await workerDb();
+    const agents = await wb.admin.query(
+      "select name, timezone from workspace_members where kind = 'agent' order by name",
+    );
+    expect(agents.rows).toEqual([
+      { name: "OKR Champion", timezone: "Asia/Kuala_Lumpur" },
+      { name: "OKR Coach", timezone: "Asia/Kuala_Lumpur" },
+    ]);
+  });
+
   it("falls back to UTC with no cookie, as before", async () => {
     expect((await registerFrom(null)).status).toBe(200);
     expect((await zones()).workspace).toBe("UTC");

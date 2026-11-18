@@ -29,12 +29,34 @@
  * **Every entry declares its own reverse, or admits it has none.** A proposal
  * that cannot be undone is still applicable; the interface says so instead of
  * offering a button that does nothing.
+ *
+ * **Three edits join the creates (plan 0.9.0 L4a):** an objective's title and
+ * description, a task's status and an initiative's status. An edit returns
+ * only an id, so there is nothing to reverse from afterwards. Applying one
+ * therefore reads the values from before through the product's own read
+ * actions, as the member, just before the action runs (`capture`), and undo
+ * checks the record still holds what the edit left (`current`) before it puts
+ * the old values back. Deletes are not on this list and never will be.
+ *
+ * **Two more join them (plan 0.9.0 L4c):** a check-in and a KPI value. Their
+ * undo needs what applying returned, the new check-in's id or the new KPI
+ * value's id, which does not exist until the action has run. `capture` reads
+ * the values from before, and `settle` fills in the id from the result. A
+ * check-in's undo is refused unless it is still the goal's latest, and a KPI
+ * value's undo is refused unless the period still holds what the copilot
+ * recorded, so an undo never removes or overwrites what a person did after.
  */
+
 import {
+  CHECK_IN_STATUSES,
   INDICATOR_TYPES,
+  INITIATIVE_STATUSES,
   KEY_RESULT_DIRECTIONS,
+  TASK_STATUSES,
   withContext,
 } from "@openokr/db";
+import { LOCAL_DATE_PATTERN } from "@openokr/formats";
+import { type KpiFrequency, normalisePeriod } from "@openokr/method";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -42,8 +64,17 @@ import { visibleResourceIds } from "../access/reads.ts";
 import type { ActionCallContext } from "../actions/define.ts";
 import { callAction } from "../actions/registry.ts";
 import type { ProposalDrop, ProposalNote } from "../agents/drafter.ts";
+import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { cyclesOpenForWork } from "../cycles/open-for-work.ts";
+import { workspaceTimeZone } from "../cycles/service.ts";
+import {
+  OperationError,
+  type OperationTx,
+  writeFloorFor,
+} from "../operations/operation.ts";
+import { excerptRichText } from "../rich-text/excerpt.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
+import type { RichTextDocument } from "../rich-text/schema.ts";
 import { errorNameOf, logProposalDrop } from "./proposal-drops.ts";
 
 /** One thing the model may be shown and point at by number. */
@@ -97,6 +128,21 @@ export interface Reversal {
   readonly payload: Record<string, unknown>;
 }
 
+/** The values an edit changes, read as the product reads them. */
+type Fields = Record<string, unknown>;
+
+/** What reading before an edit yields: how to put it back, and what it leaves. */
+interface Captured {
+  readonly reverse: Reversal;
+  /** The values the edit leaves, which undo expects to still find. */
+  readonly expect: Fields;
+}
+
+/** What `proposed_changes.reverse_payload` holds. */
+export interface StoredReverse extends Reversal {
+  readonly expect: Fields;
+}
+
 interface ProposableAction {
   readonly action: string;
   readonly label: string;
@@ -112,8 +158,63 @@ interface ProposableAction {
     fields: Record<string, unknown>,
     choices: ProposalOffer["choices"],
   ): Promise<BuiltProposal>;
+  /**
+   * One more sentence for the model about this offer, read as the member:
+   * today's date, for an action that takes a period.
+   */
+  note?(scope: OfferScope): Promise<string>;
   /** The reverse, given what applying it returned. */
   reverse(result: Record<string, unknown>): Reversal | null;
+  /**
+   * An edit only: completes what `capture` read once the action has run, for
+   * a reverse that needs what the action created. Null means it cannot be put
+   * back after all.
+   */
+  settle?(captured: Captured, result: Record<string, unknown>): Captured | null;
+  /**
+   * An edit only: reads the values from before, as the member, to build the
+   * reverse. Called just before the action runs, with the payload it will run.
+   * Null means this edit cannot be put back, and the card says so.
+   */
+  capture?(
+    context: ActionCallContext,
+    payload: Record<string, unknown>,
+  ): Promise<Captured | null>;
+  /**
+   * An edit only: the fields `capture` expects, as they are now, for undo's
+   * staleness check.
+   */
+  current?(
+    context: ActionCallContext,
+    payload: Record<string, unknown>,
+  ): Promise<Fields>;
+}
+
+/** How a status reads in a preview and in the labels the model is shown. */
+const TASK_STATUS_WORD: Readonly<Record<string, string>> = {
+  backlog: "Backlog",
+  todo: "To do",
+  in_progress: "In progress",
+  done: "Done",
+};
+const INITIATIVE_STATUS_WORD: Readonly<Record<string, string>> = {
+  planned: "Planned",
+  active: "Active",
+  done: "Done",
+  dropped: "Dropped",
+};
+
+/** A rich text value as one short line, for a before and after row. */
+function lineOf(value: unknown): string {
+  if (typeof value === "object" && value !== null) {
+    try {
+      const line = excerptRichText(value as RichTextDocument, 160);
+      return line === "" ? "(empty)" : line;
+    } catch {
+      return "(empty)";
+    }
+  }
+  return "(empty)";
 }
 
 const GOAL_LEVELS = ["company", "department", "team", "individual"] as const;
@@ -138,6 +239,8 @@ const createObjective: ProposableAction = {
     level: z.enum(GOAL_LEVELS),
     /** One-based, into the `spaces` list the model was shown. */
     spaceNumber: z.number().int().min(1),
+    /** The person's own words for why it starts now (design §4.3). */
+    reason: z.string().trim().max(500).optional(),
   }) as unknown as z.ZodType<Record<string, unknown>>,
   fields: {
     type: "object",
@@ -148,6 +251,7 @@ const createObjective: ProposableAction = {
       description: { type: "string", maxLength: 2000 },
       level: { type: "string", enum: [...GOAL_LEVELS] },
       spaceNumber: { type: "integer", minimum: 1 },
+      reason: { type: "string", maxLength: 500 },
     },
   },
   async offer(scope) {
@@ -159,6 +263,7 @@ const createObjective: ProposableAction = {
       description?: string;
       level: (typeof GOAL_LEVELS)[number];
       spaceNumber: number;
+      reason?: string;
     };
     const spaces = choices.spaces ?? [];
     const space = spaces[authored.spaceNumber - 1];
@@ -191,6 +296,7 @@ const createObjective: ProposableAction = {
         championId: memberId,
         reviewerId: memberId,
         weight: 1,
+        ...(authored.reason ? { reason: authored.reason } : {}),
       },
       preview: [
         { label: "Objective", value: authored.title },
@@ -200,6 +306,9 @@ const createObjective: ProposableAction = {
         { label: "Level", value: authored.level },
         { label: "Space", value: space.label },
         { label: "Cycle", value: cycle.name },
+        ...(authored.reason
+          ? [{ label: "Reason", value: authored.reason }]
+          : []),
       ],
       subjectType: "space",
       subjectId: space.id,
@@ -264,6 +373,8 @@ const addKeyResult: ProposableAction = {
     target: z.number().finite(),
     /** One-based, into the `objectives` list the model was shown. */
     objectiveNumber: z.number().int().min(1),
+    /** The person's own words for why it starts now (design §4.3). */
+    reason: z.string().trim().max(500).optional(),
   }) as unknown as z.ZodType<Record<string, unknown>>,
   fields: {
     type: "object",
@@ -284,6 +395,7 @@ const addKeyResult: ProposableAction = {
       baseline: { type: "number" },
       target: { type: "number" },
       objectiveNumber: { type: "integer", minimum: 1 },
+      reason: { type: "string", maxLength: 500 },
     },
   },
   async offer(scope) {
@@ -298,6 +410,7 @@ const addKeyResult: ProposableAction = {
       baseline: number;
       target: number;
       objectiveNumber: number;
+      reason?: string;
     };
     const objective = picked(choices, "objectives", authored.objectiveNumber);
     const memberId = await askingMember(context);
@@ -319,6 +432,7 @@ const addKeyResult: ProposableAction = {
         ownerId: memberId,
         weight: 1,
         ...(dueOn ? { dueOn } : {}),
+        ...(authored.reason ? { reason: authored.reason } : {}),
       },
       preview: [
         { label: "Key result", value: authored.title },
@@ -327,6 +441,9 @@ const addKeyResult: ProposableAction = {
         { label: "Target", value: measure(authored.target) },
         { label: "Direction", value: authored.direction },
         { label: "Indicator", value: authored.indicatorType },
+        ...(authored.reason
+          ? [{ label: "Reason", value: authored.reason }]
+          : []),
       ],
       subjectType: "goal",
       subjectId: objective.id,
@@ -467,12 +584,811 @@ const addTask: ProposableAction = {
   },
 };
 
+/**
+ * Renaming or redescribing an objective (plan 0.9.0 L4a).
+ *
+ * The model writes the new title and a sentence of description and picks the
+ * objective by number from the ones this member may edit. The preview reads
+ * `Title: old -> new`, with the old values read now as the member.
+ *
+ * **Undo needs an expectation.** `goals.update` has no read guard, so a later
+ * edit by somebody else would be overwritten by an undo that wrote the old
+ * title back. `expect` holds what this edit left and undo refuses when the
+ * objective no longer holds it.
+ */
+const editObjective: ProposableAction = {
+  action: "goals.update",
+  label: "Rename or redescribe an objective",
+  whatItDoes:
+    "Changes the title or the description of one objective the person may edit. Writes only the fields the person asked to change.",
+  authored: z
+    .object({
+      /** One-based, into the `objectives` list the model was shown. */
+      objectiveNumber: z.number().int().min(1),
+      title: z.string().trim().min(1).max(500).optional(),
+      description: z.string().trim().max(2000).optional(),
+    })
+    .refine(
+      (value) => value.title !== undefined || value.description !== undefined,
+      { message: "an edit has to change something" },
+    ) as unknown as z.ZodType<Record<string, unknown>>,
+  fields: {
+    type: "object",
+    additionalProperties: false,
+    required: ["objectiveNumber"],
+    properties: {
+      objectiveNumber: { type: "integer", minimum: 1 },
+      title: { type: "string", maxLength: 500 },
+      description: { type: "string", maxLength: 2000 },
+    },
+  },
+  async offer(scope) {
+    return { objectives: await scope.editableObjectives() };
+  },
+  async build(context, fields, choices) {
+    const authored = fields as {
+      objectiveNumber: number;
+      title?: string;
+      description?: string;
+    };
+    const objective = picked(choices, "objectives", authored.objectiveNumber);
+    const now = await callAction(context, "goals.read", { id: objective.id });
+    const newTitle = authored.title ? authored.title : undefined;
+    const newDescription = authored.description
+      ? authored.description
+      : undefined;
+    if (
+      (newTitle === undefined || newTitle === now.title) &&
+      newDescription === undefined
+    ) {
+      // Nothing to put in place of what is there. No card rather than a
+      // proposal that changes nothing.
+      throw new Error("That would not change the objective.");
+    }
+    // A title the model repeats unchanged is not a change, so it stays out of
+    // the payload and the preview rather than reading "X -> X".
+    const titleChanged = newTitle !== undefined && newTitle !== now.title;
+    return {
+      action: "goals.update",
+      payload: {
+        id: objective.id,
+        ...(titleChanged ? { title: newTitle } : {}),
+        ...(newDescription === undefined
+          ? {}
+          : { description: richTextFromPlainText(newDescription) }),
+      },
+      preview: [
+        { label: "Objective", value: now.title },
+        ...(titleChanged
+          ? [{ label: "Title", value: `${now.title} -> ${newTitle}` }]
+          : []),
+        ...(newDescription === undefined
+          ? []
+          : [
+              {
+                label: "Description",
+                value: `${lineOf(now.description)} -> ${newDescription}`,
+              },
+            ]),
+      ],
+      subjectType: "goal",
+      subjectId: objective.id,
+    };
+  },
+  reverse() {
+    return null;
+  },
+  async capture(context, payload) {
+    const id = String(payload.id);
+    const now = await callAction(context, "goals.read", { id });
+    return {
+      reverse: {
+        action: "goals.update",
+        payload: {
+          id,
+          ...(payload.title === undefined ? {} : { title: now.title }),
+          ...(payload.description === undefined
+            ? {}
+            : { description: now.description ?? null }),
+        },
+      },
+      expect: {
+        ...(payload.title === undefined ? {} : { title: payload.title }),
+        ...(payload.description === undefined
+          ? {}
+          : { description: payload.description }),
+      },
+    };
+  },
+  async current(context, payload) {
+    const now = await callAction(context, "goals.read", {
+      id: String(payload.id),
+    });
+    return {
+      ...(payload.title === undefined ? {} : { title: now.title }),
+      ...(payload.description === undefined
+        ? {}
+        : { description: now.description ?? null }),
+    };
+  },
+};
+
+/**
+ * Moving a task to another status (plan 0.9.0 L4a).
+ *
+ * The model picks the task by number and writes the status. Undo moves it
+ * back to the status it had. `tasks.move` puts a card at the top of its
+ * column when no slot is given, so an undone move lands at the top of the old
+ * column rather than at its old slot. That is accepted: the slot is a
+ * fraction nobody reads, and storing it would make undo refuse after any
+ * unrelated move in the same column.
+ */
+const moveTask: ProposableAction = {
+  action: "tasks.move",
+  label: "Move a task to another status",
+  whatItDoes:
+    "Moves one of the person's tasks to another status: backlog, to do, in progress or done.",
+  authored: z.object({
+    /** One-based, into the `tasks` list the model was shown. */
+    taskNumber: z.number().int().min(1),
+    status: z.enum(TASK_STATUSES),
+  }) as unknown as z.ZodType<Record<string, unknown>>,
+  fields: {
+    type: "object",
+    additionalProperties: false,
+    required: ["taskNumber", "status"],
+    properties: {
+      taskNumber: { type: "integer", minimum: 1 },
+      status: { type: "string", enum: [...TASK_STATUSES] },
+    },
+  },
+  async offer(scope) {
+    return { tasks: await scope.editableTasks() };
+  },
+  async build(_context, fields, choices) {
+    const authored = fields as {
+      taskNumber: number;
+      status: (typeof TASK_STATUSES)[number];
+    };
+    const task = picked(choices, "tasks", authored.taskNumber);
+    const from = carried(task, "status");
+    if (from === authored.status) {
+      throw new Error("The task is already there.");
+    }
+    return {
+      action: "tasks.move",
+      payload: { id: task.id, status: authored.status },
+      preview: [
+        { label: "Task", value: carried(task, "title") },
+        {
+          label: "Status",
+          value: `${TASK_STATUS_WORD[from] ?? from} -> ${TASK_STATUS_WORD[authored.status] ?? authored.status}`,
+        },
+      ],
+      subjectType: "task",
+      subjectId: task.id,
+    };
+  },
+  reverse() {
+    return null;
+  },
+  async capture(context, payload) {
+    const id = String(payload.id);
+    const now = await callAction(context, "tasks.read", { id });
+    return {
+      reverse: { action: "tasks.move", payload: { id, status: now.status } },
+      expect: { status: payload.status },
+    };
+  },
+  async current(context, payload) {
+    const now = await callAction(context, "tasks.read", {
+      id: String(payload.id),
+    });
+    return { status: now.status };
+  },
+};
+
+/**
+ * Changing an initiative's status (plan 0.9.0 L4a).
+ *
+ * Undo sends the old status with `read` set to the status the edit left, so
+ * the action's own conflict guard refuses a status somebody changed since, in
+ * addition to the check undo makes first.
+ */
+const changeInitiativeStatus: ProposableAction = {
+  action: "initiatives.update",
+  label: "Change an initiative's status",
+  whatItDoes:
+    "Changes the status of one initiative the person may edit: planned, active, done or dropped.",
+  authored: z.object({
+    /** One-based, into the `initiatives` list the model was shown. */
+    initiativeNumber: z.number().int().min(1),
+    status: z.enum(INITIATIVE_STATUSES),
+  }) as unknown as z.ZodType<Record<string, unknown>>,
+  fields: {
+    type: "object",
+    additionalProperties: false,
+    required: ["initiativeNumber", "status"],
+    properties: {
+      initiativeNumber: { type: "integer", minimum: 1 },
+      status: { type: "string", enum: [...INITIATIVE_STATUSES] },
+    },
+  },
+  async offer(scope) {
+    return { initiatives: await scope.editableInitiatives() };
+  },
+  async build(_context, fields, choices) {
+    const authored = fields as {
+      initiativeNumber: number;
+      status: (typeof INITIATIVE_STATUSES)[number];
+    };
+    const initiative = picked(
+      choices,
+      "initiatives",
+      authored.initiativeNumber,
+    );
+    const from = carried(initiative, "status");
+    if (from === authored.status) {
+      throw new Error("The initiative is already there.");
+    }
+    return {
+      action: "initiatives.update",
+      payload: { id: initiative.id, status: authored.status },
+      preview: [
+        { label: "Initiative", value: carried(initiative, "title") },
+        {
+          label: "Status",
+          value: `${INITIATIVE_STATUS_WORD[from] ?? from} -> ${INITIATIVE_STATUS_WORD[authored.status] ?? authored.status}`,
+        },
+      ],
+      subjectType: "initiative",
+      subjectId: initiative.id,
+    };
+  },
+  reverse() {
+    return null;
+  },
+  async capture(context, payload) {
+    const id = String(payload.id);
+    const now = await callAction(context, "initiatives.read", { id });
+    return {
+      reverse: {
+        action: "initiatives.update",
+        payload: {
+          id,
+          status: now.status,
+          read: { status: payload.status },
+        },
+      },
+      expect: { status: payload.status },
+    };
+  },
+  async current(context, payload) {
+    const now = await callAction(context, "initiatives.read", {
+      id: String(payload.id),
+    });
+    return { status: now.status };
+  },
+};
+
+const OPEN_DRAFT_REFUSAL =
+  "You already have a draft check-in on this objective. Finish or discard it first.";
+
+/**
+ * Whether the asking member has an open draft check-in on a goal, read through
+ * `goals.checkIns` as the member. `goals.publishDraftedCheckIn` reuses an
+ * author's open draft, so proposing over one would publish what the person
+ * had been writing, and a person's draft is never touched.
+ */
+async function hasOpenDraft(
+  context: ActionCallContext,
+  goalId: string,
+): Promise<boolean> {
+  const memberId = await askingMember(context);
+  const { checkIns } = await callAction(context, "goals.checkIns", {
+    goalId,
+    includeDrafts: true,
+  });
+  return checkIns.some(
+    (entry) => entry.state === "draft" && entry.author.id === memberId,
+  );
+}
+
+const CHECK_IN_STATUS_WORD: Readonly<Record<string, string>> = {
+  on_track: "On track",
+  caution: "Caution",
+  off_track: "Off track",
+};
+
+/**
+ * Checking in on an objective (plan 0.9.0 L4c).
+ *
+ * The model writes the status, an overall confidence, the narrative and, for
+ * the key results the person gave a number for, a value and a confidence. It
+ * picks the objective and each key result by number. A key result must sit
+ * under the objective picked, so a number that points somewhere else is
+ * refused rather than written onto another objective.
+ *
+ * **One action, no draft to supply.** `goals.publishDraftedCheckIn` opens the
+ * author's own draft and publishes it as the member in one step, which is what
+ * a proposal row can hold (it keeps one action and one payload). The preview
+ * reads `64.6 -> 65` for each value, with the old value read when the model
+ * was offered the list.
+ *
+ * **Undo is `goals.deleteCheckIn`, only while this is still the latest.** That
+ * action rolls the goal back only for the latest check-in and does not check
+ * it itself, so `expect` holds this check-in's id and undo refuses once a
+ * newer one is the latest. Only metric and maintain key results are offered:
+ * a milestone is checked in as done, not as a number.
+ */
+const checkIn: ProposableAction = {
+  action: "goals.publishDraftedCheckIn",
+  label: "Check in on an objective",
+  whatItDoes:
+    "Publishes a check-in on one objective the person may edit: a status, an overall confidence from 0 to 1, a narrative and, only where the person gave a number, a key result's new value and confidence from 0 to 1.",
+  authored: z.object({
+    /** One-based, into the `objectives` list the model was shown. */
+    objectiveNumber: z.number().int().min(1),
+    checkInStatus: z.enum(CHECK_IN_STATUSES),
+    confidence: z.number().min(0).max(1),
+    narrative: z.string().trim().min(1).max(2000),
+    keyResultValues: z
+      .array(
+        z.object({
+          /** One-based, into the `keyResults` list the model was shown. */
+          keyResultNumber: z.number().int().min(1),
+          value: z.number().finite().nullable().optional(),
+          confidence: z.number().min(0).max(1).nullable().optional(),
+        }),
+      )
+      .max(8)
+      .optional(),
+  }) as unknown as z.ZodType<Record<string, unknown>>,
+  fields: {
+    type: "object",
+    additionalProperties: false,
+    required: ["objectiveNumber", "checkInStatus", "confidence", "narrative"],
+    properties: {
+      objectiveNumber: { type: "integer", minimum: 1 },
+      checkInStatus: { type: "string", enum: [...CHECK_IN_STATUSES] },
+      confidence: { type: "number", minimum: 0, maximum: 1 },
+      narrative: { type: "string", maxLength: 2000 },
+      keyResultValues: {
+        type: "array",
+        maxItems: 8,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["keyResultNumber", "value", "confidence"],
+          properties: {
+            keyResultNumber: { type: "integer", minimum: 1 },
+            value: { anyOf: [{ type: "number" }, { type: "null" }] },
+            confidence: {
+              anyOf: [
+                { type: "number", minimum: 0, maximum: 1 },
+                { type: "null" },
+              ],
+            },
+          },
+        },
+      },
+    },
+  },
+  async offer(scope) {
+    return {
+      objectives: await scope.editableObjectives(),
+      keyResults: await scope.checkInKeyResults(),
+    };
+  },
+  async build(context, fields, choices) {
+    const authored = fields as {
+      objectiveNumber: number;
+      checkInStatus: (typeof CHECK_IN_STATUSES)[number];
+      confidence: number;
+      narrative: string;
+      keyResultValues?: {
+        keyResultNumber: number;
+        value?: number | null;
+        confidence?: number | null;
+      }[];
+    };
+    const objective = picked(choices, "objectives", authored.objectiveNumber);
+    if (await hasOpenDraft(context, objective.id)) {
+      throw new Error(OPEN_DRAFT_REFUSAL);
+    }
+    const seen = new Set<string>();
+    const values: {
+      keyResultId: string;
+      value?: number;
+      confidence?: number;
+    }[] = [];
+    const rows: { label: string; value: string }[] = [];
+    for (const entry of authored.keyResultValues ?? []) {
+      const keyResult = picked(choices, "keyResults", entry.keyResultNumber);
+      if (carried(keyResult, "goalId") !== objective.id) {
+        // A number that points at another objective's key result. Refused
+        // rather than written onto an objective nobody checked in on.
+        throw new Error("That key result is not under that objective.");
+      }
+      if (seen.has(keyResult.id)) {
+        throw new Error("A key result is listed twice.");
+      }
+      seen.add(keyResult.id);
+      const value = entry.value ?? undefined;
+      const confidence = entry.confidence ?? undefined;
+      if (value === undefined && confidence === undefined) {
+        continue;
+      }
+      values.push({
+        keyResultId: keyResult.id,
+        ...(value === undefined ? {} : { value }),
+        ...(confidence === undefined ? {} : { confidence }),
+      });
+      const shown = [
+        ...(value === undefined
+          ? []
+          : [`${carried(keyResult, "current")} -> ${value}`]),
+        ...(confidence === undefined ? [] : [`confidence ${confidence}`]),
+      ];
+      rows.push({
+        label: carried(keyResult, "title"),
+        value: shown.join(", "),
+      });
+    }
+    return {
+      action: "goals.publishDraftedCheckIn",
+      payload: {
+        goalId: objective.id,
+        status: authored.checkInStatus,
+        confidence: authored.confidence,
+        narrative: richTextFromPlainText(authored.narrative),
+        values,
+      },
+      preview: [
+        { label: "Objective", value: objective.label },
+        {
+          label: "Status",
+          value:
+            CHECK_IN_STATUS_WORD[authored.checkInStatus] ??
+            authored.checkInStatus,
+        },
+        { label: "Confidence", value: String(authored.confidence) },
+        { label: "Narrative", value: authored.narrative },
+        ...rows,
+      ],
+      subjectType: "goal",
+      subjectId: objective.id,
+    };
+  },
+  reverse() {
+    return null;
+  },
+  async capture(context, payload) {
+    // A draft that appeared since the proposal was made is the person's, and
+    // applying would publish it. Refused before the action runs.
+    if (await hasOpenDraft(context, String(payload.goalId))) {
+      throw new OperationError("forbidden", OPEN_DRAFT_REFUSAL);
+    }
+    // Nothing else to read first: undo deletes the check-in this creates, and its
+    // id is known only once it exists, in `settle`. `expect` is what the
+    // check-in holds when it is published, so undo refuses a check-in a person
+    // edited or a reviewer acknowledged since.
+    const values = (payload.values ?? []) as {
+      keyResultId: string;
+      value?: number;
+      confidence?: number;
+    }[];
+    return {
+      reverse: { action: "goals.deleteCheckIn", payload: {} },
+      expect: {
+        status: payload.status,
+        confidence: payload.confidence,
+        narrative: narrativeLine(payload.narrative),
+        acknowledgedAt: null,
+        values: Object.fromEntries(
+          values.map((entry) => [
+            entry.keyResultId,
+            {
+              ...(entry.value === undefined ? {} : { value: entry.value }),
+              ...(entry.confidence === undefined
+                ? {}
+                : { confidence: entry.confidence }),
+            },
+          ]),
+        ),
+      },
+    };
+  },
+  settle(captured, result) {
+    const id = result.id;
+    if (typeof id !== "string") {
+      return null;
+    }
+    return {
+      reverse: { ...captured.reverse, payload: { id } },
+      expect: { ...captured.expect, latestCheckInId: id },
+    };
+  },
+  async current(context, payload) {
+    const { checkIns } = await callAction(context, "goals.checkIns", {
+      goalId: String(payload.goalId),
+      includeDrafts: false,
+    });
+    const latest = checkIns[0];
+    if (!latest) {
+      return { latestCheckInId: null };
+    }
+    // Only the key results this check-in wrote, read from the snapshot of
+    // whatever the latest check-in holds now.
+    const wrote = (
+      (payload.values ?? []) as {
+        keyResultId: string;
+        value?: number;
+        confidence?: number;
+      }[]
+    ).map((entry) => entry.keyResultId);
+    const values = Object.fromEntries(
+      wrote.map((keyResultId) => {
+        const entry = latest.entries.find(
+          (candidate) => candidate.keyResultId === keyResultId,
+        );
+        const written = (
+          payload.values as {
+            keyResultId: string;
+            value?: number;
+            confidence?: number;
+          }[]
+        ).find((candidate) => candidate.keyResultId === keyResultId);
+        return [
+          keyResultId,
+          {
+            ...(written?.value === undefined
+              ? {}
+              : { value: entry?.value ?? null }),
+            ...(written?.confidence === undefined
+              ? {}
+              : { confidence: entry?.confidence ?? null }),
+          },
+        ];
+      }),
+    );
+    return {
+      latestCheckInId: latest.id,
+      status: latest.status,
+      confidence: latest.confidence,
+      narrative: narrativeLine(latest.narrative),
+      acknowledgedAt: latest.acknowledgedAt,
+      values,
+    };
+  },
+};
+
+/** A narrative as the one line two readings of it compare on. */
+function narrativeLine(narrative: unknown): string {
+  if (typeof narrative !== "object" || narrative === null) {
+    return "";
+  }
+  try {
+    return excerptRichText(narrative as RichTextDocument, 2000);
+  } catch {
+    return "";
+  }
+}
+
+/** How many periods `kpis.detail` is asked for when looking up one. */
+const KPI_PERIOD_WINDOW = 48;
+
+/** One KPI's period, and the value it holds now, or null when it has none. */
+interface KpiPeriod {
+  readonly periodStart: string;
+  readonly record: {
+    readonly actualValue: number | null;
+    readonly remark: string | null;
+  } | null;
+}
+
+/**
+ * The record a date's period holds, read as the member.
+ *
+ * `kpis.detail` returns the newest periods only. A period older than the
+ * oldest it returned might hold a value this cannot see, and treating that as
+ * "no value" would make undo delete what was there before, so it is refused.
+ */
+async function kpiPeriod(
+  context: ActionCallContext,
+  kpiId: string,
+  on: string,
+): Promise<KpiPeriod> {
+  const detail = await callAction(context, "kpis.detail", {
+    kpiId,
+    periods: KPI_PERIOD_WINDOW,
+  });
+  const periodStart = normalisePeriod(detail.kpi.frequency as KpiFrequency, on);
+  const found = detail.records.find(
+    (entry) => entry.periodStart === periodStart,
+  );
+  const oldest = detail.records[detail.records.length - 1]?.periodStart ?? "";
+  if (
+    !found &&
+    detail.records.length >= KPI_PERIOD_WINDOW &&
+    oldest > periodStart
+  ) {
+    throw new Error("That period is too far back to propose a value for.");
+  }
+  return {
+    periodStart,
+    record: found
+      ? { actualValue: found.actualValue, remark: found.remark }
+      : null,
+  };
+}
+
+/** True for a date that exists on the calendar, not only one that is shaped like it. */
+function isCalendarDate(value: string): boolean {
+  if (!LOCAL_DATE_PATTERN.test(value)) {
+    return false;
+  }
+  const at = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(at.getTime()) && at.toISOString().slice(0, 10) === value;
+}
+
+/**
+ * Recording a KPI's value for a period (plan 0.9.0 L4c).
+ *
+ * The model writes a date inside the period, the actual value and, if the
+ * person said one, a remark. It picks the KPI by number from the ones this
+ * member may edit, calculated KPIs left out because `kpis.record` refuses
+ * them. The model is told today's date, because "this month" means nothing
+ * without it.
+ *
+ * **Undo depends on what the period held.** With a value before, undo records
+ * that value again. With none, undo removes the one this recorded
+ * (`kpis.deleteRecord`, which is never proposable and exists for this). Either
+ * way `expect` holds the value this recorded and undo is refused when the
+ * period no longer holds it, so a figure somebody typed after is never removed
+ * or overwritten.
+ */
+const recordKpiValue: ProposableAction = {
+  action: "kpis.record",
+  label: "Record a KPI value",
+  whatItDoes:
+    "Records the actual value of one KPI the person may edit for one period. periodDate is any date inside that period, written YYYY-MM-DD. A value already recorded for that period is replaced.",
+  authored: z.object({
+    /** One-based, into the `kpis` list the model was shown. */
+    kpiNumber: z.number().int().min(1),
+    periodDate: z.string().refine(isCalendarDate, "not a calendar date"),
+    actualValue: z.number().finite(),
+    remark: z.string().trim().max(500).optional(),
+  }) as unknown as z.ZodType<Record<string, unknown>>,
+  fields: {
+    type: "object",
+    additionalProperties: false,
+    required: ["kpiNumber", "periodDate", "actualValue"],
+    properties: {
+      kpiNumber: { type: "integer", minimum: 1 },
+      periodDate: { type: "string", maxLength: 10 },
+      actualValue: { type: "number" },
+      remark: { type: "string", maxLength: 500 },
+    },
+  },
+  async offer(scope) {
+    return { kpis: await scope.editableKpis() };
+  },
+  async note(scope) {
+    return `Today is ${await scope.today()}.`;
+  },
+  async build(context, fields, choices) {
+    const authored = fields as {
+      kpiNumber: number;
+      periodDate: string;
+      actualValue: number;
+      remark?: string;
+    };
+    const kpi = picked(choices, "kpis", authored.kpiNumber);
+    const period = await kpiPeriod(context, kpi.id, authored.periodDate);
+    if (period.record?.actualValue === authored.actualValue) {
+      // The period already holds it. No card rather than a change of nothing.
+      throw new Error("That value is already recorded.");
+    }
+    const before =
+      period.record?.actualValue === null ||
+      period.record?.actualValue === undefined
+        ? "(none)"
+        : String(period.record.actualValue);
+    return {
+      action: "kpis.record",
+      payload: {
+        kpiId: kpi.id,
+        on: period.periodStart,
+        actualValue: authored.actualValue,
+        ...(authored.remark ? { remark: authored.remark } : {}),
+      },
+      preview: [
+        { label: "KPI", value: carried(kpi, "title") },
+        { label: "Period", value: period.periodStart },
+        { label: "Value", value: `${before} -> ${authored.actualValue}` },
+        ...(authored.remark
+          ? [{ label: "Remark", value: authored.remark }]
+          : []),
+      ],
+      subjectType: "kpi",
+      subjectId: kpi.id,
+    };
+  },
+  reverse() {
+    return null;
+  },
+  async capture(context, payload) {
+    const kpiId = String(payload.kpiId);
+    const wroteRemark = payload.remark !== undefined;
+    let period: KpiPeriod;
+    try {
+      period = await kpiPeriod(context, kpiId, String(payload.on));
+    } catch {
+      // A period too far back to see what it held: no undo, said on the card.
+      return null;
+    }
+    // The remark is always compared, even when the copilot wrote none: a
+    // remark a person adds afterwards by recording the period again would
+    // otherwise be removed with the value by an undo. When it wrote none, the
+    // remark the period already held is what it leaves.
+    const expect: Fields = {
+      actualValue: payload.actualValue,
+      remark: wroteRemark ? payload.remark : (period.record?.remark ?? null),
+    };
+    if (period.record === null) {
+      // Nothing there before. The new record's id is known in `settle`.
+      return { reverse: { action: "kpis.deleteRecord", payload: {} }, expect };
+    }
+    return {
+      reverse: {
+        action: "kpis.record",
+        payload: {
+          kpiId,
+          on: period.periodStart,
+          actualValue: period.record.actualValue,
+          ...(wroteRemark ? { remark: period.record.remark } : {}),
+        },
+      },
+      expect,
+    };
+  },
+  settle(captured, result) {
+    if (captured.reverse.action !== "kpis.deleteRecord") {
+      return captured;
+    }
+    const id = result.id;
+    return typeof id === "string"
+      ? {
+          reverse: { ...captured.reverse, payload: { id } },
+          expect: captured.expect,
+        }
+      : null;
+  },
+  async current(context, payload) {
+    const period = await kpiPeriod(
+      context,
+      String(payload.kpiId),
+      String(payload.on),
+    );
+    return {
+      actualValue: period.record?.actualValue ?? null,
+      remark: period.record?.remark ?? null,
+    };
+  },
+};
+
 /** Every action the copilot may propose, by registry name. */
 export const PROPOSABLE_ACTIONS: readonly ProposableAction[] = [
   createObjective,
   addKeyResult,
   startInitiative,
   addTask,
+  editObjective,
+  moveTask,
+  changeInitiativeStatus,
+  checkIn,
+  recordKpiValue,
 ];
 
 /** How many objectives or key results a model is shown at once. */
@@ -490,6 +1406,19 @@ interface OfferScope {
   editableObjectives(): Promise<NumberedChoice[]>;
   /** Key results new work may be tied to, in spaces the member may edit. */
   workKeyResults(): Promise<NumberedChoice[]>;
+  /** The member's own tasks they may edit, with their status in the label. */
+  editableTasks(): Promise<NumberedChoice[]>;
+  /** Initiatives the member may edit, with their status in the label. */
+  editableInitiatives(): Promise<NumberedChoice[]>;
+  /**
+   * Metric and maintain key results under the editable objectives, with the
+   * value they hold now beside the label.
+   */
+  checkInKeyResults(): Promise<NumberedChoice[]>;
+  /** Non-calculated KPIs, when the member's role lets them record values. */
+  editableKpis(): Promise<NumberedChoice[]>;
+  /** Today in the workspace's calendar, as YYYY-MM-DD. */
+  today(): Promise<string>;
 }
 
 function offerScope(context: ActionCallContext): OfferScope {
@@ -503,7 +1432,7 @@ function offerScope(context: ActionCallContext): OfferScope {
 
   /** The subset of `ids` this member may change, by the access model. */
   const editable = async (
-    resourceType: "space" | "goal",
+    resourceType: "space" | "goal" | "task" | "initiative",
     ids: readonly string[],
   ): Promise<Set<string>> => {
     if (ids.length === 0) {
@@ -557,7 +1486,125 @@ function offerScope(context: ActionCallContext): OfferScope {
       .map((goal) => ({ goal, cycleEndsOn: cycle.endsOn }));
   });
 
+  const tasks = once(async () => {
+    // Their own tasks: `tasks.list` has no limit, and a copilot asked to move
+    // a task is almost always asked about work that is the asker's.
+    const listed = await callAction(context, "tasks.list", { mine: true });
+    const allowed = await editable(
+      "task",
+      listed.map((task) => task.id),
+    );
+    return (
+      listed
+        .filter((task) => allowed.has(task.id))
+        // What is open first, so a cap never hides it behind finished work.
+        .sort(
+          (a, b) => Number(a.status === "done") - Number(b.status === "done"),
+        )
+        .slice(0, CHOICE_LIMIT)
+        .map((task) => ({
+          id: task.id,
+          label: `${task.title} (${TASK_STATUS_WORD[task.status] ?? task.status}${task.keyResultTitle ? `, ${task.keyResultTitle}` : ""})`,
+          with: { title: task.title, status: task.status },
+        }))
+    );
+  });
+
+  const initiatives = once(async () => {
+    const listed = await callAction(context, "initiatives.list", {});
+    const allowed = await editable(
+      "initiative",
+      listed.map((initiative) => initiative.id),
+    );
+    const closed = (status: string) =>
+      status === "done" || status === "dropped";
+    return listed
+      .filter((initiative) => allowed.has(initiative.id))
+      .sort((a, b) => Number(closed(a.status)) - Number(closed(b.status)))
+      .slice(0, CHOICE_LIMIT)
+      .map((initiative) => ({
+        id: initiative.id,
+        label: `${initiative.title} (${INITIATIVE_STATUS_WORD[initiative.status] ?? initiative.status}, ${initiative.spaceName})`,
+        with: { title: initiative.title, status: initiative.status },
+      }));
+  });
+
+  const kpiChoices = once(async () => {
+    // KPIs sit at the workspace floor and `kpis.record` is measured on the
+    // member's role for that domain, so the offer asks the same question.
+    const level = await withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      (tx) =>
+        writeFloorFor(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          actor: context.actor,
+          domain: "kpi",
+        }),
+    );
+    if (level < ACCESS_LEVELS.edit) {
+      return [];
+    }
+    const { kpis } = await callAction(context, "kpis.list", {});
+    return (
+      kpis
+        // `kpis.record` refuses a calculated KPI, so it is never offered.
+        .filter((kpi) => !kpi.isCalculated)
+        .slice(0, CHOICE_LIMIT)
+        .map((kpi) => ({
+          id: kpi.id,
+          label: `${kpi.title} (${kpi.frequency}${kpi.unit ? `, ${kpi.unit}` : ""})`,
+          with: { title: kpi.title, frequency: kpi.frequency },
+        }))
+    );
+  });
+
   return {
+    editableTasks: tasks,
+    editableInitiatives: initiatives,
+    editableKpis: kpiChoices,
+    today: once(async () =>
+      withContext(
+        drizzle(context.pool),
+        {
+          workspaceId: context.workspaceId,
+          userId: context.actor.userId ?? "",
+        },
+        async (tx) =>
+          formatLocalDate(
+            localDateIn(
+              new Date(),
+              await workspaceTimeZone(tx as OperationTx, context.workspaceId),
+            ),
+          ),
+      ),
+    ),
+    checkInKeyResults: once(async () => {
+      const choices: NumberedChoice[] = [];
+      for (const { goal } of await objectives()) {
+        for (const keyResult of goal.keyResults) {
+          // A milestone is checked in as done and a baseline as recorded, not
+          // as a number the model could write.
+          if (keyResult.kind !== "metric" && keyResult.kind !== "maintain") {
+            continue;
+          }
+          const unit = keyResult.unit ? ` ${keyResult.unit}` : "";
+          choices.push({
+            id: keyResult.id,
+            label: `${keyResult.title} (${goal.title}, now ${keyResult.currentValue}${unit})`,
+            with: {
+              goalId: goal.id,
+              title: keyResult.title,
+              current: String(keyResult.currentValue),
+            },
+          });
+          if (choices.length >= CHOICE_LIMIT) {
+            return choices;
+          }
+        }
+      }
+      return choices;
+    }),
     editableSpaces: spaces,
     editableObjectives: once(async () =>
       (await objectives()).map(({ goal, cycleEndsOn }) => ({
@@ -626,6 +1673,89 @@ export function reversalFor(
   return entry.reverse(result);
 }
 
+/** True for an action that is an edit, whose undo comes from `capture`. */
+export function isEdit(action: string): boolean {
+  return proposableAction(action)?.capture !== undefined;
+}
+
+/**
+ * Reads the values from before an edit and builds the reverse, as the member.
+ * Call it just before the action runs. Null for a create and for an edit that
+ * cannot be put back.
+ */
+export async function captureReverse(
+  context: ActionCallContext,
+  action: string,
+  payload: Record<string, unknown>,
+): Promise<StoredReverse | null> {
+  const entry = proposableAction(action);
+  if (!entry?.capture) {
+    return null;
+  }
+  const captured = await entry.capture(context, payload);
+  return captured ? { ...captured.reverse, expect: captured.expect } : null;
+}
+
+/**
+ * Completes a captured reverse with what the action returned, for an undo that
+ * needs the id of what was created. Null when it cannot be completed, which
+ * leaves the proposal applied with no undo, as a create with no reverse is.
+ */
+export function settleReverse(
+  action: string,
+  stored: StoredReverse,
+  result: Record<string, unknown>,
+): StoredReverse | null {
+  const entry = proposableAction(action);
+  if (!entry?.settle) {
+    return stored;
+  }
+  const settled = entry.settle(
+    {
+      reverse: { action: stored.action, payload: stored.payload },
+      expect: stored.expect,
+    },
+    result,
+  );
+  return settled ? { ...settled.reverse, expect: settled.expect } : null;
+}
+
+/** One spelling of a value, keys sorted, so two readings of it compare. */
+function stable(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stable).join(",")}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stable(record[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+/**
+ * Whether an applied edit's record no longer holds what the edit left.
+ * True when it cannot be checked, because undoing blind is the one thing
+ * this guard exists to prevent.
+ */
+export async function changedSinceApplied(
+  context: ActionCallContext,
+  action: string,
+  payload: Record<string, unknown>,
+  expect: Record<string, unknown>,
+): Promise<boolean> {
+  const entry = proposableAction(action);
+  if (!entry?.current) {
+    return true;
+  }
+  const now = await entry.current(context, payload);
+  return Object.keys(expect).some(
+    (key) => stable(expect[key]) !== stable(now[key]),
+  );
+}
+
 /** The asking member, without a second copy of the actor resolution. */
 async function askingMember(context: ActionCallContext): Promise<string> {
   const { askingMemberId } = await import("../actions/copilot.ts");
@@ -649,10 +1779,11 @@ export async function proposalOffers(
     if (Object.values(choices).some((list) => list.length === 0)) {
       continue;
     }
+    const note = entry.note ? ` ${await entry.note(scope)}` : "";
     offers.push({
       action: entry.action,
       label: entry.label,
-      whatItDoes: entry.whatItDoes,
+      whatItDoes: `${entry.whatItDoes}${note}`,
       fields: entry.fields,
       choices,
     });
@@ -828,12 +1959,24 @@ export async function proposeBeforeAnswering(
     return { note: { made: false }, proposalId: null };
   }
   return {
-    note: {
-      made: true,
-      label: proposableAction(proposed.action)?.label ?? proposed.action,
-      preview: proposed.preview,
-    },
+    note: proposalNoteFor(proposed.action, proposed.preview),
     proposalId: proposed.id,
+  };
+}
+
+/**
+ * What the answer is told about a card that exists. One place for both ways a
+ * card is made: the proposal-first call above and the `propose_change` tool
+ * (plan 0.9.0 A4).
+ */
+export function proposalNoteFor(
+  action: string,
+  preview: BuiltProposal["preview"],
+): Extract<ProposalNote, { made: true }> {
+  return {
+    made: true,
+    label: proposableAction(action)?.label ?? action,
+    preview,
   };
 }
 

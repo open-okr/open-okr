@@ -30,17 +30,14 @@ const TEAM_ID = "T-e2e-acme";
  * The card for one provider.
  *
  * All four have drivers now, so four connect forms are on the page and every
- * locator has to say which one it means. The hint text is what distinguishes
- * them, because it is the one thing on a form that names its provider.
+ * locator has to say which one it means. Each card carries its provider's id
+ * in its test id. The Connect button sits in the card's footer bar, outside
+ * the form element, so the card is the scope rather than the form.
  */
-const slackForm = () =>
-  page.locator("form").filter({ hasText: "Bot User OAuth Token" });
-const telegramForm = () =>
-  page.locator("form").filter({ hasText: "BotFather" });
-const teamsForm = () =>
-  page.locator("form").filter({ hasText: "Azure bot registration" });
-const whatsAppForm = () =>
-  page.locator("form").filter({ hasText: "Phone number ID" });
+const slackForm = () => page.getByTestId("channel-card-slack");
+const telegramForm = () => page.getByTestId("channel-card-telegram");
+const teamsForm = () => page.getByTestId("channel-card-teams");
+const whatsAppForm = () => page.getByTestId("channel-card-whatsapp");
 
 test.describe.configure({ mode: "serial" });
 
@@ -92,7 +89,7 @@ test("connecting Slack stores it and does not claim it is verified", async () =>
   await form.getByLabel("Bot User OAuth Token").fill(BOT_TOKEN);
   await form.getByLabel("Signing Secret").fill(SIGNING_SECRET);
   await form.getByLabel("Workspace ID").fill(TEAM_ID);
-  await form.getByRole("button", { name: "Connect" }).click();
+  await form.getByRole("button", { name: "Connect", exact: true }).click();
 
   // The confirmation comes from the card, not from the form: a successful
   // connect revalidates the page and replaces the tree the form was in, so a
@@ -121,9 +118,10 @@ test("the workspace id is shown, because it is not a secret and routing needs it
 
 test("a test send writes one row into the log", async () => {
   await page.getByRole("button", { name: "Send me a test" }).click();
-  await expect(page.getByRole("status")).toContainText("Queued", {
-    timeout: 10_000,
-  });
+  // Every save bar on the page has an empty status line of its own.
+  await expect(
+    page.getByRole("status").filter({ hasText: "Queued" }),
+  ).toBeVisible({ timeout: 10_000 });
 
   await goTo(page, "/admin/channels");
   const log = page.locator("li").filter({ hasText: "email" });
@@ -191,13 +189,13 @@ test("quiet hours save, and the copy says a reminder waits rather than vanishes"
   // primary channel above". A prose filter is a locator that any wording
   // change can break; the field this test fills is what actually identifies
   // the form it belongs to.
-  const delivery = page
-    .locator("form")
-    .filter({ has: page.locator('input[name="quietStart"]') });
-  await delivery.getByRole("button", { name: "Save" }).click();
+  // The save bar is the card's own footer, outside the form and attached to it
+  // with `form=`, so the card is the scope.
+  const delivery = page.getByTestId("channels-delivery-card");
+  await delivery.getByRole("button", { name: "Save changes" }).click();
 
   // A refusal would be here, and a spec that only checked the value would read
-  // "the write did nothing" as "the write is slow". Scoped to the form: Next
+  // "the write did nothing" as "the write is slow". Scoped to the card: Next
   // renders its own route announcer with role="alert" on every page.
   await expect(
     delivery.getByRole("alert"),
@@ -227,16 +225,16 @@ test("saving your profile keeps the quiet hours set here", async () => {
   // means "off", so saving anything on the profile deleted this window.
   // Your own profile form is on Your account since plan 0.8.0 Y2.
   await goTo(page, "/account");
-  const profile = page
-    .locator("form")
-    .filter({ has: page.locator('input[name="quietStart"]') });
+  // The save bar is the card's footer, outside the form, so the card is the
+  // scope (the same test id s33-people.spec.ts uses).
+  const profile = page.getByTestId("profile-card");
   await expect(profile.locator('input[name="quietStart"]')).toHaveValue(
     "22:00",
     { timeout: 10_000 },
   );
   await expect(profile.locator('input[name="quietEnd"]')).toHaveValue("07:00");
 
-  await profile.getByRole("button", { name: "Save" }).click();
+  await profile.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Profile updated.")).toBeVisible({
     timeout: 10_000,
   });
@@ -250,9 +248,7 @@ test("saving your profile keeps the quiet hours set here", async () => {
 
 test("one time without the other is held back, and the window stays", async () => {
   await goTo(page, "/account/channels");
-  const delivery = page
-    .locator("form")
-    .filter({ has: page.locator('input[name="quietStart"]') });
+  const delivery = page.getByTestId("channels-delivery-card");
   // Retried for the same reason as the fill above: an uncontrolled input
   // filled before hydration goes back to what the server rendered.
   await expect(async () => {
@@ -261,7 +257,7 @@ test("one time without the other is held back, and the window stays", async () =
       timeout: 1_000,
     });
   }).toPass({ timeout: 20_000 });
-  await delivery.getByRole("button", { name: "Save" }).click();
+  await delivery.getByRole("button", { name: "Save changes" }).click();
 
   // guided-inputs §4.9: the empty half is required while the other is set,
   // so the browser holds the save, and the field says why under it. The

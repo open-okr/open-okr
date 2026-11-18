@@ -14,7 +14,7 @@ export const generateMetadata = pageTitle("pageTitle.adminBackups");
  * Backups in workspace admin (UIUX-PLAN S-36, docs/design/backups-screen.md,
  * plan 0.7.0 U3).
  *
- * Four cards. The workspace's own backup is its archive, so the first takes
+ * A header with an intro, then four cards. The workspace's own backup is its archive, so the first takes
  * one and the second lists every one taken. The third says how a copy is
  * restored, in words, because importing an archive into the workspace it came
  * from would add a second copy of everything. The fourth says where the
@@ -40,119 +40,122 @@ export default async function BackupsPage() {
     resolveSupportEmail(pool),
   ]);
 
+  const linkClass =
+    "whitespace-nowrap text-xs font-semibold text-brand-text hover:underline";
   return (
-    <>
-      <h1 className="mb-4 text-lg font-bold text-ink">
-        {t("admin.backups.title")}
-      </h1>
-      <div className="flex flex-col gap-4">
-        <ExportCard />
+    <div className="flex w-full flex-col gap-4">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.backups.title")}
+        </h1>
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("admin.backups.intro")}
+        </p>
+      </header>
 
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
-              {t("admin.backups.historyTitle")}
-            </h2>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-2">
-            <p className="text-xs text-ink-3">
-              {t("admin.backups.historyNote")}
+      <ExportCard />
+
+      <Card>
+        <CardHeader className="flex-col items-stretch gap-0.5">
+          <h2 className="text-sm font-semibold text-ink">
+            {t("admin.backups.historyTitle")}
+          </h2>
+          <p className="text-xs text-ink-3">{t("admin.backups.historyNote")}</p>
+        </CardHeader>
+        <CardBody>
+          {history.archives.length === 0 ? (
+            <p className="rounded-md border border-line border-dashed px-3 py-4 text-center text-sm text-ink-3">
+              {t("admin.backups.noneTaken")}
             </p>
-            {history.archives.length === 0 ? (
-              <p className="rounded-md border border-line border-dashed px-3 py-4 text-center text-sm text-ink-3">
-                {t("admin.backups.noneTaken")}
-              </p>
-            ) : (
-              <ul
-                className="flex flex-col divide-y divide-line"
-                data-testid="archive-history"
-              >
-                {history.archives.map((archive) => (
-                  <li
-                    key={archive.id}
-                    className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2 text-sm"
-                  >
-                    <span className="font-medium text-ink">
-                      {archive.takenByName ?? t("admin.backups.someone")}
+          ) : (
+            <ul
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+              tabIndex={0}
+              aria-label={t("admin.backups.historyTitle")}
+              // Scrolls inside the card after about five rows.
+              className="flex max-h-[296px] flex-col divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain"
+              data-testid="archive-history"
+            >
+              {history.archives.map((archive) => (
+                <li
+                  key={archive.id}
+                  className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2 text-sm"
+                >
+                  <span className="font-medium text-ink">
+                    {archive.takenByName ?? t("admin.backups.someone")}
+                  </span>
+                  <span className="text-ink-2">
+                    {dayLabel(archive.takenAt, locale)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-ink-3">
+                    {archive.filename}
+                  </span>
+                  {archive.rows === null ? null : (
+                    <span className="text-xs text-ink-3">
+                      {t("admin.backups.rows", { count: archive.rows })}
                     </span>
-                    <span className="text-ink-2">
-                      {dayLabel(archive.takenAt, locale)}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-ink-3">
-                      {archive.filename}
-                    </span>
-                    {archive.rows === null ? null : (
-                      <span className="text-xs text-ink-3">
-                        {t("admin.backups.rows", { count: archive.rows })}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
+      <Card>
+        <CardHeader className="items-start border-b-0">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-sm font-semibold text-ink">
               {t("admin.backups.restoreTitle")}
             </h2>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-1.5 text-sm text-ink-2">
-            <p>{t("admin.backups.restoreBody")}</p>
-            <p>
-              <a
-                className="font-medium text-brand-text hover:underline"
-                href={docsUrl("docs/runbooks/migration-cutover.md")}
-                rel="noreferrer"
-                target="_blank"
-              >
-                {t("admin.backups.restoreGuide")}
-              </a>
+            <p className="max-w-prose text-xs text-ink-3">
+              {t("admin.backups.restoreBody")}
             </p>
-          </CardBody>
-        </Card>
+          </div>
+          <a
+            className={`ml-auto ${linkClass}`}
+            href={docsUrl("docs/runbooks/migration-cutover.md")}
+            rel="noreferrer"
+            target="_blank"
+          >
+            {t("admin.backups.restoreGuide")}
+          </a>
+        </CardHeader>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
+      <Card>
+        <CardHeader className="items-start border-b-0">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-sm font-semibold text-ink">
               {t("admin.backups.instanceTitle")}
             </h2>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-1.5 text-sm text-ink-2">
-            {cloud ? (
-              <>
-                <p>{t("admin.backups.instanceCloud")}</p>
-                {supportEmail ? (
-                  <p>
-                    <a
-                      className="font-medium text-brand-text hover:underline"
-                      href={`mailto:${supportEmail}`}
-                    >
-                      {supportEmail}
-                    </a>
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <>
-                <p>{t("admin.backups.instanceSelfHosted")}</p>
-                <p>
-                  <a
-                    className="font-medium text-brand-text hover:underline"
-                    href={docsUrl("docs/runbooks/restore.md")}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    {t("admin.backups.instanceGuide")}
-                  </a>
-                </p>
-              </>
-            )}
-          </CardBody>
-        </Card>
-      </div>
-    </>
+            <p className="max-w-prose text-xs text-ink-3">
+              {cloud
+                ? t("admin.backups.instanceCloud")
+                : t("admin.backups.instanceSelfHosted")}
+            </p>
+          </div>
+          {cloud ? (
+            supportEmail ? (
+              <a
+                className={`ml-auto ${linkClass}`}
+                href={`mailto:${supportEmail}`}
+              >
+                {supportEmail}
+              </a>
+            ) : null
+          ) : (
+            <a
+              className={`ml-auto ${linkClass}`}
+              href={docsUrl("docs/runbooks/restore.md")}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {t("admin.backups.instanceGuide")}
+            </a>
+          )}
+        </CardHeader>
+      </Card>
+    </div>
   );
 }

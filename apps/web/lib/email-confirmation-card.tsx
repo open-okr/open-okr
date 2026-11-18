@@ -1,5 +1,6 @@
 import type { EmailConfirmation } from "@openokr/core";
 import { Button, Card, CardBody, CardHeader } from "@openokr/ui";
+import { SettingsFormCard } from "./settings-form-card";
 import { getTranslations } from "./translations";
 
 /**
@@ -11,15 +12,22 @@ import { getTranslations } from "./translations";
  * accounts are shared by every customer and the choice is the operator's
  * (Q12). Each screen passes its own action, which checks its own grant.
  *
+ * **`settingsLayout` is opt-in.** Admin, General draws the card on the
+ * settings page standard (docs/design/settings-page-layout.md): two tiles in
+ * a 12-column grid and the shared save bar. The operator's Instance screen
+ * keeps the original card until it is converted.
+ *
  * Under the `company_domains` registration policy `off` is not offered,
  * because that policy trusts the domain an address claims (Q13).
  */
 export async function EmailConfirmationCard({
   confirmation,
   save,
+  settingsLayout = false,
 }: {
   readonly confirmation: EmailConfirmation;
   readonly save: (formData: FormData) => Promise<void>;
+  readonly settingsLayout?: boolean;
 }) {
   const { t } = await getTranslations();
   const choices = [
@@ -36,6 +44,72 @@ export async function EmailConfirmationCard({
       disabled: confirmation.companyDomains,
     },
   ] as const;
+
+  const now = confirmation.required
+    ? t("admin.emailConfirmation.nowRequired")
+    : confirmation.linksCanArrive
+      ? t("admin.emailConfirmation.nowNotRequired")
+      : t("admin.emailConfirmation.nowNoMail");
+
+  if (settingsLayout) {
+    return (
+      <SettingsFormCard
+        formId="email-confirmation-form"
+        testId="email-confirmation-card"
+        unsavedLabel={t("admin.emailConfirmation.title")}
+        action={save}
+        header={
+          <CardHeader>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <h2 className="text-sm font-semibold text-ink">
+                {t("admin.emailConfirmation.title")}
+              </h2>
+              <p className="text-xs text-ink-3">
+                {t("admin.emailConfirmation.lead")}
+              </p>
+            </div>
+          </CardHeader>
+        }
+      >
+        <fieldset className="contents">
+          <legend className="sr-only">
+            {t("admin.emailConfirmation.title")}
+          </legend>
+          {choices.map((choice) => (
+            <label
+              key={choice.value}
+              className="col-span-12 flex cursor-pointer items-start gap-2.5 rounded-control border border-line p-3 text-sm text-ink hover:border-line-2 has-[:checked]:border-brand-line has-[:checked]:bg-brand-weak has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 md:col-span-6"
+            >
+              <input
+                type="radio"
+                name="emailVerification"
+                value={choice.value}
+                defaultChecked={choice.value === confirmation.mode}
+                disabled={choice.disabled}
+                data-testid={`email-confirmation-${choice.value}`}
+                className="mt-0.5 size-4 flex-none accent-brand"
+              />
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="font-semibold text-ink">{choice.title}</span>
+                <span className="text-xs text-ink-3">{choice.hint}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        {confirmation.companyDomains ? (
+          <p className="col-span-12 text-xs text-ink-3">
+            {t("admin.emailConfirmation.heldByCompanyDomains")}
+          </p>
+        ) : null}
+        <p
+          className="col-span-12 text-xs text-ink-3"
+          data-testid="email-confirmation-now"
+        >
+          {now}
+        </p>
+      </SettingsFormCard>
+    );
+  }
 
   return (
     <Card data-testid="email-confirmation-card">
@@ -87,11 +161,7 @@ export async function EmailConfirmationCard({
             className="text-xs text-ink-3"
             data-testid="email-confirmation-now"
           >
-            {confirmation.required
-              ? t("admin.emailConfirmation.nowRequired")
-              : confirmation.linksCanArrive
-                ? t("admin.emailConfirmation.nowNotRequired")
-                : t("admin.emailConfirmation.nowNoMail")}
+            {now}
           </p>
           <div className="flex flex-wrap items-center gap-2.5 border-t border-line pt-3">
             <Button type="submit" variant="primary" size="sm">

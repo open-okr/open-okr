@@ -21,21 +21,25 @@ import {
   useState,
 } from "react";
 import {
+  type ContentWidth,
   DENSITY_STORAGE_KEY,
   type Density,
   resolveTheme,
   THEME_STORAGE_KEY,
   type ThemePreference,
+  WIDTH_STORAGE_KEY,
 } from "./theme-script.ts";
 
-export type { Density, ThemePreference };
+export type { ContentWidth, Density, ThemePreference };
 
 interface ThemeContextValue {
   readonly theme: ThemePreference;
   readonly resolvedTheme: "light" | "dark";
   readonly density: Density;
+  readonly width: ContentWidth;
   setTheme(theme: ThemePreference): void;
   setDensity(density: Density): void;
+  setWidth(width: ContentWidth): void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -63,17 +67,33 @@ function readStored<T extends string>(
 
 const THEME_VALUES: readonly ThemePreference[] = ["light", "dark", "system"];
 const DENSITY_VALUES: readonly Density[] = ["comfortable", "compact"];
+const WIDTH_VALUES: readonly ContentWidth[] = ["compact", "full"];
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemePreference>(() =>
-    readStored(THEME_STORAGE_KEY, "system", THEME_VALUES),
-  );
-  const [density, setDensityState] = useState<Density>(() =>
-    readStored(DENSITY_STORAGE_KEY, "comfortable", DENSITY_VALUES),
-  );
+  // Start from the defaults on the client too, never from storage. The
+  // server renders the defaults, and hydration does not patch an attribute
+  // that differs (React keeps the server's `aria-pressed`). Starting equal and
+  // reading storage in the effect below is a real state change, so the
+  // controls re-render with the stored choice before the first paint.
+  const [theme, setThemeState] = useState<ThemePreference>("system");
+  const [density, setDensityState] = useState<Density>("comfortable");
+  const [width, setWidthState] = useState<ContentWidth>("compact");
   const [systemDark, setSystemDark] = useState(systemPrefersDark);
 
   const resolvedTheme = resolveTheme(theme, systemDark);
+
+  // A member whose browser holds Full width saw Compact pressed after a
+  // reload while the page itself was Full. Reading the stored values once
+  // after mount makes the state, and so the controls, match. A browser on the
+  // defaults bails out and re-renders nothing. The attribute effects below
+  // run in the same commit, so the page does not flash the default.
+  useLayoutEffect(() => {
+    setThemeState(readStored(THEME_STORAGE_KEY, "system", THEME_VALUES));
+    setDensityState(
+      readStored(DENSITY_STORAGE_KEY, "comfortable", DENSITY_VALUES),
+    );
+    setWidthState(readStored(WIDTH_STORAGE_KEY, "compact", WIDTH_VALUES));
+  }, []);
 
   // React Strict Mode's dev-only mount→unmount→remount cycle re-runs effects
   // but never re-executes the inline <head> script, so the attributes it set
@@ -87,6 +107,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     document.documentElement.setAttribute("data-density", density);
   }, [density]);
+
+  useLayoutEffect(() => {
+    document.documentElement.setAttribute("data-width", width);
+  }, [width]);
 
   useLayoutEffect(() => {
     if (theme !== "system") {
@@ -108,9 +132,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(DENSITY_STORAGE_KEY, next);
   }, []);
 
+  const setWidth = useCallback((next: ContentWidth) => {
+    setWidthState(next);
+    window.localStorage.setItem(WIDTH_STORAGE_KEY, next);
+  }, []);
+
   const value = useMemo<ThemeContextValue>(
-    () => ({ theme, resolvedTheme, density, setTheme, setDensity }),
-    [theme, resolvedTheme, density, setTheme, setDensity],
+    () => ({
+      theme,
+      resolvedTheme,
+      density,
+      width,
+      setTheme,
+      setDensity,
+      setWidth,
+    }),
+    [theme, resolvedTheme, density, width, setTheme, setDensity, setWidth],
   );
 
   return (

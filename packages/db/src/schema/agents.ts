@@ -192,6 +192,14 @@ export const proposedChanges = pgTable("proposed_changes", {
    * Not a status. It was applied, and then it was undone, and both are true.
    */
   undoneAt: timestamp("undone_at", { withTimezone: true }),
+  /**
+   * How to put an applied edit back (plan 0.9.0 L4a): `{ action, payload,
+   * expect }`. Read just before the edit's own transaction, because the
+   * action returns only an id. `expect` holds the values the edit left, which
+   * undo checks first so it never overwrites a later change. Null for a
+   * create, whose reverse comes from its result, and before it is applied.
+   */
+  reversePayload: jsonb("reverse_payload"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

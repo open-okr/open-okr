@@ -74,7 +74,7 @@ export async function GrantDecision({
   return (
     <form
       action={decide}
-      className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-4"
+      className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-3.5"
     >
       <input name="sessionId" type="hidden" value={sessionId} />
 
@@ -86,8 +86,8 @@ export async function GrantDecision({
         <p className="text-ink text-sm">{reason}</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
+      <div className="grid grid-cols-12 gap-x-6 gap-y-4">
+        <div className="col-span-12 flex flex-col gap-1.5 md:col-span-6">
           <SelectInput
             label={t("admin.support.grant.theyMay")}
             defaultValue={String(ACCESS_LEVELS.view)}
@@ -109,7 +109,7 @@ export async function GrantDecision({
             {t("admin.support.grant.neverAccessControl")}
           </p>
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="col-span-12 flex flex-col gap-1.5 md:col-span-6">
           <SelectInput
             label={t("admin.support.grant.for")}
             defaultValue="4"
@@ -130,20 +130,10 @@ export async function GrantDecision({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <SubmitButton
-          bare
-          className="rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong aria-disabled:opacity-60"
-          name="answer"
-          value="grant"
-        >
+        <SubmitButton name="answer" size="sm" value="grant" variant="primary">
           <span>{t("admin.support.grant.letThemIn")}</span>
         </SubmitButton>
-        <SubmitButton
-          bare
-          className="rounded-md border border-line px-4 py-2 font-medium text-ink text-sm aria-disabled:opacity-60"
-          name="answer"
-          value="refuse"
-        >
+        <SubmitButton name="answer" size="sm" value="refuse">
           <span>{t("admin.support.grant.no")}</span>
         </SubmitButton>
       </div>

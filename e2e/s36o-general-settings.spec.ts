@@ -29,8 +29,7 @@ test.afterAll(async () => {
   await context?.close();
 });
 
-const generalForm = () =>
-  page.locator("form", { has: page.getByLabel("Timezone") });
+const generalForm = () => page.getByTestId("general-defaults-card");
 
 /** Fills a field, retried because a fill before hydration is undone by it. */
 async function type(label: string, value: string): Promise<void> {
@@ -82,7 +81,9 @@ test("an entry that is not a domain is refused, and named", async () => {
   await expect(
     generalForm().getByText(/^priya@northwind is not a domain\./),
   ).toBeVisible({ timeout: 10_000 });
-  await generalForm().getByRole("button", { name: "Save", exact: true }).click();
+  await generalForm()
+    .getByRole("button", { name: "Save changes", exact: true })
+    .click();
 
   await goTo(page, "/admin/general");
   await expect(page.locator('input[name="trustedEmailDomains"]')).toHaveValue(

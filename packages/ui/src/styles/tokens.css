@@ -202,6 +202,15 @@
 }
 
 /*
+ * Content width (docs/design/content-width.md). Compact caps the page content
+ * inside the shell's main area and centres it; Full width leaves it as wide as
+ * the area. The sidebar and top bar sit outside the wrapper and do not move.
+ */
+:root[data-width="compact"] [data-content-width] {
+  max-width: 1152px;
+}
+
+/*
  * Dark mode (§2: "first class... light, dark or system"). "System" is
  * resolved to a concrete "light" or "dark" before this ever matters — see
  * theme-script.ts and theme-provider.tsx — so this file only has two

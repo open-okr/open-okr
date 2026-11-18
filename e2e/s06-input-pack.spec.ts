@@ -68,6 +68,12 @@ test("a first note gathers a pack item, and after that only the box changes it",
   await expect(row.getByText("Missing", { exact: true })).toBeVisible();
   await expect(page.getByText("0 of 7", { exact: true })).toBeVisible();
 
+  // The account is the Owner, who may change the pack, so the line naming who
+  // may is not drawn (plan 0.9.0 G8). A Member's read-only view is covered
+  // by `packages/core/test/input-pack-access.test.ts` (`workflow.read`'s
+  // `packAccess`): the suite has no second account to sign in as.
+  await expect(page.getByTestId("pack-who-line")).toHaveCount(0);
+
   // The box is a checkbox to look at: an icon rather than a text glyph, and a
   // name a sighted person can read on hover.
   await expect(tickBox(false)).toHaveAttribute("aria-pressed", "false");

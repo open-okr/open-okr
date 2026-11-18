@@ -159,94 +159,58 @@ export function ProposalQueue({
             {t("admin.agents.proposalQueue.nothingWaitingAnAgent")}
           </p>
         ) : (
-          <>
-            {/* `j` and `k` walk the proposals and `x` chooses one, so a
-             * reviewer can work the queue from the keyboard (plan 0.7.0,
-             * U2). No `e`: a proposal is applied or dismissed, not edited. */}
-            <KeyboardList select>
-              <ul className="flex flex-col gap-2">
-                {proposals.map((proposal) => (
-                  <li
-                    key={proposal.id}
-                    data-keyboard-row
-                    className="flex items-start gap-2.5 border-line border-b pb-2 last:border-0 last:pb-0"
+          /* `j` and `k` walk the proposals and `x` chooses one, so a
+           * reviewer can work the queue from the keyboard (plan 0.7.0,
+           * U2). No `e`: a proposal is applied or dismissed, not edited. */
+          <KeyboardList select>
+            <ul
+              aria-label={t("admin.agents.proposalQueue.proposalsWaiting")}
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: a list that scrolls has to be reachable from the keyboard.
+              tabIndex={0}
+              className="flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5"
+            >
+              {proposals.map((proposal) => (
+                <li
+                  key={proposal.id}
+                  data-keyboard-row
+                  className="flex items-start gap-2.5 border-line border-b pb-2 last:border-0 last:pb-0"
+                >
+                  <input
+                    type="checkbox"
+                    id={`proposal-${proposal.id}`}
+                    checked={chosen.has(proposal.id)}
+                    onChange={() => toggle(proposal.id)}
+                    data-keyboard-select
+                    className="mt-1"
+                  />
+                  <label
+                    htmlFor={`proposal-${proposal.id}`}
+                    className="flex min-w-0 flex-1 flex-col gap-0.5"
                   >
-                    <input
-                      type="checkbox"
-                      id={`proposal-${proposal.id}`}
-                      checked={chosen.has(proposal.id)}
-                      onChange={() => toggle(proposal.id)}
-                      data-keyboard-select
-                      className="mt-1"
-                    />
-                    <label
-                      htmlFor={`proposal-${proposal.id}`}
-                      className="flex min-w-0 flex-1 flex-col gap-0.5"
-                    >
-                      <span className="font-mono text-xs text-brand-text">
-                        {proposal.action}
-                      </span>
-                      <span className="text-sm text-ink">
-                        {describe(proposal.payload, t)}
-                      </span>
-                      <span className="text-xs text-ink-4">
-                        {proposal.subjectType
-                          ? t("admin.agents.proposalQueue.onASubject", {
-                              subjectType: proposal.subjectType.replace(
-                                /_/g,
-                                " ",
-                              ),
-                            })
-                          : t("admin.agents.proposalQueue.workspaceWide")}
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </KeyboardList>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="primary"
-                disabled={pending || ids.length === 0}
-                pending={pending && acting === "apply"}
-                onClick={() =>
-                  run("apply", async () => {
-                    const result = await applyProposalsAction(ids);
-                    setRefusals(result.failed);
-                    return t("admin.agents.proposalQueue.appliedOf", {
-                      applied: result.applied,
-                      total: ids.length,
-                    });
-                  })
-                }
-              >
-                {t("common.apply2", {
-                  length: ids.length > 0 ? ids.length : "",
-                })}
-              </Button>
-              <Button
-                disabled={pending || ids.length === 0}
-                pending={pending && acting === "dismiss"}
-                onClick={() =>
-                  run("dismiss", async () => {
-                    const result = await dismissProposalsAction(ids);
-                    return t("admin.agents.proposalQueue.dismissedCount", {
-                      dismissed: result.dismissed,
-                    });
-                  })
-                }
-              >
-                {t("common.dismiss")}
-              </Button>
-              <span className="text-xs text-ink-4">
-                {t("admin.agents.proposalQueue.nothingIsChosenFor")}
-              </span>
-            </div>
-          </>
+                    <span className="font-mono text-xs text-brand-text">
+                      {proposal.action}
+                    </span>
+                    <span className="text-sm text-ink">
+                      {describe(proposal.payload, t)}
+                    </span>
+                    <span className="text-xs text-ink-4">
+                      {proposal.subjectType
+                        ? t("admin.agents.proposalQueue.onASubject", {
+                            subjectType: proposal.subjectType.replace(
+                              /_/g,
+                              " ",
+                            ),
+                          })
+                        : t("admin.agents.proposalQueue.workspaceWide")}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </KeyboardList>
         )}
 
-        {outcome ? (
+        {proposals.length === 0 && outcome ? (
           <p role="status" className="text-xs text-ink-2">
             {outcome}
           </p>
@@ -262,6 +226,58 @@ export function ProposalQueue({
           </ul>
         ) : null}
       </CardBody>
+      {proposals.length === 0 ? null : (
+        // Both buttons apply at once: Apply is a write in the reviewer's name
+        // and Dismiss drops the proposal, so there is no Discard here.
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-3.5 py-2.5">
+          {outcome ? (
+            <p role="status" className="text-xs text-ink-2">
+              {outcome}
+            </p>
+          ) : (
+            <p className="text-xs text-ink-4">
+              {t("admin.agents.proposalQueue.nothingIsChosenFor")}
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              disabled={pending || ids.length === 0}
+              pending={pending && acting === "dismiss"}
+              onClick={() =>
+                run("dismiss", async () => {
+                  const result = await dismissProposalsAction(ids);
+                  return t("admin.agents.proposalQueue.dismissedCount", {
+                    dismissed: result.dismissed,
+                  });
+                })
+              }
+            >
+              {t("common.dismiss")}
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={pending || ids.length === 0}
+              pending={pending && acting === "apply"}
+              onClick={() =>
+                run("apply", async () => {
+                  const result = await applyProposalsAction(ids);
+                  setRefusals(result.failed);
+                  return t("admin.agents.proposalQueue.appliedOf", {
+                    applied: result.applied,
+                    total: ids.length,
+                  });
+                })
+              }
+            >
+              {t("common.apply2", {
+                length: ids.length > 0 ? ids.length : "",
+              })}
+            </Button>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

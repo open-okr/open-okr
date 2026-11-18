@@ -20,7 +20,7 @@ import {
 } from "./contract.ts";
 import { openBrowser, pollDevice, startDevice } from "./device.ts";
 import { commandHelp, parseFlags } from "./flags.ts";
-import { runMcpBridge } from "./mcp-bridge.ts";
+import { bridgeUrlRefusal, runMcpBridge } from "./mcp-bridge.ts";
 import {
   type Config,
   configPath,
@@ -199,6 +199,10 @@ async function mcp(
     return usage(
       `Profile "${name}" has no agent token. Mint one under Agent tokens in your account, then run \`okr login --url ${profile.url} --mcp-token <token>\`.`,
     );
+  }
+  const refusal = bridgeUrlRefusal(profile.url);
+  if (refusal !== null) {
+    return usage(refusal);
   }
   await runMcpBridge({
     url: profile.url,

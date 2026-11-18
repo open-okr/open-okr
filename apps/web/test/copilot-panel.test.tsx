@@ -36,9 +36,11 @@ const actions = vi.hoisted(() => ({
   deleteCopilotThreadAction: vi.fn(),
   listCopilotProposalsAction: vi.fn(async (): Promise<unknown[]> => []),
   listCopilotThreadsAction: vi.fn(async (): Promise<unknown[]> => []),
+  rateCopilotAnswerAction: vi.fn(async () => ({ error: null })),
   readCopilotThreadAction: vi.fn(),
   stopCopilotRunAction: vi.fn(async () => ({})),
   undoCopilotProposalAction: vi.fn(),
+  unrateCopilotAnswerAction: vi.fn(async () => ({ error: null })),
 }));
 vi.mock("../app/copilot/actions", () => actions);
 // The address the panel reads and writes (plan 0.8.1 CP2): the window's own,
@@ -55,6 +57,8 @@ const AVAILABLE: CopilotAvailability = {
   available: true,
   providerConfigured: true,
   reason: null,
+  reasonCode: null,
+  reasonParams: null,
   searchAvailable: true,
   streaming: true,
   resetsAt: null,
@@ -66,6 +70,9 @@ const AI_OFF: CopilotAvailability = {
   providerConfigured: false,
   reason:
     "No AI provider is configured, so the copilot can find sources but cannot write an answer.",
+  // Worded from the catalogue, which reads the same in English (CP10).
+  reasonCode: "ai_off",
+  reasonParams: { offReason: "no_provider" },
   searchAvailable: true,
   streaming: false,
   resetsAt: null,
@@ -1194,6 +1201,105 @@ describe("the streaming look (plan 0.8.1 CP9)", () => {
     await settle();
   });
 
+  test("says what it is reading, folds the reads into one line, and links what it read", async () => {
+    const stream = feed();
+    fetchMock.mockResolvedValue(stream.response);
+    await render(AVAILABLE);
+    await open();
+    await ask("How is the activation objective doing?");
+    await settle();
+    stream.push({
+      kind: "thread",
+      threadId: THREAD,
+      questionMessageId: QUESTION_ID,
+    });
+    stream.push({ kind: "step", step: "found", count: 0 });
+    stream.push({ kind: "step", step: "reading", tool: "goals.list" });
+    stream.push({
+      kind: "step",
+      step: "reading",
+      tool: "goals.read",
+      subject: "Raise activation for mid-market teams",
+    });
+    // Longer than every step's dwell, so the line has reached the last one.
+    for (let wait = 0; wait < 5; wait += 1) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 450));
+      });
+    }
+    expect(panel()?.querySelector("article")?.textContent).toContain(
+      "Reading Raise activation for mid-market teams…",
+    );
+
+    stream.push({ kind: "step", step: "writing" });
+    stream.push({ kind: "text", text: "It is on track. " });
+    await settle();
+
+    const turn = panel()?.querySelector("article");
+    expect(turn?.querySelector("details > summary")?.textContent).toBe(
+      "Searched your workspace, made 2 reads",
+    );
+    stream.end();
+    await settle();
+  });
+
+  test("links an answer's sources to the key result, initiative and task it read", async () => {
+    fetchMock.mockResolvedValue(
+      streamOf([
+        { kind: "thread", threadId: THREAD, questionMessageId: QUESTION_ID },
+        { kind: "text", text: "It is on track." },
+        { kind: "done", answerMessageId: "a1", stopped: false },
+      ]),
+    );
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: null,
+      subjectId: null,
+      title: "How is activation?",
+      messages: [
+        recorded(
+          QUESTION_ID,
+          "member",
+          "How is activation?",
+          "2026-11-12T10:00:00.000Z",
+        ),
+        {
+          ...recorded(
+            "a1",
+            "assistant",
+            "It is on track.",
+            "2026-11-12T10:00:04.000Z",
+          ),
+          citations: [
+            { entityType: "key_result", entityId: "kr-1", label: "Rate" },
+            { entityType: "initiative", entityId: "in-1", label: "Setup" },
+            { entityType: "task", entityId: "t-1", label: "Checklist" },
+            { entityType: "check_in", entityId: "ci-1", label: "Check-in" },
+          ],
+        },
+      ],
+    });
+    await render(AVAILABLE);
+    await open();
+    await ask("How is activation?");
+    await settle();
+
+    const turn = panel()?.querySelector("article");
+    const hrefs = [...(turn?.querySelectorAll("a") ?? [])].map((link) =>
+      link.getAttribute("href"),
+    );
+    expect(hrefs).toEqual(
+      expect.arrayContaining(["/initiatives/in-1", "/tasks/t-1"]),
+    );
+    // A key result's page takes a short id, so with no server link (CP5) it
+    // is named and not linked.
+    expect(turn?.textContent).toContain("Rate");
+    expect(hrefs.some((href) => href?.includes("kr-1"))).toBe(false);
+    // A check-in has no page of its own, so it is named and not linked.
+    expect(turn?.textContent).toContain("Check-in");
+    expect(hrefs.some((href) => href?.includes("ci-1"))).toBe(false);
+  });
+
   test("moves on from a step no sooner than 400 milliseconds", () => {
     expect(nextShownStep(3, -1, 0)).toBe(0);
     expect(nextShownStep(3, 0, 120)).toBe(0);
@@ -1265,5 +1371,84 @@ describe("a stopped answer (plan 0.8.1 CP9 with W4)", () => {
     const turn = panel()?.querySelector("article");
     expect(turn?.textContent).toContain("Activation is up four");
     expect(turn?.textContent).toContain("Stopped");
+  });
+});
+
+describe("Ask about this page (plan 0.9.0 CP11)", () => {
+  const GOAL_PAGE = "/goals/ab3dk9xq";
+
+  test("offers the chip on an objective page and not on /admin", async () => {
+    window.history.replaceState(null, "", GOAL_PAGE);
+    await render(AVAILABLE);
+    await open();
+    expect(panel()?.textContent).toContain("Ask about this objective");
+
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    window.history.replaceState(null, "", "/admin");
+    await render(AVAILABLE);
+    await open();
+    expect(
+      panel()?.querySelector('[data-testid="copilot-ask-about-page"]'),
+    ).toBeNull();
+  });
+
+  test("hides the chip with AI off", async () => {
+    window.history.replaceState(null, "", GOAL_PAGE);
+    await render(AI_OFF);
+    await open();
+    expect(
+      panel()?.querySelector('[data-testid="copilot-ask-about-page"]'),
+    ).toBeNull();
+  });
+
+  test("anchors a drawer's key result to its objective", async () => {
+    window.history.replaceState(null, "", "/goals?okr=ab3dk9xq&kr=zz9yy8xx");
+    await render(AVAILABLE);
+    await open();
+    expect(panel()?.textContent).toContain("Ask about this objective");
+  });
+
+  test("sends only the kind and the id, with the first question, then hides the chip", async () => {
+    window.history.replaceState(null, "", GOAL_PAGE);
+    fetchMock.mockResolvedValue(
+      streamOf([
+        { kind: "thread", threadId: THREAD, questionMessageId: QUESTION_ID },
+        { kind: "done", answerMessageId: null, stopped: false },
+      ]),
+    );
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: "goal",
+      subjectId: "00000000-0000-4000-8000-0000000000aa",
+      title: "How is this going?",
+      messages: [],
+    });
+    await render(AVAILABLE);
+    await open();
+    await act(async () => byName("Ask about this objective").click());
+
+    // Two anchored suggestions replace the workspace four, and the header
+    // names the kind with no title.
+    const suggestions = panel()?.querySelector(
+      '[aria-label="Suggested questions"]',
+    );
+    expect(suggestions?.querySelectorAll("button")).toHaveLength(2);
+    expect(panel()?.querySelector("header")?.textContent).toContain(
+      "About this objective",
+    );
+
+    await act(async () => byName("How is this going?").click());
+    await settle();
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({
+      question: "How is this going?",
+      subjectType: "goal",
+      subjectId: "ab3dk9xq",
+    });
+    // The thread is anchored to the page's record now, so the chip is gone
+    // although the server kept a UUID and the page names a short id.
+    expect(panel()?.textContent).not.toContain("Ask about this objective");
   });
 });

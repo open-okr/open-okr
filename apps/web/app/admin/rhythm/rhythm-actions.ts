@@ -1,7 +1,7 @@
 "use server";
 
 /**
- * Saving and resetting the §11 registry for one workspace (P6-G20).
+ * Saving the §11 registry for one workspace (P6-G20).
  *
  * **The refusal used to be swallowed.** The previous version of this save
  * caught `OperationError` and returned, so an out-of-range threshold looked
@@ -13,10 +13,10 @@
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
-import { refusalFields, refusedSentence } from "../../../lib/refusal";
+import { refusalFields } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
-import { NOTHING_SAVED, type RhythmState } from "./rhythm-state.ts";
+import type { RhythmState } from "./rhythm-state.ts";
 
 /**
  * A refused save as the card reads it, or null for a failure.
@@ -110,17 +110,18 @@ function composites(
 }
 
 /**
- * Saves whatever the submitted card carries, and nothing else (P8-G11).
+ * Saves whatever the submitted form carries, and nothing else (P8-G11).
  *
- * **Every field of `rhythm.update` is optional and `overrides` merges**, which
- * is what lets one card submit its own thresholds without the other seven
- * being present. `resetGroup` below has relied on that since P6-G20; this is
- * the same property used for the save.
+ * The page is one form with one save bar, so every card arrives at once and
+ * is written or refused as one. **Every field of `rhythm.update` is optional
+ * and `overrides` merges**, so the payload is still built from what arrived
+ * rather than read at fixed names: a form that holds no cadence dropdown
+ * sends no cadence setting.
  *
- * So the payload is built from what arrived rather than read at fixed names.
- * Reading `form.get("checkInAnchorDay")` unconditionally, as this did while
- * one form wrapped the whole screen, would send `null` for the cadence
- * settings on every save from any other card.
+ * "Reset to defaults" on a card is not a server call. It blanks that card's
+ * fields in the browser and this save then sends each blank as `null`, which
+ * is the difference between having no opinion and having chosen today's
+ * default and keeping it after the canon moves.
  */
 export async function saveRhythm(
   _previous: RhythmState,
@@ -260,10 +261,9 @@ export async function saveRhythm(
     revalidatePath("/", "layout");
   }
 
-  // Counted over this card's thresholds rather than the workspace's, because
-  // that is what the sentence sits under. A card carrying no threshold at all
-  // gets the plain confirmation instead of "every threshold is the canon's",
-  // which would have been a claim about seven cards it never saw.
+  // Counted over what was submitted. A form carrying no threshold at all gets
+  // the plain confirmation instead of "every threshold is the canon's", which
+  // would be a claim about fields it never saw.
   if (!sawThreshold) {
     return { error: null, saved: t("admin.rhythm.actions.saved") };
   }
@@ -278,51 +278,5 @@ export async function saveRhythm(
         : changed === 1
           ? t("admin.rhythm.actions.savedDifferOne", { count: changed })
           : t("admin.rhythm.actions.savedDifferOther", { count: changed }),
-  };
-}
-
-/**
- * Returns one card's thresholds to the canon.
- *
- * Called from a button rather than submitted as a form. Each card is its own
- * form since P8-G11, and reset sits inside that form beside the save, so a
- * second form there would be a form inside a form, which is not markup a
- * browser will honour. The same reason the invitation revoke button is a
- * button.
- *
- * Sent as nulls rather than as the canon's numbers, which is the difference
- * between "this workspace has no opinion" and "this workspace has chosen
- * exactly what the canon happens to say today". The second would survive a
- * change to the canon and quietly hold the old number.
- */
-export async function resetGroup(
-  keys: readonly string[],
-): Promise<RhythmState> {
-  const { t } = await getTranslations();
-  const wanted = keys.filter((key) => key !== "");
-  if (wanted.length === 0) {
-    return { error: t("admin.rhythm.actions.nothingToReset"), saved: null };
-  }
-
-  try {
-    await callAction(await context(), "rhythm.update", {
-      overrides: Object.fromEntries(wanted.map((key) => [key, null])),
-    });
-  } catch (error) {
-    // A button with no field, so the sentence; a schema's too (plan U1b).
-    const refused = refusedSentence(error, t);
-    if (refused === null) {
-      throw error;
-    }
-    return { error: refused.error, saved: null };
-  }
-
-  revalidatePath("/admin/rhythm");
-  return {
-    ...NOTHING_SAVED,
-    saved:
-      wanted.length === 1
-        ? t("admin.rhythm.actions.returnedOne", { count: wanted.length })
-        : t("admin.rhythm.actions.returnedOther", { count: wanted.length }),
   };
 }

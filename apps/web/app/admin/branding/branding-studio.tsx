@@ -1,11 +1,11 @@
 "use client";
 
 import {
-  Button,
   Card,
   CardBody,
   initialsOf,
   RefusedFields,
+  SettingsSaveBar,
   TextInput,
   useTranslations,
 } from "@openokr/ui";
@@ -34,7 +34,9 @@ import {
 /**
  * The Branding page's body (docs/design/branding-page.md §2, §3): the live
  * mirror across the top, then one form holding the colour, the logo and the
- * favicon as three columns of one card, then the page's one Save.
+ * favicon as three 4-column spans of one 12-column grid, then the page's one
+ * Save. The grid and the save bar are the settings standard
+ * (docs/design/settings-page-layout.md §A, §E); the bar is `SettingsSaveBar`.
  *
  * **Save follows the fields.** It sits in a bar under the card that sticks to
  * the bottom of the window while the card is in view, and says what is not
@@ -169,7 +171,7 @@ function StudioBody({
               setDiscarded((count) => count + 1);
             }}
             aria-busy={pending}
-            className="grid gap-5 lg:grid-cols-3 lg:gap-0"
+            className="grid grid-cols-12 gap-x-6 gap-y-5 [&>ul]:col-span-12"
           >
             {/* The name and the colour show what the server refused about
              * them (guided-inputs §4.2, plan U1b). */}
@@ -177,7 +179,7 @@ function StudioBody({
               {/* The workspace's own name, beside the logo it sits next to in
                * the sidebar, so the mirror shows both before either is saved.
                * It moved here from General (owner, 4 November 2026). */}
-              <div className="flex flex-col gap-1 border-b border-line pb-5 lg:col-span-3 lg:mb-5">
+              <div className="col-span-12 flex flex-col gap-1 border-b border-line pb-5">
                 <input type="hidden" name="storedName" value={workspaceName} />
                 <TextInput
                   key={`name-${discarded}`}
@@ -189,11 +191,10 @@ function StudioBody({
                   maxLength={WORKSPACE_NAME_MAX_LENGTH}
                   autoComplete="organization"
                   disabled={pending}
-                  className="max-w-sm"
                   onChange={(event) => setName(event.currentTarget.value)}
                 />
               </div>
-              <div className="lg:pr-5">
+              <div className="col-span-12 lg:col-span-4">
                 <BrandingSettingsForm
                   status={status}
                   disabled={pending}
@@ -201,7 +202,7 @@ function StudioBody({
                   onColourChange={setColour}
                 />
               </div>
-              <div className="border-t border-line pt-5 lg:border-t-0 lg:border-l lg:px-5 lg:pt-0">
+              <div className="col-span-12 border-t border-line pt-5 lg:col-span-4 lg:border-t-0 lg:pt-0">
                 <BrandingImageCard
                   key={`logo-${discarded}`}
                   slot="logo"
@@ -216,7 +217,7 @@ function StudioBody({
                   }
                 />
               </div>
-              <div className="border-t border-line pt-5 lg:border-t-0 lg:border-l lg:pl-5 lg:pt-0">
+              <div className="col-span-12 border-t border-line pt-5 lg:col-span-4 lg:border-t-0 lg:pt-0">
                 <BrandingImageCard
                   key={`favicon-${discarded}`}
                   slot="favicon"
@@ -235,67 +236,19 @@ function StudioBody({
           </form>
         </CardBody>
       </Card>
-      <div
+      <SettingsSaveBar
+        mode="sticky"
+        formId={FORM_ID}
         data-testid="branding-save-bar"
-        className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface px-4 py-3"
-      >
-        <div className="flex min-w-0 flex-col gap-0.5">
-          {unsaved.length > 0 ||
-          state.saved !== null ||
-          state.error !== null ||
-          state.fields !== undefined ? null : (
-            <p className="text-sm text-ink-3">
-              {t("admin.branding.nothingChanged")}
-            </p>
-          )}
-          <p
-            role="status"
-            className="text-sm font-medium text-ink"
-            data-testid="branding-mirror-unsaved"
-          >
-            {unsaved.length > 0
-              ? t("admin.branding.mirror.notSaved", {
-                  parts: unsaved.join(", "),
-                })
-              : ""}
-          </p>
-          {state.saved === null ? null : (
-            <p role="status" className="text-xs text-ink-2">
-              {state.saved}
-            </p>
-          )}
-          {state.error === null ? null : (
-            <p role="alert" className="text-xs text-bad">
-              {state.error}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-none items-center gap-2">
-          <Button
-            type="reset"
-            form={FORM_ID}
-            variant="ghost"
-            size="sm"
-            disabled={pending || unsaved.length === 0}
-          >
-            {t("admin.branding.discard")}
-          </Button>
-          <Button
-            type="submit"
-            form={FORM_ID}
-            name="intent"
-            value="save"
-            variant="primary"
-            size="sm"
-            disabled={pending}
-            pending={pending && acting === "save"}
-          >
-            {pending
-              ? t("admin.branding.images.saving")
-              : t("admin.branding.saveChanges")}
-          </Button>
-        </div>
-      </div>
+        unsavedTestId="branding-mirror-unsaved"
+        unsaved={unsaved}
+        saved={state.saved}
+        error={state.error}
+        pending={pending}
+        savePending={pending && acting === "save"}
+        idleHint={t("admin.branding.nothingChanged")}
+        hideIdle={state.fields !== undefined}
+      />
     </div>
   );
 }

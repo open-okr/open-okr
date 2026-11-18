@@ -2,7 +2,7 @@
 
 import { Dialog } from "@base-ui-components/react/dialog";
 import type { ProfileComparisonRow, ProfileKey } from "@openokr/method";
-import { Button, Chip, cn, MethodHint, useTranslations } from "@openokr/ui";
+import { Button, Chip, MethodHint, useTranslations } from "@openokr/ui";
 import { X } from "lucide-react";
 
 /**
@@ -13,9 +13,9 @@ import { X } from "lucide-react";
  * `method:check` holds METHOD.md §12.3 to, so this dialog and the document
  * cannot show different tables. Nothing here names a setting or a profile.
  *
- * Only what some profile changes is a row. A cell that differs from
- * Recommended is bold on a tint, and the bold is what carries it for a reader
- * who cannot see the tint. Each row's name has a hint saying what the row
+ * Only what some profile changes is a row. A value that differs from
+ * Recommended is a bold pill, and the bold is what carries it for a reader
+ * who cannot see the colour. Each row's name has a hint saying what the row
  * decides, so the table reads without METHOD.md beside it.
  */
 export function ProfileComparison({
@@ -52,7 +52,7 @@ export function ProfileComparison({
         >
           <header className="flex flex-none items-start gap-3 border-b border-line px-4 py-3">
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <Dialog.Title className="text-lg font-bold text-ink">
+              <Dialog.Title className="text-base font-semibold text-ink">
                 {title}
               </Dialog.Title>
               <Dialog.Description className="text-sm text-ink-3">
@@ -73,13 +73,13 @@ export function ProfileComparison({
             tabIndex={0}
             className="min-h-0 flex-1 overflow-auto"
           >
-            <table className="w-full min-w-176 border-collapse text-sm">
+            <table className="w-full min-w-176 table-fixed border-collapse text-sm">
               <caption className="sr-only">{title}</caption>
               <thead>
                 <tr>
                   <th
                     scope="col"
-                    className="sticky top-0 left-0 z-20 bg-surface px-3 py-2 text-left text-xs font-bold tracking-wide text-ink-4 uppercase"
+                    className="sticky top-0 left-0 z-20 w-[30%] border-b border-line bg-raised px-3 py-2 text-left align-top text-xs font-semibold text-ink-2"
                   >
                     {t("admin.practice.compare.setting")}
                   </th>
@@ -87,7 +87,7 @@ export function ProfileComparison({
                     <th
                       key={profile.key}
                       scope="col"
-                      className="sticky top-0 z-10 bg-surface px-3 py-2 text-left align-bottom font-semibold text-ink"
+                      className="sticky top-0 z-10 border-b border-line bg-raised px-3 py-2 text-left align-top text-xs font-semibold text-ink-2"
                     >
                       <span className="flex flex-wrap items-center gap-1.5">
                         {profile.label}
@@ -106,9 +106,9 @@ export function ProfileComparison({
                   <tr key={row.key} className="border-t border-line">
                     <th
                       scope="row"
-                      className="sticky left-0 w-40 bg-surface px-3 py-2 text-left align-top font-medium text-ink sm:w-64"
+                      className="sticky left-0 bg-surface px-3 py-2.5 text-left align-top text-sm font-medium text-ink"
                     >
-                      <span className="flex items-start justify-between gap-1">
+                      <span className="flex items-start gap-1.5">
                         {row.name}
                         <MethodHint
                           name={row.name}
@@ -121,14 +121,17 @@ export function ProfileComparison({
                     {profiles.map((profile) => (
                       <td
                         key={profile.key}
-                        className={cn(
-                          "px-3 py-2 align-top",
-                          row.differs.includes(profile.key)
-                            ? "bg-brand-weak font-semibold text-ink"
-                            : "text-ink-3",
-                        )}
+                        className="px-1.5 py-2 align-top text-ink-3"
                       >
-                        {row.values[profile.key]}
+                        {row.differs.includes(profile.key) ? (
+                          <span className="inline-flex rounded-sm bg-brand-weak px-1.5 py-0.5 font-semibold text-brand-text">
+                            {row.values[profile.key]}
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-1.5 py-0.5">
+                            {row.values[profile.key]}
+                          </span>
+                        )}
                       </td>
                     ))}
                   </tr>

@@ -50,6 +50,10 @@ type Reason =
   | { readonly apiOnly: true; readonly why: string };
 
 const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
+  "kpis.deleteRecord": {
+    apiOnly: true,
+    why: "used only by the copilot's undo, which calls it through the server; no screen removes a KPI value",
+  },
   "goals.checkDraft": {
     apiOnly: true,
     why: "an agent checks a draft before creating it; the browser's composer runs the same checks as the person types",

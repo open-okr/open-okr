@@ -61,6 +61,12 @@ const CHAMPION_EXECUTION_INSTRUCTIONS =
 
 export interface SeedChampionInput {
   readonly workspaceId: string;
+  /**
+   * The workspace's own time zone, which the agent's member row starts with, as
+   * a human member's does at provisioning. Without it, data change 0001 found
+   * both agents with no time zone on every fresh workspace.
+   */
+  readonly timezone?: string | null;
 }
 
 export interface SeededChampion {
@@ -92,6 +98,7 @@ export async function seedChampionInTx<
     workspaceId: input.workspaceId,
     userId: null,
     name: CHAMPION_NAME,
+    timezone: input.timezone ?? null,
     kind: "agent",
     status: "active",
   });

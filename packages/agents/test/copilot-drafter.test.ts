@@ -207,6 +207,43 @@ describe("what the answer is told about the card (plan 0.8.1 A2)", () => {
   });
 });
 
+describe("who the answer is told is asking (plan 0.9.0 L7b)", () => {
+  const systemNotes = (provider: ScriptedProvider) =>
+    (provider.requests[0]?.messages ?? [])
+      .filter((message) => message.role === "system")
+      .map((message) => message.content);
+
+  it("Given an asker, When the answer is written, Then a system message names them", async () => {
+    const { drafter, provider } = drafterOver(["It is yours."]);
+    await drafter.answerGrounded?.({ ...question, asker: "Priya Raman" });
+    const named = systemNotes(provider).filter((note) =>
+      note.includes("The person asking is Priya Raman."),
+    );
+    expect(named).toHaveLength(1);
+    expect(named[0]).toContain("champion, reviewer, owner, assignee or author");
+  });
+
+  it("Given no asker, When the answer is written, Then no such message is sent", async () => {
+    const { drafter, provider } = drafterOver(["Activation is at 41%."]);
+    await drafter.answerGrounded?.(question);
+    expect(systemNotes(provider)).toHaveLength(1);
+    expect(systemNotes(provider).join("")).not.toContain(
+      "The person asking is",
+    );
+  });
+
+  it("tells the answer to pick between same-titled records by cycle", async () => {
+    const { drafter, provider } = drafterOver(["Fine."]);
+    await drafter.answerGrounded?.({
+      ...question,
+      reading: { reads: 1, limited: false },
+    });
+    expect(provider.requests[0]?.messages.at(-1)?.content).toContain(
+      "this quarter is the one whose cycle is a quarter",
+    );
+  });
+});
+
 describe("which feature asked", () => {
   it("is said on every call, for the usage row", async () => {
     const { drafter, provider } = drafterOver(["An answer."]);

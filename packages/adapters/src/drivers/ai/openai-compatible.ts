@@ -22,6 +22,7 @@ import type {
   TokenUsage,
   ToolDefinition,
 } from "../../ports/ai.ts";
+import { fromWireName, toWireName } from "./tool-names.ts";
 
 export interface OpenAiCompatibleOptions {
   readonly apiKey: string;
@@ -55,6 +56,20 @@ function toMessages(
         tool_call_id: message.toolCallId ?? "",
       };
     }
+    if (message.role === "assistant" && message.toolCalls?.length) {
+      return {
+        role: "assistant",
+        content: message.content === "" ? null : message.content,
+        tool_calls: message.toolCalls.map((call) => ({
+          id: call.id,
+          type: "function" as const,
+          function: {
+            name: toWireName(call.name),
+            arguments: JSON.stringify(call.arguments),
+          },
+        })),
+      };
+    }
     return { role: message.role, content: message.content };
   });
 }
@@ -63,7 +78,7 @@ function toTool(tool: ToolDefinition): OpenAI.Chat.ChatCompletionTool {
   return {
     type: "function",
     function: {
-      name: tool.name,
+      name: toWireName(tool.name),
       description: tool.description,
       parameters: tool.parameters,
     },
@@ -79,7 +94,10 @@ const usageOf = (usage: OpenAI.CompletionUsage | undefined): TokenUsage => {
   };
 };
 
-function fromCompletion(completion: OpenAI.Chat.ChatCompletion): ChatResponse {
+function fromCompletion(
+  completion: OpenAI.Chat.ChatCompletion,
+  tools: readonly ToolDefinition[] = [],
+): ChatResponse {
   const message = completion.choices[0]?.message;
   const usage = completion.usage;
   const toolCalls = message?.tool_calls
@@ -93,7 +111,7 @@ function fromCompletion(completion: OpenAI.Chat.ChatCompletion): ChatResponse {
     )
     .map((call) => ({
       id: call.id,
-      name: call.function.name,
+      name: fromWireName(call.function.name, tools),
       arguments: JSON.parse(call.function.arguments) as Record<string, unknown>,
     }));
 
@@ -167,7 +185,7 @@ export class OpenAiCompatibleProvider implements AIProvider {
       max_completion_tokens: request.maxTokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
       tools: request.tools.map(toTool),
     });
-    return fromCompletion(completion);
+    return fromCompletion(completion, request.tools);
   }
 
   async embed(request: EmbedRequest): Promise<EmbedResponse> {

@@ -57,11 +57,17 @@ export function MemberRoles({
         </p>
       ) : null}
 
-      <ul className="flex flex-col divide-y divide-line">
+      <ul
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+        tabIndex={0}
+        aria-label={t("admin.roles.whoHoldsWhat")}
+        // Scrolls inside the card at about five rows, as the sessions list does.
+        className="max-h-[296px] overflow-y-auto overscroll-contain divide-y divide-line rounded-lg border border-line"
+      >
         {members.map((member) => (
           <li
             key={member.id}
-            className="flex flex-wrap items-center justify-between gap-2 py-2"
+            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
           >
             <span className="min-w-0 text-sm text-ink">{member.name}</span>
             <span className="flex items-center gap-1.5">

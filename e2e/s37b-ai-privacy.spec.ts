@@ -28,12 +28,11 @@ test.describe.configure({ mode: "serial" });
 let context: BrowserContext;
 let page: Page;
 
-/** The privacy card's own form, not one of the console's other Save buttons. */
-const card = (page: Page): Locator =>
-  page.locator("form").filter({ has: page.getByText("What may be sent") });
+/** The privacy card: its fields, its notes and its footer. */
+const card = (page: Page): Locator => page.getByTestId("ai-privacy-card");
 
 async function save(page: Page): Promise<void> {
-  await card(page).getByRole("button", { name: "Save" }).click();
+  await card(page).getByRole("button", { name: "Save changes" }).click();
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -56,7 +55,7 @@ test.afterAll(async () => {
     .uncheck();
   await setTokens(form.getByLabel("Hosts an AI request may reach"), []);
   await save(page);
-  await expect(form.getByRole("status")).toHaveText("Saved.", {
+  await expect(form.getByText("Saved.", { exact: true })).toBeVisible({
     timeout: 15_000,
   });
   await context?.close();
@@ -93,7 +92,7 @@ test("a narrowed card is what the page reads after a reload", async () => {
     "api.anthropic.com",
   ]);
   await save(page);
-  await expect(form.getByRole("status")).toHaveText("Saved.", {
+  await expect(form.getByText("Saved.", { exact: true })).toBeVisible({
     timeout: 15_000,
   });
 

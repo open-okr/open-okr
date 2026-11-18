@@ -189,6 +189,8 @@ export const updateOwnProfile = defineWriteAction({
      */
     theme: z.enum(["light", "dark", "system"]).nullable().optional(),
     density: z.enum(["comfortable", "compact"]).nullable().optional(),
+    /** Compact caps the content column, Full width does not. Null is compact. */
+    width: z.enum(["compact", "full"]).nullable().optional(),
     /**
      * Which catalogue renders for this member (P6-G22a).
      *
@@ -321,6 +323,10 @@ export const updateOwnProfile = defineWriteAction({
       if (input.density !== undefined) {
         patch.density = input.density;
         changed.push("density");
+      }
+      if (input.width !== undefined) {
+        patch.width = input.width;
+        changed.push("width");
       }
       if (input.language !== undefined) {
         patch.language = input.language;
@@ -918,6 +924,7 @@ export const eraseMember = defineWriteAction({
         copilotThreads: z.number(),
         copilotMessages: z.number(),
         agentToolCalls: z.number(),
+        answerRatings: z.number(),
       }),
     }),
   }),
@@ -1079,6 +1086,7 @@ const memberProfile = z.object({
    */
   theme: z.enum(["light", "dark", "system"]).nullable(),
   density: z.enum(["comfortable", "compact"]).nullable(),
+  width: z.enum(["compact", "full"]).nullable(),
   /**
    * Which catalogue renders for this member (P6-G22a).
    *
@@ -1141,6 +1149,7 @@ export const readMember = defineReadAction({
             primaryChannel: workspaceMembers.primaryChannel,
             theme: workspaceMembers.theme,
             density: workspaceMembers.density,
+            width: workspaceMembers.width,
             language: workspaceMembers.language,
             roleName: workspaceRoles.name,
             roleKey: workspaceRoles.builtinKey,

@@ -212,11 +212,10 @@ test("hydrates, so a write happens without loading a new document", async () => 
   // A picker since completeness review M-15, which offers the languages the
   // catalogue has rather than taking any text.
   await page.getByLabel("Language").selectOption("en");
-  // The general form's own Save: the instance card beside it has one too
-  // since completeness review M-33.
+  // The defaults card's own save bar: every card on the page has one.
   await page
-    .locator("form", { has: page.getByLabel("Language") })
-    .getByRole("button", { name: "Save" })
+    .getByTestId("general-defaults-card")
+    .getByRole("button", { name: "Save changes" })
     .click();
 
   await expect(page.getByLabel("Language")).toBeVisible();
@@ -240,23 +239,20 @@ test("both seeded agents are in admin, with their schedules and an empty log", a
     page.getByRole("heading", { name: "Agents and runs" }),
   ).toBeVisible();
 
-  // **Inside the agents list, not the page.** The scheduler runs the
+  // **Inside the agent tabs, not the page.** The scheduler runs the
   // Champion at :00, :15, :30 and :45, and a run row names its agent, so a
   // page-wide filter matched twice whenever this test crossed one of those
-  // minutes (found on 2 October 2026, when it ran at 22:15).
-  const agents = page.getByRole("list", { name: "The agents" });
-  const champion = agents
-    .getByRole("listitem")
-    .filter({ hasText: "OKR Champion" });
+  // minutes (found on 2 October 2026, when it ran at 22:15). Each agent's
+  // schedule and write policy are chips on its own tab.
+  const tabs = page.getByRole("tablist", { name: "The agents" });
+  const champion = tabs.getByRole("tab", { name: /OKR Champion/ });
   await expect(champion).toHaveCount(1);
   await expect(champion.getByText("On the hour")).toBeVisible();
-  // **Exact, so it means the chip.** P6-G13b put a "Propose" button in each
-  // row, and `getByText` is case-insensitive by default, so the bare match
-  // resolved to two elements and Playwright refused it under strict mode. The
-  // chip is lower case and the button is not, which `exact` distinguishes.
+  // **Exact, so it means the chip.** The write policy tile reads "Propose",
+  // and `getByText` is case-insensitive by default; the chip is lower case.
   await expect(champion.getByText("propose", { exact: true })).toBeVisible();
 
-  const coach = agents.getByRole("listitem").filter({ hasText: "OKR Coach" });
+  const coach = tabs.getByRole("tab", { name: /OKR Coach/ });
   await expect(coach).toHaveCount(1);
   await expect(coach.getByText("On every write")).toBeVisible();
   await expect(coach.getByText("propose", { exact: true })).toBeVisible();
@@ -297,45 +293,46 @@ test("an agent's write policy can be moved, and the workspace cannot be bound", 
   // a one-way door.
   await page.goto("/admin/agents");
 
-  const coach = page.getByRole("listitem").filter({ hasText: "OKR Coach" });
+  await page.getByRole("tab", { name: /OKR Coach/ }).click();
+  const coach = page.getByRole("tabpanel", { name: /OKR Coach/ });
   await expect(coach.getByText("propose", { exact: true })).toBeVisible();
 
   // Into the sandbox, which commits nothing at all. Chosen rather than
   // scoped direct because widening asks for a confirmation and this test is
-  // about the move, not about the dialog.
+  // about the move, not about the dialog. The tile only chooses: Save
+  // changes sends it.
   await coach.getByTestId("autonomy-sandbox").click();
-  await expect(coach.getByText("commits nothing at all")).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(coach.getByText("Not saved yet: Write policy")).toBeVisible();
+  await coach.getByRole("button", { name: "Save changes" }).click();
+  await expect(coach.getByText("Saved.")).toBeVisible({ timeout: 15_000 });
 
   await page.goto("/admin/agents");
   await expect(
     page
-      .getByRole("listitem")
-      .filter({ hasText: "OKR Coach" })
+      .getByRole("tab", { name: /OKR Coach/ })
       .getByText("sandbox", { exact: true }),
   ).toBeVisible();
 
   // The binder offers named things and not the workspace. CLAUDE.md's rule is
   // that there is no service account with authority over everything, and the
   // action refuses it too; this is the half a browser can see.
-  const restored = page.getByRole("listitem").filter({ hasText: "OKR Coach" });
+  await page.getByRole("tab", { name: /OKR Coach/ }).click();
+  const restored = page.getByRole("tabpanel", { name: /OKR Coach/ });
   await restored.getByRole("button", { name: "Bind a scope" }).click();
   const kinds = restored.locator("select[name='resourceType'] option");
   await expect(kinds).toHaveText(["Space", "Goal", "KPI tree"]);
 
   // Put back, so every spec after this one meets the agent it expects.
   await page.goto("/admin/agents");
-  await page
-    .getByRole("listitem")
-    .filter({ hasText: "OKR Coach" })
-    .getByTestId("autonomy-propose")
-    .click();
+  await page.getByRole("tab", { name: /OKR Coach/ }).click();
+  const back = page.getByRole("tabpanel", { name: /OKR Coach/ });
+  await back.getByTestId("autonomy-propose").click();
+  await back.getByRole("button", { name: "Save changes" }).click();
+  await expect(back.getByText("Saved.")).toBeVisible({ timeout: 15_000 });
   await expect(
     page
-      .getByRole("listitem")
-      .filter({ hasText: "OKR Coach" })
-      .getByText("into the review queue"),
+      .getByRole("tab", { name: /OKR Coach/ })
+      .getByText("propose", { exact: true }),
   ).toBeVisible({ timeout: 15_000 });
 });
 

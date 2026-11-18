@@ -32,6 +32,7 @@
     "perf:budgets": "pnpm --filter @openokr/core perf:budgets",
     "perf:load": "pnpm --filter @openokr/core perf:load",
     "method:check": "node --experimental-strip-types --no-warnings scripts/method-check.ts",
+    "copilot:feedback": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/copilot-feedback.ts",
     "method:verdicts": "node --experimental-strip-types --no-warnings scripts/method-verdicts.ts",
     "changeset": "changeset",
     "check:changeset": "node --experimental-strip-types --no-warnings scripts/check-changeset.ts",

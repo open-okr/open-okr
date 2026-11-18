@@ -219,7 +219,7 @@ A variable that closes registration means "closed behind the owner", which is wh
 | # | Decision | Why |
 |---|---|---|
 | D17 | **An unclaimed instance admits its first account whatever the policy says**, stored or from the variable. Unclaimed is the existing `readSetupState` test: setup unfinished and no account. The check moves to the top of `user.create.before`, before `registrationRefusal`, and the claim keeps arriving verified (BUG-028) | The wizard is the claim. The policy then governs every account after it, which is what an operator setting `invite_only` before the first run expects |
-| D18 | **Nothing else changes about who may claim.** Today, with no policy, whoever reaches an unclaimed instance first claims it. D17 gives a closed policy the same rule, no wider | A setup code that proves the claimant is the deployer would be a new security mechanism, and is Q1 |
+| D18 | **Nothing else changes about who may claim.** Today, with no policy, whoever reaches an unclaimed instance first claims it. D17 gives a closed policy the same rule, no wider | A setup code that proves the claimant is the deployer would be a new security mechanism, and is Q1. **Built in 0.9.0 (plan row G1): [setup-code.md](setup-code.md).** The first account now needs the code, so "whoever reaches an unclaimed instance first" reads "whoever holds the code" |
 | D19 | The wizard shows a refused sign-up as the refusal, never as a failed sign-in. Already true on `main`; a test pins it | So a future change to the fall-through cannot bring back "Invalid email or password" |
 
 ### 10.3 Acceptance criteria

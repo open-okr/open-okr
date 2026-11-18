@@ -95,7 +95,6 @@ export function BrandingSettingsForm({
             ? null
             : t(REFUSED_HUE[family], { colour: hex });
         }}
-        className="max-w-sm"
         fallback={fill ?? PRODUCT_BRAND}
         onValueChange={onColourChange}
         trailing={

@@ -40,12 +40,15 @@ const providerForm = (page: Page): Locator =>
 /** The OpenRouter slot on the member's own screen. */
 const slot = (page: Page): Locator =>
   page.getByTestId("personal-key").filter({
-    has: page.getByRole("heading", { level: 2, name: "OpenRouter" }),
+    has: page.getByRole("heading", { level: 3, name: "OpenRouter" }),
   });
 
 async function allowPersonalKeys(page: Page, allow: boolean): Promise<void> {
   await goTo(page, "/admin/ai");
+  // One tab per provider, one card visible: open OpenRouter's.
+  await page.getByRole("tab", { name: /OpenRouter/ }).click();
   const form = providerForm(page);
+  const card = page.getByTestId("ai-provider-openrouter");
   const box = form.getByLabel("Let members supply their own key");
   if (allow) {
     await box.check();
@@ -55,10 +58,10 @@ async function allowPersonalKeys(page: Page, allow: boolean): Promise<void> {
   // Left off: a provider that takes personal keys and is not in use keeps AI
   // off for every other spec.
   await expect(form.getByLabel("Use this provider")).not.toBeChecked();
-  await form.getByRole("button", { name: "Save" }).click();
-  await expect(form.getByRole("status")).toHaveText("Saved.", {
-    timeout: 15_000,
-  });
+  await card.getByRole("button", { name: "Save changes" }).click();
+  await expect(card.getByRole("status").filter({ hasText: "Saved." })).toBeVisible(
+    { timeout: 15_000 },
+  );
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -86,7 +89,7 @@ test("with no provider taking personal keys, the screen says so and who can chan
     page.getByRole("heading", { level: 1, name: "Your AI keys" }),
   ).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("personal-keys-empty")).toBeVisible();
-  await expect(page.locator('input[name="apiKey"]')).toHaveCount(0);
+  await expect(page.locator('input[name^="apiKey-"]')).toHaveCount(0);
 });
 
 test("an administrator opening a provider gives the member a slot for it", async () => {
@@ -104,16 +107,18 @@ test("a key goes in once, and only its last four characters come back", async ()
   const field = card.getByLabel(/Paste your key for OpenRouter/);
   await expect(field).toHaveAttribute("type", "password");
   await field.fill(KEY);
-  await card.getByRole("button", { name: "Store" }).click();
+  await page.getByRole("button", { name: "Save changes" }).click();
 
-  await expect(card.getByRole("status")).toContainText(
-    "Stored. Your next request to OpenRouter uses it.",
-    { timeout: 15_000 },
-  );
+  // The one sticky bar says what the save did.
+  await expect(
+    page.getByRole("status").filter({ hasText: "Stored. Your next request" }),
+  ).toContainText("Stored. Your next request to OpenRouter uses it.", {
+    timeout: 15_000,
+  });
   await expect(card.getByText(HINT)).toBeVisible();
   await expect(card.getByText("Stored", { exact: true })).toBeVisible();
   // The field is empty again, and nowhere on the page holds the key.
-  await expect(card.locator('input[name="apiKey"]')).toHaveValue("");
+  await expect(card.locator('input[name="apiKey-openrouter"]')).toHaveValue("");
   expect(await page.content()).not.toContain(KEY);
 
   // And after a reload, which is the read rather than the write's answer.
@@ -126,7 +131,7 @@ test("a malformed key is refused by the form, and the stored one stays", async (
   await goTo(page, "/account/ai");
   const card = slot(page);
   await card.getByLabel(/Paste a new key for OpenRouter/).fill("sk-or has a space");
-  await card.getByRole("button", { name: "Replace" }).click();
+  await page.getByRole("button", { name: "Save changes" }).click();
 
   await expect(card.getByRole("alert")).toContainText(
     "That is not a key this can store.",
@@ -158,5 +163,5 @@ test("removing it leaves the slot empty", async () => {
   await expect(
     card.getByRole("button", { name: "Remove my key" }),
   ).toHaveCount(0);
-  await expect(card.getByRole("button", { name: "Store" })).toBeVisible();
+  await expect(card.getByLabel(/Paste your key for OpenRouter/)).toBeVisible();
 });

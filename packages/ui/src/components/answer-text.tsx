@@ -28,7 +28,7 @@
  * Not the rich-text module in `packages/core`: that is the editor's stored
  * JSON, and an answer is a text column that is never stored as rich text.
  */
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
 import { CopyButton } from "./copy-button.tsx";
@@ -281,26 +281,85 @@ export function parseAnswer(answer: string): Block[] {
   return blocks;
 }
 
-function Inlines({ parts }: { readonly parts: readonly Inline[] }) {
+/** What draws a `[n]` source marker, or null to drop it (plan 0.9.0 CP5). */
+type RenderCitation = (n: number) => ReactNode | null;
+
+const CITATION_MARKER = /\[(\d{1,3})\]/g;
+
+/**
+ * A run of text with its `[n]` markers handed to `renderCitation`.
+ *
+ * Only text runs get here: a code span or a code block keeps its brackets,
+ * because `[1]` inside code is an index and not a source.
+ */
+function TextRun({
+  text,
+  renderCitation,
+}: {
+  readonly text: string;
+  readonly renderCitation: RenderCitation | undefined;
+}) {
+  if (!renderCitation) {
+    return <span>{text}</span>;
+  }
+  const out: ReactNode[] = [];
+  let last = 0;
+  for (const match of text.matchAll(CITATION_MARKER)) {
+    const start = match.index ?? 0;
+    if (start > last) {
+      out.push(text.slice(last, start));
+    }
+    out.push(
+      <Fragment key={`cite-${start}`}>
+        {renderCitation(Number(match[1]))}
+      </Fragment>,
+    );
+    last = start + match[0].length;
+  }
+  if (last < text.length) {
+    out.push(text.slice(last));
+  }
+  return <span>{out}</span>;
+}
+
+function Inlines({
+  parts,
+  renderCitation,
+}: {
+  readonly parts: readonly Inline[];
+  readonly renderCitation?: RenderCitation;
+}) {
   return (
     <>
       {parts.map((part, index) => {
         switch (part.kind) {
           case "text":
-            // biome-ignore lint/suspicious/noArrayIndexKey: parts never move; the index is their place in the line.
-            return <span key={index}>{part.text}</span>;
+            return (
+              <TextRun
+                // biome-ignore lint/suspicious/noArrayIndexKey: parts never move; the index is their place in the line.
+                key={index}
+                text={part.text}
+                renderCitation={renderCitation}
+              />
+            );
           case "strong":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: as above.
               <strong key={index} className="font-semibold">
-                <Inlines parts={part.children} />
+                <Inlines
+                  parts={part.children}
+                  renderCitation={renderCitation}
+                />
               </strong>
             );
           case "em":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: as above.
               <em key={index}>
-                <Inlines parts={part.children} />
+                <Inlines
+                  parts={part.children}
+                  renderCitation={renderCitation}
+                />
               </em>
             );
           default:
@@ -324,8 +383,10 @@ function Inlines({ parts }: { readonly parts: readonly Inline[] }) {
 function Lines({
   lines,
   trailing,
+  renderCitation,
 }: {
   readonly lines: readonly (readonly Inline[])[];
+  readonly renderCitation?: RenderCitation;
   /** Drawn after the last line, inside it. */
   readonly trailing?: ReactNode;
 }) {
@@ -335,8 +396,14 @@ function Lines({
       // biome-ignore lint/suspicious/noArrayIndexKey: lines never move.
       out.push(<br key={`break-${index}`} />);
     }
-    // biome-ignore lint/suspicious/noArrayIndexKey: as above.
-    out.push(<Inlines key={`line-${index}`} parts={line} />);
+    out.push(
+      <Inlines
+        // biome-ignore lint/suspicious/noArrayIndexKey: as above.
+        key={`line-${index}`}
+        parts={line}
+        renderCitation={renderCitation}
+      />,
+    );
   });
   return (
     <>
@@ -354,9 +421,17 @@ export function AnswerText({
   text,
   className,
   trailing,
+  renderCitation,
 }: {
   readonly text: string;
   readonly className?: string;
+  /**
+   * Draws a `[n]` source marker in the answer's text, or returns null to drop
+   * it (plan 0.9.0 CP5). Called for text only, never inside code. Without it
+   * the markers stay as typed. Returns React nodes, so the model's text never
+   * becomes a link.
+   */
+  readonly renderCitation?: (n: number) => ReactNode | null;
   /**
    * Drawn at the very end of the text, inside its last line: the caret of an
    * answer still arriving (plan 0.8.1 CP9). After a block of its own would
@@ -376,7 +451,11 @@ export function AnswerText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: blocks only grow at the end while an answer arrives.
               <p key={index}>
-                <Lines lines={block.lines} trailing={end} />
+                <Lines
+                  lines={block.lines}
+                  trailing={end}
+                  renderCitation={renderCitation}
+                />
               </p>
             );
           case "list": {
@@ -385,6 +464,7 @@ export function AnswerText({
               <li key={itemIndex} className="pl-0.5">
                 <Lines
                   lines={item}
+                  renderCitation={renderCitation}
                   trailing={
                     itemIndex === block.items.length - 1 ? end : undefined
                   }

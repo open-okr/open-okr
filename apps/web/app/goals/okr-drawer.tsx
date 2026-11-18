@@ -340,6 +340,7 @@ function DrawerBody({
         {tabs.map((entry) => (
           <Tabs.Tab
             key={entry}
+            id={`drawer-tab-${entry}`}
             value={entry}
             className="-mb-px border-b-2 border-transparent px-2 py-2 text-xs font-semibold text-ink-3 hover:text-ink data-active:border-brand data-active:text-ink"
           >
@@ -532,8 +533,21 @@ function DrawerBody({
                 thresholds={coach.thresholds}
                 display={coach.practice["confidence.display"]}
                 onPublished={() => {
-                  toast.show({ tone: "ok", message: t("okrDrawer.checkedIn") });
                   onTab("history");
+                  // The form unmounts with its focused button, so focus would
+                  // fall to the body and a screen reader would re-read the page
+                  // over the toast. Focus the History tab first, then write the
+                  // confirmation to the live region one frame later so it is
+                  // announced after the focus move and heard once.
+                  requestAnimationFrame(() => {
+                    document.getElementById("drawer-tab-history")?.focus();
+                    requestAnimationFrame(() =>
+                      toast.show({
+                        tone: "ok",
+                        message: t("okrDrawer.checkedIn"),
+                      }),
+                    );
+                  });
                 }}
               />
             )}

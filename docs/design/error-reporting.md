@@ -1,6 +1,6 @@
 # Error reporting
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan rows E1 to E4). Approved by Akmal on 9 November 2026 ("design approved"), with every recommendation in §9: a hand-written client, the message allow-list, and Sentry's EU region for OKRGoal. A new subsystem that can send data off the host, so it is designed first (CLAUDE.md).
+Status: proposed 9 November 2026 for release 0.7.0 (plan rows E1 to E4). Approved by Akmal on 9 November 2026 ("design approved"), with every recommendation in §9: a hand-written client and the message allow-list. A new subsystem that can send data off the host, so it is designed first (CLAUDE.md).
 
 **In one sentence:** the product catches its own unexpected errors and records each one locally, and an operator who sets one address sends them to any tracker that speaks Sentry's protocol: Sentry, self-hosted Sentry, GlitchTip or Bugsink.
 
@@ -15,7 +15,7 @@ Status: proposed 9 November 2026 for release 0.7.0 (plan rows E1 to E4). Approve
 | Dead letters | `apps/web/lib/relay.ts:484`, `onDeadLetter` | "The loudest line this process writes", and a log line is all it is |
 | Next's hook | `onRequestError` in `instrumentation.ts` (Next 15 and later) | Not exported, so server errors are not captured anywhere |
 
-So on every setup today, an operator learns about an unexpected error from a person, or by reading `docker compose logs app`. Nothing groups errors, counts them by kind, or alerts. On OKRGoal, no AI tool can query them.
+So on every setup today, an operator learns about an unexpected error from a person, or by reading `docker compose logs app`. Nothing groups errors, counts them by kind, or alerts.
 
 ## 1. The shape
 
@@ -26,7 +26,7 @@ Four rows. Each layer works without the ones after it.
 | E1 | Capture, classify, scrub, and the local floor: a JSON log line and a counter | Every install | Never |
 | E2 | The `ErrorReporter` port and the Sentry-protocol driver | Whoever sets `OPENOKR_ERROR_DSN` | Only with a DSN |
 | E3 | Browser errors, through our own server | Every install; forwarded only with a DSN | Only with a DSN |
-| E4 | OKRGoal's tracker, the runbook, and a check by hand against GlitchTip and Bugsink | OKRGoal, and every operator who reads the runbook | OKRGoal's choice |
+| E4 | The runbook, and a check by hand against one tracker | Every operator who reads the runbook | Only with a DSN |
 
 ```
  server render, route, action ─┐
@@ -102,26 +102,24 @@ Four rows. Each layer works without the ones after it.
 | One company, or air-gapped | Nothing | JSON lines in the log, `openokr_errors_total` on the Grafana dashboards, the digest on the error page |
 | One company, wants a tracker | Run GlitchTip, Bugsink or Sentry, set `OPENOKR_ERROR_DSN`, restart | Grouped errors with readable frames, alerts from the tracker |
 | On-premises group | The same, once for the instance | The workspace id on each report says which company was affected |
-| Another SaaS provider | Their own tracker's DSN in their deployment's secret | The same as OKRGoal, with their tracker |
-| OKRGoal | E4 | Sentry, with its MCP, CLI and Seer for AI triage |
+| A provider running the instance for other companies | Their own tracker's DSN in the deployment's secret | The same, with their tracker |
 
 Compose: `OPENOKR_ERROR_ENVIRONMENT` joins `deploy/docker/compose.yaml` the way `OPENOKR_CLAMD_HOST` does, `production` by default, and `staging` in the staging overlay. `OPENOKR_ERROR_DSN` goes in `secrets/app.env` instead, because it is a credential and a line in the `environment:` block would override that file with an empty value (§10, C1). Helm: two values in `values.yaml`, with the DSN read from a Secret key when it is set.
 
-## 4. OKRGoal (E4)
+## 4. An operator's tracker (E4)
 
-Operations, mostly outside this repository. Nothing below names OKRGoal in product code.
+Operations, outside this repository. Any tracker that speaks Sentry's protocol works: Sentry, self-hosted Sentry, GlitchTip or Bugsink. A checklist for whoever runs one.
 
 | Step | Detail |
 |---|---|
-| Sentry project | One project for the cloud, in Sentry's EU region (Q3). Staging reports into it with `OPENOKR_ERROR_ENVIRONMENT=staging` |
-| DSN | In OKRGoal's deployment secret, never in the repository |
-| Releases | When a version is deployed, create the Sentry release for it and link its commits, so a commit that names a Sentry issue (`Fixes OKRGOAL-1A2`) resolves it when that release ships. The release field is already the `apps/web` version (D4) |
-| GitHub | Sentry's GitHub integration on `open-okr/open-okr`, with code mappings, so a frame links to its line in the source and an issue can open a GitHub issue |
+| Project | One project per instance. A staging instance reports into its own project, or into the same one with `OPENOKR_ERROR_ENVIRONMENT=staging` |
+| DSN | In the deployment's secret, never in the repository. `secrets/app.env` in Compose, a Secret in Helm (`errors.existingSecret`) |
+| Releases | When a version is deployed, create the tracker's release for it. The release field the instance sends is already the `apps/web` version (D4), so the two match without a setting |
+| GitHub link | Optional. A tracker's source-control integration, with code mappings, lets a frame link to its line in the source and an issue open a GitHub issue |
 | Alerts | A new issue in production, and a spike, to whoever is on call |
-| AI triage | `claude mcp add --transport http sentry https://mcp.sentry.dev/mcp`, or the Sentry CLI inside the repository |
-| Privacy | Sentry is listed as a sub-processor on OKRGoal's privacy page. Retention at most 90 days. D4 and D5 keep what reaches it to identifiers and code |
+| Privacy and retention | The operator's duty. Name the tracker as a processor where the law asks for it, and set a retention period the tracker enforces. D4 and D5 keep what reaches it to identifiers and code |
 
-The runbook section E4 writes, "Sending errors to a tracker", is generic: any DSN, with GlitchTip and Bugsink named as tested. The check by hand runs before release: one GlitchTip and one Bugsink in Docker, one forced error, the issue seen grouped with readable frames in each. The result is written into the runbook with the versions tested.
+The runbook section E4 writes, "Sending errors to a tracker", is generic: any DSN. The check by hand runs before release: one tracker in Docker, one forced error, the issue seen grouped with readable frames. The result is written into the runbook with the version tested. Sentry and GlitchTip speak the same protocol and were not checked by hand.
 
 ## 5. Acceptance criteria
 
@@ -146,7 +144,7 @@ The runbook section E4 writes, "Sending errors to a tracker", is generic: any DS
 - Given any page, when its HTML and scripts are read, then neither the DSN nor the tracker's host appears in them.
 
 **E4**
-- Given GlitchTip and Bugsink in Docker, when a forced error is reported to each, then each shows one issue, grouped, with readable frames. Recorded in the runbook with the versions.
+- Given Bugsink in Docker, when a forced error is reported, then it shows one issue, grouped, with readable frames. Recorded in the runbook with the version.
 
 ## 6. Tests
 
@@ -191,7 +189,6 @@ Answered 9 November 2026, each as recommended.
 |---|---|---|---|
 | Q1 | Write the small Sentry-protocol client (D12), or add Sentry's SDK as a runtime dependency? | Write the client. No dependency, no second OpenTelemetry setup, and it sends only what every compatible tracker accepts | Write the client. No new dependency |
 | Q2 | Messages: the allow-list in D5, never send any message, or send every message? | The allow-list. "Never" loses the most useful line of a `TypeError`. "Every" sends tenant data and opens the prompt-injection route in D6 | The allow-list in D5 |
-| Q3 | Which Sentry region for OKRGoal, EU or US? | The region OKRGoal's database is in, so error data does not cross a border the customer data does not | EU |
 
 ## 10. As built
 
@@ -223,7 +220,7 @@ Readings the build had to make, and what it measured. Each is within a decision 
 | C2 | **Helm:** `errors.existingSecret` and `errors.dsnKey` (default `dsn`) give the DSN by `secretKeyRef`, and `errors.environment` (default `production`). Read through `default dict`, so a release upgraded with `--reuse-values` renders. `deploy/helm/check.sh` checks all three | D14: never in values, where `helm get values` reads it back |
 | C3 | **One event per envelope**, which is what the protocol allows. A batch is up to twenty POSTs, one after another. A send with no answer within three seconds drops the rest of its batch; a refusal other than `429` drops only that event | A tracker that did not answer one will not answer the next inside the same two seconds |
 | C4 | **`openokr_error_reports_dropped_total{reason}`**, `reason` one of `queue_full`, `rate_limited`, `send_failed`. The driver calls `onDropped`; the host counts, so the metric's name lives in `recorder.ts` with every other | Which loss it was is the operator's first question |
-| C5 | **The event carries** `event_id`, `timestamp` (Unix seconds), `platform` (`node`, or `javascript` for a browser report), `level`, `logger`, `release` (the plain version, `0.7.0`), `environment`, `transaction` (the route pattern, else the action), one exception with its frames oldest first and `in_app`, `fingerprint`, `tags` and, with tracing, `contexts.trace`. Never `user`, `request`, `server_name`, `breadcrumbs`, `extra` or `modules` | D4's allow-list, in the protocol's words. The release matches what OKRGoal names its Sentry release (§4) |
+| C5 | **The event carries** `event_id`, `timestamp` (Unix seconds), `platform` (`node`, or `javascript` for a browser report), `level`, `logger`, `release` (the plain version, `0.7.0`), `environment`, `transaction` (the route pattern, else the action), one exception with its frames oldest first and `in_app`, `fingerprint`, `tags` and, with tracing, `contexts.trace`. Never `user`, `request`, `server_name`, `breadcrumbs`, `extra` or `modules` | D4's allow-list, in the protocol's words. The release matches the version an operator names a release in their tracker (§4) |
 | C6 | **The DSN's shape is checked in `packages/config`** at boot, and parsed again by the driver | `packages/config` sits below `packages/adapters` and cannot call it; the shape is not protocol code |
 
 ### E3
@@ -242,8 +239,7 @@ Readings the build had to make, and what it measured. Each is within a decision 
 
 | # | Reading | Result |
 |---|---|---|
-| G1 | **Bugsink, checked by hand on 9 November 2026**: `bugsink/bugsink` 2.6.3 with SQLite in one container, a project made in its shell, and two identical `TypeError`s sent through `reportError` and `createErrorReporter` from a script, with no build | Both POSTs answered 2xx. One issue holding both events, grouped by our fingerprint; frames with file, function, line and in-app; release `0.7.0`, the environment, the transaction and every tag as sent. Recorded in `docs/runbooks/observability.md` |
-| G2 | **GlitchTip is not checked yet.** It needs Postgres, Valkey, a web and a worker container, more than this row's machine had to spare. The procedure is in the runbook's "Checking one yourself" | Before 0.7.0 ships |
-| G3 | **OKRGoal's Sentry project, releases, alerts and GitHub link** are outside the repository (§4) | Akmal's |
+| G1 | **Bugsink, checked by hand on 9 November 2026**: `bugsink/bugsink` 2.6.3 with SQLite in one container, a project made in its shell, and two identical `TypeError`s sent through `reportError` and `createErrorReporter` from a script, with no build | Both POSTs answered 2xx. One issue holding both events, grouped by our fingerprint; frames with file, function, line and in-app; release `0.7.0`, the environment, the transaction and every tag as sent. Checked again on a live instance on 10 November 2026. Recorded in `docs/runbooks/observability.md` |
+| G2 | **GlitchTip and Sentry speak the protocol and were not checked by hand.** GlitchTip needs Postgres, Valkey, a web and a worker container, more than this row's machine had to spare. The procedure is in the runbook's "Checking one yourself" | Not checked by hand |
 
 **D18, measured as far as a build allows.** `productionBrowserSourceMaps` is on. The build of 9 November 2026, without browser maps, has 3.7 MB of browser JavaScript in `apps/web/.next/static` (3.9 MB in all). The server's maps ran at 3.9 times their JavaScript, so the browser maps are expected to add about 15 MB to the image. Measuring it needs a build, which this row did not run: `du -sh apps/web/.next/static` after the next `pnpm build`, against 3.9 MB, is the number to record here.

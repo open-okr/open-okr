@@ -19,8 +19,10 @@ import {
   type ChatRequest,
   type ExtractRequest,
   MockAIProvider,
+  type ModelCapabilities,
   redactPersonalData,
   type TokenUsage,
+  type ToolCall,
   type ToolDefinition,
 } from "@openokr/adapters";
 import {
@@ -66,6 +68,16 @@ const EVALUATION_MODEL = "evaluation";
 /** What the mock reports, so the drafter's spend stays at nothing. */
 const NO_USAGE: TokenUsage = { inputTokens: 0, outputTokens: 0 };
 
+/** A model that answers but cannot call tools (plan 0.9.0 L5). */
+const NO_TOOLS: ModelCapabilities = {
+  available: true,
+  tools: false,
+  vision: false,
+  jsonMode: true,
+  streaming: true,
+  contextWindow: 128_000,
+};
+
 /** Characters per token, the estimate the egress guard already makes. */
 const CHARACTERS_PER_TOKEN = 4;
 
@@ -80,11 +92,31 @@ interface EvaluationFixture {
   /** The capability's result after the product's own checks. Null to refuse. */
   readonly expected: unknown;
   /**
+   * One entry per `chatWithTools` call, in order: the tool calls the scripted
+   * model makes in that round (plan 0.9.0 L5). Once they run out the model
+   * answers with no calls, which ends a loop. Ignored by a live run, where the
+   * model chooses.
+   */
+  readonly toolRounds?: readonly (readonly ToolCall[])[];
+  /** False for a model that cannot call tools. Ignored by a live run. */
+  readonly tools?: boolean;
+  /**
    * `note` is how a capability says why it answered nothing (plan 0.8.1 A3):
    * a dropped proposal's reason. Printed beside a `result` failure only.
+   * `sent` is every request made so far, each as it was when it was made, for
+   * a fixture that judges the conversation and not only the result.
    */
-  run(drafter: AgentDrafter, note: (text: string) => void): Promise<unknown>;
+  run(
+    drafter: AgentDrafter,
+    note: (text: string) => void,
+    sent?: () => readonly SentRequest[],
+  ): Promise<unknown>;
 }
+
+/** A request as the provider received it. Only a tool round carries `tools`. */
+export type SentRequest = ChatRequest & {
+  readonly tools?: readonly ToolDefinition[];
+};
 
 /** One capability's fixtures, and the limits they are held to. */
 export interface EvaluationSet {
@@ -135,7 +167,7 @@ export interface EvaluateOptions {
 
 type Recorded =
   | { readonly method: "extract"; readonly request: ExtractRequest }
-  | { readonly method: "chat" | "stream"; readonly request: ChatRequest };
+  | { readonly method: "chat" | "stream"; readonly request: SentRequest };
 
 /** The provider, with every request it was sent written down. */
 class Recording implements AIProvider {
@@ -171,7 +203,12 @@ class Recording implements AIProvider {
   async chatWithTools(
     request: ChatRequest & { readonly tools: readonly ToolDefinition[] },
   ) {
-    this.requests.push({ method: "chat", request });
+    // A copy of the conversation, because a loop keeps adding to the one array
+    // it sends, and a record that grew afterwards would misreport round one.
+    this.requests.push({
+      method: "chat",
+      request: { ...request, messages: [...request.messages] },
+    });
     const response = await this.#inner.chatWithTools(request);
     this.#count(response.usage);
     return response;
@@ -299,7 +336,12 @@ function judge(
 
   const [first] = outcome.requests;
   if (first === undefined) {
-    // A fixture that sends nothing tests nothing a prompt can change.
+    // A model that cannot call tools is not sent the request, and that is what
+    // its fixture proves: the product asks nothing it cannot be answered.
+    if (fixture.tools === false) {
+      return failures;
+    }
+    // Any other fixture that sends nothing tests nothing a prompt can change.
     fail("prompt", "no request was sent");
     return failures;
   }
@@ -375,6 +417,10 @@ async function evaluateFixture(
         usage: NO_USAGE,
       },
       streamChunks: pieces ?? [fixture.reply as string],
+      ...(fixture.toolRounds === undefined
+        ? {}
+        : { toolRounds: fixture.toolRounds }),
+      ...(fixture.tools === false ? { capabilities: NO_TOOLS } : {}),
     });
   const recording = new Recording(inner);
   const drafter = createProviderDrafter({
@@ -395,7 +441,14 @@ async function evaluateFixture(
   const notes: string[] = [];
   const started = performance.now();
   try {
-    result = await fixture.run(drafter, (text) => notes.push(text));
+    result = await fixture.run(
+      drafter,
+      (text) => notes.push(text),
+      () =>
+        recording.requests.flatMap((one) =>
+          one.method === "extract" ? [] : [one.request],
+        ),
+    );
   } catch (error) {
     threw = error ?? new Error("an empty throw");
   }

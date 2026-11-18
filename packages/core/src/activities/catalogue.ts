@@ -294,6 +294,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // Plan 0.7.0 A2: the tool call record's retention sweep.
   "connection.tool_calls_swept": z.object({
     deleted: z.number(),
+    /** Answer ratings removed by the same window (plan 0.9.0 FB1). */
+    ratingsDeleted: z.number().optional(),
     retentionDays: z.number(),
   }),
   // Plan 0.7.0 A4: an administrator ended a member's agent connection.
@@ -637,6 +639,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     periodStart: z.string(),
     created: z.boolean(),
   }),
+  // Undo of a value the copilot recorded for a period that had none. Not a
+  // webhook event: absent from the route table, so nothing is sent.
+  "kpi.value_removed": z.object({ periodStart: z.string() }),
   "kpi.formula_set": z.object({ references: z.number().int() }),
   // The recovery loop (P3-T14). Launching one is a commitment by the team, so
   // it belongs in the feed beside the objectives it creates.
@@ -838,6 +843,14 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // A member deleting one of their own conversations (plan 0.8.1 CP2). The
   // id, never the title, which is their question.
   "copilot.threadDeleted": z.object({ threadId: z.string() }),
+  // A thumbs up or down on an answer (plan 0.9.0 FB1). The value and whether
+  // it was shared with AI administrators, never the note.
+  "copilot.rated": z.object({
+    threadId: z.string(),
+    rating: z.enum(["up", "down"]),
+    shared: z.boolean(),
+  }),
+  "copilot.unrated": z.object({ removed: z.boolean() }),
   // Outbound webhooks (outbound-webhooks.md, plan 0.7.0 D5). The name, never
   // the address, which can carry a receiver's own token, and never a secret.
   "webhook.created": z.object({ name: z.string() }),
@@ -885,6 +898,8 @@ export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
   "copilot.proposalDismissed",
   "copilot.proposalUndone",
   "copilot.threadDeleted",
+  "copilot.rated",
+  "copilot.unrated",
   // A request one member's assist or question made, withheld or redacted
   // (M-10). Which member asked is theirs; the audit row is where an
   // administrator reads that the control acted.

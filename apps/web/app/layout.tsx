@@ -116,6 +116,7 @@ export default async function RootLayout({
       className={geistSans.variable}
       data-theme="light"
       data-density="comfortable"
+      data-width="compact"
       suppressHydrationWarning
     >
       <head>

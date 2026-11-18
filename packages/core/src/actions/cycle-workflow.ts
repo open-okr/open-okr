@@ -35,6 +35,11 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
 import { readClosureInTx } from "../cycles/archive.ts";
 import { localDateIn, parseLocalDate } from "../cycles/generation.ts";
+import {
+  INPUT_PACK_REFUSAL,
+  inputPackAccess,
+  mayChangeInputPack,
+} from "../cycles/input-pack-access.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import {
@@ -273,6 +278,17 @@ export const readWorkflow = defineReadAction({
      */
     companyPublishedAt: z.string().nullable(),
     packDistributedAt: z.string().nullable(),
+    /**
+     * Whether this caller may change the input pack, from the function the two
+     * pack writes refuse through, so the screen and the write cannot disagree.
+     * `facilitatorName` is the named facilitator who holds the right, for the
+     * screen's "who may change this" line. The sentence itself is built on the
+     * client from the catalogue, never sent from here.
+     */
+    packAccess: z.object({
+      canChange: z.boolean(),
+      facilitatorName: z.string().nullable(),
+    }),
     firstCycle: z.boolean(),
     sponsor: z.object({ id: z.uuid(), name: z.string() }).nullable(),
     facilitator: z.object({ id: z.uuid(), name: z.string() }).nullable(),
@@ -614,6 +630,11 @@ export const readWorkflow = defineReadAction({
           packDistributedAt: cycle.packDistributedAt
             ? new Date(cycle.packDistributedAt).toISOString()
             : null,
+          packAccess: await inputPackAccess(tx, {
+            workspaceId: context.workspaceId,
+            actor: context.actor,
+            cycleId: input.cycleId,
+          }),
           firstCycle: cycle.firstCycle,
           sponsor: await memberSummary(
             tx,
@@ -722,7 +743,20 @@ export const setPackItem = defineWriteAction({
   }),
   output: z.object({ itemKey: z.number().int(), gathered: z.boolean() }),
   access: ACCESS_LEVELS.edit,
-  operation: (_context, input) => ({
+  operation: (context, input) => ({
+    // Before the change, against the freshly loaded cycle row, so REST, the
+    // command line, the agent surface and chat are refused alike (D4).
+    async load({ tx, workspaceId }) {
+      if (
+        !(await mayChangeInputPack(tx, {
+          workspaceId,
+          actor: context.actor,
+          cycleId: input.cycleId,
+        }))
+      ) {
+        throw new OperationError("forbidden", INPUT_PACK_REFUSAL);
+      }
+    },
     async execute({ tx, workspaceId }) {
       await ensurePackItemsInTx(tx, workspaceId, input.cycleId);
 
@@ -774,7 +808,20 @@ export const distributePack = defineWriteAction({
   input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({ distributedAt: z.string() }),
   access: ACCESS_LEVELS.edit,
-  operation: (_context, input) => ({
+  operation: (context, input) => ({
+    // Before the change, against the freshly loaded cycle row, so REST, the
+    // command line, the agent surface and chat are refused alike (D4).
+    async load({ tx, workspaceId }) {
+      if (
+        !(await mayChangeInputPack(tx, {
+          workspaceId,
+          actor: context.actor,
+          cycleId: input.cycleId,
+        }))
+      ) {
+        throw new OperationError("forbidden", INPUT_PACK_REFUSAL);
+      }
+    },
     async execute({ tx, workspaceId }) {
       const at = new Date();
       const [updated] = await tx

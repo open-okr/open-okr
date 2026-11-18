@@ -1,6 +1,13 @@
 "use client";
 
-import { guardPress, Spinner, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  cn,
+  useTranslations,
+} from "@openokr/ui";
 import { useActionState, useEffect, useState } from "react";
 import { formatPrice } from "../../../lib/format-price.ts";
 import type { BillingActionState } from "./actions";
@@ -22,11 +29,6 @@ interface PlanRow {
 }
 
 type BillingAction = (formData: FormData) => Promise<BillingActionState>;
-
-const BUTTON =
-  "inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 font-medium text-on-brand text-sm hover:bg-brand-strong";
-const QUIET_BUTTON =
-  "inline-flex items-center gap-1.5 rounded-md border border-line bg-surface px-3 py-1.5 font-medium text-ink text-sm hover:bg-line";
 
 /** Runs a billing action, and goes to the address it answers, if it answers one. */
 function useBillingAction(action: BillingAction) {
@@ -71,16 +73,9 @@ function PlanButton({
     <form action={formAction} className="flex flex-col items-end gap-1.5">
       <input name="planKey" type="hidden" value={planKey} />
       <input name="interval" type="hidden" value={interval} />
-      <button
-        aria-busy={pending || undefined}
-        aria-disabled={pending || undefined}
-        className={BUTTON}
-        onClick={guardPress(pending, undefined)}
-        type="submit"
-      >
-        {pending ? <Spinner /> : null}
-        <span>{label}</span>
-      </button>
+      <Button pending={pending} size="sm" type="submit" variant="primary">
+        {label}
+      </Button>
       {state?.when ? (
         <p className="text-ok text-sm" role="status">
           {state.when === "now"
@@ -105,16 +100,14 @@ function ActionButton({
   const { state, formAction, pending } = useBillingAction(action);
   return (
     <form action={formAction} className="flex flex-col items-start gap-1.5">
-      <button
-        aria-busy={pending || undefined}
-        aria-disabled={pending || undefined}
-        className={quiet ? QUIET_BUTTON : BUTTON}
-        onClick={guardPress(pending, undefined)}
+      <Button
+        pending={pending}
+        size="sm"
         type="submit"
+        variant={quiet ? "default" : "primary"}
       >
-        {pending ? <Spinner /> : null}
-        <span>{label}</span>
-      </button>
+        {label}
+      </Button>
       <Refusal state={state} />
     </form>
   );
@@ -165,79 +158,94 @@ export function BillingPanel({
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      {!pricesAvailable ? (
-        <p className="rounded-md bg-warn-bg px-2.5 py-1.5 text-sm text-warn">
-          {t("admin.billing.pricesUnavailable")}
-        </p>
-      ) : null}
-      {offersYearly ? (
-        <fieldset className="flex gap-4 text-ink text-sm">
-          <legend className="sr-only">{t("admin.billing.interval")}</legend>
-          {(["month", "year"] as const).map((value) => (
-            <label className="flex items-center gap-1.5" key={value}>
-              <input
-                checked={interval === value}
-                name="billing-interval"
-                onChange={() => setInterval(value)}
-                type="radio"
-              />
-              {value === "month"
-                ? t("admin.billing.monthly")
-                : t("admin.billing.yearly")}
-            </label>
-          ))}
-        </fieldset>
-      ) : null}
-      <ul className="flex flex-col gap-2">
-        {plans.map((plan) => {
-          const price = priceOf(plan);
-          return (
-            <li
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface px-4 py-3"
-              key={plan.key}
-            >
-              <div className="flex flex-col gap-0.5">
-                <span className="font-medium text-ink text-sm">
-                  {plan.name}
-                </span>
-                <span className="text-ink-2 text-sm">
-                  {plan.seats === null
-                    ? t("admin.plan.unlimitedSeats")
-                    : plan.seats === 1
-                      ? t("admin.plan.seatCountOne", { count: plan.seats })
-                      : t("admin.plan.seatCountOther", { count: plan.seats })}
-                  {price ? ` · ${price}` : ""}
-                </span>
-              </div>
-              {plan.key === currentPlanKey ? (
-                <span className="text-ink-3 text-sm">
-                  {t("admin.billing.currentPlan")}
-                </span>
-              ) : price ? (
-                <PlanButton
-                  action={hasLiveSubscription ? changePlan : startCheckout}
-                  interval={interval}
-                  label={
-                    hasLiveSubscription
-                      ? t("admin.billing.moveToPlan")
-                      : t("admin.billing.upgrade")
-                  }
-                  planKey={plan.key}
-                />
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
+    <Card>
+      <CardHeader className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h2 className="font-semibold text-ink text-sm">
+          {t("admin.plan.plans")}
+        </h2>
+        {offersYearly ? (
+          <fieldset className="m-0 inline-flex min-w-0 rounded-control border border-line-2 bg-raised p-0.5">
+            <legend className="sr-only">{t("admin.billing.interval")}</legend>
+            {(["month", "year"] as const).map((value) => (
+              <button
+                aria-pressed={interval === value}
+                className={cn(
+                  "h-6 rounded-md px-3 font-medium text-ink-3 text-xs",
+                  interval === value &&
+                    "bg-surface font-semibold text-ink shadow-control",
+                )}
+                key={value}
+                onClick={() => setInterval(value)}
+                type="button"
+              >
+                {value === "month"
+                  ? t("admin.billing.monthly")
+                  : t("admin.billing.yearly")}
+              </button>
+            ))}
+          </fieldset>
+        ) : null}
+      </CardHeader>
+      <CardBody className="flex flex-col gap-3">
+        {!pricesAvailable ? (
+          <p className="rounded-md bg-warn-bg px-2.5 py-1.5 text-sm text-warn">
+            {t("admin.billing.pricesUnavailable")}
+          </p>
+        ) : null}
+        <ul className="divide-y divide-line rounded-lg border border-line">
+          {plans.map((plan) => {
+            const price = priceOf(plan);
+            return (
+              <li
+                className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5"
+                key={plan.key}
+              >
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium text-ink text-sm">
+                    {plan.name}
+                  </span>
+                  <span className="text-ink-2 text-sm">
+                    {plan.seats === null
+                      ? t("admin.plan.unlimitedSeats")
+                      : plan.seats === 1
+                        ? t("admin.plan.seatCountOne", { count: plan.seats })
+                        : t("admin.plan.seatCountOther", { count: plan.seats })}
+                    {price ? ` · ${price}` : ""}
+                  </span>
+                </div>
+                {plan.key === currentPlanKey ? (
+                  <span className="text-ink-3 text-sm">
+                    {t("admin.billing.currentPlan")}
+                  </span>
+                ) : price ? (
+                  <PlanButton
+                    action={hasLiveSubscription ? changePlan : startCheckout}
+                    interval={interval}
+                    label={
+                      hasLiveSubscription
+                        ? t("admin.billing.moveToPlan")
+                        : t("admin.billing.upgrade")
+                    }
+                    planKey={plan.key}
+                  />
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+        {/* The one sentence that matters most on this screen. */}
+        <p className="text-ink-3 text-xs">{t("admin.plan.noFeatureGate")}</p>
+      </CardBody>
       {hasAccount ? (
-        <ActionButton
-          action={openPortal}
-          label={t("admin.billing.manage")}
-          quiet
-        />
+        <div className="flex justify-end rounded-b-lg border-t border-line bg-raised px-3.5 py-2.5">
+          <ActionButton
+            action={openPortal}
+            label={t("admin.billing.manage")}
+            quiet
+          />
+        </div>
       ) : null}
-    </div>
+    </Card>
   );
 }
 

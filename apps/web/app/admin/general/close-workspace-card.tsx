@@ -28,6 +28,10 @@ import {
  * Offered only to whoever holds `full` on the workspace, which is what the server
  * asks for. A closure the provider made shows no reopen button, because the server
  * would refuse it.
+ *
+ * It is the page's danger card (docs/design/settings-page-layout.md §B): red
+ * title, light red line, a 12-column body. The slug field and its button share
+ * a row, 9 and 3.
  */
 export function CloseWorkspaceCard(
   props:
@@ -60,14 +64,14 @@ export function CloseWorkspaceCard(
 
   if (props.mode === "closed") {
     return (
-      <Card data-testid="close-workspace-card">
+      <Card data-testid="close-workspace-card" className="border-bad/30">
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">
+          <h2 className="text-sm font-semibold text-bad">
             {t("admin.close.closedTitle")}
           </h2>
         </CardHeader>
-        <CardBody className="flex flex-col gap-3">
-          <p className="text-sm text-ink-2">
+        <CardBody className="grid grid-cols-12 gap-x-6 gap-y-4 text-sm">
+          <p className="col-span-12 text-sm text-ink-2">
             {props.eraseOn
               ? t("admin.close.closedOn", {
                   closed: props.closedOn,
@@ -76,7 +80,10 @@ export function CloseWorkspaceCard(
               : t("admin.close.closedKept", { closed: props.closedOn })}
           </p>
           {props.mayReopen ? (
-            <form action={reopenAction} className="flex flex-col gap-2.5">
+            <form
+              action={reopenAction}
+              className="col-span-12 flex flex-col gap-2.5"
+            >
               <p className="text-xs text-ink-3">
                 {t("admin.close.reopenExplains")}
               </p>
@@ -98,7 +105,7 @@ export function CloseWorkspaceCard(
               </div>
             </form>
           ) : (
-            <p className="text-xs text-ink-3">
+            <p className="col-span-12 text-xs text-ink-3">
               {t("admin.close.onlyProvider")}
             </p>
           )}
@@ -109,17 +116,17 @@ export function CloseWorkspaceCard(
 
   const matches = typed.trim() === props.slug;
   return (
-    <Card data-testid="close-workspace-card">
+    <Card data-testid="close-workspace-card" className="border-bad/30">
       <CardHeader>
-        <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2 className="text-sm font-semibold text-bad">
             {t("admin.close.title")}
           </h2>
           <p className="text-xs text-ink-3">{t("admin.close.explains")}</p>
         </div>
       </CardHeader>
-      <CardBody className="flex flex-col gap-3">
-        <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink-2">
+      <CardBody className="grid grid-cols-12 gap-x-6 gap-y-4 text-sm">
+        <ul className="col-span-12 flex list-disc flex-col gap-1 pl-5 text-sm text-ink-2">
           <li>
             {props.eraseIfClosedToday
               ? t("admin.close.deletedOn", { date: props.eraseIfClosedToday })
@@ -134,11 +141,14 @@ export function CloseWorkspaceCard(
         </ul>
         <Link
           href="/admin/backups"
-          className="text-sm font-semibold text-brand-text hover:underline"
+          className="col-span-12 text-sm font-semibold text-brand-text hover:underline"
         >
           {t("admin.close.exportFirst")}
         </Link>
-        <form action={closeAction} className="flex flex-col gap-2.5">
+        <form
+          action={closeAction}
+          className="col-span-12 grid grid-cols-12 gap-x-6 gap-y-4"
+        >
           <TextInput
             name="slug"
             label={t("admin.close.typeSlug", { slug: props.slug })}
@@ -146,23 +156,25 @@ export function CloseWorkspaceCard(
             spellCheck={false}
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
+            className="col-span-12 md:col-span-9"
             data-testid="close-workspace-slug"
           />
-          {closeState?.failed ? (
-            <p className="text-sm text-bad" role="alert">
-              {t("admin.close.failed")}
-            </p>
-          ) : null}
-          <div>
+          <div className="col-span-12 self-end md:col-span-3">
             <Button
               type="submit"
               size="sm"
+              className="w-full"
               disabled={!matches || closing}
               data-testid="close-workspace-submit"
             >
               {t("admin.close.confirm")}
             </Button>
           </div>
+          {closeState?.failed ? (
+            <p className="col-span-12 text-sm text-bad" role="alert">
+              {t("admin.close.failed")}
+            </p>
+          ) : null}
         </form>
       </CardBody>
     </Card>

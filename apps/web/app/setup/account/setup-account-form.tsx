@@ -20,7 +20,36 @@ import { finishSetup } from "./actions";
  * so a refresh recovers. The reverse order would close registration around an
  * instance with nobody in it, and there would be no way back in.
  */
-export function SetupAccountForm() {
+/**
+ * `SetupCodeSource` says where the code is for this deployment, which only the
+ * server knows: the deployment's own variable (Compose, Helm), or a file the
+ * server made at first boot (docs/design/setup-code.md D3, D11).
+ */
+export interface SetupCodeSource {
+  /** Where a server-made code is kept. Always given, so the help can name it. */
+  readonly path: string;
+  /** True when `OPENOKR_SETUP_CODE` is set, so no file was made. */
+  readonly fromDeployment: boolean;
+}
+
+/** The sign-up refusals that mean the code, as Better Auth reports them. */
+const SETUP_CODE_REFUSALS = new Set([
+  "SETUP_CODE_REQUIRED",
+  "SETUP_CODE_WRONG",
+]);
+
+/**
+ * Optional only so a caller that renders the form without a page above it,
+ * such as a unit test, still compiles. The page always names the source, and
+ * with none the help names no file.
+ */
+const NO_SOURCE: SetupCodeSource = { path: "", fromDeployment: true };
+
+export function SetupAccountForm({
+  codeSource = NO_SOURCE,
+}: {
+  codeSource?: SetupCodeSource;
+}) {
   const { t } = useTranslations();
   const instanceName = useInstanceName();
 
@@ -36,11 +65,20 @@ export function SetupAccountForm() {
 
     const email = String(form.get("email"));
     const password = String(form.get("password"));
-    const { data, error: signUpFailure } = await authClient.signUp.email({
-      email,
-      password,
-      name: String(form.get("name")),
-    });
+    // The code travels with the sign-up, in a header, so the one request that
+    // claims the instance carries its own proof (setup-code.md D7).
+    const { data, error: signUpFailure } = await authClient.signUp.email(
+      {
+        email,
+        password,
+        name: String(form.get("name")),
+      },
+      {
+        headers: {
+          "x-openokr-setup-code": String(form.get("setupCode") ?? ""),
+        },
+      },
+    );
 
     // An instance with mail configured before its first run requires a
     // verified address, and Better Auth then signs nobody in at sign-up. The
@@ -54,8 +92,13 @@ export function SetupAccountForm() {
 
     if (failure) {
       setPending(false);
+      // The server's words are English; the catalogue says it in the
+      // reader's language.
       setError(
-        failure.message ?? t("setup.account.setupAccountForm.thatDidNotWork"),
+        failure.code && SETUP_CODE_REFUSALS.has(failure.code)
+          ? t("setup.account.setupAccountForm.setupCodeNotRight")
+          : (failure.message ??
+              t("setup.account.setupAccountForm.thatDidNotWork")),
       );
       return;
     }
@@ -90,6 +133,26 @@ export function SetupAccountForm() {
         clicking through the wizard replaced the operator's variable for good.
         Left as it is, nothing is stored and the variable keeps deciding.
       */}
+      {/*
+        First, because it is what the rest of the form needs permission to
+        do. Where the code is depends on the deployment, so the help names
+        each place, and the path when the server made it (D11).
+      */}
+      <Field
+        label={t("setup.account.setupAccountForm.setupCode")}
+        name="setupCode"
+        autoComplete="off"
+        autoCapitalize="characters"
+        spellCheck={false}
+        required
+        description={t(
+          codeSource.fromDeployment
+            ? "setup.account.setupAccountForm.setupCodeHelpFromDeployment"
+            : "setup.account.setupAccountForm.setupCodeHelpFromFile",
+          { path: codeSource.path },
+        )}
+      />
+
       <Field
         label={t("setup.account.setupAccountForm.whatShouldThisInstance")}
         name="instanceName"

@@ -3,6 +3,7 @@
 import type { SSOConnectionDetails } from "@openokr/core";
 import {
   Button,
+  CardBody,
   IdentifierInput,
   SelectInput,
   TextArea,
@@ -11,7 +12,7 @@ import {
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Field } from "../../(auth)/auth-card";
 import { updateSSOConnectionAction } from "./actions";
 
@@ -91,6 +92,86 @@ export function SSOForm({
   const idFor = (name: string) =>
     connection ? `sso-${connection.id}-${name}` : `field-${name}`;
 
+  // What is unsaved, named by field (docs/design/settings-page-layout.md §C).
+  // The token inputs post through hidden fields that raise no input event, so
+  // `tick` is bumped by them and by the form's own events, and the snapshot is
+  // read after the render that holds the new value.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [tick, setTick] = useState(0);
+  const [base, setBase] = useState<ReadonlyMap<string, string> | null>(null);
+  const [values, setValues] = useState<ReadonlyMap<string, string> | null>(
+    null,
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the listed values are what changes the posted fields
+  useEffect(() => {
+    const element = formRef.current;
+    if (!element) {
+      return;
+    }
+    const now = readFields(element);
+    setValues(now);
+    setBase((current) => current ?? now);
+  }, [tick, kind, enforce, domains]);
+  const rebase = () => {
+    const element = formRef.current;
+    if (!element) {
+      return;
+    }
+    const now = readFields(element);
+    setBase(now);
+    setValues(now);
+  };
+  const labelOf = (name: string): string => {
+    switch (name) {
+      case "kind":
+        return t("admin.sso.ssoForm.protocol");
+      case "providerId":
+        return t("admin.sso.ssoForm.providerId");
+      case "displayName":
+        return t("admin.sso.ssoForm.displayName");
+      case "discoveryUrl":
+        return t("admin.sso.ssoForm.discoveryUrl");
+      case "authorizationUrl":
+        return t("admin.sso.ssoForm.authorizationUrl");
+      case "tokenUrl":
+        return t("admin.sso.ssoForm.tokenUrl");
+      case "userInfoUrl":
+        return t("admin.sso.ssoForm.userInfoUrl");
+      case "clientId":
+        return t("admin.sso.ssoForm.clientId");
+      case "clientSecret":
+        return t("admin.sso.ssoForm.clientSecret");
+      case "scopes":
+        return t("account.apiTokens.scopes");
+      case "samlEntryPoint":
+        return t("admin.sso.ssoForm.signOnUrl");
+      case "samlIssuer":
+        return t("admin.sso.ssoForm.issuer");
+      case "samlCertificate":
+        return t("admin.sso.ssoForm.signingCertificate");
+      case "samlAudience":
+        return t("admin.sso.ssoForm.audienceOptional");
+      case "emailDomains":
+        return t("admin.sso.ssoForm.emailDomains");
+      case "enforce":
+        return t("admin.sso.ssoForm.enforceSso");
+      default:
+        return name;
+    }
+  };
+  const unsaved: readonly string[] =
+    base === null || values === null
+      ? []
+      : [
+          ...new Set(
+            [...new Set([...base.keys(), ...values.keys()])]
+              .filter(
+                (name) => (base.get(name) ?? "") !== (values.get(name) ?? ""),
+              )
+              .map(labelOf),
+          ),
+        ];
+
   const text = (form: FormData, name: string) =>
     String(form.get(name) ?? "").trim();
 
@@ -160,10 +241,10 @@ export function SSOForm({
       setField(body.field ?? "");
       return;
     }
-    setSuccess(t("admin.sso.ssoForm.providerSaved"));
+    // The reset clears the messages, so the success line comes after it.
     element.reset();
-    setDomains([]);
-    setEnforce(false);
+    setSuccess(t("admin.sso.ssoForm.providerSaved"));
+    setTimeout(rebase, 0);
     router.refresh();
   };
 
@@ -204,10 +285,37 @@ export function SSOForm({
       ? t("admin.sso.saml2")
       : t("admin.sso.ssoForm.oidcOpenIdConnect");
 
+  const saveLabel = pending
+    ? t("admin.sso.ssoForm.saving")
+    : editing
+      ? t("admin.sso.ssoForm.saveChanges")
+      : t("admin.sso.addProvider");
+  const idle = unsaved.length === 0 && !success && !error;
+
   return (
     <form
+      ref={formRef}
       onSubmit={submit}
-      className="flex flex-col gap-3"
+      onInput={() => setTick((n) => n + 1)}
+      onChange={() => setTick((n) => n + 1)}
+      onReset={() => {
+        // Discard puts the browser's defaults back. The controlled values
+        // and the messages are put back here, and the snapshot is read once
+        // the browser has finished.
+        setKind("oidc");
+        setEnforce(connection?.enforce ?? false);
+        setDomains(
+          (connection?.emailDomains ?? "")
+            .split(",")
+            .map((one) => one.trim().toLowerCase())
+            .filter(Boolean),
+        );
+        setError("");
+        setField("");
+        setSuccess("");
+        setTimeout(() => setTick((n) => n + 1), 0);
+      }}
+      className="flex flex-col"
       aria-busy={pending}
       aria-label={
         connection
@@ -217,266 +325,313 @@ export function SSOForm({
           : undefined
       }
     >
-      {connection ? (
-        <p className="text-sm text-ink-2">
-          {t("admin.sso.ssoForm.protocolFixed", { protocol: protocolName })}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-1">
-          <SelectInput
-            label={t("admin.sso.ssoForm.protocol")}
-            id={idFor("kind")}
-            name="kind"
-            value={kind}
-            onChange={(event) =>
-              setKind(event.target.value === "saml" ? "saml" : "oidc")
-            }
-          >
-            <option value="oidc">
-              {t("admin.sso.ssoForm.oidcOpenIdConnect")}
-            </option>
-            <option value="saml">{t("admin.sso.saml2")}</option>
-          </SelectInput>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {/* The server's own rule as it is typed: capitals lowered, and
-            anything else marked (guided-inputs §4.11). */}
-        <IdentifierInput
-          id={idFor("providerId")}
-          label={t("admin.sso.ssoForm.providerId")}
-          name="providerId"
-          rule="slug"
-          placeholder={t("admin.sso.ssoForm.providerIdPlaceholder")}
-          defaultValue={connection?.providerId}
-          readOnly={editing}
-          description={
-            editing ? t("admin.sso.ssoForm.providerIdFixed") : undefined
-          }
-          required={!editing}
-          error={errorFor("providerId")}
-        />
-        <Field
-          id={idFor("displayName")}
-          label={t("admin.sso.ssoForm.displayName")}
-          name="displayName"
-          placeholder={t("admin.sso.ssoForm.displayNamePlaceholder")}
-          defaultValue={connection?.displayName}
-          required
-          error={errorFor("displayName")}
-        />
-      </div>
-
-      {kind === "oidc" ? (
-        <>
-          {/* Each a whole https address, the rule the server applies. */}
-          <UrlInput
-            id={idFor("discoveryUrl")}
-            label={t("admin.sso.ssoForm.discoveryUrl")}
-            name="discoveryUrl"
-            secure
-            placeholder={t("admin.sso.ssoForm.discoveryUrlPlaceholder")}
-            defaultValue={connection?.discoveryUrl ?? undefined}
-            error={errorFor("discoveryUrl")}
-          />
-
-          <p className="text-xs text-ink-3">
-            {t("admin.sso.ssoForm.ifADiscoveryUrlIsSet")}
-          </p>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <UrlInput
-              id={idFor("authorizationUrl")}
-              label={t("admin.sso.ssoForm.authorizationUrl")}
-              name="authorizationUrl"
-              secure
-              placeholder={t("admin.sso.ssoForm.urlPlaceholder")}
-              defaultValue={connection?.authorizationUrl ?? undefined}
-              error={errorFor("authorizationUrl")}
-            />
-            <UrlInput
-              id={idFor("tokenUrl")}
-              label={t("admin.sso.ssoForm.tokenUrl")}
-              name="tokenUrl"
-              secure
-              placeholder={t("admin.sso.ssoForm.urlPlaceholder")}
-              defaultValue={connection?.tokenUrl ?? undefined}
-              error={errorFor("tokenUrl")}
-            />
-            <UrlInput
-              id={idFor("userInfoUrl")}
-              label={t("admin.sso.ssoForm.userInfoUrl")}
-              name="userInfoUrl"
-              secure
-              placeholder={t("admin.sso.ssoForm.urlPlaceholder")}
-              defaultValue={connection?.userInfoUrl ?? undefined}
-              error={errorFor("userInfoUrl")}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field
-              id={idFor("clientId")}
-              label={t("admin.sso.ssoForm.clientId")}
-              name="clientId"
-              defaultValue={connection?.clientId ?? undefined}
-              required
-              error={errorFor("clientId")}
-            />
-            {/* Never filled in. The stored secret is sealed and stays on the
-             * server; blank on an edit keeps it. */}
-            <Field
-              id={idFor("clientSecret")}
-              label={t("admin.sso.ssoForm.clientSecret")}
-              name="clientSecret"
-              type="password"
-              required={!editing}
-              autoComplete="off"
-              placeholder={
-                editing ? t("admin.sso.ssoForm.leaveBlankToKeep") : undefined
+      <CardBody>
+        <div className="grid grid-cols-12 gap-x-6 gap-y-4">
+          {connection ? (
+            <p className="col-span-12 text-sm text-ink-2">
+              {t("admin.sso.ssoForm.protocolFixed", { protocol: protocolName })}
+            </p>
+          ) : (
+            <SelectInput
+              className="col-span-12 lg:col-span-4"
+              label={t("admin.sso.ssoForm.protocol")}
+              id={idFor("kind")}
+              name="kind"
+              value={kind}
+              onChange={(event) =>
+                setKind(event.target.value === "saml" ? "saml" : "oidc")
               }
-              error={errorFor("clientSecret")}
-            />
-          </div>
+            >
+              <option value="oidc">
+                {t("admin.sso.ssoForm.oidcOpenIdConnect")}
+              </option>
+              <option value="saml">{t("admin.sso.saml2")}</option>
+            </SelectInput>
+          )}
 
-          {/* A chip each, posted space-separated as the provider reads
-              them (guided-inputs §4.11). */}
+          {/* The server's own rule as it is typed: capitals lowered, and
+              anything else marked (guided-inputs §4.11). */}
+          <IdentifierInput
+            className={
+              editing
+                ? "col-span-12 md:col-span-6"
+                : "col-span-12 md:col-span-6 lg:col-span-4"
+            }
+            id={idFor("providerId")}
+            label={t("admin.sso.ssoForm.providerId")}
+            name="providerId"
+            rule="slug"
+            placeholder={t("admin.sso.ssoForm.providerIdPlaceholder")}
+            defaultValue={connection?.providerId}
+            readOnly={editing}
+            description={
+              editing ? t("admin.sso.ssoForm.providerIdFixed") : undefined
+            }
+            required={!editing}
+            error={errorFor("providerId")}
+          />
+          <Field
+            className={
+              editing
+                ? "col-span-12 md:col-span-6"
+                : "col-span-12 md:col-span-6 lg:col-span-4"
+            }
+            id={idFor("displayName")}
+            label={t("admin.sso.ssoForm.displayName")}
+            name="displayName"
+            placeholder={t("admin.sso.ssoForm.displayNamePlaceholder")}
+            defaultValue={connection?.displayName}
+            required
+            error={errorFor("displayName")}
+          />
+
+          {kind === "oidc" ? (
+            <>
+              {/* Each a whole https address, the rule the server applies. */}
+              <UrlInput
+                className="col-span-12"
+                id={idFor("discoveryUrl")}
+                label={t("admin.sso.ssoForm.discoveryUrl")}
+                name="discoveryUrl"
+                secure
+                placeholder={t("admin.sso.ssoForm.discoveryUrlPlaceholder")}
+                defaultValue={connection?.discoveryUrl ?? undefined}
+                description={t("admin.sso.ssoForm.ifADiscoveryUrlIsSet")}
+                error={errorFor("discoveryUrl")}
+              />
+              <UrlInput
+                className="col-span-12 lg:col-span-4"
+                id={idFor("authorizationUrl")}
+                label={t("admin.sso.ssoForm.authorizationUrl")}
+                name="authorizationUrl"
+                secure
+                placeholder={t("admin.sso.ssoForm.urlPlaceholder")}
+                defaultValue={connection?.authorizationUrl ?? undefined}
+                error={errorFor("authorizationUrl")}
+              />
+              <UrlInput
+                className="col-span-12 lg:col-span-4"
+                id={idFor("tokenUrl")}
+                label={t("admin.sso.ssoForm.tokenUrl")}
+                name="tokenUrl"
+                secure
+                placeholder={t("admin.sso.ssoForm.urlPlaceholder")}
+                defaultValue={connection?.tokenUrl ?? undefined}
+                error={errorFor("tokenUrl")}
+              />
+              <UrlInput
+                className="col-span-12 lg:col-span-4"
+                id={idFor("userInfoUrl")}
+                label={t("admin.sso.ssoForm.userInfoUrl")}
+                name="userInfoUrl"
+                secure
+                placeholder={t("admin.sso.ssoForm.urlPlaceholder")}
+                defaultValue={connection?.userInfoUrl ?? undefined}
+                error={errorFor("userInfoUrl")}
+              />
+              <Field
+                className="col-span-12 md:col-span-6"
+                id={idFor("clientId")}
+                label={t("admin.sso.ssoForm.clientId")}
+                name="clientId"
+                defaultValue={connection?.clientId ?? undefined}
+                required
+                error={errorFor("clientId")}
+              />
+              {/* Never filled in. The stored secret is sealed and stays on
+               * the server; blank on an edit keeps it. */}
+              <Field
+                className="col-span-12 md:col-span-6"
+                id={idFor("clientSecret")}
+                label={t("admin.sso.ssoForm.clientSecret")}
+                name="clientSecret"
+                type="password"
+                required={!editing}
+                autoComplete="off"
+                placeholder={
+                  editing ? t("admin.sso.ssoForm.leaveBlankToKeep") : undefined
+                }
+                error={errorFor("clientSecret")}
+              />
+              {/* A chip each, posted space-separated as the provider reads
+                  them (guided-inputs §4.11). */}
+              <TokenInput
+                className="col-span-12"
+                id={idFor("scopes")}
+                label={t("account.apiTokens.scopes")}
+                name="scopes"
+                joiner=" "
+                placeholder={t("admin.sso.ssoForm.scopesPlaceholder")}
+                defaultValue={(connection?.scopes ?? "")
+                  .split(" ")
+                  .filter(Boolean)}
+                onValueChange={() => setTick((n) => n + 1)}
+              />
+            </>
+          ) : (
+            <>
+              <UrlInput
+                className="col-span-12"
+                id={idFor("samlEntryPoint")}
+                label={t("admin.sso.ssoForm.signOnUrl")}
+                name="samlEntryPoint"
+                placeholder={t("admin.sso.ssoForm.signOnUrlPlaceholder")}
+                defaultValue={connection?.samlEntryPoint ?? undefined}
+                required
+                error={errorFor("samlEntryPoint")}
+              />
+              <Field
+                className="col-span-12 md:col-span-6"
+                id={idFor("samlIssuer")}
+                label={t("admin.sso.ssoForm.issuer")}
+                name="samlIssuer"
+                placeholder={t("admin.sso.ssoForm.issuerPlaceholder")}
+                defaultValue={connection?.samlIssuer ?? undefined}
+                required
+                error={errorFor("samlIssuer")}
+              />
+              <Field
+                className="col-span-12 md:col-span-6"
+                id={idFor("samlAudience")}
+                label={t("admin.sso.ssoForm.audienceOptional")}
+                name="samlAudience"
+                placeholder={t(
+                  "admin.sso.ssoForm.leaveEmptyToUseThisInstancesUrl",
+                )}
+                defaultValue={connection?.samlAudience ?? undefined}
+              />
+              <TextArea
+                className="col-span-12"
+                label={t("admin.sso.ssoForm.signingCertificate")}
+                id={idFor("samlCertificate")}
+                name="samlCertificate"
+                rows={5}
+                required
+                placeholder={t("admin.sso.ssoForm.certificatePlaceholder")}
+                defaultValue={connection?.samlCertificate ?? undefined}
+                description={t("admin.sso.ssoForm.pasteTheCertificate")}
+                inputClassName="font-mono text-xs"
+                error={errorFor("samlCertificate")}
+              />
+            </>
+          )}
+
+          {/* Each a domain, on the rule the server now applies (§4.11). */}
           <TokenInput
-            id={idFor("scopes")}
-            label={t("account.apiTokens.scopes")}
-            name="scopes"
-            joiner=" "
-            placeholder={t("admin.sso.ssoForm.scopesPlaceholder")}
-            defaultValue={(connection?.scopes ?? "").split(" ").filter(Boolean)}
-          />
-        </>
-      ) : (
-        <>
-          <UrlInput
-            id={idFor("samlEntryPoint")}
-            label={t("admin.sso.ssoForm.signOnUrl")}
-            name="samlEntryPoint"
-            placeholder={t("admin.sso.ssoForm.signOnUrlPlaceholder")}
-            defaultValue={connection?.samlEntryPoint ?? undefined}
-            required
-            error={errorFor("samlEntryPoint")}
+            className="col-span-12"
+            id={idFor("emailDomains")}
+            label={t("admin.sso.ssoForm.emailDomains")}
+            name="emailDomains"
+            rule="domain"
+            placeholder={t("admin.sso.ssoForm.emailDomainsPlaceholder")}
+            defaultValue={(connection?.emailDomains ?? "")
+              .split(",")
+              .map((one) => one.trim())
+              .filter(Boolean)}
+            error={errorFor("emailDomains")}
+            onValueChange={(entries) =>
+              setDomains(entries.map((one) => one.toLowerCase()))
+            }
           />
 
-          <Field
-            id={idFor("samlIssuer")}
-            label={t("admin.sso.ssoForm.issuer")}
-            name="samlIssuer"
-            placeholder={t("admin.sso.ssoForm.issuerPlaceholder")}
-            defaultValue={connection?.samlIssuer ?? undefined}
-            required
-            error={errorFor("samlIssuer")}
-          />
-
-          <div className="flex flex-col gap-1">
-            <TextArea
-              label={t("admin.sso.ssoForm.signingCertificate")}
-              id={idFor("samlCertificate")}
-              name="samlCertificate"
-              rows={5}
-              required
-              placeholder={t("admin.sso.ssoForm.certificatePlaceholder")}
-              defaultValue={connection?.samlCertificate ?? undefined}
-              inputClassName="font-mono text-xs"
-              error={errorFor("samlCertificate")}
-            />
+          <div className="col-span-12 flex flex-col gap-1">
+            <label className="flex items-center gap-2 text-sm text-ink-2">
+              <input
+                type="checkbox"
+                name="enforce"
+                className="rounded"
+                checked={enforce}
+                disabled={enforceBlocked}
+                aria-describedby={idFor("enforceReason")}
+                onChange={(event) => setEnforce(event.currentTarget.checked)}
+              />
+              {t("admin.sso.ssoForm.enforceSsoForTheEmailDomains")}
+            </label>
+            {/* Always on the screen, so that its appearing never moves the
+             * buttons below it: the domain box commits on blur, which is the
+             * mouse-down on "Add provider", and a layout shift there loses
+             * the click. */}
+            <p id={idFor("enforceReason")} className="text-xs text-ink-3">
+              {enforceBlocked
+                ? t("admin.sso.ssoForm.enforceNeedsVerification", {
+                    domains: unverified.join(", "),
+                  })
+                : t("admin.sso.ssoForm.enforceHint")}
+            </p>
+            {errorFor("enforce") ? (
+              <p className="text-sm text-bad" role="alert">
+                {errorFor("enforce")}
+              </p>
+            ) : null}
+            <p className="text-xs text-ink-3">
+              {t("admin.sso.ssoForm.enforcingRefusesAPassword", {
+                column: "enforce",
+                table: "sso_connections",
+              })}
+            </p>
           </div>
+        </div>
+      </CardBody>
 
-          <p className="text-xs text-ink-3">
-            {t("admin.sso.ssoForm.pasteTheCertificate")}
-          </p>
-
-          <Field
-            id={idFor("samlAudience")}
-            label={t("admin.sso.ssoForm.audienceOptional")}
-            name="samlAudience"
-            placeholder={t("admin.sso.ssoForm.leaveEmptyToUseThisInstancesUrl")}
-            defaultValue={connection?.samlAudience ?? undefined}
-          />
-        </>
-      )}
-
-      {/* Each a domain, on the rule the server now applies (§4.11). */}
-      <TokenInput
-        id={idFor("emailDomains")}
-        label={t("admin.sso.ssoForm.emailDomains")}
-        name="emailDomains"
-        rule="domain"
-        placeholder={t("admin.sso.ssoForm.emailDomainsPlaceholder")}
-        defaultValue={(connection?.emailDomains ?? "")
-          .split(",")
-          .map((one) => one.trim())
-          .filter(Boolean)}
-        error={errorFor("emailDomains")}
-        onValueChange={(entries) =>
-          setDomains(entries.map((one) => one.toLowerCase()))
-        }
-      />
-
-      <label className="flex items-center gap-2 text-sm text-ink-2">
-        <input
-          type="checkbox"
-          name="enforce"
-          className="rounded"
-          checked={enforce}
-          disabled={enforceBlocked}
-          aria-describedby={idFor("enforceReason")}
-          onChange={(event) => setEnforce(event.currentTarget.checked)}
-        />
-        {t("admin.sso.ssoForm.enforceSsoForTheEmailDomains")}
-      </label>
-      {/* Always on the screen, so that its appearing never moves the buttons
-       * below it: the domain box commits on blur, which is the mouse-down on
-       * "Add provider", and a layout shift there loses the click. */}
-      <p id={idFor("enforceReason")} className="text-sm text-ink-3">
-        {enforceBlocked
-          ? t("admin.sso.ssoForm.enforceNeedsVerification", {
-              domains: unverified.join(", "),
-            })
-          : t("admin.sso.ssoForm.enforceHint")}
-      </p>
-      {errorFor("enforce") ? (
-        <p className="text-sm text-bad" role="alert">
-          {errorFor("enforce")}
-        </p>
-      ) : null}
-      <p className="text-sm text-ink-3">
-        {t("admin.sso.ssoForm.enforcingRefusesAPassword", {
-          column: "enforce",
-          table: "sso_connections",
-        })}
-      </p>
-
-      {error && !field && (
-        <p className="text-sm text-bad" role="alert">
-          {error}
-        </p>
-      )}
-      {success && (
-        <p className="text-sm text-ink-2" role="status">
-          {success}
-        </p>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" variant="primary" pending={pending}>
-          {pending
-            ? t("admin.sso.ssoForm.saving")
-            : editing
-              ? t("admin.sso.ssoForm.saveChanges")
-              : t("admin.sso.addProvider")}
-        </Button>
-        {editing ? (
-          <Button type="button" variant="ghost" onClick={onCancel}>
-            {t("common.cancel")}
+      {/* The shared save bar's footer, written here because this card needs
+          its own submit label and a Cancel beside Discard. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-3.5 py-2.5">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          {idle ? (
+            <p className="text-sm text-ink-3">{t("common.noChanges")}</p>
+          ) : null}
+          {unsaved.length > 0 ? (
+            <p role="status" className="text-sm font-medium text-ink">
+              {t("common.notSavedYet", { parts: unsaved.join(", ") })}
+            </p>
+          ) : null}
+          {success ? (
+            <p role="status" className="text-xs text-ink-2">
+              {success}
+            </p>
+          ) : null}
+          {error && !field ? (
+            <p className="text-xs text-bad" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {error && field ? (
+            // The field already holds the alert, so this line is a status.
+            <p role="status" className="text-xs text-bad">
+              {t("admin.sso.ssoForm.nothingSaved")}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-none items-center gap-2">
+          {editing ? (
+            <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+              {t("common.cancel")}
+            </Button>
+          ) : null}
+          <Button
+            type="reset"
+            variant="ghost"
+            size="sm"
+            disabled={pending || unsaved.length === 0}
+          >
+            {t("common.discard")}
           </Button>
-        ) : null}
+          <Button type="submit" variant="primary" size="sm" pending={pending}>
+            {saveLabel}
+          </Button>
+        </div>
       </div>
     </form>
   );
+}
+
+/** The posted text fields of a form, by name, for the unsaved comparison. */
+function readFields(form: HTMLFormElement): ReadonlyMap<string, string> {
+  const fields = new Map<string, string>();
+  for (const [name, value] of new FormData(form).entries()) {
+    if (typeof value === "string") {
+      fields.set(name, value);
+    }
+  }
+  return fields;
 }

@@ -11,16 +11,15 @@ import {
   CardBody,
   CardHeader,
   Chip,
-  EntityPicker,
   IdentifierInput,
   NumberInput,
   SecretInput,
   SelectInput,
   TextInput,
-  UrlInput,
 } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { resolveDrafterFor } from "../../../lib/drafter";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { latestEvaluations } from "../../../lib/prompt-evaluation.ts";
@@ -33,11 +32,10 @@ import {
   removeModel,
   removeWorkspaceKey,
   rotateKeys,
-  saveProvider,
-  saveTier,
   saveWorkspaceKey,
   testWorkspaceKeyAction,
 } from "./actions.ts";
+import { AddCard } from "./add-card.tsx";
 import { AgentCallsCard } from "./agent-calls-card";
 import { AIForm } from "./ai-form.tsx";
 import { tierModelValue } from "./choices.ts";
@@ -49,6 +47,10 @@ import {
   PromptsCard,
   UsageCard,
 } from "./governance.tsx";
+import { ProviderSettingsForm } from "./provider-settings-form.tsx";
+import { ProviderTabs } from "./provider-tabs.tsx";
+import { RatingsCard, type RatingsFilter } from "./ratings-card";
+import { TierRouteForm } from "./tier-route-form.tsx";
 
 export const generateMetadata = pageTitle("pageTitle.adminAi");
 
@@ -118,8 +120,34 @@ const STATUS_TONE: Readonly<Record<string, "ok" | "bad" | "warn">> = {
   unverified: "warn",
 };
 
-export default async function AdminAIPage() {
+/**
+ * The ratings list's place in the address: `ratings=down|up` narrows it and
+ * `before=<time>_<id>` is the last row of the page before (plan 0.9.0 FB1).
+ */
+function ratingsQuery(params: Record<string, string | undefined>): {
+  readonly filter: RatingsFilter;
+  readonly cursor?: { readonly at: string; readonly id: string };
+} {
+  const filter =
+    params.ratings === "down" || params.ratings === "up"
+      ? params.ratings
+      : "all";
+  const [at, id] = (params.before ?? "").split("_");
+  const valid =
+    at !== undefined &&
+    id !== undefined &&
+    /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(at) &&
+    /^[0-9a-f-]{36}$/i.test(id);
+  return { filter, ...(valid ? { cursor: { at, id } } : {}) };
+}
+
+export default async function AdminAIPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<Record<string, string | undefined>>;
+}) {
   const { t } = await getTranslations();
+  const ratingsParams = ratingsQuery(await searchParams);
   // A value the schema adds before the catalogue knows it is shown as itself
   // rather than hidden.
   const tierWord = (tier: string): string => {
@@ -218,163 +246,187 @@ export default async function AdminAIPage() {
 
   return (
     <div className="flex flex-col gap-4.5">
-      <Card>
-        <CardHeader className="justify-between">
-          <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">{t("common.ai")}</h1>
-            {hosted.kind === "credits" ? (
-              <p className="text-ink-2 text-sm">{t("admin.credits.ownKey")}</p>
-            ) : null}
-            {/* A cloud workspace whose plan carries no AI credits and that has
-                no key of its own has no AI at all, while this page used to say
-                only "not configured" (plan 0.8.0 O1). Say why, and where. */}
-            {planIsWhy ? (
-              <p
-                className="text-warn text-sm"
-                data-testid="ai-plan-without-credits"
-              >
-                {t("admin.ai.planWithoutCredits")}{" "}
-                <Link className="underline" href="/admin/plan">
-                  {t("admin.ai.choosePlan")}
-                </Link>
-              </p>
-            ) : null}
-            <p className="text-xs text-ink-3">
-              {t("admin.ai.everyRuleScoreGate")}
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h1 className="text-lg font-bold text-ink">{t("common.ai")}</h1>
+          <p className="max-w-prose text-sm text-ink-3">
+            {t("admin.ai.everyRuleScoreGate")}
+          </p>
+          {hosted.kind === "credits" ? (
+            <p className="max-w-prose text-sm text-ink-2">
+              {t("admin.credits.ownKey")}
             </p>
-          </div>
-          {/* Beside the plan's sentence, "not configured" repeated the reason
-              O1 replaced (UAT 0.8.0 F-09). */}
-          {planIsWhy ? null : (
-            <Chip tone={configured.length > 0 ? "ok" : "neutral"}>
-              {configured.length > 0
-                ? t("admin.ai.configuredCount", { count: configured.length })
-                : t("admin.ai.notConfigured")}
-            </Chip>
-          )}
-        </CardHeader>
-      </Card>
+          ) : null}
+          {/* A cloud workspace whose plan carries no AI credits and that has
+              no key of its own has no AI at all, while this page used to say
+              only "not configured" (plan 0.8.0 O1). Say why, and where. */}
+          {planIsWhy ? (
+            <p
+              className="max-w-prose text-sm text-warn"
+              data-testid="ai-plan-without-credits"
+            >
+              {t("admin.ai.planWithoutCredits")}{" "}
+              <Link className="underline" href="/admin/plan">
+                {t("admin.ai.choosePlan")}
+              </Link>
+            </p>
+          ) : null}
+        </div>
+        {/* Beside the plan's sentence, "not configured" repeated the reason
+            O1 replaced (UAT 0.8.0 F-09). */}
+        {planIsWhy ? null : (
+          <Chip tone={configured.length > 0 ? "ok" : "neutral"}>
+            {configured.length > 0
+              ? t("admin.ai.configuredCount", { count: configured.length })
+              : t("admin.ai.notConfigured")}
+          </Chip>
+        )}
+      </header>
 
       <section
         aria-label={t("admin.ai.providers")}
-        className="flex flex-col gap-1.5"
+        className="flex flex-col gap-3"
       >
-        <h2 className="px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
-          {t("admin.ai.providersAndKeys")}
-        </h2>
-        <div className="flex flex-col gap-4">
-          {AI_PROVIDER_KINDS.map((kind) => {
-            const config = providers.find((one) => one.provider === kind);
-            return (
-              <Card key={kind}>
-                <CardHeader className="justify-between">
-                  <span className="flex items-center gap-2 text-sm font-medium text-ink">
-                    {providerWord(kind)}
-                    {config?.enabled ? (
-                      <Chip tone="ok">{t("admin.ai.on")}</Chip>
-                    ) : (
-                      <Chip tone="neutral">{t("admin.ai.off")}</Chip>
-                    )}
-                    {config?.hasWorkspaceCredential &&
-                    config.workspaceKeyStatus ? (
-                      <Chip
-                        tone={STATUS_TONE[config.workspaceKeyStatus] ?? "warn"}
-                      >
-                        {config.workspaceKeyStatus}
-                      </Chip>
-                    ) : null}
-                  </span>
-                  {config?.workspaceKeyHint ? (
-                    <code className="font-mono text-xs text-ink-3">
-                      {config.workspaceKeyHint}
-                    </code>
-                  ) : null}
-                </CardHeader>
-                <CardBody className="flex flex-col gap-3">
-                  <AIForm action={saveProvider} className="flex flex-col gap-2">
-                    <input type="hidden" name="provider" value={kind} />
-                    <label className="flex items-center gap-2 text-sm text-ink">
-                      <input
-                        type="checkbox"
-                        name="enabled"
-                        defaultChecked={config?.enabled ?? false}
-                        className="size-4"
-                      />
-                      {t("admin.ai.useThisProvider")}
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-ink">
-                      <input
-                        type="checkbox"
-                        name="allowUserKeys"
-                        defaultChecked={config?.allowUserKeys ?? false}
-                        className="size-4"
-                      />
-                      {t("admin.ai.letMembersSupplyTheir")}
-                    </label>
-                    {/* Where the other half of this switch lives, since it is
-                      on the member's own account rather than here (M-36). */}
-                    <p className="pl-6 text-xs text-ink-3">
-                      {t("admin.ai.membersStoreTheirs")}
-                    </p>
-                    {/* A whole http or https address, the server's rule: a
-                      local Ollama is plain http (guided-inputs §4.11). */}
-                    <UrlInput
-                      id={`${kind}-baseUrl`}
-                      label={t("admin.ai.baseUrlForA")}
-                      name="baseUrl"
-                      defaultValue={config?.baseUrl ?? ""}
-                      placeholder={t("admin.ai.leaveEmptyForThe")}
-                    />
-                    <Button type="submit" size="sm">
-                      {t("common.save")}
-                    </Button>
-                  </AIForm>
-
-                  <AIForm
-                    action={saveWorkspaceKey}
-                    className="flex flex-col gap-2 border-t border-line pt-3"
-                  >
-                    <input type="hidden" name="provider" value={kind} />
-                    <SecretInput
-                      label={
-                        config?.hasWorkspaceCredential
-                          ? t("admin.ai.replaceTheKeyHelp")
-                          : t("admin.ai.pasteTheProviderKey")
-                      }
-                      name="apiKey"
-                      autoComplete="off"
-                      required
-                      maxLength={4096}
-                    />
-                    <Button type="submit" variant="default" size="sm">
-                      {config?.hasWorkspaceCredential
-                        ? t("admin.ai.replace")
-                        : t("admin.ai.store")}
-                    </Button>
-                  </AIForm>
-
-                  {config?.hasWorkspaceCredential ? (
-                    <AIForm action={testWorkspaceKeyAction}>
-                      <input type="hidden" name="provider" value={kind} />
-                      <Button type="submit" size="sm">
-                        {t("admin.ai.testTheConnection")}
-                      </Button>
-                    </AIForm>
-                  ) : null}
-
-                  {config?.hasWorkspaceCredential ? (
-                    <AIForm action={removeWorkspaceKey}>
-                      <input type="hidden" name="provider" value={kind} />
-                      <Button type="submit" variant="ghost" size="sm">
-                        {t("admin.ai.removeTheKey")}
-                      </Button>
-                    </AIForm>
-                  ) : null}
-                </CardBody>
-              </Card>
-            );
-          })}
+        <div className="flex flex-col gap-1">
+          <h2 className="text-xs font-semibold tracking-wide text-ink-4 uppercase">
+            {t("admin.ai.providersAndKeys")}
+          </h2>
+          <p className="max-w-prose text-xs text-ink-3">
+            {t("admin.ai.providersIntro")}
+          </p>
         </div>
+        <ProviderTabs
+          label={t("admin.ai.providers")}
+          tabs={AI_PROVIDER_KINDS.map((kind) => {
+            const config = providers.find((one) => one.provider === kind);
+            const chips = (
+              <>
+                {config?.enabled ? (
+                  <Chip tone="ok">{t("admin.ai.on")}</Chip>
+                ) : (
+                  <Chip tone="neutral">{t("admin.ai.off")}</Chip>
+                )}
+                {config?.hasWorkspaceCredential && config.workspaceKeyStatus ? (
+                  <Chip tone={STATUS_TONE[config.workspaceKeyStatus] ?? "warn"}>
+                    {config.workspaceKeyStatus}
+                  </Chip>
+                ) : null}
+              </>
+            );
+            return {
+              kind,
+              label: providerWord(kind),
+              chips,
+              panel: (
+                <Card data-testid={`ai-provider-${kind}`}>
+                  <CardHeader className="justify-between">
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
+                        {providerWord(kind)}
+                        {chips}
+                      </span>
+                      <p className="text-xs text-ink-3">
+                        {t("admin.ai.providerCardIntro")}
+                      </p>
+                    </div>
+                    {config?.workspaceKeyHint ? (
+                      <code className="font-mono text-xs text-ink-3">
+                        {config.workspaceKeyHint}
+                      </code>
+                    ) : null}
+                  </CardHeader>
+                  <div className="flex flex-col gap-3 p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-ink-3">
+                        {t("admin.ai.keyHeading")}
+                      </p>
+                      <span className="text-xs text-ink-4">
+                        {t("common.appliesAtOnce")}
+                      </span>
+                    </div>
+                    {/* The server refuses a key for a provider with no
+                        configuration row, and the row is made by saving the
+                        settings below. Say so instead of offering a Store that
+                        can only fail. */}
+                    {config ? null : (
+                      <p
+                        id={`ai-key-needs-provider-${kind}`}
+                        className="text-xs text-ink-3"
+                      >
+                        {t("admin.ai.keyNeedsProvider")}
+                      </p>
+                    )}
+                    <AIForm
+                      action={saveWorkspaceKey}
+                      className="grid grid-cols-12 items-end gap-x-6 gap-y-2"
+                    >
+                      <input type="hidden" name="provider" value={kind} />
+                      <SecretInput
+                        className="col-span-12 md:col-span-9"
+                        label={
+                          config?.hasWorkspaceCredential
+                            ? t("admin.ai.replaceTheKeyHelp")
+                            : t("admin.ai.pasteTheProviderKey")
+                        }
+                        name="apiKey"
+                        // A provider key, never the member's own password: stop
+                        // the browser and password managers offering logins.
+                        autoComplete="new-password"
+                        data-1p-ignore
+                        data-lpignore="true"
+                        data-bwignore
+                        data-form-type="other"
+                        required
+                        maxLength={4096}
+                        disabled={!config}
+                      />
+                      <div className="col-span-12 md:col-span-3">
+                        <Button
+                          type="submit"
+                          variant="default"
+                          size="sm"
+                          className="w-full"
+                          disabled={!config}
+                          aria-describedby={
+                            config ? undefined : `ai-key-needs-provider-${kind}`
+                          }
+                        >
+                          {config?.hasWorkspaceCredential
+                            ? t("admin.ai.replace")
+                            : t("admin.ai.store")}
+                        </Button>
+                      </div>
+                    </AIForm>
+                    {config?.hasWorkspaceCredential ? (
+                      <div className="flex flex-wrap items-start gap-2">
+                        <AIForm action={testWorkspaceKeyAction}>
+                          <input type="hidden" name="provider" value={kind} />
+                          <Button type="submit" size="sm">
+                            {t("admin.ai.testTheConnection")}
+                          </Button>
+                        </AIForm>
+                        <AIForm action={removeWorkspaceKey}>
+                          <input type="hidden" name="provider" value={kind} />
+                          <Button type="submit" variant="ghost" size="sm">
+                            {t("admin.ai.removeTheKey")}
+                          </Button>
+                        </AIForm>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="border-t border-line">
+                    <ProviderSettingsForm
+                      kind={kind}
+                      enabled={config?.enabled ?? false}
+                      allowUserKeys={config?.allowUserKeys ?? false}
+                      baseUrl={config?.baseUrl ?? ""}
+                    />
+                  </div>
+                </Card>
+              ),
+            };
+          })}
+        />
       </section>
 
       <Card>
@@ -397,178 +449,184 @@ export default async function AdminAIPage() {
         </CardBody>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">
-              {t("admin.ai.models")}
-            </h2>
-            <p className="text-xs text-ink-3">
-              {t("admin.ai.theSeededCataloguePlus")}
-            </p>
-          </div>
-        </CardHeader>
-        <CardBody className="flex flex-col gap-2.5">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="text-ink-3">
-                <tr>
-                  <th className="py-1 pr-3 font-semibold">
-                    {t("admin.ai.model")}
-                  </th>
-                  <th className="py-1 pr-3 font-semibold">
-                    {t("admin.ai.provider")}
-                  </th>
-                  <th className="py-1 pr-3 font-semibold">
-                    {t("admin.ai.context")}
-                  </th>
-                  <th className="py-1 pr-3 font-semibold">
-                    {t("admin.ai.inOutPerM")}
-                  </th>
-                  <th className="py-1 pr-3 font-semibold">
-                    {t("admin.ai.tiers")}
-                  </th>
-                  <th className="py-1 font-semibold">{t("admin.ai.source")}</th>
-                </tr>
-              </thead>
-              <tbody className="text-ink-2">
-                {models.map((model) => (
-                  <tr
-                    key={`${model.provider}:${model.modelId}`}
-                    className="border-t border-line"
-                  >
-                    <td className="py-1.5 pr-3 text-ink">
-                      {model.displayName}
-                      <span className="ml-1.5 font-mono text-ink-3">
-                        {model.modelId}
-                      </span>
-                    </td>
-                    <td className="py-1.5 pr-3">
-                      {providerWord(model.provider)}
-                    </td>
-                    <td className="py-1.5 pr-3 tabular-nums">
-                      {model.contextWindow.toLocaleString("en-GB")}
-                    </td>
-                    <td className="py-1.5 pr-3 tabular-nums">
-                      {model.costInPerMillion} / {model.costOutPerMillion}
-                    </td>
-                    <td className="py-1.5 pr-3">
-                      {model.tiers.length === 0
-                        ? "—"
-                        : model.tiers.map((tier) => tierWord(tier)).join(", ")}
-                    </td>
-                    <td className="py-1.5">
-                      {model.source === "custom" && model.id ? (
-                        <AIForm action={removeModel}>
-                          <input type="hidden" name="id" value={model.id} />
-                          <Button type="submit" size="sm">
-                            {t("common.remove")}
-                          </Button>
-                        </AIForm>
-                      ) : (
-                        <Chip tone="neutral">{t("admin.ai.seeded")}</Chip>
-                      )}
-                    </td>
+      <section
+        aria-label={t("admin.ai.models")}
+        className="flex flex-col gap-3"
+      >
+        <GroupHeading title={t("admin.ai.models")} />
+        <AddCard
+          data-testid="ai-models-card"
+          title={t("admin.ai.models")}
+          intro={t("admin.ai.theSeededCataloguePlus")}
+          addLabel={t("admin.ai.addAModel")}
+          submitLabel={t("common.add")}
+          action={addModel}
+          list={
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="text-ink-3">
+                  <tr>
+                    <th className="py-1 pr-3 font-semibold">
+                      {t("admin.ai.model")}
+                    </th>
+                    <th className="py-1 pr-3 font-semibold">
+                      {t("admin.ai.provider")}
+                    </th>
+                    <th className="py-1 pr-3 font-semibold">
+                      {t("admin.ai.context")}
+                    </th>
+                    <th className="py-1 pr-3 font-semibold">
+                      {t("admin.ai.inOutPerM")}
+                    </th>
+                    <th className="py-1 pr-3 font-semibold">
+                      {t("admin.ai.tiers")}
+                    </th>
+                    <th className="py-1 font-semibold">
+                      {t("admin.ai.source")}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <AIForm
-            action={addModel}
-            className="flex flex-col gap-2 border-t border-line pt-3"
-          >
-            <h3 className="text-xs font-bold uppercase tracking-wide text-ink-3">
-              {t("admin.ai.addAModel")}
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              <SelectInput label={t("admin.ai.provider")} name="provider">
-                {AI_PROVIDER_KINDS.map((kind) => (
-                  <option key={kind} value={kind}>
-                    {providerWord(kind)}
-                  </option>
-                ))}
-              </SelectInput>
-              <IdentifierInput
-                id="custom-modelId"
-                label={t("admin.ai.modelId")}
-                name="modelId"
-                required
-              />
-              <TextInput label={t("common.name")} name="displayName" required />
-              <NumberInput
-                label={t("admin.ai.contextWindow")}
-                name="contextWindow"
-                min={1}
-                step={1}
-                defaultValue={8192}
-                inputClassName="w-32"
-              />
-              <NumberInput
-                label={t("admin.ai.costInPerMillion")}
-                name="costInPerMillion"
-                min={0}
-                step={0.01}
-                defaultValue={0}
-                unit={t("admin.ai.usdPerMillionTokens")}
-                inputClassName="w-32"
-              />
-              <NumberInput
-                label={t("admin.ai.costOutPerMillion")}
-                name="costOutPerMillion"
-                min={0}
-                step={0.01}
-                defaultValue={0}
-                unit={t("admin.ai.usdPerMillionTokens")}
-                inputClassName="w-32"
-              />
+                </thead>
+                <tbody className="text-ink-2">
+                  {models.map((model) => (
+                    <tr
+                      key={`${model.provider}:${model.modelId}`}
+                      className="border-t border-line"
+                    >
+                      <td className="py-1.5 pr-3 text-ink">
+                        {model.displayName}
+                        <span className="ml-1.5 font-mono text-ink-3">
+                          {model.modelId}
+                        </span>
+                      </td>
+                      <td className="py-1.5 pr-3">
+                        {providerWord(model.provider)}
+                      </td>
+                      <td className="py-1.5 pr-3 tabular-nums">
+                        {model.contextWindow.toLocaleString("en-GB")}
+                      </td>
+                      <td className="py-1.5 pr-3 tabular-nums">
+                        {model.costInPerMillion} / {model.costOutPerMillion}
+                      </td>
+                      <td className="py-1.5 pr-3">
+                        {model.tiers.length === 0
+                          ? "—"
+                          : model.tiers
+                              .map((tier) => tierWord(tier))
+                              .join(", ")}
+                      </td>
+                      <td className="py-1.5">
+                        {model.source === "custom" && model.id ? (
+                          <AIForm action={removeModel}>
+                            <input type="hidden" name="id" value={model.id} />
+                            <Button type="submit" size="sm">
+                              {t("common.remove")}
+                            </Button>
+                          </AIForm>
+                        ) : (
+                          <Chip tone="neutral">{t("admin.ai.seeded")}</Chip>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-ink-2">
+          }
+        >
+          <div className="grid grid-cols-12 gap-x-6 gap-y-4">
+            <SelectInput
+              label={t("admin.ai.provider")}
+              name="provider"
+              className="col-span-12 md:col-span-4"
+            >
+              {AI_PROVIDER_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {providerWord(kind)}
+                </option>
+              ))}
+            </SelectInput>
+            <IdentifierInput
+              id="custom-modelId"
+              label={t("admin.ai.modelId")}
+              name="modelId"
+              required
+              className="col-span-12 md:col-span-4"
+            />
+            <TextInput
+              label={t("common.name")}
+              name="displayName"
+              required
+              className="col-span-12 md:col-span-4"
+            />
+            <NumberInput
+              label={t("admin.ai.contextWindow")}
+              name="contextWindow"
+              min={1}
+              step={1}
+              defaultValue={8192}
+              className="col-span-12 md:col-span-4"
+            />
+            <NumberInput
+              label={t("admin.ai.costInPerMillion")}
+              name="costInPerMillion"
+              min={0}
+              step={0.01}
+              defaultValue={0}
+              unit={t("admin.ai.usdPerMillionTokens")}
+              className="col-span-12 md:col-span-4"
+            />
+            <NumberInput
+              label={t("admin.ai.costOutPerMillion")}
+              name="costOutPerMillion"
+              min={0}
+              step={0.01}
+              defaultValue={0}
+              unit={t("admin.ai.usdPerMillionTokens")}
+              className="col-span-12 md:col-span-4"
+            />
+            <fieldset className="col-span-12 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-ink-2 md:col-span-6">
+              <legend className="mb-1 text-sm font-medium text-ink-2">
+                {t("admin.ai.capabilities")}
+              </legend>
               {CAPABILITIES.map(([name, labelKey]) => (
                 <label key={name} className="flex items-center gap-1.5">
-                  <input type="checkbox" name={name} className="size-3.5" />
+                  <input type="checkbox" name={name} className="size-4" />
                   {t(labelKey)}
                 </label>
               ))}
-              <span className="text-ink-3">{t("admin.ai.tiers2")}</span>
+            </fieldset>
+            <fieldset className="col-span-12 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-ink-2 md:col-span-6">
+              <legend className="mb-1 text-sm font-medium text-ink-2">
+                {t("admin.ai.tiers")}
+              </legend>
               {MODEL_TIERS.map((tier) => (
                 <label key={tier} className="flex items-center gap-1.5">
                   <input
                     type="checkbox"
                     name="tiers"
                     value={tier}
-                    className="size-3.5"
+                    className="size-4"
                   />
                   {tierWord(tier)}
                 </label>
               ))}
-            </div>
-            <Button type="submit" variant="default" size="sm">
-              {t("common.add")}
-            </Button>
-          </AIForm>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">
-              {t("admin.ai.tierRouting")}
-            </h2>
-            <p className="text-xs text-ink-3">
-              {t("admin.ai.whichModelAnswersEach")}
-            </p>
+            </fieldset>
           </div>
-        </CardHeader>
-        <CardBody className="flex flex-col gap-2.5">
-          {routes.map((route) => (
-            <div
-              key={route.tier}
-              className="flex flex-col gap-1.5 border-t border-line pt-2.5 first:border-0 first:pt-0"
-            >
-              <span className="flex items-center gap-2 text-sm text-ink">
+        </AddCard>
+      </section>
+
+      <section
+        aria-label={t("admin.ai.tierRouting")}
+        className="flex flex-col gap-3"
+      >
+        <GroupHeading
+          title={t("admin.ai.tierRouting")}
+          intro={t("admin.ai.whichModelAnswersEach")}
+        />
+        {routes.map((route) => (
+          <Card key={route.tier} data-testid={`ai-tier-${route.tier}`}>
+            <CardHeader className="justify-between">
+              <span className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-bold text-ink">
                 {tierWord(route.tier)}
                 <Chip tone={route.source === "unresolved" ? "warn" : "neutral"}>
                   {route.source === "policy"
@@ -580,105 +638,154 @@ export default async function AdminAIPage() {
                         : t("admin.ai.nothingAnswersThisYet")}
                 </Chip>
                 {route.modelId ? (
-                  <code className="font-mono text-xs text-ink-3">
+                  <code className="font-mono text-xs font-normal text-ink-3">
                     {route.modelId}
                   </code>
                 ) : null}
               </span>
-              <div className="flex flex-wrap items-end gap-2">
-                <AIForm
-                  action={saveTier}
-                  className="flex flex-wrap items-end gap-2"
-                >
+              {route.source === "policy" ? (
+                <AIForm action={clearTier}>
                   <input type="hidden" name="tier" value={route.tier} />
-                  {/* One model from the catalogue above, which says its
-                   * provider, where a provider select stood beside a name
-                   * typed by hand (guided-inputs §4.10). A route to a model
-                   * no longer listed still shows as what it is. */}
-                  <EntityPicker
-                    label={t("admin.ai.modelId")}
-                    name="model"
-                    required
-                    defaultValue={
-                      route.provider && route.modelId
-                        ? tierModelValue(route.provider, route.modelId)
-                        : null
-                    }
-                    options={modelChoices}
-                    current={
-                      route.provider && route.modelId
-                        ? {
-                            id: tierModelValue(route.provider, route.modelId),
-                            label: route.modelId,
-                            detail: providerWord(route.provider),
-                          }
-                        : null
-                    }
-                    className="w-72"
-                  />
-                  <NumberInput
-                    label={t("admin.ai.temperature")}
-                    name="temperature"
-                    min={0}
-                    max={2}
-                    step={0.1}
-                    defaultValue={route.temperature ?? null}
-                    placeholder={t("admin.ai.driverSOwn")}
-                    inputClassName="w-28"
-                  />
-                  <NumberInput
-                    label={t("admin.ai.maxTokens")}
-                    name="maxTokens"
-                    min={1}
-                    step={1}
-                    defaultValue={route.maxTokens ?? null}
-                    placeholder={t("admin.ai.driverSOwn")}
-                    inputClassName="w-28"
-                  />
                   <Button type="submit" size="sm">
-                    {t("admin.ai.route")}
+                    {t("admin.ai.backToTheDefault")}
                   </Button>
                 </AIForm>
-                {route.source === "policy" ? (
-                  <AIForm action={clearTier}>
-                    <input type="hidden" name="tier" value={route.tier} />
-                    <Button type="submit" variant="ghost" size="sm">
-                      {t("admin.ai.backToTheDefault")}
-                    </Button>
-                  </AIForm>
-                ) : null}
-              </div>
-            </div>
-          ))}
-        </CardBody>
-      </Card>
+              ) : null}
+            </CardHeader>
+            <TierRouteForm
+              tier={route.tier}
+              model={
+                route.provider && route.modelId
+                  ? tierModelValue(route.provider, route.modelId)
+                  : null
+              }
+              current={
+                route.provider && route.modelId
+                  ? {
+                      id: tierModelValue(route.provider, route.modelId),
+                      label: route.modelId,
+                      detail: providerWord(route.provider),
+                    }
+                  : null
+              }
+              options={modelChoices}
+              temperature={route.temperature ?? null}
+              maxTokens={route.maxTokens ?? null}
+            />
+          </Card>
+        ))}
+      </section>
 
       {/* The second half of S-37 (P6-G12b): what it costs, what it is allowed
           to cost, which assists are on, and what the prompts say. Its cards
           live in `governance.tsx` because the console is one screen and one
           file for it was getting long, not because it is a second screen. */}
-      <UsageCard
-        usage={usage}
-        days={USAGE_WINDOW_DAYS}
-        evaluations={evaluations}
-      />
-      {/* Plan 0.7.0 A2: external agents' calls, totals only. */}
-      <AgentCallsCard
-        summary={await callAction(context, "ai.readToolCallSummary", {})}
-      />
-      <BudgetsCard
-        budgets={budgets}
-        people={directory.filter(
-          (member) => member.kind === "human" || member.kind === "guest",
-        )}
-        agents={agents.map((agent) => ({ id: agent.id, name: agent.name }))}
-      />
-      <FeaturesCard features={features} />
-      <PromptsCard prompts={prompts} />
+      <section
+        aria-label={t("admin.ai.spendAndLimits")}
+        className="flex flex-col gap-3"
+      >
+        <GroupHeading title={t("admin.ai.spendAndLimits")} />
+        <UsageCard
+          usage={usage}
+          days={USAGE_WINDOW_DAYS}
+          evaluations={evaluations}
+        />
+        <BudgetsCard
+          budgets={budgets}
+          people={directory.filter(
+            (member) => member.kind === "human" || member.kind === "guest",
+          )}
+          agents={agents.map((agent) => ({ id: agent.id, name: agent.name }))}
+        />
+      </section>
+
+      <section
+        aria-label={t("admin.ai.usageByAgents")}
+        className="flex flex-col gap-3"
+      >
+        <GroupHeading title={t("admin.ai.usageByAgents")} />
+        {/* Plan 0.7.0 A2: external agents' calls, totals only. */}
+        <AgentCallsCard
+          summary={await callAction(context, "ai.readToolCallSummary", {})}
+          timeZone={String(
+            (await callAction(context, "settings.readForMember", {})).settings
+              .timezone ?? "UTC",
+          )}
+        />
+        {/* Plan 0.9.0 FB1: how members rated the copilot's answers. Hidden
+            while the copilot cannot answer, like every AI affordance. */}
+        {
+          await ratingsCard(
+            context,
+            session.user.id,
+            workspace.workspaceId,
+            ratingsParams,
+          )
+        }
+      </section>
+
+      <section
+        aria-label={t("admin.ai.behaviour")}
+        className="flex flex-col gap-3"
+      >
+        <GroupHeading title={t("admin.ai.behaviour")} />
+        <FeaturesCard features={features} />
+        <PromptsCard prompts={prompts} />
+      </section>
+
       <PrivacyCard
         privacy={privacy}
         egress={egressStateOf(routes, providers)}
       />
+    </div>
+  );
+}
+
+/** The ratings list, or nothing while there is no AI to rate. */
+async function ratingsCard(
+  context: Parameters<typeof callAction>[0],
+  userId: string,
+  workspaceId: string,
+  query: ReturnType<typeof ratingsQuery>,
+) {
+  const outcome = await resolveDrafterFor(workspaceId, "balanced", userId, {
+    source: "copilot",
+  });
+  if (!("drafter" in outcome)) {
+    return null;
+  }
+  const page = await callAction(context, "ai.answerRatings", {
+    ...(query.filter === "all" ? {} : { rating: query.filter }),
+    ...(query.cursor ? { cursor: query.cursor } : {}),
+  });
+  return (
+    <RatingsCard
+      rows={page.rows}
+      more={page.more}
+      filter={query.filter}
+      paged={query.cursor !== undefined}
+      timeZone={String(
+        (await callAction(context, "settings.readForMember", {})).settings
+          .timezone ?? "UTC",
+      )}
+    />
+  );
+}
+
+/** A group heading with an optional line under it, as Providers and keys has. */
+function GroupHeading({
+  title,
+  intro,
+}: {
+  readonly title: string;
+  readonly intro?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <h2 className="text-xs font-semibold tracking-wide text-ink-4 uppercase">
+        {title}
+      </h2>
+      {intro ? <p className="max-w-prose text-xs text-ink-3">{intro}</p> : null}
     </div>
   );
 }

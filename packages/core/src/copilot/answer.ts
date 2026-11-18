@@ -21,6 +21,9 @@
  * and records what arrived even when the reader stops it halfway.
  */
 
+import { activeOnly, withWorkspace, workspaceMembers } from "@openokr/db";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import {
   askingMemberId,
@@ -35,11 +38,19 @@ import type {
   GroundingSource,
 } from "../agents/drafter.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
-import { aiOffSentence } from "../ai/off-reason.ts";
 import { EmbeddingService, type RetrievalHit } from "../embeddings/service.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import { citationLabel } from "./citations.ts";
 import { offersToPropose, proposeBeforeAnswering } from "./proposals.ts";
+import { COPILOT_READS } from "./read-tools.ts";
+import { drainReading, readLiveData, withReadingCost } from "./reading.ts";
+import {
+  aiOffReason,
+  type CopilotReason,
+  type ReasonLike,
+  reasonFields,
+  reasonText,
+} from "./reasons.ts";
 
 /**
  * How many passages a grounded answer is given.
@@ -82,6 +93,11 @@ export interface AnswerQuestionResult {
   readonly sources: readonly AnswerSource[];
   /** Why there is no prose, in words for the reader. Null when there is prose. */
   readonly unavailableReason: string | null;
+  /**
+   * The same reason as a code the panel words from its own catalogue (plan
+   * 0.9.0 CP10). Absent when the reason has no code, such as a budget message.
+   */
+  readonly unavailableCode?: CopilotReason;
 }
 
 /** What the model is shown of one hit. Never its identifier. */
@@ -99,25 +115,48 @@ const sourceFor = (hit: RetrievalHit): GroundingSource => ({
  * and the citation it would have produced does not exist.
  */
 export const citationsFrom = (
-  hits: readonly RetrievalHit[],
+  hits: readonly { readonly entityType: string; readonly entityId: string }[],
   indexes: readonly number[],
 ) =>
   [...new Set(indexes)]
     .filter(
       (index) => Number.isInteger(index) && index >= 0 && index < hits.length,
     )
-    .map((index) => hits[index])
-    .filter((hit): hit is RetrievalHit => hit !== undefined)
-    .map((hit) => ({ entityType: hit.entityType, entityId: hit.entityId }));
+    .map((index) => ({ index, hit: hits[index] }))
+    .filter(
+      (
+        entry,
+      ): entry is {
+        readonly index: number;
+        readonly hit: NonNullable<(typeof hits)[number]>;
+      } => entry.hit !== undefined,
+    )
+    // `n` is the number the model saw: indexes are 0-based, the prose's `[n]`
+    // is 1-based (plan 0.9.0 CP5).
+    .map(({ index, hit }) => ({
+      entityType: hit.entityType,
+      entityId: hit.entityId,
+      n: index + 1,
+    }));
 
 export interface Prepared {
   readonly threadId: string;
   readonly questionMessageId: string;
   readonly hits: readonly RetrievalHit[];
+  /**
+   * What a citation index points at, by position. Retrieval's hits until the
+   * read loop replaces them with the records it read, in the order the model
+   * was shown their numbers (plan 0.9.0 L2b).
+   */
+  readonly cite: readonly {
+    readonly entityType: string;
+    readonly entityId: string;
+  }[];
   readonly sources: readonly AnswerSource[];
   /** Null when there is nothing that can answer. */
   readonly ask: GroundedQuestionContext | null;
-  readonly unavailableReason: string | null;
+  /** Why there is nothing to ask, as a code or as plain text. */
+  readonly unavailable: ReasonLike | null;
 }
 
 /**
@@ -175,6 +214,7 @@ export async function groundQuestion(
   const pool: Pool = context.pool;
   const input = { question: asked.question, workspaceId: context.workspaceId };
   const memberId = await askingMemberId(context);
+  const asker = await askerName(context, memberId);
 
   // Retrieval runs whether or not there is a model: with no provider this is
   // the whole answer.
@@ -192,22 +232,23 @@ export async function groundQuestion(
     excerpt: hit.content,
   }));
 
-  const nothing = (reason: string): Prepared => ({
+  const nothing = (reason: ReasonLike): Prepared => ({
     threadId: asked.threadId,
     questionMessageId: asked.questionMessageId,
     hits,
+    cite: hits,
     sources,
     ask: null,
-    unavailableReason: reason,
+    unavailable: reason,
   });
 
   const drafter = context.drafter;
   if (!drafter || !wants(drafter)) {
     const paused = await creditsPausedReason(pool, input.workspaceId);
     if (paused) {
-      return nothing(paused);
+      return nothing(aiOffReason("credits_used"));
     }
-    return nothing(aiOffSentence(context.aiOff ?? "no_provider", "answer"));
+    return nothing(aiOffReason(context.aiOff ?? "no_provider"));
   }
 
   const availability = await checkFeatureAvailability(pool, {
@@ -217,16 +258,14 @@ export async function groundQuestion(
     memberId,
   });
   if (!availability.available) {
-    return nothing(
-      availability.reason ??
-        "The copilot is not available in this workspace right now.",
-    );
+    return nothing(availability.reason ?? { code: "unavailable" });
   }
 
   return {
     threadId: asked.threadId,
     questionMessageId: asked.questionMessageId,
     hits,
+    cite: hits,
     sources,
     ask: {
       question: input.question,
@@ -236,9 +275,43 @@ export async function groundQuestion(
         asked.questionMessageId,
       ),
       sources: hits.map(sourceFor),
+      ...(asker === null ? {} : { asker }),
     },
-    unavailableReason: null,
+    unavailable: null,
   };
+}
+
+/**
+ * The asking member's name, or null. The model needs it to match "my" to a
+ * record that names the person; the same directory names tool results carry.
+ * A decoration: a failure leaves the name out and the answer still runs.
+ */
+async function askerName(
+  context: ActionCallContext,
+  memberId: string,
+): Promise<string | null> {
+  try {
+    return await withWorkspace(
+      drizzle(context.pool),
+      context.workspaceId,
+      async (tx) => {
+        const rows = await tx
+          .select({ name: workspaceMembers.name })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.id, memberId),
+            ),
+          );
+        const name = rows[0]?.name?.trim();
+        return name ? name : null;
+      },
+    );
+  } catch {
+    return null;
+  }
 }
 
 /** Asks, grounds, answers and records, waiting for the whole answer. */
@@ -246,16 +319,20 @@ export async function answerQuestion(
   context: ActionCallContext,
   input: AnswerQuestionInput,
 ): Promise<AnswerQuestionResult> {
-  const prepared = await prepare(context, input, (drafter) =>
+  const groundedFirst = await prepare(context, input, (drafter) =>
     Boolean(drafter.answerGrounded),
   );
-  const nothing = (reason: string): AnswerQuestionResult => ({
+  // The read loop, which leaves the passages as they were when it cannot run.
+  const reading = await drainReading(readLiveData(context, groundedFirst));
+  const prepared = reading?.prepared ?? groundedFirst;
+  const nothing = (reason: ReasonLike): AnswerQuestionResult => ({
     threadId: prepared.threadId,
     questionMessageId: prepared.questionMessageId,
     answerMessageId: null,
     answer: null,
     sources: prepared.sources,
-    unavailableReason: reason,
+    unavailableReason: reasonText(reason),
+    ...(typeof reason === "string" ? {} : { unavailableCode: reason }),
   });
 
   // Called through the drafter, never as a detached function. A host's drafter
@@ -264,10 +341,12 @@ export async function answerQuestion(
   // did not answer", and a working provider reads as an absent one. Cost an
   // afternoon once.
   const drafter = context.drafter;
+  if (reading?.blocked) {
+    return nothing(reading.blocked);
+  }
   if (!prepared.ask || !drafter?.answerGrounded) {
     return nothing(
-      prepared.unavailableReason ??
-        aiOffSentence(context.aiOff ?? "no_provider", "answer"),
+      prepared.unavailable ?? aiOffReason(context.aiOff ?? "no_provider"),
     );
   }
 
@@ -277,24 +356,21 @@ export async function answerQuestion(
   } catch {
     // A model having a bad minute leaves the question recorded and the passages
     // on screen, which is the same place a provider-off workspace stands.
-    return nothing(
-      "The provider did not answer. These are the passages that match your question.",
-    );
+    return nothing({ code: "provider_error" });
   }
   if (!answer || answer.text.trim() === "") {
-    return nothing(
-      "The copilot had nothing to add. These are the passages that match your question.",
-    );
+    return nothing({ code: "nothing_to_add" });
   }
 
+  const spent = withReadingCost(answer, reading);
   const recorded = await callAction(context, "copilot.recordAnswer", {
     threadId: prepared.threadId,
     text: answer.text,
-    citations: citationsFrom(prepared.hits, answer.usedSourceIndexes),
+    citations: citationsFrom(prepared.cite, answer.usedSourceIndexes),
     model: answer.model,
-    tokensIn: answer.tokensIn,
-    tokensOut: answer.tokensOut,
-    cost: answer.costUsd,
+    tokensIn: spent.tokensIn,
+    tokensOut: spent.tokensOut,
+    cost: spent.costUsd,
     stopped: false,
   });
 
@@ -319,6 +395,16 @@ export async function answerQuestion(
 export type CopilotStep =
   | { readonly step: "searching" }
   | { readonly step: "found"; readonly count: number }
+  /**
+   * One read the loop ran (plan 0.9.0 L2b). `tool` is one of the copilot's
+   * dotted read names, and `subject` is the title of the one record a read of
+   * a single record opened, so the panel can say "Reading <title>".
+   */
+  | {
+      readonly step: "reading";
+      readonly tool: string;
+      readonly subject?: string;
+    }
   | { readonly step: "proposing" }
   | { readonly step: "writing" };
 
@@ -340,6 +426,25 @@ export function copilotStepFrom(
         data.count >= 0
         ? { step: "found", count: data.count }
         : null;
+    case "reading": {
+      // Bounded, and only the tools the copilot has: a payload off the wire
+      // never puts its own words on a reader's screen.
+      if (
+        typeof data.tool !== "string" ||
+        !(COPILOT_READS as readonly string[]).includes(data.tool)
+      ) {
+        return null;
+      }
+      const subject =
+        typeof data.subject === "string" && data.subject.trim() !== ""
+          ? data.subject.slice(0, 120)
+          : undefined;
+      return {
+        step: "reading",
+        tool: data.tool,
+        ...(subject === undefined ? {} : { subject }),
+      };
+    }
     default:
       return null;
   }
@@ -370,7 +475,13 @@ export type CopilotEvent =
    */
   | { readonly kind: "proposal"; readonly proposalId: string }
   /** No prose is coming, and this is why, in words for the reader. */
-  | { readonly kind: "unavailable"; readonly reason: string }
+  | {
+      readonly kind: "unavailable";
+      readonly reason: string;
+      /** The same reason as a code, when it has one (plan 0.9.0 CP10). */
+      readonly code?: string;
+      readonly params?: Record<string, string>;
+    }
   | { readonly kind: "text"; readonly text: string }
   /** Last: what was recorded, and whether the reader cut it short. */
   | {
@@ -412,7 +523,7 @@ export async function* streamAnswer(
     questionMessageId: asked.messageId,
   };
   yield { kind: "step", step: "searching" };
-  const prepared = await groundQuestion(
+  const groundedFirst = await groundQuestion(
     context,
     {
       threadId: asked.threadId,
@@ -421,34 +532,68 @@ export async function* streamAnswer(
     },
     (drafter) => Boolean(drafter.streamGrounded),
   );
-  yield { kind: "step", step: "found", count: prepared.sources.length };
-  yield { kind: "sources", sources: prepared.sources };
+  yield { kind: "step", step: "found", count: groundedFirst.sources.length };
+  yield { kind: "sources", sources: groundedFirst.sources };
+
+  // The read loop: one step per read, then the records it read replace the
+  // passages as the sources. It leaves the passages when it cannot run.
+  // `proceed` ends the loop when the reader has gone, before the next round.
+  // What the member may propose is read first: the loop offers it as a tool
+  // (plan 0.9.0 A4), and the card is sent the moment the call finishes.
+  const offers = await offersToPropose(context);
+  const readingRun = readLiveData(context, groundedFirst, {
+    proceed: async () => !signal?.aborted,
+    proposal: { offers },
+  });
+  let readingNext = await readingRun.next();
+  while (!readingNext.done) {
+    const event = readingNext.value;
+    if (event.step === "card") {
+      yield { kind: "proposal", proposalId: event.proposalId };
+    } else {
+      yield { kind: "step", ...event };
+    }
+    readingNext = await readingRun.next();
+  }
+  const reading = readingNext.value;
+  const prepared = reading?.prepared ?? groundedFirst;
+  if (prepared !== groundedFirst) {
+    yield { kind: "sources", sources: prepared.sources };
+  }
 
   // Through the drafter, for the reason `answerQuestion` records above.
   const drafter = context.drafter;
-  if (!prepared.ask || !drafter?.streamGrounded) {
+  if (reading?.blocked || !prepared.ask || !drafter?.streamGrounded) {
+    const why =
+      reading?.blocked ??
+      prepared.unavailable ??
+      aiOffReason(context.aiOff ?? "no_provider");
     yield {
       kind: "unavailable",
-      reason:
-        prepared.unavailableReason ??
-        aiOffSentence(context.aiOff ?? "no_provider", "answer"),
+      reason: reasonText(why),
+      ...reasonFields(why),
     };
     yield { kind: "done", answerMessageId: null, stopped: false };
     return;
   }
 
   // The proposal first, so the answer is told whether a card exists (A2).
-  const offers = await offersToPropose(context);
-  if (offers !== null) {
-    yield { kind: "step", step: "proposing" };
-  }
-  const proposal = await proposeBeforeAnswering(
-    context,
-    { threadId: prepared.threadId, request: input.question },
-    offers,
-  );
-  if (proposal.proposalId !== null) {
-    yield { kind: "proposal", proposalId: proposal.proposalId };
+  // On the tool path the loop already decided and sent the card (A4-D5,
+  // A4-D6). Without the tool (a provider that cannot call tools, or a
+  // conversation anchored to a page, A4-D7) it is the 0.8.1 call.
+  let proposal = reading?.proposal ?? null;
+  if (proposal === null) {
+    if (offers !== null) {
+      yield { kind: "step", step: "proposing" };
+    }
+    proposal = await proposeBeforeAnswering(
+      context,
+      { threadId: prepared.threadId, request: input.question },
+      offers,
+    );
+    if (proposal.proposalId !== null) {
+      yield { kind: "proposal", proposalId: proposal.proposalId };
+    }
   }
   const ask = { ...prepared.ask, proposal: proposal.note };
   yield { kind: "step", step: "writing" };
@@ -471,17 +616,21 @@ export async function* streamAnswer(
     if (text.trim() === "") {
       return;
     }
+    const spent = withReadingCost(
+      { costUsd: cost, tokensIn, tokensOut },
+      reading,
+    );
     const written = await callAction(context, "copilot.recordAnswer", {
       threadId: prepared.threadId,
       text,
       // No `done` chunk means no citation list: the model never said which
       // passages its unfinished sentence rested on, and guessing would be
       // inventing the one thing this feature promises not to invent.
-      citations: cited ? citationsFrom(prepared.hits, cited) : [],
+      citations: cited ? citationsFrom(prepared.cite, cited) : [],
       model,
-      tokensIn,
-      tokensOut,
-      cost,
+      tokensIn: spent.tokensIn,
+      tokensOut: spent.tokensOut,
+      cost: spent.costUsd,
       stopped: cited === null,
     });
     answerMessageId = written.messageId;
@@ -509,10 +658,11 @@ export async function* streamAnswer(
   }
 
   if (text.trim() === "") {
+    const why: CopilotReason = { code: "nothing_to_add" };
     yield {
       kind: "unavailable",
-      reason:
-        "The copilot had nothing to add. These are the passages that match your question.",
+      reason: reasonText(why),
+      ...reasonFields(why),
     };
   }
   yield { kind: "done", answerMessageId, stopped: cited === null };

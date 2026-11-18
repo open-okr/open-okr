@@ -163,7 +163,7 @@ test("the profile page loads for the signed-in member", async () => {
     INSTANCE_ACCOUNT.name,
   );
   await expect(
-    page.getByRole("heading", { name: "Edit your profile" }),
+    page.getByRole("heading", { name: "Profile details" }),
   ).toBeVisible();
 });
 
@@ -195,7 +195,7 @@ const PICTURE = Buffer.from(
  */
 test("a member sets their own picture and it shows in the header", async () => {
   await expect(
-    page.getByRole("heading", { name: "Your picture" }),
+    page.getByRole("heading", { name: "Name and picture" }),
   ).toBeVisible();
   await page
     .getByLabel("Picture (PNG, JPEG, GIF or WebP)")
@@ -225,8 +225,11 @@ test("a member writes their own bio and reads it back", async () => {
   await editor.click();
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.type("Runs the growth team from Kuala Lumpur.");
-  const form = page.locator("form").filter({ has: editor });
-  await form.getByRole("button", { name: "Save" }).click();
+  // The save bar is the card's footer, outside the form.
+  await page
+    .getByTestId("profile-card")
+    .getByRole("button", { name: "Save changes" })
+    .click();
   await expect(page.getByText("Profile updated.")).toBeVisible({
     timeout: 15_000,
   });
@@ -246,8 +249,10 @@ test("and both can be taken away again", async () => {
   await editor.click();
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.press("Backspace");
-  const form = page.locator("form").filter({ has: editor });
-  await form.getByRole("button", { name: "Save" }).click();
+  await page
+    .getByTestId("profile-card")
+    .getByRole("button", { name: "Save changes" })
+    .click();
   await expect(page.getByText("Profile updated.")).toBeVisible({
     timeout: 15_000,
   });
@@ -501,6 +506,32 @@ test("a theme follows the member to another browser", async ({ browser }) => {
     "aria-pressed",
     "true",
   );
+});
+
+/**
+ * Content width (docs/design/content-width.md A2, A3): Full width is kept on
+ * the member and survives a reload.
+ */
+test("the content width is kept after a reload", async () => {
+  await goTo(page, "/account");
+  await page.getByTestId("width-full").first().click();
+  await expect(page.getByTestId("width-full").first()).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator("html")).toHaveAttribute("data-width", "full");
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-width", "full");
+  await expect(page.getByTestId("width-full").first()).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  // Back to the default, so every spec after this one meets the layout it
+  // expects.
+  await page.getByTestId("width-compact").first().click();
+  await expect(page.locator("html")).toHaveAttribute("data-width", "compact");
 });
 
 /**

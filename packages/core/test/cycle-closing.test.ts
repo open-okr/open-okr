@@ -56,13 +56,21 @@ const rowsFor = async (cycleId: string) => {
   return { activity: activity.rows, audit: audit.rows };
 };
 
-/** A quarterly cycle with these dates, made directly as an old instance would hold it. */
+/**
+ * A quarterly cycle with these dates, made directly as an old instance would hold it.
+ * The derived start is day 2 of the month two before the end. Provisioning makes the
+ * quarter that holds today, which starts on a quarter's first day, and a cycle may not
+ * share that start (cycles_period_idx), so day 2 cannot collide whatever today's date is.
+ */
 const cycleEnding = async (
   endsOn: string,
   status: "planning" | "active" | "closed" = "active",
+  startsOnOverride?: string,
 ) => {
   const wb = await workerDb();
-  const startsOn = `${endsOn.slice(0, 4)}-${String(Number(endsOn.slice(5, 7)) - 2).padStart(2, "0")}-01`;
+  const startsOn =
+    startsOnOverride ??
+    `${endsOn.slice(0, 4)}-${String(Number(endsOn.slice(5, 7)) - 2).padStart(2, "0")}-02`;
   const { rows } = await wb.admin.query(
     `insert into cycles (id, workspace_id, name, mode, cadence, starts_on, ends_on, status, phase, published_at, short_id)
      values (gen_random_uuid(), $1, $2, 'quarterly', 'quarterly', $3, $4, $5, 6,
@@ -159,7 +167,16 @@ describe("the date moves a cycle to closing", () => {
 describe("the facilitator starts closing early", () => {
   const endingSoon = () => {
     const end = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-    return cycleEnding(end.toISOString().slice(0, 10));
+    // The provisioned workspace already holds the current quarter, which starts
+    // on a quarter's first day. Starting on day 2 of an earlier month cannot
+    // collide with it whatever today's date is.
+    const start = new Date(end);
+    start.setUTCMonth(start.getUTCMonth() - 2, 2);
+    return cycleEnding(
+      end.toISOString().slice(0, 10),
+      "active",
+      start.toISOString().slice(0, 10),
+    );
   };
 
   it("moves an active cycle to closing, and back to active at phase 6", async () => {

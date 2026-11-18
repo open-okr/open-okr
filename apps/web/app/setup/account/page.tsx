@@ -1,4 +1,5 @@
-import { readSetupState } from "@openokr/core";
+import { loadEnv } from "@openokr/config";
+import { readSetupState, setupCodePath } from "@openokr/core";
 import { buttonVariants, cn } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../../lib/auth";
@@ -60,7 +61,12 @@ export default async function SetupAccountPage() {
         {t("setup.account.thisAccountOwnsThe")}
       </p>
 
-      <SetupAccountForm />
+      <SetupAccountForm
+        codeSource={{
+          path: setupCodePath(),
+          fromDeployment: Boolean(loadEnv().OPENOKR_SETUP_CODE),
+        }}
+      />
 
       <Link href="/setup" className={cn(buttonVariants(), "self-start")}>
         {t("setup.account.back")}

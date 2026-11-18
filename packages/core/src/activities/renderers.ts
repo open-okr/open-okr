@@ -544,6 +544,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     p.created
       ? `A value was recorded for the period beginning ${String(p.periodStart ?? "")}`
       : `The value for the period beginning ${String(p.periodStart ?? "")} was updated`,
+  "kpi.value_removed": (p) =>
+    `The value for the period beginning ${String(p.periodStart ?? "")} was removed`,
   "kpi.formula_set": (p) =>
     `A KPI became calculated from ${Number(p.references ?? 0)} other measure(s)`,
   "kpi.tree_created": (p) => `A KPI tree "${String(p.name ?? "")}" was named`,
@@ -663,6 +665,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "copilot.proposalDismissed": () => "Dismissed a copilot proposal",
   "copilot.proposalUndone": () => "Undid a copilot proposal",
   "copilot.threadDeleted": () => "Deleted a copilot conversation",
+  "copilot.rated": () => "Rated a copilot answer",
+  "copilot.unrated": () => "Removed a rating of a copilot answer",
   "webhook.created": (p) => `Added the webhook "${asString(p.name)}"`,
   "webhook.updated": (p) => `Changed the webhook "${asString(p.name)}"`,
   "webhook.secret_rotated": (p) =>

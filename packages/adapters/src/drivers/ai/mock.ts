@@ -24,6 +24,11 @@ import type {
 export interface MockAIProviderOptions {
   readonly chatResponse?: ChatResponse;
   readonly toolCalls?: readonly ToolCall[];
+  /**
+   * One entry per `chatWithTools` call, in order; once they run out the reply
+   * carries no tool calls, which is how a loop ends. Wins over `toolCalls`.
+   */
+  readonly toolRounds?: readonly (readonly ToolCall[])[];
   readonly streamChunks?: readonly string[];
   readonly embedDimensions?: number;
   readonly capabilities?: ModelCapabilities;
@@ -59,6 +64,8 @@ const DEFAULT_CAPABILITIES: ModelCapabilities = {
 export class MockAIProvider implements AIProvider {
   readonly #chatResponse: ChatResponse;
   readonly #toolCalls: readonly ToolCall[] | undefined;
+  readonly #toolRounds: readonly (readonly ToolCall[])[] | undefined;
+  #toolRoundIndex = 0;
   readonly #streamChunks: readonly string[];
   readonly #embedDimensions: number;
   readonly #capabilities: ModelCapabilities;
@@ -67,6 +74,7 @@ export class MockAIProvider implements AIProvider {
   constructor(options: MockAIProviderOptions = {}) {
     this.#chatResponse = options.chatResponse ?? DEFAULT_CHAT_RESPONSE;
     this.#toolCalls = options.toolCalls;
+    this.#toolRounds = options.toolRounds;
     this.#streamChunks = options.streamChunks ?? [
       "This ",
       "is ",
@@ -98,6 +106,13 @@ export class MockAIProvider implements AIProvider {
     request: ChatRequest & { readonly tools: readonly ToolDefinition[] },
   ): Promise<ChatResponse> {
     this.calls.push({ method: "chatWithTools", request });
+    if (this.#toolRounds) {
+      const round = this.#toolRounds[this.#toolRoundIndex];
+      this.#toolRoundIndex += 1;
+      return round
+        ? { ...this.#chatResponse, toolCalls: round }
+        : this.#chatResponse;
+    }
     return this.#toolCalls
       ? { ...this.#chatResponse, toolCalls: this.#toolCalls }
       : this.#chatResponse;

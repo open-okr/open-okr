@@ -3181,6 +3181,63 @@ describe("0035: queues the check-ins, key results, blockers and objectives neith
     expect(await queuedJobs(client)).toHaveLength(10);
   });
 
+  /** A job the product's own write queued: not this script's key. */
+  async function insertProductJob(
+    db: DataChangeClient,
+    topic: string,
+    entityType: string,
+    entityId: string,
+    workspaceId: string,
+    delivered: boolean,
+  ) {
+    await db.query(
+      `insert into outbox (topic, payload, idempotency_key, delivered_at)
+       values ($1, jsonb_build_object('workspaceId', $4::text,
+                                      'entityType', $2::text,
+                                      'entityId', $3::text),
+               $1 || ':' || $2 || ':' || $3 || ':1:' || gen_random_uuid(),
+               case when $5 then now() else null end)`,
+      [topic, entityType, entityId, workspaceId, delivered],
+    );
+  }
+
+  it("queues nothing for a row the product already queued, pending or delivered", async () => {
+    await runMigrations(client, { dirs: [MIGRATIONS] });
+    const acme = await seedWorkspace(client, "acme");
+    // The key result has a pending product index job, as a seed's own writes
+    // leave one. The published check-in's was delivered. Both count as
+    // queued already, whatever became of the job.
+    await insertProductJob(
+      client,
+      "content.index",
+      "key_result",
+      acme.key_result_id,
+      acme.workspaceId,
+      false,
+    );
+    await insertProductJob(
+      client,
+      "content.index",
+      "check_in",
+      acme.published_id,
+      acme.workspaceId,
+      true,
+    );
+
+    await runDataChanges(client, { scripts: [indexContentNeverQueued] });
+
+    const fromScript = await client.query<{ topic: string; id: string }>(
+      `select topic, payload->>'entityId' as id from outbox
+        where idempotency_key like '%:0035'`,
+    );
+    const queued = fromScript.rows.map((row) => `${row.topic} ${row.id}`);
+    expect(queued).not.toContain(`content.index ${acme.key_result_id}`);
+    expect(queued).not.toContain(`content.index ${acme.published_id}`);
+    // The pending job's own embed counterpart is a different topic and is
+    // still queued, so only the matching topic is skipped.
+    expect(queued).toContain(`content.embed ${acme.key_result_id}`);
+  });
+
   it("sees every workspace when it runs as the table owner, under the tenant floor", async () => {
     const wb = await workerDb();
     const ownerDb = `${scratchDb}_owner`;

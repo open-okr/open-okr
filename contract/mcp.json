@@ -191,6 +191,20 @@
               }
             ]
           },
+          "width": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "compact",
+                  "full"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "language": {
             "anyOf": [
               {
@@ -1433,6 +1447,12 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "One line on why, where the workspace asks for one."
           }
         },
         "required": [

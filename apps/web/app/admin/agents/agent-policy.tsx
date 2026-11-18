@@ -2,11 +2,15 @@
 
 import {
   Button,
+  Card,
+  CardBody,
+  CardHeader,
   EntityPicker,
   SelectInput,
+  SettingsSaveBar,
   useTranslations,
 } from "@openokr/ui";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { searchGoals } from "../../../lib/entity-search.ts";
 import { bindAgentScopeAction, setAgentAutonomyAction } from "./actions";
 
@@ -32,6 +36,17 @@ import { bindAgentScopeAction, setAgentAutonomyAction } from "./actions";
  * that merely omits an option is not an authorisation. P6-G13b wrote them and
  * had to withdraw them, because the access floor left an agent bound to a
  * space unable to write; P6-G13c fixed the floor and they are back.
+ *
+ * **The policy is chosen, then saved.** The three policies are radio tiles
+ * with a footer: "Save changes" sends the choice through the same action the
+ * buttons called, "Discard" puts the saved one back, and the bar says "Not
+ * saved yet" while they differ. Widening to "Scoped direct" still asks first,
+ * at the moment Save changes is pressed. Nothing here raises an agent's
+ * autonomy on its own; only when the choice is sent has changed.
+ *
+ * **Binding a scope applies at once.** "Bind a scope" opens a panel in the
+ * Scope card whose Bind button calls the action; there is no Discard, and
+ * Cancel only closes the panel.
  *
  * **The policy list and the access levels arrive as props.** Importing
  * `AGENT_AUTONOMIES` from `@openokr/db` and `ACCESS_LEVELS` from
@@ -71,20 +86,138 @@ const BINDABLE = [
   { type: "kpi_tree", labelKey: "admin.agents.agentPolicy.kpiTree" },
 ] as const;
 
-export function AgentPolicy({
+export function WritePolicyCard({
   agentId,
   autonomy,
   name,
   autonomies,
-  levels,
-  spaces,
-  trees,
 }: {
   readonly agentId: string;
   readonly autonomy: string;
   readonly name: string;
   /** Every policy the column can hold, from the table. */
   readonly autonomies: readonly string[];
+}) {
+  const { t } = useTranslations();
+  const POLICY = policies(t);
+  const formId = `agent-policy-form-${agentId}`;
+  const [chosen, setChosen] = useState(autonomy);
+  const [baseline, setBaseline] = useState(autonomy);
+  const [pending, start] = useTransition();
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+
+  // What the server stores is the new baseline, after a save here or a change
+  // made elsewhere.
+  useEffect(() => {
+    setChosen(autonomy);
+    setBaseline(autonomy);
+  }, [autonomy]);
+
+  const label = t("admin.agents.agentPolicy.writePolicy");
+
+  return (
+    <Card data-testid={`agent-policy-${agentId}`}>
+      <CardHeader>
+        <div className="flex min-w-0 flex-col">
+          <h3 className="text-sm font-bold text-ink">{label}</h3>
+          <p className="text-xs text-ink-3">
+            {t("admin.agents.agentPolicy.writePolicyAbout", { name })}
+          </p>
+        </div>
+      </CardHeader>
+      <form
+        id={formId}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (chosen === baseline) {
+            return;
+          }
+          if (
+            chosen === "scoped_direct" &&
+            !window.confirm(
+              t("admin.agents.agentPolicy.confirmScopedDirect", { name }),
+            )
+          ) {
+            return;
+          }
+          setProblem(null);
+          setSaved(null);
+          const sent = chosen;
+          start(async () => {
+            const result = await setAgentAutonomyAction(
+              agentId,
+              sent as "sandbox" | "propose" | "scoped_direct",
+            );
+            setProblem(result.error);
+            if (result.error === null) {
+              setBaseline(sent);
+              setSaved(t("admin.agents.agentPolicy.saved"));
+            }
+          });
+        }}
+        onReset={(event) => {
+          event.preventDefault();
+          setChosen(baseline);
+          setProblem(null);
+          setSaved(null);
+        }}
+        aria-busy={pending}
+        className="p-3.5"
+      >
+        <fieldset
+          disabled={pending}
+          className="grid grid-cols-12 gap-x-6 gap-y-3"
+        >
+          <legend className="sr-only">{label}</legend>
+          {autonomies.map((option) => (
+            <label
+              key={option}
+              className="col-span-12 flex items-start gap-2.5 rounded-lg border border-line p-3 text-sm has-[:checked]:border-brand-line has-[:checked]:bg-brand-weak lg:col-span-4"
+            >
+              <input
+                type="radio"
+                name="autonomy"
+                value={option}
+                checked={chosen === option}
+                data-testid={`autonomy-${option}`}
+                onChange={() => {
+                  setChosen(option);
+                  setSaved(null);
+                }}
+                className="mt-0.5 size-4"
+              />
+              <span className="flex flex-col gap-0.5">
+                <span className="font-medium text-ink">
+                  {POLICY[option]?.label ?? option}
+                </span>
+                <span className="text-xs text-ink-3">
+                  {POLICY[option]?.means ?? option}
+                </span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      </form>
+      <SettingsSaveBar
+        mode="footer"
+        formId={formId}
+        unsaved={chosen === baseline ? [] : [label]}
+        saved={saved}
+        error={problem}
+        pending={pending}
+      />
+    </Card>
+  );
+}
+
+export function ScopeCard({
+  agentId,
+  levels,
+  spaces,
+  trees,
+}: {
+  readonly agentId: string;
   /** The four access levels, from the canon's own map. */
   readonly levels: readonly {
     readonly value: number;
@@ -95,7 +228,6 @@ export function AgentPolicy({
   readonly trees: readonly { readonly id: string; readonly name: string }[];
 }) {
   const { t } = useTranslations();
-  const POLICY = policies(t);
   // What the binding names decides what the picker offers (guided-inputs
   // §4.10), where an id was pasted from the thing's own page. Goals can be
   // tens of thousands, so they are searched rather than listed.
@@ -103,70 +235,39 @@ export function AgentPolicy({
   const choices = kind === "space" ? spaces : kind === "kpi_tree" ? trees : [];
 
   const [pending, start] = useTransition();
-  // The autonomy option that started the write in flight, so only it spins.
-  const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const formId = `agent-bind-form-${agentId}`;
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
-      <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-semibold uppercase tracking-wide text-ink-3">
-          {t("admin.agents.agentPolicy.writePolicy")}
-        </span>
-        <div className="flex flex-wrap gap-2">
-          {autonomies.map((option) => {
-            const current = option === autonomy;
-            const meaning = POLICY[option];
-            return (
-              <Button
-                key={option}
-                type="button"
-                size="sm"
-                variant={current ? "primary" : "default"}
-                disabled={pending || current}
-                pending={pending && acting === option}
-                data-testid={`autonomy-${option}`}
-                onClick={() => {
-                  if (
-                    option === "scoped_direct" &&
-                    !window.confirm(
-                      t("admin.agents.agentPolicy.confirmScopedDirect", {
-                        name,
-                      }),
-                    )
-                  ) {
-                    return;
-                  }
-                  setProblem(null);
-                  setActing(option);
-                  start(async () => {
-                    const result = await setAgentAutonomyAction(
-                      agentId,
-                      option as "sandbox" | "propose" | "scoped_direct",
-                    );
-                    setProblem(result.error);
-                  });
-                }}
-              >
-                {meaning?.label ?? option}
-              </Button>
-            );
-          })}
+    <Card data-testid={`agent-scope-${agentId}`}>
+      <CardHeader className="justify-between">
+        <div className="flex min-w-0 flex-col">
+          <h3 className="text-sm font-bold text-ink">
+            {t("admin.agents.agentPolicy.scope")}
+          </h3>
+          <p className="text-xs text-ink-3">
+            {t("admin.agents.agentPolicy.anAgentIsBound")}
+          </p>
         </div>
-        <span className="text-xs text-ink-3">
-          {POLICY[autonomy]?.means ?? autonomy}
-        </span>
-      </div>
-
+        {open ? null : (
+          <Button
+            type="button"
+            size="sm"
+            variant="default"
+            onClick={() => setOpen(true)}
+          >
+            {t("admin.agents.agentPolicy.bindAScope")}
+          </Button>
+        )}
+      </CardHeader>
       {open ? (
         <form
-          className="flex flex-wrap items-end gap-2"
+          id={formId}
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
             setProblem(null);
-            setActing("bind");
             start(async () => {
               const result = await bindAgentScopeAction({
                 agentId,
@@ -181,84 +282,94 @@ export function AgentPolicy({
             });
           }}
         >
-          <SelectInput
-            label={t("admin.agents.agentPolicy.what")}
-            name="resourceType"
-            value={kind}
-            onChange={(event) =>
-              setKind(event.target.value as (typeof BINDABLE)[number]["type"])
-            }
-          >
-            {BINDABLE.map((one) => (
-              <option key={one.type} value={one.type}>
-                {t(one.labelKey)}
-              </option>
-            ))}
-          </SelectInput>
-          <EntityPicker
-            key={kind}
-            label={t("admin.agents.agentPolicy.which")}
-            name="resourceId"
-            required
-            options={choices.map((one) => ({ id: one.id, label: one.name }))}
-            {...(kind === "goal" ? { search: searchGoals } : {})}
-            className="w-80"
-          />
-          <SelectInput
-            label={t("common.level")}
-            name="level"
-            defaultValue={String(levels[2]?.value ?? 70)}
-          >
-            {levels.map((one) => (
-              <option key={one.value} value={one.value}>
-                {one.label}
-              </option>
-            ))}
-          </SelectInput>
-          <Button
-            type="submit"
-            size="sm"
-            disabled={pending}
-            pending={pending && acting === "bind"}
-          >
-            {pending
-              ? t("admin.agents.agentPolicy.binding")
-              : t("admin.agents.agentPolicy.bind")}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => setOpen(false)}
-          >
-            {t("common.cancel")}
-          </Button>
+          <div className="grid grid-cols-12 gap-x-6 gap-y-4 p-3.5">
+            <SelectInput
+              className="col-span-12 lg:col-span-4"
+              label={t("admin.agents.agentPolicy.what")}
+              name="resourceType"
+              value={kind}
+              onChange={(event) =>
+                setKind(event.target.value as (typeof BINDABLE)[number]["type"])
+              }
+            >
+              {BINDABLE.map((one) => (
+                <option key={one.type} value={one.type}>
+                  {t(one.labelKey)}
+                </option>
+              ))}
+            </SelectInput>
+            <EntityPicker
+              key={kind}
+              label={t("admin.agents.agentPolicy.which")}
+              name="resourceId"
+              required
+              options={choices.map((one) => ({ id: one.id, label: one.name }))}
+              {...(kind === "goal" ? { search: searchGoals } : {})}
+              className="col-span-12 lg:col-span-4"
+            />
+            <SelectInput
+              className="col-span-12 lg:col-span-4"
+              label={t("common.level")}
+              name="level"
+              defaultValue={String(levels[2]?.value ?? 70)}
+            >
+              {levels.map((one) => (
+                <option key={one.value} value={one.value}>
+                  {one.label}
+                </option>
+              ))}
+            </SelectInput>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-3.5 py-2.5">
+            <div className="min-w-0">
+              {problem ? (
+                <p
+                  role="alert"
+                  data-testid="agent-policy-error"
+                  className="text-xs text-bad"
+                >
+                  {problem}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => {
+                  setProblem(null);
+                  setOpen(false);
+                }}
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                variant="primary"
+                disabled={pending}
+                pending={pending}
+              >
+                {pending
+                  ? t("admin.agents.agentPolicy.binding")
+                  : t("admin.agents.agentPolicy.bind")}
+              </Button>
+            </div>
+          </div>
         </form>
-      ) : (
-        <Button
-          type="button"
-          size="sm"
-          variant="default"
-          className="self-start"
-          onClick={() => setOpen(true)}
-        >
-          {t("admin.agents.agentPolicy.bindAScope")}
-        </Button>
-      )}
-
-      <span className="text-xs text-ink-4">
-        {t("admin.agents.agentPolicy.anAgentIsBound")}
-      </span>
-
-      {problem ? (
-        <span
-          role="alert"
-          data-testid="agent-policy-error"
-          className="text-xs text-bad"
-        >
-          {problem}
-        </span>
+      ) : problem ? (
+        <CardBody>
+          <p
+            role="alert"
+            data-testid="agent-policy-error"
+            className="text-xs text-bad"
+          >
+            {problem}
+          </p>
+        </CardBody>
       ) : null}
-    </div>
+    </Card>
   );
 }

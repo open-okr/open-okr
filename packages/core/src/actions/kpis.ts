@@ -80,6 +80,7 @@ import {
   readingOf,
   recomputeKpi,
   shownState,
+  softDeleteKpiRecord,
   targetTypeOf,
   thresholdsOf,
   upsertKpiRecord,
@@ -627,6 +628,101 @@ export const recordKpiValue = defineWriteAction({
           targetType: "kpi_record",
           targetId: record.id,
           payload: { periodStart: record.periodStart },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Removes one period's value. **For the copilot's undo only**: a value it
+ * recorded for a period that had none has nothing to roll back to, so undo
+ * removes it. Deletes stay unproposable (copilot-live-data.md §4.1), which is
+ * why this keeps off the agent surface and is never a proposable action.
+ *
+ * It is a soft delete, so recording the same period again revives the row. The
+ * recompute chain is the one `kpis.record` runs, in the same order.
+ */
+export const deleteKpiRecord = defineWriteAction({
+  name: "kpis.deleteRecord",
+  domain: "kpi",
+  summary:
+    "Removes one period's value from a KPI. Recording the same period again brings it back.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({
+    id: z.uuid(),
+    kpiId: z.uuid(),
+    periodStart: z.string(),
+    achievementPct: z.number().nullable(),
+    state: z.string(),
+    diagnostic: z.string().nullable(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  safety: "destructive",
+  agentSurface: false,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+
+      const removed = await softDeleteKpiRecord(tx, workspaceId, input.id);
+      if (!removed) {
+        throw new OperationError("not_found", "No such KPI value.");
+      }
+      if (removed.isCalculated) {
+        // A calculated cell is derived, and the next evaluation would write it
+        // straight back. The row was left untouched, and this rolls back.
+        throw new OperationError(
+          "forbidden",
+          "This KPI is calculated from a formula, so its values cannot be removed.",
+        );
+      }
+
+      // The same chain as `kpis.record`, in the same order, for the same
+      // reasons: dependents in topological order before the KPI's own state,
+      // then the key results that read any of them (design §7, §10).
+      const touched = await cascadeFromKpi(
+        tx,
+        workspaceId,
+        removed.kpiId,
+        removed.periodStart,
+        memberId,
+      );
+      for (const dependentId of touched) {
+        await recomputeKpi(tx, workspaceId, dependentId);
+      }
+
+      const recomputed = await recomputeKpi(tx, workspaceId, removed.kpiId);
+
+      await followKpisInTx(tx, {
+        workspaceId,
+        kpiIds: [removed.kpiId, ...touched],
+        authorMemberId: memberId,
+      });
+
+      return {
+        result: {
+          id: removed.id,
+          kpiId: removed.kpiId,
+          periodStart: removed.periodStart,
+          achievementPct: recomputed.achievementPct,
+          state: recomputed.state,
+          diagnostic: recomputed.diagnostic,
+        },
+        activity: {
+          kind: "kpi.value_removed" as const,
+          subjectType: "kpi" as const,
+          subjectId: removed.kpiId,
+          payload: { periodStart: removed.periodStart },
+        },
+        audit: {
+          action: "kpis.deleteRecord",
+          targetType: "kpi_record",
+          targetId: removed.id,
+          payload: { periodStart: removed.periodStart },
         },
       };
     },

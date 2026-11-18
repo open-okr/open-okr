@@ -1156,6 +1156,11 @@ A profile is a named starting point: choosing one sets the settings above, and e
 
 *Source:* Google's OKR playbook, Wodtke's Radical Focus, Castro's two levels, and the configuration Perdoo and Microsoft Viva Goals offer (vendor).
 
+*Where two profiles come from:*
+
+- **Google-style:** [Google re:Work, "Set goals with OKRs"](https://rework.withgoogle.com/en/guides/set-goals-with-okrs)
+- **Radical Focus:** [Christina Wodtke, "Radical Focus" (second edition)](https://eleganthack.com/radical-focus)
+
 ### 12.3 The profiles compared
 
 Every setting (§12.1) and threshold (§11) that at least one profile sets differently from Recommended, with the value each profile gives a workspace that has changed nothing itself. Anything not listed is the same in all five. The practice screen shows the same table, and the conformance suite compares this one with the package in both directions.

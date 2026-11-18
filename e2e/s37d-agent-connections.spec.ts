@@ -48,8 +48,8 @@ test("lists an agent token a member made", async () => {
 
 test("ends it after asking first, and it moves to Ended", async () => {
   const row = page.getByTestId("admin-connection").filter({ hasText: NAME });
-  page.once("dialog", (dialog) => dialog.accept());
   await row.getByRole("button", { name: "End" }).click();
+  await row.getByRole("button", { name: "End connection" }).click();
   await expect(row).toHaveCount(0, { timeout: 10_000 });
 
   await page.getByRole("link", { name: "Ended" }).click();

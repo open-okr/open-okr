@@ -68,30 +68,31 @@ export function ExportCard() {
 
   return (
     <Card>
-      <CardHeader>
-        <h3 className="text-sm font-bold text-ink">
+      <CardHeader className="flex-col items-stretch gap-0.5">
+        <h2 className="text-sm font-semibold text-ink">
           {t("admin.imports.exportCard.exportWorkspace")}
-        </h3>
-      </CardHeader>
-      <CardBody className="flex flex-col gap-3">
-        <p className="text-sm text-ink-3">
+        </h2>
+        <p className="max-w-prose text-xs text-ink-3">
           {t("admin.imports.exportCard.createsAnEncryptedArchive")}
         </p>
+      </CardHeader>
 
-        {!result ? (
-          <div className="flex flex-wrap items-end gap-3">
-            {/* The server's 12 to 1024 (workspace.exportArchive). */}
-            <SecretInput
-              label={t("admin.imports.exportCard.passphrase")}
-              description={t("admin.imports.exportCard.passphraseHint")}
-              autoComplete="new-password"
-              minLength={12}
-              maxLength={1024}
-              value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
-              className="w-64"
-            />
-            <label className="flex items-center gap-2 text-sm text-ink-3">
+      {!result ? (
+        <>
+          <CardBody className="grid grid-cols-12 gap-x-6 gap-y-4">
+            <div className="col-span-12">
+              {/* The server's 12 to 1024 (workspace.exportArchive). */}
+              <SecretInput
+                label={t("admin.imports.exportCard.passphrase")}
+                description={t("admin.imports.exportCard.passphraseHint")}
+                autoComplete="new-password"
+                minLength={12}
+                maxLength={1024}
+                value={passphrase}
+                onChange={(e) => setPassphrase(e.target.value)}
+              />
+            </div>
+            <label className="col-span-12 flex items-center gap-2 text-sm text-ink-3">
               <input
                 type="checkbox"
                 checked={includeFiles}
@@ -99,8 +100,19 @@ export function ExportCard() {
               />
               {t("admin.imports.exportCard.includeFiles")}
             </label>
+            {error ? (
+              <p
+                className="col-span-12 rounded-md bg-bad-bg px-3 py-2 text-sm font-medium text-bad"
+                role="alert"
+              >
+                {error}
+              </p>
+            ) : null}
+          </CardBody>
+          <div className="flex flex-wrap items-center justify-end gap-3 border-line border-t px-3.5 py-2.5">
             <Button
               variant="primary"
+              size="sm"
               onClick={handleExport}
               disabled={passphrase.length < 12}
               pending={pending}
@@ -110,8 +122,10 @@ export function ExportCard() {
                 : t("admin.imports.exportCard.exportWorkspace")}
             </Button>
           </div>
-        ) : (
-          <div className="flex flex-col gap-2">
+        </>
+      ) : (
+        <>
+          <CardBody className="flex flex-col gap-2">
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
               <dt className="text-ink-3">
                 {t("admin.imports.exportCard.file")}
@@ -146,30 +160,24 @@ export function ExportCard() {
                 })}
               </p>
             ) : null}
-
-            <div className="flex gap-2">
-              <Button variant="primary" onClick={handleDownload}>
-                {t("search.myExports.download")}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setResult(null);
-                  setError(null);
-                }}
-              >
-                {t("admin.imports.exportCard.clear")}
-              </Button>
-            </div>
+          </CardBody>
+          <div className="flex flex-wrap items-center justify-end gap-2 border-line border-t px-3.5 py-2.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setResult(null);
+                setError(null);
+              }}
+            >
+              {t("admin.imports.exportCard.clear")}
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleDownload}>
+              {t("search.myExports.download")}
+            </Button>
           </div>
-        )}
-
-        {error ? (
-          <p className="text-sm text-bad" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </CardBody>
+        </>
+      )}
     </Card>
   );
 }

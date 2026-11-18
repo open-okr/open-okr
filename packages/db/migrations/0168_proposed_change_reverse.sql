@@ -1,0 +1,11 @@
+-- Undo for a copilot edit (docs/design/copilot-live-data.md §4.2, plan 0.9.0 L4a).
+--
+-- Applying a create returns the new row's id, which is all undoing it needs.
+-- Applying an edit returns only an id, so there is nothing to reverse from.
+-- This column keeps what is needed: the action and payload that put the old
+-- values back, and the values the edit left behind (`expect`), which undo
+-- compares with what is stored then so that it never overwrites somebody
+-- else's later change. Null for every create and for every proposal not yet
+-- applied. No new table, so no policy to add: the row's own tenant policy
+-- already covers the column.
+alter table proposed_changes add column reverse_payload jsonb;

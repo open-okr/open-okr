@@ -88,6 +88,17 @@ function stateOf(link: {
 export default async function InvitationsPage() {
   const { t } = await getTranslations();
 
+  const header = (
+    <header className="flex flex-col gap-1">
+      <h1 className="text-lg font-bold text-ink">
+        {t("admin.invitations.invitations")}
+      </h1>
+      <p className="max-w-prose text-sm text-ink-3">
+        {t("admin.invitations.intro")}
+      </p>
+    </header>
+  );
+
   const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
@@ -98,10 +109,8 @@ export default async function InvitationsPage() {
   // hidden control is cosmetic and this page names email addresses.
   if (level < ACCESS_LEVELS.full) {
     return (
-      <>
-        <h1 className="mb-4 text-lg font-bold text-ink">
-          {t("admin.invitations.invitations")}
-        </h1>
+      <div className="flex flex-col gap-4">
+        {header}
         <Card>
           <CardBody>
             <p className="text-sm text-ink-3">
@@ -109,7 +118,7 @@ export default async function InvitationsPage() {
             </p>
           </CardBody>
         </Card>
-      </>
+      </div>
     );
   }
 
@@ -127,34 +136,89 @@ export default async function InvitationsPage() {
   const spaceNames = new Map(spaces.map((space) => [space.id, space.name]));
 
   return (
-    <>
-      <h1 className="mb-4 text-lg font-bold text-ink">
-        {t("admin.invitations.invitations")}
-      </h1>
-      <div className="flex flex-col gap-4">
-        <Card>
-          <CardHeader>
-            <div className="flex min-w-0 flex-col">
-              <h2 className="text-sm font-bold text-ink">
-                {t("admin.invitations.inviteOnePerson")}
-              </h2>
-              <p className="text-xs text-ink-3">
-                {t("admin.invitations.oneAddressOneUse")}
-              </p>
-            </div>
-          </CardHeader>
+    <div className="flex flex-col gap-4">
+      {header}
+      <Card>
+        <CardHeader>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-sm font-semibold text-ink">
+              {t("admin.invitations.inviteOnePerson")}
+            </h2>
+            <p className="text-xs text-ink-3">
+              {t("admin.invitations.oneAddressOneUse")}
+            </p>
+          </div>
+        </CardHeader>
+        <InviteForm
+          action={createPersonalLinkAction}
+          submitLabel={t("admin.invitations.createTheInvitation")}
+          bodyClassName="grid grid-cols-12 gap-x-6 gap-y-4"
+        >
+          <div className="col-span-12 md:col-span-6">
+            <EmailInput
+              label={t("admin.invitations.emailAddress")}
+              name="email"
+              required
+              placeholder={t("admin.invitations.nameExampleCom")}
+            />
+          </div>
+          <div className="col-span-12 md:col-span-6">
+            {/* 1 to 365, the server's range (guided-inputs §6). */}
+            <NumberInput
+              label={t("admin.invitations.expiresInDays")}
+              name="expiresInDays"
+              min={1}
+              max={365}
+              step={1}
+              defaultValue={14}
+            />
+          </div>
+        </InviteForm>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-sm font-semibold text-ink">
+              {t("admin.invitations.inviteAGuest")}
+            </h2>
+            <p className="text-xs text-ink-3">
+              {t("admin.invitations.aGuestSeesOne")}
+            </p>
+          </div>
+        </CardHeader>
+        {spaces.length === 0 ? (
           <CardBody>
-            <InviteForm
-              action={createPersonalLinkAction}
-              submitLabel={t("admin.invitations.createTheInvitation")}
-            >
+            <p className="text-sm text-ink-3">
+              {t("admin.invitations.noSpaceToInviteAGuestTo")}
+            </p>
+          </CardBody>
+        ) : (
+          <InviteForm
+            action={createGuestLinkAction}
+            submitLabel={t("admin.invitations.inviteTheGuest")}
+            bodyClassName="grid grid-cols-12 gap-x-6 gap-y-4"
+          >
+            <div className="col-span-12 md:col-span-4">
+              {/* Its own label, so the page never has two fields a person or
+                      a screen reader would both call "Email address". */}
               <EmailInput
-                label={t("admin.invitations.emailAddress")}
+                label={t("admin.invitations.guestEmailAddress")}
                 name="email"
                 required
                 placeholder={t("admin.invitations.nameExampleCom")}
               />
-              {/* 1 to 365, the server's range (guided-inputs §6). */}
+            </div>
+            <div className="col-span-12 md:col-span-4">
+              <EntityPicker
+                label={t("admin.invitations.guestOf")}
+                name="spaceId"
+                required
+                placeholder={t("admin.invitations.chooseTheSpace")}
+                options={spaces.map(namedOption)}
+              />
+            </div>
+            <div className="col-span-12 md:col-span-4">
               <NumberInput
                 label={t("admin.invitations.expiresInDays")}
                 name="expiresInDays"
@@ -162,195 +226,151 @@ export default async function InvitationsPage() {
                 max={365}
                 step={1}
                 defaultValue={14}
-                inputClassName="w-28"
               />
-            </InviteForm>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex min-w-0 flex-col">
-              <h2 className="text-sm font-bold text-ink">
-                {t("admin.invitations.inviteAGuest")}
-              </h2>
-              <p className="text-xs text-ink-3">
-                {t("admin.invitations.aGuestSeesOne")}
-              </p>
             </div>
-          </CardHeader>
-          <CardBody>
-            {spaces.length === 0 ? (
-              <p className="text-sm text-ink-3">
-                {t("admin.invitations.noSpaceToInviteAGuestTo")}
-              </p>
-            ) : (
-              <InviteForm
-                action={createGuestLinkAction}
-                submitLabel={t("admin.invitations.inviteTheGuest")}
-              >
-                {/* Its own label, so the page never has two fields a person or
-                    a screen reader would both call "Email address". */}
-                <EmailInput
-                  label={t("admin.invitations.guestEmailAddress")}
-                  name="email"
-                  required
-                  placeholder={t("admin.invitations.nameExampleCom")}
-                />
-                <div className="flex flex-wrap gap-2.5">
-                  <EntityPicker
-                    label={t("admin.invitations.guestOf")}
-                    name="spaceId"
-                    required
-                    placeholder={t("admin.invitations.chooseTheSpace")}
-                    options={spaces.map(namedOption)}
-                    className="w-60"
-                  />
-                  <NumberInput
-                    label={t("admin.invitations.expiresInDays")}
-                    name="expiresInDays"
-                    min={1}
-                    max={365}
-                    step={1}
-                    defaultValue={14}
-                    inputClassName="w-28"
-                  />
-                </div>
-              </InviteForm>
-            )}
-          </CardBody>
-        </Card>
+          </InviteForm>
+        )}
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <div className="flex min-w-0 flex-col">
-              <h2 className="text-sm font-bold text-ink">
-                {t("admin.invitations.createALinkTo")}
-              </h2>
-              <p className="text-xs text-ink-3">
-                {t("admin.invitations.forAChannelOr")}
-              </p>
-            </div>
-          </CardHeader>
-          <CardBody>
-            <InviteForm
-              action={createWorkspaceLinkAction}
-              submitLabel={t("admin.invitations.createTheLink")}
-            >
-              <div className="flex flex-wrap gap-2.5">
-                <NumberInput
-                  label={t("admin.invitations.maximumUses")}
-                  name="maxUses"
-                  min={1}
-                  step={1}
-                  placeholder={t("admin.invitations.noLimit")}
-                  inputClassName="w-28"
-                />
-                <NumberInput
-                  label={t("admin.invitations.expiresInDays")}
-                  name="expiresInDays"
-                  min={1}
-                  max={365}
-                  step={1}
-                  defaultValue={30}
-                  inputClassName="w-28"
-                />
-              </div>
-              {/* Each domain a chip, checked by the rule trusted domains use
+      <Card>
+        <CardHeader>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-sm font-semibold text-ink">
+              {t("admin.invitations.createALinkTo")}
+            </h2>
+            <p className="text-xs text-ink-3">
+              {t("admin.invitations.forAChannelOr")}
+            </p>
+          </div>
+        </CardHeader>
+        <InviteForm
+          action={createWorkspaceLinkAction}
+          submitLabel={t("admin.invitations.createTheLink")}
+          bodyClassName="grid grid-cols-12 gap-x-6 gap-y-4"
+        >
+          <div className="col-span-12 md:col-span-6">
+            <NumberInput
+              label={t("admin.invitations.maximumUses")}
+              name="maxUses"
+              min={1}
+              step={1}
+              placeholder={t("admin.invitations.noLimit")}
+            />
+          </div>
+          <div className="col-span-12 md:col-span-6">
+            <NumberInput
+              label={t("admin.invitations.expiresInDays")}
+              name="expiresInDays"
+              min={1}
+              max={365}
+              step={1}
+              defaultValue={30}
+            />
+          </div>
+          <div className="col-span-12">
+            {/* Each domain a chip, checked by the rule trusted domains use
                   (guided-inputs §4.11). */}
-              <TokenInput
-                label={t("admin.invitations.allowedDomains")}
-                name="allowedDomains"
-                rule="domain"
-                placeholder={t("admin.invitations.exampleComExampleOrg")}
-                description={t("admin.invitations.leaveEmptyToAccept")}
-              />
-            </InviteForm>
-          </CardBody>
-        </Card>
+            <TokenInput
+              label={t("admin.invitations.allowedDomains")}
+              name="allowedDomains"
+              rule="domain"
+              placeholder={t("admin.invitations.exampleComExampleOrg")}
+              description={t("admin.invitations.leaveEmptyToAccept")}
+            />
+          </div>
+        </InviteForm>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <div className="flex min-w-0 flex-col">
-              <h2 className="text-sm font-bold text-ink">
+      <Card>
+        <CardHeader>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-ink">
                 {t("admin.invitations.issued")}
               </h2>
-              <p className="text-xs text-ink-3">
-                {t("admin.invitations.revokedAndExpiredLinks")}
-              </p>
+              <span className="rounded-full bg-raised px-2 text-xs font-semibold text-ink-3">
+                {links.length}
+              </span>
             </div>
-          </CardHeader>
-          <CardBody>
-            {links.length === 0 ? (
-              <p className="text-sm text-ink-3">
-                {t("admin.invitations.nothingIssuedYetEverybody")}
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {links.map((link) => {
-                  const state = stateOf(link);
-                  const revocable = !link.revokedAt;
-                  // Each part is a whole phrase of its own, joined by the
-                  // separator, so no sentence is assembled from pieces.
-                  const details = [
-                    link.memberKind === "guest"
-                      ? t("admin.invitations.guestOfSpace", {
-                          space:
-                            (link.spaceId
-                              ? spaceNames.get(link.spaceId)
-                              : undefined) ??
-                            t("admin.invitations.anArchivedSpace"),
-                        })
-                      : link.mode === "personal"
-                        ? t("admin.invitations.modePersonal")
-                        : t("workspaceSwitcher.workspace"),
-                    link.maxUses === null
-                      ? link.useCount === 1
-                        ? t("admin.invitations.usesOne", {
-                            count: link.useCount,
-                          })
-                        : t("admin.invitations.usesOther", {
-                            count: link.useCount,
-                          })
-                      : t("admin.invitations.usesOfMax", {
+            <p className="text-xs text-ink-3">
+              {t("admin.invitations.revokedAndExpiredLinks")}
+            </p>
+          </div>
+        </CardHeader>
+        <CardBody>
+          {links.length === 0 ? (
+            <p className="text-sm text-ink-3">
+              {t("admin.invitations.nothingIssuedYetEverybody")}
+            </p>
+          ) : (
+            <ul
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+              tabIndex={0}
+              aria-label={t("admin.invitations.listLabel")}
+              className="max-h-[296px] overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line"
+            >
+              {links.map((link, index) => {
+                const state = stateOf(link);
+                const revocable = !link.revokedAt;
+                // Each part is a whole phrase of its own, joined by the
+                // separator, so no sentence is assembled from pieces.
+                const details = [
+                  link.memberKind === "guest"
+                    ? t("admin.invitations.guestOfSpace", {
+                        space:
+                          (link.spaceId
+                            ? spaceNames.get(link.spaceId)
+                            : undefined) ??
+                          t("admin.invitations.anArchivedSpace"),
+                      })
+                    : link.mode === "personal"
+                      ? t("admin.invitations.modePersonal")
+                      : t("workspaceSwitcher.workspace"),
+                  link.maxUses === null
+                    ? link.useCount === 1
+                      ? t("admin.invitations.usesOne", {
                           count: link.useCount,
-                          max: link.maxUses,
-                        }),
-                    link.expiresAt
-                      ? t("admin.invitations.expires", {
-                          date: shortDate(link.expiresAt),
                         })
-                      : null,
-                    link.allowedDomains.length > 0
-                      ? link.allowedDomains.join(", ")
-                      : null,
-                  ]
-                    .filter((part): part is string => part !== null)
-                    .join(" · ");
-                  return (
-                    <li
-                      key={link.id}
-                      className="flex flex-wrap items-center justify-between gap-2.5 border-line border-b pb-2 last:border-0 last:pb-0"
-                    >
-                      <div className="flex min-w-0 flex-col">
-                        <span className="text-sm text-ink">
-                          {link.email ??
-                            t("admin.invitations.anyoneWithTheLink")}
-                        </span>
-                        <span className="text-xs text-ink-4">{details}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Chip tone={state.tone}>{t(state.label)}</Chip>
-                        {revocable ? <RevokeButton linkId={link.id} /> : null}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
-      </div>
-    </>
+                      : t("admin.invitations.usesOther", {
+                          count: link.useCount,
+                        })
+                    : t("admin.invitations.usesOfMax", {
+                        count: link.useCount,
+                        max: link.maxUses,
+                      }),
+                  link.expiresAt
+                    ? t("admin.invitations.expires", {
+                        date: shortDate(link.expiresAt),
+                      })
+                    : null,
+                  link.allowedDomains.length > 0
+                    ? link.allowedDomains.join(", ")
+                    : null,
+                ]
+                  .filter((part): part is string => part !== null)
+                  .join(" · ");
+                return (
+                  <li
+                    key={link.id}
+                    className={`flex flex-wrap items-center justify-between gap-2.5 px-3 py-2.5 ${index === 0 ? "" : "border-line border-t"}`}
+                  >
+                    <div className="flex min-w-0 flex-col">
+                      <span className="text-sm text-ink">
+                        {link.email ?? t("admin.invitations.anyoneWithTheLink")}
+                      </span>
+                      <span className="text-xs text-ink-4">{details}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Chip tone={state.tone}>{t(state.label)}</Chip>
+                      {revocable ? <RevokeButton linkId={link.id} /> : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+    </div>
   );
 }

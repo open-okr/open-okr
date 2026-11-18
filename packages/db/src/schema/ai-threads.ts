@@ -7,6 +7,7 @@
  * depending on who opened it.
  */
 import {
+  boolean,
   integer,
   jsonb,
   numeric,
@@ -25,6 +26,11 @@ export type AiMessageRole = (typeof AI_MESSAGE_ROLES)[number];
 export interface AiCitation {
   readonly entityType: string;
   readonly entityId: string;
+  /**
+   * The 1-based number the model saw for this source, which is the `[n]` in
+   * the answer's prose. Absent on answers recorded before 0.9.0.
+   */
+  readonly n?: number;
 }
 
 export const aiThreads = pgTable("ai_threads", {
@@ -112,3 +118,41 @@ export const aiMessages = pgTable("ai_messages", {
 });
 
 export type AiMessage = typeof aiMessages.$inferSelect;
+
+export const AI_ANSWER_RATINGS = ["up", "down"] as const;
+export type AiAnswerRatingValue = (typeof AI_ANSWER_RATINGS)[number];
+
+/**
+ * A member's thumbs up or down on one copilot answer (migration 0170,
+ * docs/design/copilot-feedback.md, plan 0.9.0 FB1).
+ *
+ * One live row per member per answer. The note is plain text, at most 500
+ * characters. The question and the answer are readable by AI administrators
+ * only when `shared` is true.
+ */
+export const aiAnswerRatings = pgTable("ai_answer_ratings", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  messageId: uuid("message_id")
+    .notNull()
+    .references(() => aiMessages.id, { onDelete: "cascade" }),
+  memberId: uuid("member_id")
+    .notNull()
+    .references(() => workspaceMembers.id),
+  rating: text("rating", { enum: AI_ANSWER_RATINGS }).notNull(),
+  note: text("note"),
+  shared: boolean("shared").notNull().default(false),
+  /** Copied from the answer when it is rated, so a list needs no join. */
+  model: text("model"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+export type AiAnswerRating = typeof aiAnswerRatings.$inferSelect;

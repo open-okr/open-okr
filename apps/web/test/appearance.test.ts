@@ -79,7 +79,8 @@ describe("the appearance control", () => {
     // has just switched theme in this tab wrote both, and the stored value is
     // whatever the server last saw.
     expect(control).toContain("applied.current");
-    expect(shell).toContain("<AppearanceSync theme={me.theme}");
+    expect(shell).toMatch(/<AppearanceSync\s+theme=\{me\.theme\}/);
+    expect(shell).toContain("width={me.width}");
   });
 
   test("both settings are in the §4.14 map with a working default", () => {
@@ -95,6 +96,24 @@ describe("the appearance control", () => {
       expect(setting.resolve({})).toBeNull();
       expect(setting.schema.safeParse(null).success).toBe(true);
     }
+  });
+
+  test("the content width is a third control, written to both homes", () => {
+    // Content width (docs/design/content-width.md): the provider applies it
+    // now, the action keeps it on the member.
+    expect(control).toContain("remember({ width: option.value })");
+    expect(control).toContain("width-$" + "{option.value}");
+    expect(action).toContain('width?: "compact" | "full"');
+    const declared = SETTINGS_REGISTRY.find(
+      (setting) => setting.key === "width",
+    );
+    expect(declared?.scope).toBe("member");
+    expect(declared?.home).toBe("workspace_members");
+    expect(declared?.resolve({})).toBeNull();
+    expect(declared?.schema.safeParse("wide").success).toBe(false);
+    expect(tokens).toMatch(
+      /:root\[data-width="compact"\] \[data-content-width\] \{\s*max-width: 1152px;/,
+    );
   });
 
   test("repaints for the language and for nothing else", () => {

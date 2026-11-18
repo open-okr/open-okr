@@ -166,6 +166,96 @@ test.describe("a cloud run by a provider", () => {
     await visitor.close();
   });
 
+  /**
+   * Gives each workspace a tenant row the test may change, and returns the way
+   * back (plan 0.9.0 T1).
+   *
+   * The scheduler adopts every workspace hourly while a spec before this one
+   * has the cloud flag on, so a workspace may or may not have a tenant row yet.
+   * `on conflict do nothing` left an adopted row as it was and the test acted
+   * on nothing. Here the missing rows are inserted, the existing ones are
+   * remembered, and `restore` puts each existing row and each workspace's own
+   * state back as they were and deletes only the rows this call inserted.
+   */
+  async function holdTenants(workspaces: readonly string[]) {
+    const { rows: made } = await pool.query<{ id: string }>(
+      `insert into tenants (workspace_id, region)
+       select id, 'local' from unnest($1::uuid[]) as id
+       on conflict (workspace_id) do nothing
+       returning workspace_id as id`,
+      [workspaces],
+    );
+    const inserted = made.map((row) => row.id);
+    const existing = workspaces.filter((id) => !inserted.includes(id));
+    const { rows: tenantsBefore } = await pool.query<{
+      workspace_id: string;
+      state: string;
+      suspended_by_trial: boolean;
+      closed_at: Date | null;
+      owner_may_reopen: boolean;
+      erasure_reminded_at: Date | null;
+      deleted_at: Date | null;
+      updated_at: Date;
+    }>(
+      `select workspace_id, state, suspended_by_trial, closed_at,
+              owner_may_reopen, erasure_reminded_at, deleted_at, updated_at
+         from tenants where workspace_id = any($1::uuid[])`,
+      [existing],
+    );
+    const { rows: workspacesBefore } = await pool.query<{
+      id: string;
+      state: string;
+    }>("select id, state from workspaces where id = any($1::uuid[])", [
+      workspaces,
+    ]);
+    return {
+      /** Every row is open, active and not closed, for a test that starts there. */
+      async reset() {
+        await pool.query(
+          `update tenants
+              set state = 'active', suspended_by_trial = false,
+                  closed_at = null, owner_may_reopen = false,
+                  deleted_at = null
+            where workspace_id = any($1::uuid[])`,
+          [workspaces],
+        );
+      },
+      async restore() {
+        await pool.query(
+          "delete from tenants where workspace_id = any($1::uuid[])",
+          [inserted],
+        );
+        for (const row of tenantsBefore) {
+          await pool.query(
+            `update tenants
+                set state = $2, suspended_by_trial = $3, closed_at = $4,
+                    owner_may_reopen = $5, erasure_reminded_at = $6,
+                    deleted_at = $7, updated_at = $8
+              where workspace_id = $1`,
+            [
+              row.workspace_id,
+              row.state,
+              row.suspended_by_trial,
+              row.closed_at,
+              row.owner_may_reopen,
+              row.erasure_reminded_at,
+              row.deleted_at,
+              row.updated_at,
+            ],
+          );
+        }
+        // Every later spec on this shard needs the workspace taking writes,
+        // which is what it was before.
+        for (const row of workspacesBefore) {
+          await pool.query("update workspaces set state = $2 where id = $1", [
+            row.id,
+            row.state,
+          ]);
+        }
+      },
+    };
+  }
+
   test("the plan screen says when purchased credits expire", async ({
     page,
   }) => {
@@ -260,17 +350,15 @@ test.describe("a cloud run by a provider", () => {
       [INSTANCE_ACCOUNT.email],
     );
     const workspaces = rows.map((row) => row.id);
-    const { rows: made } = await pool.query<{ id: string }>(
-      `insert into tenants (workspace_id, state, region)
-       select id, 'suspended', 'local' from unnest($1::uuid[]) as id
-       on conflict (workspace_id) do nothing
-       returning workspace_id as id`,
+    const held = await holdTenants(workspaces);
+    // Every workspace, whether the adoption already made its tenant row or not.
+    await pool.query(
+      "update tenants set state = 'suspended' where workspace_id = any($1::uuid[])",
       [workspaces],
     );
-    const suspended = made.map((row) => row.id);
     await pool.query(
       "update workspaces set state = 'read_only' where id = any($1::uuid[])",
-      [suspended],
+      [workspaces],
     );
     try {
       await signIn(page);
@@ -284,15 +372,7 @@ test.describe("a cloud run by a provider", () => {
         "Only the provider can lift it.",
       );
     } finally {
-      // Every later spec on this shard needs the workspace taking writes.
-      await pool.query(
-        "update workspaces set state = 'active' where id = any($1::uuid[])",
-        [suspended],
-      );
-      await pool.query(
-        "delete from tenants where workspace_id = any($1::uuid[])",
-        [suspended],
-      );
+      await held.restore();
     }
   });
 
@@ -305,14 +385,8 @@ test.describe("a cloud run by a provider", () => {
         where u.email = $1 and m.deleted_at is null`,
       [INSTANCE_ACCOUNT.email],
     );
-    const { rows: made } = await pool.query<{ id: string }>(
-      `insert into tenants (workspace_id, region)
-       select id, 'local' from unnest($1::uuid[]) as id
-       on conflict (workspace_id) do nothing
-       returning workspace_id as id`,
-      [rows.map((row) => row.id)],
-    );
-    const ours = made.map((row) => row.id);
+    const held = await holdTenants(rows.map((row) => row.id));
+    await held.reset();
     await pool.query(
       `insert into system_settings (key, value, source)
        values ('cloud.closureRetentionDays', '30'::jsonb, 'admin')
@@ -342,15 +416,7 @@ test.describe("a cloud run by a provider", () => {
         timeout: 15_000,
       });
     } finally {
-      // Every later spec on this shard needs the workspace taking writes.
-      await pool.query(
-        "update workspaces set state = 'active' where id = any($1::uuid[])",
-        [ours],
-      );
-      await pool.query(
-        "delete from tenants where workspace_id = any($1::uuid[])",
-        [ours],
-      );
+      await held.restore();
       await pool.query(
         "delete from system_settings where key = 'cloud.closureRetentionDays'",
       );

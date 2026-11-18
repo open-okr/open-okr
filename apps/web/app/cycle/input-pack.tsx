@@ -41,7 +41,7 @@ export async function InputPack({
   distributedAt,
   sponsor,
   facilitator,
-  canEdit,
+  packAccess,
 }: {
   readonly cycleId: string;
   readonly mode: "annual" | "quarterly";
@@ -49,9 +49,19 @@ export async function InputPack({
   readonly distributedAt: string | null;
   readonly sponsor: { readonly name: string } | null;
   readonly facilitator: { readonly name: string } | null;
-  readonly canEdit: boolean;
+  /**
+   * From `workflow.read`, which asks the function the two pack writes refuse
+   * through (docs/design/input-pack-access.md), so a control is drawn only
+   * when its write would pass. `facilitatorName` is the named facilitator who
+   * holds the right, or null.
+   */
+  readonly packAccess: {
+    readonly canChange: boolean;
+    readonly facilitatorName: string | null;
+  };
 }) {
   const { t } = await getTranslations();
+  const canEdit = packAccess.canChange;
 
   const gathered = items.filter((item) => item.gathered).length;
 
@@ -66,6 +76,20 @@ export async function InputPack({
             {t("common.of", { gathered, length: items.length })}
           </Chip>
         </CardHeader>
+        {canEdit ? null : (
+          // Who may change the pack, for everybody who may not (D8). Built
+          // here from the catalogue rather than sent by the server.
+          <CardBody
+            className="border-line border-b py-2.5 text-xs text-ink-3"
+            data-testid="pack-who-line"
+          >
+            {packAccess.facilitatorName
+              ? t("cycle.inputPack.whoCanChangeWithFacilitator", {
+                  name: packAccess.facilitatorName,
+                })
+              : t("cycle.inputPack.whoCanChange")}
+          </CardBody>
+        )}
         <CardBody className="flex flex-col divide-y divide-line p-0">
           {items.map((item) => (
             <div

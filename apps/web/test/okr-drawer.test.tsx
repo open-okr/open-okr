@@ -707,6 +707,27 @@ describe("checking in", () => {
     );
   });
 
+  test("after a check-in the History tab has focus and the confirmation is in a live region once", async () => {
+    await render({ address: "?okr=g&tab=check-in" });
+    await fill(
+      inDrawer(`Value for ${KR} in this check-in (%)`) as HTMLInputElement,
+      "40",
+    );
+    await fill(
+      form()?.querySelector("textarea") as HTMLTextAreaElement,
+      "The guide is back.",
+    );
+    await submit();
+    await act(async () => new Promise((done) => setTimeout(done, 100)));
+    expect(document.activeElement?.id).toBe("drawer-tab-history");
+    const text =
+      "Checked in. The objective's health and next check-in follow it.";
+    const live = [
+      ...document.querySelectorAll('[role="status"], [aria-live]'),
+    ].filter((node) => node.textContent?.includes(text));
+    expect(live).toHaveLength(1);
+  });
+
   test("with no check-in yet the status is the reader's to choose, and an empty narrative is said before anything is sent", async () => {
     readOkrDetail.mockResolvedValue({ ...detail(), checkIns: [] });
     await render({ address: "?okr=g&tab=check-in" });

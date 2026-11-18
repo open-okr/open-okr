@@ -42,7 +42,6 @@ import type {
   GroundedAnswer,
   GroundedQuestionContext,
 } from "../agents/drafter.ts";
-import { aiOffSentence } from "../ai/off-reason.ts";
 import { resolveAgentRunCostCap } from "../ai/resolve.ts";
 import {
   type AnswerSource,
@@ -51,6 +50,16 @@ import {
   groundQuestion,
 } from "./answer.ts";
 import { offersToPropose, proposeBeforeAnswering } from "./proposals.ts";
+import { drainReading, readLiveData, withReadingCost } from "./reading.ts";
+import {
+  aiOffReason,
+  type CopilotReason,
+  encodeReason,
+  haltedFields,
+  type ReasonLike,
+  reasonStored,
+  reasonText,
+} from "./reasons.ts";
 
 /** The channel one copilot conversation's prose is published on. */
 export function copilotThreadChannel(
@@ -108,7 +117,7 @@ export function parseCopilotRunJob(
 /** How the run reports itself, for a caller that wants to know. */
 export interface CopilotRunOutcome {
   readonly answered: boolean;
-  /** Set when the run ended early, in the words the reader is shown. */
+  /** Set when the run ended early, in the English words REST and MCP read. */
   readonly haltedReason: string | null;
   readonly sources: readonly AnswerSource[];
 }
@@ -144,18 +153,24 @@ export async function runCopilotAnswer(
     await deps.publish?.(channel, event, data).catch(() => undefined);
   };
 
-  const halt = async (reason: string): Promise<CopilotRunOutcome> => {
+  const halt = async (reason: ReasonLike): Promise<CopilotRunOutcome> => {
     await callAction(context, "copilot.completeRun", {
       answerMessageId: job.answerMessageId,
       text: "",
       citations: [],
-      haltedReason: reason,
+      haltedReason: reasonStored(reason),
     });
+    // The text for a reader with no catalogue, and the code for the panel.
     await publish("copilot.done", {
       answerMessageId: job.answerMessageId,
-      haltedReason: reason,
+      haltedReason: reasonText(reason),
+      ...haltedFields(reason),
     });
-    return { answered: false, haltedReason: reason, sources: [] };
+    return {
+      answered: false,
+      haltedReason: reasonText(reason),
+      sources: [],
+    };
   };
 
   /**
@@ -177,10 +192,7 @@ export async function runCopilotAnswer(
 
   const capUsd = await resolveAgentRunCostCap(context.pool, job.workspaceId);
   if (capUsd <= 0) {
-    return halt(
-      `Halted before starting: the cost cap for this workspace is ${capUsd}, ` +
-        "so a run may not spend. An administrator sets it in AI governance.",
-    );
+    return halt({ code: "cost_cap_before", params: { cap: String(capUsd) } });
   }
 
   // Each step as it happens, so the reader is told what the run is doing
@@ -189,7 +201,7 @@ export async function runCopilotAnswer(
     publish("copilot.step", { answerMessageId: job.answerMessageId, ...data });
 
   await step({ step: "searching" });
-  const prepared = await groundQuestion(
+  const groundedFirst = await groundQuestion(
     context,
     {
       threadId: job.threadId,
@@ -198,45 +210,93 @@ export async function runCopilotAnswer(
     },
     (drafter) => Boolean(drafter.streamGrounded ?? drafter.answerGrounded),
   );
-  await step({ step: "found", count: prepared.sources.length });
+  await step({ step: "found", count: groundedFirst.sources.length });
   await publish("copilot.sources", {
     answerMessageId: job.answerMessageId,
-    sources: prepared.sources,
+    sources: groundedFirst.sources,
   });
 
   const drafter = context.drafter;
-  if (!prepared.ask || !(drafter?.streamGrounded ?? drafter?.answerGrounded)) {
+  if (
+    !groundedFirst.ask ||
+    !(drafter?.streamGrounded ?? drafter?.answerGrounded)
+  ) {
     // The relay passes no reason, so this reads as no provider, as before. It
     // only happens when AI went off between the question and this run.
     return halt(
-      prepared.unavailableReason ??
-        aiOffSentence(context.aiOff ?? "no_provider", "answer"),
+      groundedFirst.unavailable ?? aiOffReason(context.aiOff ?? "no_provider"),
     );
   }
-
-  // The proposal first, so the answer is told whether a card exists (A2).
-  const offers = await offersToPropose(context);
-  if (offers !== null) {
-    await step({ step: "proposing" });
-  }
-  const proposal = await proposeBeforeAnswering(
-    context,
-    { threadId: job.threadId, request: job.question },
-    offers,
-  );
-  if (proposal.proposalId !== null) {
-    await publish("copilot.proposal", {
-      answerMessageId: job.answerMessageId,
-      proposalId: proposal.proposalId,
-    });
-  }
-  const ask = { ...prepared.ask, proposal: proposal.note };
-  await step({ step: "writing" });
 
   // A member may stop the run while it works (plan 0.8.1 W4). Asked between
   // pieces, at most every `STOP_CHECK_EVERY_MS`, and once more before the
   // answer starts, since a stop pressed during the search lands here first.
   const stopped = stopCheck(context, job);
+
+  // The read loop (plan 0.9.0 L2b): one step per read, and a Stop pressed
+  // while it reads ends it before the next model call. It leaves the
+  // passages in place when it cannot run.
+  //
+  // What the member may propose is read first, because the loop offers it as a
+  // tool (plan 0.9.0 A4). The card is published the moment the call finishes,
+  // before the answer starts.
+  const offers = await offersToPropose(context);
+  const reading = await drainReading(
+    readLiveData(context, groundedFirst, {
+      proceed: async () => !(await stopped()),
+      proposal: { offers },
+    }),
+    async (event) => {
+      if (event.step === "card") {
+        await publish("copilot.proposal", {
+          answerMessageId: job.answerMessageId,
+          proposalId: event.proposalId,
+        });
+        return;
+      }
+      await step(event);
+    },
+  );
+  const prepared = reading?.prepared ?? groundedFirst;
+  if (reading?.blocked) {
+    // The rounds used up what the answer needed: say so, and do not call it.
+    return halt(reading.blocked);
+  }
+  if (prepared !== groundedFirst) {
+    await publish("copilot.sources", {
+      answerMessageId: job.answerMessageId,
+      sources: prepared.sources,
+    });
+  }
+
+  // The proposal first, so the answer is told whether a card exists (A2).
+  // On the tool path the loop already decided, and published the card when
+  // its call finished (A4-D5, A4-D6): no second call. Without the tool (a
+  // provider that cannot call tools, or a conversation anchored to a page,
+  // A4-D7) it is asked for the 0.8.1 way, with one structured call.
+  let proposal = reading?.proposal ?? null;
+  if (proposal === null) {
+    if (offers !== null) {
+      await step({ step: "proposing" });
+    }
+    proposal = await proposeBeforeAnswering(
+      context,
+      { threadId: job.threadId, request: job.question },
+      offers,
+    );
+    if (proposal.proposalId !== null) {
+      await publish("copilot.proposal", {
+        answerMessageId: job.answerMessageId,
+        proposalId: proposal.proposalId,
+      });
+    }
+  }
+  const ask = {
+    ...(prepared.ask ?? groundedFirst.ask),
+    proposal: proposal.note,
+  };
+  await step({ step: "writing" });
+
   const answered = (await stopped(true))
     ? ({ kind: "stopped", text: "" } as const)
     : drafter?.streamGrounded
@@ -268,52 +328,50 @@ export async function runCopilotAnswer(
     await publish("copilot.done", {
       answerMessageId: job.answerMessageId,
       haltedReason: null,
+      haltedCode: null,
+      haltedParams: null,
       stopped: true,
     });
     return { answered: false, haltedReason: null, sources: prepared.sources };
   }
   if (answered.kind === "failed") {
-    return halt(
-      "The provider did not answer. These are the passages that match your question.",
-    );
+    return halt({ code: "provider_error" });
   }
   if (answered.kind === "empty") {
-    return halt(
-      "The copilot had nothing to add. These are the passages that match your question.",
-    );
+    return halt({ code: "nothing_to_add" });
   }
 
   const answer = answered.answer;
-  const spent = answer.costUsd ?? 0;
+  const totals = withReadingCost(answer, reading);
+  const spent = totals.costUsd ?? 0;
   const overBudget = spent > capUsd;
-  const stoppedPartway =
-    answered.kind === "partial"
-      ? "The provider stopped partway through this answer. What arrived is kept."
-      : null;
+  const stoppedPartway: CopilotReason | null =
+    answered.kind === "partial" ? { code: "stopped_partway" } : null;
 
   await callAction(context, "copilot.completeRun", {
     answerMessageId: job.answerMessageId,
     text: answer.text,
-    citations: citationsFrom(prepared.hits, answer.usedSourceIndexes),
+    citations: citationsFrom(prepared.cite, answer.usedSourceIndexes),
     ...(answer.model ? { model: answer.model } : {}),
-    ...(answer.tokensIn === undefined ? {} : { tokensIn: answer.tokensIn }),
-    ...(answer.tokensOut === undefined ? {} : { tokensOut: answer.tokensOut }),
-    ...(answer.costUsd === undefined ? {} : { cost: answer.costUsd }),
+    ...(totals.tokensIn === undefined ? {} : { tokensIn: totals.tokensIn }),
+    ...(totals.tokensOut === undefined ? {} : { tokensOut: totals.tokensOut }),
+    ...(totals.costUsd === undefined ? {} : { cost: totals.costUsd }),
     ...(overBudget
       ? {
-          haltedReason:
-            `This answer cost ${spent} and the cap for this workspace is ` +
-            `${capUsd}. The next run will halt before starting until an ` +
-            "administrator raises it.",
+          haltedReason: encodeReason({
+            code: "cost_cap_after",
+            params: { spent: String(spent), cap: String(capUsd) },
+          }),
         }
       : stoppedPartway === null
         ? {}
-        : { haltedReason: stoppedPartway }),
+        : { haltedReason: encodeReason(stoppedPartway) }),
   });
 
   await publish("copilot.done", {
     answerMessageId: job.answerMessageId,
-    haltedReason: stoppedPartway,
+    haltedReason: stoppedPartway === null ? null : reasonText(stoppedPartway),
+    ...haltedFields(stoppedPartway),
   });
 
   return {

@@ -384,6 +384,28 @@ describe("moving a card with the keyboard", () => {
       "Rewrite the first-run screen",
       "Email the dormant teams",
     ]);
+    // Never "Dropped" for a drop the server refused.
+    expect(announcer()).toBe(
+      "Could not drop Email the dormant teams. It is back where it was. To do, position 2 of 2.",
+    );
+  });
+
+  test("announces nothing as dropped while the write is pending", async () => {
+    let finish: (state: WriteState) => void = () => {};
+    onMove.mockImplementationOnce(
+      () => new Promise<WriteState>((resolve) => (finish = resolve)),
+    );
+    await render();
+    await click(handle("b"));
+    await press(handle("b"), "ArrowUp");
+    await click(handle("b"));
+    expect(announcer()).not.toContain("Dropped");
+    await act(async () => {
+      finish({ error: null });
+    });
+    expect(announcer()).toBe(
+      "Dropped Email the dormant teams. To do, position 1 of 2.",
+    );
   });
 
   test("tells the keyboard how, and offers no handle to a reader who cannot edit", async () => {

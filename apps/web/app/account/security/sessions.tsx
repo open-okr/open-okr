@@ -1,5 +1,6 @@
 import { listUserSessions, type UserSession } from "@openokr/core";
 import { Button, Card, CardBody, CardHeader } from "@openokr/ui";
+import { Laptop, Smartphone } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { getAuth } from "../../../lib/auth";
@@ -58,12 +59,23 @@ export async function Sessions({ userId }: { userId: string }) {
   return (
     <Card>
       <CardHeader>
-        <h2 className="text-sm font-bold text-ink">{t("common.sessions")}</h2>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-ink">
+              {t("common.sessions")}
+            </h2>
+            {sessions === null ? null : (
+              <span className="rounded-full bg-raised px-2 font-semibold text-ink-3 text-xs">
+                {sessions.length}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-ink-3">
+            {t("account.security.sessions.everyDeviceCurrentlySigned")}
+          </p>
+        </div>
       </CardHeader>
-      <CardBody className="flex flex-col gap-3">
-        <p className="max-w-prose text-sm text-ink-3">
-          {t("account.security.sessions.everyDeviceCurrentlySigned")}
-        </p>
+      <CardBody>
         {sessions === null ? (
           <p role="status" className="text-sm text-ink-3">
             {t("account.security.sessions.thisListCouldNot")}
@@ -73,31 +85,53 @@ export async function Sessions({ userId }: { userId: string }) {
             {t("account.security.sessions.noOtherDeviceIs")}
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {sessions.map((session) => (
-              <li
-                key={session.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line p-3"
-              >
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="break-all text-sm font-medium text-ink">
-                    {session.userAgent ??
-                      t("account.security.sessions.unknownDevice")}
+          // Scrolls inside the card at about five rows; tabIndex lets a
+          // keyboard user scroll it.
+          <ul
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+            tabIndex={0}
+            aria-label={t("account.security.sessions.listLabel")}
+            className="max-h-[296px] overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line"
+          >
+            {sessions.map((session, index) => {
+              const device = session.userAgent ?? "";
+              const Icon = /Mobile|iPhone|Android/i.test(device)
+                ? Smartphone
+                : Laptop;
+              return (
+                <li
+                  key={session.id}
+                  className={`flex items-center gap-3 px-3 py-2.5 ${index === 0 ? "" : "border-line border-t"}`}
+                >
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-raised text-ink-3">
+                    <Icon className="size-4" aria-hidden="true" />
                   </span>
-                  <span className="text-xs text-ink-3">
-                    {[session.ipAddress, session.createdAt.toLocaleString()]
-                      .filter((one) => one)
-                      .join(" · ")}
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span
+                      className="truncate text-sm font-medium text-ink"
+                      title={
+                        session.userAgent ??
+                        t("account.security.sessions.unknownDevice")
+                      }
+                    >
+                      {session.userAgent ??
+                        t("account.security.sessions.unknownDevice")}
+                    </span>
+                    <span className="text-xs text-ink-3">
+                      {[session.ipAddress, session.createdAt.toLocaleString()]
+                        .filter((one) => one)
+                        .join(" · ")}
+                    </span>
                   </span>
-                </span>
-                <form action={revoke}>
-                  <input type="hidden" name="token" value={session.token} />
-                  <Button type="submit" size="sm">
-                    {t("common.revoke")}
-                  </Button>
-                </form>
-              </li>
-            ))}
+                  <form action={revoke}>
+                    <input type="hidden" name="token" value={session.token} />
+                    <Button type="submit" size="sm">
+                      {t("common.revoke")}
+                    </Button>
+                  </form>
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardBody>

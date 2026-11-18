@@ -102,7 +102,7 @@ test("an administrator chooses on Admin, General, and the choice sticks", async 
   );
 
   await card.getByTestId("email-confirmation-auto").check();
-  await card.getByRole("button", { name: "Save" }).click();
+  await card.getByRole("button", { name: "Save changes" }).click();
   await goTo(admin, "/admin/general");
   await expect(
     admin.getByTestId("email-confirmation-card").getByTestId(

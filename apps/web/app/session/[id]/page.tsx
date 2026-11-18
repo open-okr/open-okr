@@ -776,7 +776,23 @@ export default async function SessionPage({ params }: SessionPageProps) {
   return (
     <div className="space-y-6 p-6">
       {/* Live sync: subscribes to SSE and calls router.refresh() on stage changes */}
-      {isRunning && <SessionLive sessionId={id} />}
+      {isRunning && (
+        <SessionLive
+          sessionId={id}
+          stageKey={sessionRow.stageKey}
+          stages={
+            sessionRow.kind === "weekly"
+              ? WEEKLY_STEPS.map((step: WeeklyStep, index: number) => ({
+                  key: WEEKLY_STAGE_KEYS[index] ?? "",
+                  title: step.title,
+                }))
+              : reviewAgenda.map((stage) => ({
+                  key: REVIEW_STAGE_KEYS[stage.stage - 1] ?? "",
+                  title: stage.title,
+                }))
+          }
+        />
+      )}
 
       {/* Session header */}
       <div className="flex items-center justify-between">

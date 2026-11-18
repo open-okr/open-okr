@@ -63,6 +63,18 @@ describe("every tool is an action, and every action is a tool", () => {
     );
   });
 
+  it("leaves out kpis.deleteRecord, which exists for the copilot's undo only", () => {
+    // Deletes stay unproposable and unavailable to agents (design
+    // copilot-live-data.md section 4.1). The action stays on REST and the CLI.
+    expect(MCP_TOOLS.map((tool) => tool.name)).not.toContain(
+      "kpis.deleteRecord",
+    );
+    expect(
+      REST_ROUTES.find((route) => route.action === "kpis.deleteRecord")
+        ?.agentSurface,
+    ).toBe(false);
+  });
+
   it("marks both research tools as reads that no grant may widen", () => {
     // The scope is enforcement and the hints are what a client shows somebody
     // before it approves a call. A research tool that lost either would be a

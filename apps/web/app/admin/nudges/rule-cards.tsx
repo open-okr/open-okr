@@ -126,10 +126,22 @@ function LadderEditor({
   // the key on screen, in a place nobody looks at to find it.
   const named = TRIGGER_NAME_KEYS[rule.key];
   const label = named === undefined ? rule.key : t(named);
+  // The rungs and the button share the 12 columns: three rungs and the button
+  // take three each, two take four each, one takes nine beside the button.
+  const rungSpan =
+    ladder.rungs.length === 3
+      ? "col-span-6 md:col-span-3"
+      : ladder.rungs.length === 2
+        ? "col-span-6 md:col-span-4"
+        : "col-span-12 md:col-span-9";
+  const buttonSpan =
+    ladder.rungs.length === 2
+      ? "col-span-12 md:col-span-4"
+      : "col-span-12 md:col-span-3";
 
   return (
     <div
-      className="flex flex-col gap-1.5 rounded-md bg-raised px-2.5 py-2"
+      className="flex flex-col gap-2 rounded-lg bg-raised px-3 py-2.5"
       data-testid={`ladder-${rule.key}`}
     >
       <span className="text-xs text-ink-3">
@@ -145,7 +157,7 @@ function LadderEditor({
             .join(", "),
         })}
       </span>
-      <div className="flex flex-wrap items-end gap-2.5">
+      <div className="grid grid-cols-12 items-end gap-x-6 gap-y-2">
         {ladder.rungs.map((rung) => {
           // The rung by name, in days, where its camelCase key used to be
           // the label (guided-inputs §6).
@@ -155,7 +167,7 @@ function LadderEditor({
           return (
             <div
               key={rung}
-              className="flex flex-col gap-0.5 text-xs text-ink-3"
+              className={`flex flex-col gap-0.5 text-xs text-ink-3 ${rungSpan}`}
             >
               <span aria-hidden="true">{named}</span>
               <NumberInput
@@ -176,7 +188,7 @@ function LadderEditor({
                     [rung]: next === null ? "" : String(next),
                   }))
                 }
-                inputClassName="h-6.5 w-16 text-xs"
+                inputClassName="h-6.5 w-full text-xs"
               />
             </div>
           );
@@ -184,6 +196,7 @@ function LadderEditor({
         <Button
           type="button"
           size="sm"
+          className={`w-full ${buttonSpan}`}
           disabled={pending || partial}
           pending={saving}
           data-testid={`save-ladder-${rule.key}`}
@@ -245,9 +258,9 @@ function Rule({
   const label = name === undefined ? rule.key : t(name);
 
   return (
-    <div className="flex flex-col gap-1.5 border-line border-b py-2.5 last:border-0 last:pb-0">
-      <div className="flex flex-wrap items-baseline justify-between gap-2.5">
-        <span className="flex min-w-0 flex-col">
+    <div className="grid grid-cols-12 gap-x-6 gap-y-3 border-line border-b py-4 first:pt-0 last:border-0 last:pb-0">
+      <div className="col-span-12 grid grid-cols-12 items-baseline gap-x-6 gap-y-1">
+        <span className="col-span-12 flex min-w-0 flex-col md:col-span-8">
           <span className="flex flex-wrap items-center gap-2">
             {/*
              * The rule's name, not its key (P8-G11d). The key is still what
@@ -273,7 +286,7 @@ function Rule({
             {rule.fires}. {rule.recipient}.
           </span>
         </span>
-        <span className="flex flex-none items-center gap-2 text-xs text-ink-3">
+        <span className="col-span-12 flex items-center gap-2 text-xs text-ink-3 md:col-span-4 md:justify-end">
           <span data-testid={`volume-${rule.key}`}>
             {t("admin.nudges.ruleCards.sentHeld", {
               sent: rule.sent,
@@ -283,10 +296,11 @@ function Rule({
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="col-span-12 grid grid-cols-12 items-end gap-x-6 gap-y-3">
         <Button
           type="button"
           size="sm"
+          className="col-span-12 w-full sm:col-span-3"
           variant={rule.enabled ? "default" : "primary"}
           disabled={pending}
           pending={pending && acting === "toggle"}
@@ -302,7 +316,7 @@ function Rule({
 
         {/* Named for its rule, as every card has one: "Send on" alone
             would name a dozen dropdowns the same. */}
-        <span className="flex items-center gap-1.5 text-xs text-ink-3">
+        <span className="col-span-12 flex flex-col gap-1 text-xs text-ink-3 sm:col-span-5">
           <span aria-hidden="true">{t("admin.nudges.ruleCards.sendOn")}</span>
           <SelectInput
             label={t("admin.nudges.ruleCards.channelFor", { rule: label })}
@@ -322,7 +336,7 @@ function Rule({
                       >),
               })
             }
-            inputClassName="h-6.5 w-auto text-xs"
+            inputClassName="h-6.5 w-full text-xs"
           >
             <option value="">
               {t("admin.nudges.ruleCards.eachMemberSOwn")}
@@ -336,7 +350,7 @@ function Rule({
           {pending && acting === "channel" ? <Spinner /> : null}
         </span>
 
-        <label className="flex items-center gap-1.5 text-xs text-ink-3">
+        <label className="col-span-12 flex items-center gap-1.5 text-xs text-ink-3 sm:col-span-4">
           <input
             type="checkbox"
             checked={rule.quietModeExempt}
@@ -354,23 +368,25 @@ function Rule({
         </label>
       </div>
 
-      <LadderEditor
-        rule={rule}
-        pending={pending}
-        saving={pending && acting === "ladder"}
-        onSave={(ladder) =>
-          change("ladder", { ruleKey: rule.key, escalationLadder: ladder })
-        }
-      />
+      <div className="col-span-12 empty:hidden">
+        <LadderEditor
+          rule={rule}
+          pending={pending}
+          saving={pending && acting === "ladder"}
+          onSave={(ladder) =>
+            change("ladder", { ruleKey: rule.key, escalationLadder: ladder })
+          }
+        />
+      </div>
 
       {rule.enabled ? null : (
-        <span className="text-xs text-warn">
+        <span className="col-span-12 text-xs text-warn">
           {t("admin.nudges.ruleCards.heldTheRunStill")}
         </span>
       )}
 
       {problem ? (
-        <span role="alert" className="text-xs text-bad">
+        <span role="alert" className="col-span-12 text-xs text-bad">
           {problem}
         </span>
       ) : null}

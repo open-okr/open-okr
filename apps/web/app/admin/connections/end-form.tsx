@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, useTranslations } from "@openokr/ui";
-import { type FormEvent, useActionState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   NOTHING_YET,
   type RevokeResult,
@@ -10,7 +10,8 @@ import {
 /**
  * Ending one connection on Admin, Agent connections. It asks first (D10),
  * because the member's agent stops at once and only they can connect it
- * again.
+ * again. The question is on the page rather than in a browser dialog, so it
+ * is reached from the keyboard like the rest of the row.
  */
 export function EndConnectionForm({
   action,
@@ -30,25 +31,72 @@ export function EndConnectionForm({
 }) {
   const { t } = useTranslations();
   const [state, formAction, pending] = useActionState(action, NOTHING_YET);
-  const ask = (event: FormEvent<HTMLFormElement>) => {
-    if (
-      !window.confirm(
-        t("admin.connections.confirmEnd", { member: memberName, label }),
-      )
-    ) {
-      event.preventDefault();
+  const [asking, setAsking] = useState(false);
+  const openRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const questionId = `end-${kind}-${id}-question`;
+
+  useEffect(() => {
+    if (asking) {
+      confirmRef.current?.focus();
     }
-  };
+  }, [asking]);
+
+  // A refusal closes the question so the message shows under the row button.
+  useEffect(() => {
+    if (!state.ok) {
+      setAsking(false);
+    }
+  }, [state]);
+
+  if (asking) {
+    return (
+      <form action={formAction} aria-busy={pending} className="w-full">
+        <input type="hidden" name="kind" value={kind} />
+        <input type="hidden" name="id" value={id} />
+        <fieldset
+          aria-labelledby={questionId}
+          className="flex min-w-0 flex-col gap-2 rounded-control border border-line-2 bg-raised p-3"
+          data-testid={`end-${kind}-${id}-confirm`}
+        >
+          <p id={questionId} className="text-sm font-medium text-ink">
+            {t("admin.connections.confirmEnd", { member: memberName, label })}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              ref={confirmRef}
+              type="submit"
+              size="sm"
+              variant="primary"
+              pending={pending}
+            >
+              {t("admin.connections.endConnection")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => {
+                setAsking(false);
+                openRef.current?.focus();
+              }}
+            >
+              {t("common.cancel")}
+            </Button>
+          </div>
+        </fieldset>
+      </form>
+    );
+  }
   return (
-    <form
-      action={formAction}
-      onSubmit={ask}
-      className="w-fit"
-      aria-busy={pending}
-    >
-      <input type="hidden" name="kind" value={kind} />
-      <input type="hidden" name="id" value={id} />
-      <Button type="submit" size="sm" disabled={pending}>
+    <div className="w-fit">
+      <Button
+        ref={openRef}
+        type="button"
+        size="sm"
+        onClick={() => setAsking(true)}
+      >
         {t("admin.connections.end")}
       </Button>
       {state.ok ? null : (
@@ -56,6 +104,6 @@ export function EndConnectionForm({
           {state.message}
         </p>
       )}
-    </form>
+    </div>
   );
 }

@@ -281,14 +281,15 @@ describe("the page", () => {
     expect(html).toContain("••••7Q4z");
     expect(html).toContain("Not tried yet");
     expect(html).toContain("Stored on 2026-09-30");
-    // A stored key offers Replace and Remove; an empty slot offers Store.
-    expect(html).toContain("Replace");
+    // A stored key offers Remove at once; the card has one Save for every key.
     expect(html).toContain("Remove my key");
+    expect(html).toContain("Save changes");
+    expect(html.match(/Remove my key/g)).toHaveLength(1);
     expect(html).toContain("OpenRouter");
     expect(html).toContain("Not stored");
     expect(html).toContain("Paste your key for OpenRouter.");
     // The field is a password field, empty, twice: one per provider.
-    const fields = html.match(/<input[^>]*name="apiKey"[^>]*>/g) ?? [];
+    const fields = html.match(/<input[^>]*name="apiKey-[a-z]+"[^>]*>/g) ?? [];
     expect(fields).toHaveLength(2);
     for (const field of fields) {
       expect(field).toContain('type="password"');
@@ -302,7 +303,7 @@ describe("the page", () => {
     expect(html).toContain(
       "Your workspace does not take a personal key for any provider.",
     );
-    expect(html).not.toContain('name="apiKey"');
+    expect(html).not.toContain('name="apiKey-');
   });
 
   it("shows a member below edit their slots and why there is no form", async () => {
@@ -313,8 +314,9 @@ describe("the page", () => {
       "Your access in this workspace lets you see your keys but not store or remove one.",
     );
     expect(html).toContain("••••7Q4z");
-    expect(html).not.toContain('name="apiKey"');
+    expect(html).not.toContain('name="apiKey-');
     expect(html).not.toContain("Remove my key");
+    expect(html).not.toContain("Save changes");
   });
 });
 
@@ -328,7 +330,9 @@ describe("where it lives", () => {
 
   it("is where the AI console sends an administrator who allows personal keys", () => {
     const aiConsole = readScreen(
-      fileURLToPath(new URL("../app/admin/ai/page.tsx", import.meta.url)),
+      fileURLToPath(
+        new URL("../app/admin/ai/provider-settings-form.tsx", import.meta.url),
+      ),
     );
     expect(aiConsole).toContain(
       "Each member stores their own under Your AI keys, in their account.",

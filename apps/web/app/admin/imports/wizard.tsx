@@ -207,7 +207,12 @@ export function ImportWizard({
               {t("admin.imports.wizard.csvOrXlsxNothing")}
             </p>
             <div>
-              <Button type="submit" variant="primary" pending={pending}>
+              <Button
+                size="sm"
+                type="submit"
+                variant="primary"
+                pending={pending}
+              >
                 {pending
                   ? t("admin.imports.wizard.reading")
                   : t("admin.imports.wizard.readTheFile")}
@@ -236,13 +241,16 @@ export function ImportWizard({
               </p>
             ) : null}
             <ul
-              className="flex flex-col divide-y divide-line"
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+              tabIndex={0}
+              aria-label={t("admin.imports.wizard.columns")}
+              className="relative max-h-[296px] divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line"
               data-testid="import-columns"
             >
               {columns.map((column, index) => (
                 <li
                   key={column.header}
-                  className="flex items-center gap-3 py-2"
+                  className="flex items-center gap-3 px-3 py-2"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-ink">
@@ -311,6 +319,7 @@ export function ImportWizard({
             ) : null}
             <div className="flex gap-2">
               <Button
+                size="sm"
                 variant="primary"
                 disabled={missing.length > 0}
                 pending={pending}
@@ -321,7 +330,7 @@ export function ImportWizard({
                   ? t("admin.imports.wizard.checking")
                   : t("admin.imports.preview")}
               </Button>
-              <Button onClick={restart} disabled={pending}>
+              <Button size="sm" onClick={restart} disabled={pending}>
                 {t("admin.imports.wizard.chooseAnotherFile")}
               </Button>
             </div>
@@ -352,6 +361,7 @@ export function ImportWizard({
             {step === "preview" ? (
               <div className="flex gap-2">
                 <Button
+                  size="sm"
                   variant="primary"
                   disabled={report.created + report.updated === 0}
                   pending={pending}
@@ -365,6 +375,7 @@ export function ImportWizard({
                       })}
                 </Button>
                 <Button
+                  size="sm"
                   onClick={() => {
                     setReport(null);
                     setStep("mapping");
@@ -382,7 +393,7 @@ export function ImportWizard({
                 >
                   {t("admin.imports.wizard.importedRunTheSame")}
                 </p>
-                <Button onClick={restart}>
+                <Button size="sm" onClick={restart}>
                   {t("admin.imports.wizard.importAnotherFile")}
                 </Button>
               </div>

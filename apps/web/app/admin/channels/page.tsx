@@ -11,9 +11,8 @@ import {
   Card,
   CardBody,
   CardHeader,
+  ChannelLogo,
   Chip,
-  IdentifierInput,
-  SecretInput,
 } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { pageTitle } from "../../../lib/page-title.ts";
@@ -21,13 +20,13 @@ import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
-  connectProvider,
   disconnectProvider,
   removeTemplateMapping,
   sendTest,
   syncTemplates,
 } from "./actions.ts";
 import { ChannelForm } from "./channel-form.tsx";
+import { CredentialForm } from "./credential-form.tsx";
 import { TemplateMappingForm } from "./template-mapping-form.tsx";
 
 export const generateMetadata = pageTitle("pageTitle.adminChannels");
@@ -177,126 +176,280 @@ export default async function ChannelsPage() {
         </p>
       </div>
 
-      {whatsAppConnected ? (
-        <Card>
-          <CardHeader>
-            <span className="flex flex-wrap items-center gap-2">
-              {t("admin.channels.whatsappTemplates")}
-              <Chip tone="neutral">{templates.length}</Chip>
-            </span>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-3">
-            <p className="text-sm text-ink-3">
-              {t("admin.channels.whatsappWillOnlyCarry")}
-            </p>
+      <GroupHeading title={t("admin.channels.groupProviders")} />
 
-            <ChannelForm action={syncTemplates}>
-              <Button type="submit" variant="default" size="sm">
-                {t("admin.channels.syncFromMeta")}
-              </Button>
-            </ChannelForm>
-
-            {templates.length === 0 ? (
-              <p className="text-xs text-ink-3">
-                {t("admin.channels.nothingSyncedYetPress")}
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {templates.map((template) => (
-                  <li
-                    key={template.id}
-                    className="flex flex-col gap-1 rounded-lg border border-line p-3"
-                    data-testid="whatsapp-template"
-                  >
-                    <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
-                      {template.name}
-                      <Chip
-                        tone={
-                          template.status.toUpperCase() === "APPROVED"
-                            ? "ok"
-                            : template.status.toUpperCase() === "REJECTED"
-                              ? "bad"
-                              : "warn"
-                        }
-                      >
-                        {template.status.toLowerCase()}
-                      </Chip>
-                      <span className="text-xs font-normal text-ink-3">
-                        {template.language}
-                      </span>
-                      {template.variables > 0 ? (
-                        <Chip tone="neutral">
-                          {template.variables === 1
-                            ? t("common.count.variableOne", {
-                                count: template.variables,
-                              })
-                            : t("common.count.variableOther", {
-                                count: template.variables,
-                              })}
-                        </Chip>
-                      ) : null}
-                    </span>
-                    {template.bodyText ? (
-                      <span className="whitespace-pre-wrap text-xs text-ink-3">
-                        {template.bodyText}
-                      </span>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <div className="flex flex-col gap-2 border-t border-line pt-3">
-              <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
-                {t("admin.channels.whichTemplateAnswersWhich")}
-                <Chip tone="neutral">{mappings.length}</Chip>
+      {PROVIDERS.map((provider) => {
+        const connection = connections.find(
+          (row) => row.provider === provider.id,
+        );
+        const credentials = (
+          <CredentialForm
+            provider={provider.id}
+            fields={CONNECT_FIELDS[provider.id].map((field) => ({
+              name: field.name,
+              label: t(field.label),
+              secret: field.secret,
+            }))}
+            hint={t(provider.hint)}
+          />
+        );
+        const facts = connection
+          ? [
+              {
+                label: t("admin.channels.lastVerified"),
+                value: when(connection.lastVerifiedAt),
+                bad: false,
+              },
+              {
+                label: t("admin.channels.workspaceId"),
+                value: String(connection.config.teamId ?? "not set"),
+                bad: false,
+              },
+              ...(connection.error
+                ? [
+                    {
+                      label: t("admin.channels.lastComplaint"),
+                      value: connection.error,
+                      bad: true,
+                    },
+                  ]
+                : []),
+            ]
+          : [];
+        return (
+          <Card key={provider.id} data-testid={`channel-card-${provider.id}`}>
+            <CardHeader className="flex-wrap justify-between">
+              <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
+                <ChannelLogo channel={provider.id} size="sm" />
+                <h2>{provider.label}</h2>
+                {connection ? (
+                  <Chip tone={STATE_TONE[connection.state] ?? "neutral"}>
+                    {connection.state}
+                  </Chip>
+                ) : (
+                  <Chip tone="neutral">{t("admin.channels.notConnected")}</Chip>
+                )}
+                {connection && !connection.lastVerifiedAt ? (
+                  <Chip tone="warn">{t("admin.channels.neverVerified")}</Chip>
+                ) : null}
               </span>
-              <p className="text-xs text-ink-3">
-                {t("admin.channels.outsideTheTwentyFour")}
-              </p>
+              {connection ? (
+                <div className="flex flex-wrap items-start gap-2">
+                  <ChannelForm
+                    action={sendTest}
+                    className="flex flex-col items-end"
+                  >
+                    <input type="hidden" name="attempt" value={attempt} />
+                    <Button type="submit" variant="default" size="sm">
+                      {t("admin.channels.sendMeATest")}
+                    </Button>
+                  </ChannelForm>
+                  <ChannelForm
+                    action={disconnectProvider}
+                    className="flex flex-col items-end"
+                  >
+                    <input type="hidden" name="provider" value={provider.id} />
+                    <Button type="submit" variant="ghost" size="sm">
+                      {t("admin.channels.disconnect")}
+                    </Button>
+                  </ChannelForm>
+                </div>
+              ) : null}
+            </CardHeader>
+            {!provider.ready ? (
+              <CardBody>
+                <p className="text-sm text-ink-3">
+                  {t("admin.channels.noDriverYetThe")}
+                </p>
+              </CardBody>
+            ) : connection ? (
+              <>
+                <CardBody className="flex flex-col gap-3">
+                  {/* The confirmation, from server state rather than from the
+                      form's own answer. A successful connect revalidates the
+                      page, which replaces the tree the form was in, so its
+                      message would never survive to be read. What an
+                      administrator needs to know is a fact about the
+                      connection, not about the request. */}
+                  {connection.lastVerifiedAt ? null : (
+                    <p className="rounded-md bg-warn-bg px-2.5 py-1.5 text-xs text-warn">
+                      {t("admin.channels.storedAndConnectedRather")}
+                    </p>
+                  )}
+                  <dl className="grid grid-cols-12 gap-x-6 gap-y-3 text-xs">
+                    {facts.map((fact) => (
+                      <div
+                        key={fact.label}
+                        className={`col-span-12 flex flex-col gap-0.5 ${
+                          facts.length === 3 ? "md:col-span-4" : "md:col-span-6"
+                        }`}
+                      >
+                        <dt className="text-ink-3">{fact.label}</dt>
+                        <dd className={fact.bad ? "text-bad" : "text-ink-2"}>
+                          {fact.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </CardBody>
+                <details className="group border-t border-line">
+                  <summary className="cursor-pointer px-3.5 py-2.5 text-sm text-ink-3">
+                    {t("admin.channels.replaceTheCredentials")}
+                  </summary>
+                  {credentials}
+                </details>
+              </>
+            ) : (
+              credentials
+            )}
+          </Card>
+        );
+      })}
 
+      {whatsAppConnected ? (
+        <>
+          <GroupHeading title={t("admin.channels.groupWhatsapp")} />
+
+          <Card>
+            <CardHeader className="flex-wrap justify-between">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <h2 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
+                  {t("admin.channels.whatsappTemplates")}
+                  <Chip tone="neutral">{templates.length}</Chip>
+                </h2>
+                <p className="text-xs text-ink-3">
+                  {t("admin.channels.whatsappWillOnlyCarry")}
+                </p>
+              </div>
+              <ChannelForm
+                action={syncTemplates}
+                className="flex flex-col items-end"
+              >
+                <Button type="submit" variant="default" size="sm">
+                  {t("admin.channels.syncFromMeta")}
+                </Button>
+              </ChannelForm>
+            </CardHeader>
+            <CardBody>
+              {templates.length === 0 ? (
+                <p className="text-xs text-ink-3">
+                  {t("admin.channels.nothingSyncedYetPress")}
+                </p>
+              ) : (
+                <ul
+                  // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+                  tabIndex={0}
+                  aria-label={t("admin.channels.whatsappTemplates")}
+                  className="flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain"
+                >
+                  {templates.map((template) => (
+                    <li
+                      key={template.id}
+                      className="flex flex-col gap-1 rounded-lg border border-line p-3"
+                      data-testid="whatsapp-template"
+                    >
+                      <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
+                        {template.name}
+                        <Chip
+                          tone={
+                            template.status.toUpperCase() === "APPROVED"
+                              ? "ok"
+                              : template.status.toUpperCase() === "REJECTED"
+                                ? "bad"
+                                : "warn"
+                          }
+                        >
+                          {template.status.toLowerCase()}
+                        </Chip>
+                        <span className="text-xs font-normal text-ink-3">
+                          {template.language}
+                        </span>
+                        {template.variables > 0 ? (
+                          <Chip tone="neutral">
+                            {template.variables === 1
+                              ? t("common.count.variableOne", {
+                                  count: template.variables,
+                                })
+                              : t("common.count.variableOther", {
+                                  count: template.variables,
+                                })}
+                          </Chip>
+                        ) : null}
+                      </span>
+                      {template.bodyText ? (
+                        <span className="whitespace-pre-wrap text-xs text-ink-3">
+                          {template.bodyText}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <h2 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
+                  {t("admin.channels.whichTemplateAnswersWhich")}
+                  <Chip tone="neutral">{mappings.length}</Chip>
+                </h2>
+                <p className="text-xs text-ink-3">
+                  {t("admin.channels.outsideTheTwentyFour")}
+                </p>
+              </div>
+            </CardHeader>
+            <CardBody>
               {mappings.length === 0 ? (
                 <p className="text-xs text-ink-3">
                   {t("admin.channels.nothingMappedYet")}
                 </p>
               ) : (
-                <ul className="flex flex-col gap-2">
+                <ul
+                  // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+                  tabIndex={0}
+                  aria-label={t("admin.channels.whichTemplateAnswersWhich")}
+                  className="flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain"
+                >
                   {mappings.map((mapping) => (
                     <li
                       key={mapping.id}
-                      className="flex flex-col gap-1 rounded-lg border border-line p-3"
+                      className="flex items-start justify-between gap-3 rounded-lg border border-line p-3"
                       data-testid="whatsapp-mapping"
                     >
-                      <span className="flex flex-wrap items-center gap-2 text-sm text-ink">
-                        <span className="font-medium">{mapping.ruleKey}</span>
-                        {t("admin.channels.uses")}
-                        <span className="font-medium">
-                          {mapping.templateName}
+                      <span className="flex min-w-0 flex-col gap-1">
+                        <span className="flex flex-wrap items-center gap-2 text-sm text-ink">
+                          <span className="font-medium">{mapping.ruleKey}</span>
+                          {t("admin.channels.uses")}
+                          <span className="font-medium">
+                            {mapping.templateName}
+                          </span>
+                          {mapping.withdrawn ? (
+                            <Chip tone="bad">
+                              {t("admin.channels.metaNoLongerLists")}
+                            </Chip>
+                          ) : mapping.templateStatus.toUpperCase() ===
+                            "APPROVED" ? null : (
+                            <Chip tone="warn">
+                              {mapping.templateStatus.toLowerCase()}
+                            </Chip>
+                          )}
                         </span>
-                        {mapping.withdrawn ? (
-                          <Chip tone="bad">
-                            {t("admin.channels.metaNoLongerLists")}
-                          </Chip>
-                        ) : mapping.templateStatus.toUpperCase() ===
-                          "APPROVED" ? null : (
-                          <Chip tone="warn">
-                            {mapping.templateStatus.toLowerCase()}
-                          </Chip>
-                        )}
+                        {mapping.bindings.length > 0 ? (
+                          <span className="text-xs text-ink-3">
+                            {mapping.bindings
+                              .map(
+                                (source, index) =>
+                                  `{{${index + 1}}} ${BINDING_LABELS[source as BindingSource] ?? source}`,
+                              )
+                              .join(", ")}
+                          </span>
+                        ) : null}
                       </span>
-                      {mapping.bindings.length > 0 ? (
-                        <span className="text-xs text-ink-3">
-                          {mapping.bindings
-                            .map(
-                              (source, index) =>
-                                `{{${index + 1}}} ${BINDING_LABELS[source as BindingSource] ?? source}`,
-                            )
-                            .join(", ")}
-                        </span>
-                      ) : null}
                       <ChannelForm
                         action={removeTemplateMapping}
-                        className="w-fit"
+                        className="flex flex-none flex-col items-end"
                       >
                         <input
                           type="hidden"
@@ -311,140 +464,61 @@ export default async function ChannelsPage() {
                   ))}
                 </ul>
               )}
-
-              <TemplateMappingForm
-                rules={TRIGGER_CATALOGUE.map((entry) => ({
-                  key: entry.key,
-                  fires: entry.fires,
-                }))}
-                templates={approved.map((template) => ({
-                  id: template.id,
-                  name: template.name,
-                  language: template.language,
-                  variables: template.variables,
-                  bodyText: template.bodyText ?? null,
-                }))}
-                sources={BINDING_SOURCES.map((source) => ({
-                  value: source,
-                  label: BINDING_LABELS[source],
-                }))}
-              />
-            </div>
-          </CardBody>
-        </Card>
+            </CardBody>
+            <TemplateMappingForm
+              rules={TRIGGER_CATALOGUE.map((entry) => ({
+                key: entry.key,
+                fires: entry.fires,
+              }))}
+              templates={approved.map((template) => ({
+                id: template.id,
+                name: template.name,
+                language: template.language,
+                variables: template.variables,
+                bodyText: template.bodyText ?? null,
+              }))}
+              sources={BINDING_SOURCES.map((source) => ({
+                value: source,
+                label: BINDING_LABELS[source],
+              }))}
+            />
+          </Card>
+        </>
       ) : null}
 
-      {PROVIDERS.map((provider) => {
-        const connection = connections.find(
-          (row) => row.provider === provider.id,
-        );
-        return (
-          <Card key={provider.id}>
-            <CardHeader className="justify-between">
-              <span className="flex items-center gap-2">
-                {provider.label}
-                {connection ? (
-                  <Chip tone={STATE_TONE[connection.state] ?? "neutral"}>
-                    {connection.state}
-                  </Chip>
-                ) : (
-                  <Chip tone="neutral">{t("admin.channels.notConnected")}</Chip>
-                )}
-                {connection && !connection.lastVerifiedAt ? (
-                  <Chip tone="warn">{t("admin.channels.neverVerified")}</Chip>
-                ) : null}
-              </span>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-3">
-              {!provider.ready ? (
-                <p className="text-sm text-ink-3">
-                  {t("admin.channels.noDriverYetThe")}
-                </p>
-              ) : connection ? (
-                <>
-                  {/* The confirmation, from server state rather than from the
-                      form's own answer. A successful connect revalidates the
-                      page, which replaces the tree the form was in, so its
-                      message would never survive to be read. What an
-                      administrator needs to know is a fact about the
-                      connection, not about the request. */}
-                  {connection.lastVerifiedAt ? null : (
-                    <p className="rounded-md bg-warn-bg px-2.5 py-1.5 text-xs text-warn">
-                      {t("admin.channels.storedAndConnectedRather")}
-                    </p>
-                  )}
-                  <dl className="grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-1 text-xs">
-                    <dt className="text-ink-3">
-                      {t("admin.channels.lastVerified")}
-                    </dt>
-                    <dd className="text-ink-2">
-                      {when(connection.lastVerifiedAt)}
-                    </dd>
-                    <dt className="text-ink-3">
-                      {t("admin.channels.workspaceId")}
-                    </dt>
-                    <dd className="text-ink-2">
-                      {String(connection.config.teamId ?? "not set")}
-                    </dd>
-                    {connection.error ? (
-                      <>
-                        <dt className="text-ink-3">
-                          {t("admin.channels.lastComplaint")}
-                        </dt>
-                        <dd className="text-bad">{connection.error}</dd>
-                      </>
-                    ) : null}
-                  </dl>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ChannelForm action={sendTest}>
-                      <input type="hidden" name="attempt" value={attempt} />
-                      <Button type="submit" variant="default" size="sm">
-                        {t("admin.channels.sendMeATest")}
-                      </Button>
-                    </ChannelForm>
-                    <ChannelForm action={disconnectProvider}>
-                      <input
-                        type="hidden"
-                        name="provider"
-                        value={provider.id}
-                      />
-                      <Button type="submit" variant="ghost" size="sm">
-                        {t("admin.channels.disconnect")}
-                      </Button>
-                    </ChannelForm>
-                  </div>
-
-                  <details className="text-xs">
-                    <summary className="cursor-pointer text-ink-3">
-                      {t("admin.channels.replaceTheCredentials")}
-                    </summary>
-                    <ConnectFields
-                      provider={provider.id}
-                      hint={provider.hint}
-                    />
-                  </details>
-                </>
-              ) : (
-                <ConnectFields provider={provider.id} hint={provider.hint} />
-              )}
-            </CardBody>
-          </Card>
-        );
-      })}
+      <GroupHeading title={t("admin.channels.groupDelivery")} />
 
       <Card>
-        <CardHeader>{t("admin.channels.recentMessages")}</CardHeader>
+        <CardHeader>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-sm font-semibold text-ink">
+              {t("admin.channels.recentMessages")}
+            </h2>
+            <p className="text-xs text-ink-3">
+              {t("admin.channels.recentMessagesHint")}
+            </p>
+          </div>
+        </CardHeader>
         <CardBody>
           {messages.length === 0 ? (
             <p className="text-sm text-ink-3">
               {t("admin.channels.nothingHasBeenSent")}
             </p>
           ) : (
-            <ul className="flex flex-col gap-1.5">
-              {messages.map((message) => (
+            <ul
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+              tabIndex={0}
+              aria-label={t("admin.channels.recentMessages")}
+              // About seven rows, then it scrolls inside the card.
+              className="flex max-h-52 flex-col gap-1.5 overflow-y-auto pr-1.5 overscroll-contain"
+            >
+              {messages.map((message, index) => (
                 <li
-                  key={`${message.createdAt}-${message.provider}`}
+                  // The message row carries no id, and two sent in the same
+                  // millisecond share a time and provider. The list is
+                  // read-only, so the position is a stable tiebreaker.
+                  // biome-ignore lint/suspicious/noArrayIndexKey: no id on the row.
+                  key={`${index}-${message.createdAt}-${message.provider}`}
                   className="flex flex-wrap items-center gap-2 text-xs"
                 >
                   <Chip tone="neutral">{message.provider}</Chip>
@@ -470,6 +544,15 @@ export default async function ChannelsPage() {
         </CardBody>
       </Card>
     </div>
+  );
+}
+
+/** The heading of a run of cards. */
+function GroupHeading({ title }: { readonly title: string }) {
+  return (
+    <h2 className="mt-2 -mb-1 text-xs font-semibold tracking-wide text-ink-4 uppercase">
+      {title}
+    </h2>
   );
 }
 
@@ -565,46 +648,3 @@ const CONNECT_FIELDS: Readonly<
     },
   ],
 };
-
-/**
- * The provider's fields, empty every time.
- *
- * Never pre-filled from the stored connection, which is the point: the
- * credential went in once and the product cannot read it back, so neither can
- * this screen.
- */
-async function ConnectFields({
-  provider,
-  hint,
-}: {
-  readonly provider: (typeof PROVIDERS)[number]["id"];
-  readonly hint: string;
-}) {
-  const { t } = await getTranslations();
-
-  return (
-    <ChannelForm action={connectProvider} className="mt-2 flex flex-col gap-2">
-      <input type="hidden" name="provider" value={provider} />
-      {CONNECT_FIELDS[provider].map((field) =>
-        field.secret ? (
-          <SecretInput
-            key={field.name}
-            label={t(field.label)}
-            name={field.name}
-            autoComplete="off"
-          />
-        ) : (
-          <IdentifierInput
-            key={field.name}
-            label={t(field.label)}
-            name={field.name}
-          />
-        ),
-      )}
-      <p className="text-xs text-ink-3">{t(hint)}</p>
-      <Button type="submit" variant="primary" size="sm" className="w-fit">
-        {t("common.connect")}
-      </Button>
-    </ChannelForm>
-  );
-}

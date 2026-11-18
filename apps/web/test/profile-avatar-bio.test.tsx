@@ -53,10 +53,10 @@ describe("the picture", () => {
     expect(html).not.toContain("Remove picture");
   });
 
-  test("can be removed once there is one, and says who sees it", () => {
+  test("can be removed once there is one, and says it applies at once", () => {
     const html = avatarForm("/api/blobs/abc/thumbnail");
     expect(html).toContain("Remove picture");
-    expect(html).toContain("Everybody in this workspace sees it");
+    expect(html).toContain("Applies at once");
   });
 
   test("goes through storeUpload and then the member's own profile action", () => {

@@ -467,7 +467,7 @@ Each row is one change: one branch, one commit, one working session. The kit lan
 - a keyboard path;
 - the accessibility scan, which `e2e/s43-accessibility.spec.ts` already runs over every screen.
 
-It also updates any reference mockup that draws a changed field, or records it as a follow-up. Those mockups are 02 cycle workspace, 03 draft coach, 07 weekly session, 08 quarterly review, 12 OKR home and 12b OKR create.
+It also updates any reference mockup that draws a changed field, or records it as a follow-up. Those mockups are 02 cycle workspace, 03 draft coach, 07 weekly session, 08 quarterly review, 12 OKR home and 12b OKR create. **Checked on 13 November 2026 (plan 0.9.0 G6):** only 12b drew a field a change moved. Its champion opens on whoever is drafting (change 8b), so it now reads "Priya Raman" and OBJ-4 passes; the reviewer still opens on nobody. The others (02, 03, 07, 08 and 12) draw no field, and 07's "3 in 10" is the workspace's own 0 to 10 confidence scale.
 
 ## 7. Acceptance criteria
 

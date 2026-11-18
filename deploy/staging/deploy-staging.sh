@@ -124,7 +124,8 @@ workspaces="$(
 if [ -z "$inbox" ]; then
   log "done. Next:"
   if [ "${workspaces:-0}" = "0" ]; then
-    log "  1. finish the setup and welcome wizards in a browser (UAT M01, M02)"
+    log "  1. finish the setup and welcome wizards in a browser (UAT M01, M02)."
+    log "     The setup wizard asks for the setup code that 'up' printed above."
     log "  2. then: sh deploy/staging/deploy-staging.sh --inbox <your inbox>"
   else
     log "  the wizard has run. Create the personas, if you have not:"

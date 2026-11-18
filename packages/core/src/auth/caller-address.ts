@@ -171,7 +171,16 @@ export function withResolvedCaller(request: Request): Request {
   if (resolved !== undefined) {
     headers.set(RESOLVED_CALLER_HEADER, resolved);
   }
-  return new Request(request, { headers });
+  // The router's request may come from another realm (next dev), and the Request
+  // constructor reads a private field of its input, so a copy is built from public properties.
+  return new Request(request.url, {
+    method: request.method,
+    headers,
+    body: request.body,
+    signal: request.signal,
+    // Node requires duplex for a streamed body. Not in the DOM lib types yet.
+    duplex: "half",
+  } as RequestInit);
 }
 
 /** Whether this process has met a caller it could not place (D12). */

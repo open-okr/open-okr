@@ -38,6 +38,7 @@ import { previewInvite } from "../invitations/preview.ts";
 import { domainIsTrusted } from "../invitations/trusted-domain.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import type { KeyRing } from "../secrets/key-ring.ts";
+import { checkSetupCode, SETUP_CODE_HEADER } from "../setup/setup-code.ts";
 import { readSetupState } from "../setup/state.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import { browserTimezoneFromCookies } from "../workspaces/browser-timezone.ts";
@@ -361,6 +362,16 @@ export interface AuthOptions {
    * one-process command wants.
    */
   readonly rateLimitStorage?: AuthLimiterStorage;
+  /**
+   * Asks for the setup code before the first account is created
+   * (docs/design/setup-code.md D7, D8). The web app passes it, with
+   * `environmentCode` set to the normalised `OPENOKR_SETUP_CODE` when the
+   * deployment has one. **Absent means no code is asked for**, which is what
+   * the many tests that claim an instance by signing up, and the commands
+   * that build their own instance, rely on. The only production caller is
+   * `apps/web/lib/auth.ts`, which always passes it.
+   */
+  readonly setupCode?: { readonly environmentCode?: string };
   /**
    * Holding password sign-in after too many failures (docs/design/
    * account-lockout.md, plan 0.7.0 P10). On by default, tests included, like
@@ -1353,6 +1364,29 @@ export function createAuth(options: AuthOptions) {
             // there is nobody to prove the address to.
             const setup = await readSetupState(options.pool);
             if (!setup.configured && !setup.hasUser) {
+              // **The claim needs the setup code** (docs/design/setup-code.md
+              // D7, D8). Here, beside the rule it narrows, so no route that
+              // creates a user can reach the first account without it. A
+              // claimed instance never reads the header. Not 403, for the
+              // reason the registration refusal below gives.
+              if (options.setupCode) {
+                const verdict = await checkSetupCode(
+                  options.pool,
+                  options.secret,
+                  hookContext?.headers?.get(SETUP_CODE_HEADER),
+                  options.setupCode.environmentCode,
+                );
+                if (verdict !== "ok") {
+                  throw new APIError("UNPROCESSABLE_ENTITY", {
+                    message:
+                      "That setup code is not right. Check it and try again.",
+                    code:
+                      verdict === "required"
+                        ? "SETUP_CODE_REQUIRED"
+                        : "SETUP_CODE_WRONG",
+                  });
+                }
+              }
               return { data: { ...user, emailVerified: true } };
             }
 

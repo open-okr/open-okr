@@ -3,6 +3,9 @@
 import type { RoleDomain } from "@openokr/db";
 import {
   Button,
+  Card,
+  CardBody,
+  CardHeader,
   SelectInput,
   Spinner,
   TextInput,
@@ -113,235 +116,261 @@ export function RoleMatrix({
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      {problem ? (
-        <p role="alert" className="text-xs text-bad">
-          {problem}
-        </p>
-      ) : null}
+    <Card>
+      <CardHeader className="justify-between">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2 className="text-sm font-semibold text-ink">
+            {t("admin.roles.permissions")}
+          </h2>
+          <p className="text-xs text-ink-3">
+            {t("admin.roles.permissionsHint")}
+          </p>
+        </div>
+        {/* Hidden while the form is open: the form's own submit carries the
+         * same name, and two buttons called "Add role" would read as one. */}
+        {adding ? null : (
+          <Button type="button" size="sm" onClick={() => setAdding(true)}>
+            {t("admin.roles.addRole")}
+          </Button>
+        )}
+      </CardHeader>
+      <CardBody className="flex flex-col gap-4">
+        {problem ? (
+          <p role="alert" className="text-xs text-bad">
+            {problem}
+          </p>
+        ) : null}
 
-      {/* The table scrolls, the page never does: seven domains and five
-       * choices do not fit a phone, and shrinking the cells would make the
-       * words unreadable before it made the table fit. */}
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[52rem] border-collapse">
-          <thead>
-            <tr className="border-b border-line">
-              <th
-                scope="col"
-                className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-ink-3"
-              >
-                {t("admin.roles.role")}
-              </th>
-              {domains.map((domain) => (
+        {/* The table scrolls, the page never does: seven domains and five
+         * choices do not fit a phone, and shrinking the cells would make the
+         * words unreadable before it made the table fit. */}
+        <div className="relative overflow-x-auto">
+          <table className="w-full min-w-[60rem] table-fixed border-collapse">
+            <thead>
+              <tr className="border-b border-line">
                 <th
-                  key={domain}
                   scope="col"
-                  className="px-2 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-ink-3"
+                  className="w-[160px] px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-ink-3"
                 >
-                  {t(DOMAIN_LABEL[domain] ?? "admin.roles.domainGoal")}
+                  {t("admin.roles.role")}
                 </th>
-              ))}
-              <th scope="col" className="px-3 py-2">
-                <span className="sr-only">{t("admin.roles.rowActions")}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {roles.map((role) => (
-              <tr key={role.id} className="border-b border-line align-top">
-                <th scope="row" className="px-3 py-2.5 text-left">
-                  <span className="flex flex-col gap-0.5">
-                    <span className="text-sm font-semibold text-ink">
-                      {role.name}
-                    </span>
-                    {/* Two spans rather than one sentence glued from two
-                     * pieces: a message assembled beside another value is one
-                     * a translator cannot place, which the catalogue gate
-                     * refuses and is right to. */}
-                    <span className="text-[11px] text-ink-3">
-                      {t("admin.roles.heldBy", { count: role.memberCount })}
-                    </span>
-                    {role.isDefault ? (
-                      <span className="text-[11px] text-ink-3">
-                        {t("admin.roles.isDefault")}
-                      </span>
-                    ) : null}
-                    {role.editable ? null : (
-                      <span className="text-[11px] text-ink-4">
-                        {t("admin.roles.ownerIsFixed")}
-                      </span>
-                    )}
-                  </span>
+                {domains.map((domain) => (
+                  <th
+                    key={domain}
+                    scope="col"
+                    className="px-1 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-ink-3"
+                  >
+                    {t(DOMAIN_LABEL[domain] ?? "admin.roles.domainGoal")}
+                  </th>
+                ))}
+                <th scope="col" className="w-[88px] px-3 py-2">
+                  <span className="sr-only">{t("admin.roles.rowActions")}</span>
                 </th>
-
-                {domains.map((domain) => {
-                  const level =
-                    role.permissions.find((entry) => entry.domain === domain)
-                      ?.level ?? 0;
-                  const label = t("admin.roles.cellFor", {
-                    role: role.name,
-                    domain: t(DOMAIN_LABEL[domain] ?? "admin.roles.domainGoal"),
-                  });
-                  return (
-                    <td key={domain} className="px-2 py-2.5">
-                      {role.editable ? (
-                        <span className="flex items-center gap-1.5">
-                          <SelectInput
-                            label={label}
-                            hideLabel
-                            value={level}
-                            disabled={pending}
-                            onChange={(event) =>
-                              run(`${role.id}:${domain}`, () =>
-                                setPermissionAction({
-                                  roleId: role.id,
-                                  domain,
-                                  level: Number(event.target.value) as
-                                    | 0
-                                    | 10
-                                    | 40
-                                    | 70
-                                    | 100,
-                                }),
-                              )
-                            }
-                            // `w-auto`, so the browser sizes the select to its
-                            // widest choice in whatever language is showing.
-                            // At the kit's `w-full` a percentage width counts
-                            // as nothing when the table shares out its width,
-                            // and the columns shrank until "Manage" read
-                            // "Man" (Q-10d, 0.8.0 acceptance test).
-                            inputClassName="h-7 w-auto px-1.5 text-xs"
-                          >
-                            {LEVELS.map((entry) => (
-                              <option key={entry.value} value={entry.value}>
-                                {t(entry.key)}
-                              </option>
-                            ))}
-                          </SelectInput>
-                          {pending && acting === `${role.id}:${domain}` ? (
-                            <Spinner />
-                          ) : null}
+              </tr>
+            </thead>
+            <tbody>
+              {roles.map((role) => (
+                <tr key={role.id} className="border-b border-line align-top">
+                  <th scope="row" className="w-[160px] px-3 py-2.5 text-left">
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-sm font-semibold text-ink">
+                        {role.name}
+                      </span>
+                      {/* Two spans rather than one sentence glued from two
+                       * pieces: a message assembled beside another value is one
+                       * a translator cannot place, which the catalogue gate
+                       * refuses and is right to. */}
+                      <span className="text-xs font-normal text-ink-3">
+                        {t("admin.roles.heldBy", { count: role.memberCount })}
+                      </span>
+                      {role.isDefault ? (
+                        <span className="text-xs font-normal text-ink-3">
+                          {t("admin.roles.isDefault")}
                         </span>
-                      ) : (
-                        <span className="text-xs text-ink-3">
-                          {t(
-                            LEVELS.find((entry) => entry.value === level)
-                              ?.key ?? "admin.roles.levelNone",
-                          )}
+                      ) : null}
+                      {role.editable ? null : (
+                        <span className="text-xs font-normal text-ink-3">
+                          {t("admin.roles.ownerIsFixed")}
                         </span>
                       )}
-                    </td>
-                  );
-                })}
+                    </span>
+                  </th>
 
-                <td className="px-3 py-2.5 text-right">
-                  {role.editable && role.builtinKey === null ? (
-                    confirming === role.id ? (
-                      <span className="flex items-center justify-end gap-1">
+                  {domains.map((domain) => {
+                    const level =
+                      role.permissions.find((entry) => entry.domain === domain)
+                        ?.level ?? 0;
+                    const label = t("admin.roles.cellFor", {
+                      role: role.name,
+                      domain: t(
+                        DOMAIN_LABEL[domain] ?? "admin.roles.domainGoal",
+                      ),
+                    });
+                    return (
+                      <td key={domain} className="px-1 py-2.5">
+                        {role.editable ? (
+                          <span className="flex items-center gap-1">
+                            <SelectInput
+                              className="min-w-0 flex-1"
+                              label={label}
+                              hideLabel
+                              value={level}
+                              disabled={pending}
+                              onChange={(event) =>
+                                run(`${role.id}:${domain}`, () =>
+                                  setPermissionAction({
+                                    roleId: role.id,
+                                    domain,
+                                    level: Number(event.target.value) as
+                                      | 0
+                                      | 10
+                                      | 40
+                                      | 70
+                                      | 100,
+                                  }),
+                                )
+                              }
+                              // `w-auto`, so the browser sizes the select to its
+                              // widest choice in whatever language is showing.
+                              // At the kit's `w-full` a percentage width counts
+                              // as nothing when the table shares out its width,
+                              // and the columns shrank until "Manage" read
+                              // "Man" (Q-10d, 0.8.0 acceptance test).
+                              inputClassName="h-7 w-full min-w-0 pl-1 pr-5! bg-position-[right_0.25rem_center] text-xs"
+                            >
+                              {LEVELS.map((entry) => (
+                                <option key={entry.value} value={entry.value}>
+                                  {t(entry.key)}
+                                </option>
+                              ))}
+                            </SelectInput>
+                            {pending && acting === `${role.id}:${domain}` ? (
+                              <Spinner />
+                            ) : null}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-ink-3">
+                            {t(
+                              LEVELS.find((entry) => entry.value === level)
+                                ?.key ?? "admin.roles.levelNone",
+                            )}
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+
+                  <td className="px-3 py-2.5 text-right">
+                    {role.editable && role.builtinKey === null ? (
+                      confirming === role.id ? (
+                        <span className="flex flex-col items-end gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={pending}
+                            pending={pending && acting === `delete:${role.id}`}
+                            onClick={() =>
+                              run(`delete:${role.id}`, async () => {
+                                const result = await deleteRoleAction({
+                                  id: role.id,
+                                });
+                                setConfirming(null);
+                                return result;
+                              })
+                            }
+                          >
+                            {t("common.delete")}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => setConfirming(null)}
+                          >
+                            {t("common.cancel")}
+                          </Button>
+                        </span>
+                      ) : (
                         <Button
                           type="button"
                           size="sm"
                           disabled={pending}
-                          pending={pending && acting === `delete:${role.id}`}
-                          onClick={() =>
-                            run(`delete:${role.id}`, async () => {
-                              const result = await deleteRoleAction({
-                                id: role.id,
-                              });
-                              setConfirming(null);
-                              return result;
-                            })
-                          }
+                          onClick={() => setConfirming(role.id)}
                         >
                           {t("common.delete")}
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => setConfirming(null)}
-                        >
-                          {t("common.cancel")}
-                        </Button>
-                      </span>
-                    ) : (
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={pending}
-                        onClick={() => setConfirming(role.id)}
-                      >
-                        {t("common.delete")}
-                      </Button>
-                    )
-                  ) : null}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                      )
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-      {adding ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <TextInput
-            label={t("admin.roles.addRole")}
-            hideLabel
-            // Focused through a ref rather than `autoFocus`, which also steals
-            // focus when a page loads with one of these already open.
-            ref={(node) => node?.focus()}
-            value={name}
-            placeholder={t("admin.roles.namePlaceholder")}
-            disabled={pending}
-            error={nameRefused}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                setName("");
-                setAdding(false);
-              }
-            }}
-            maxLength={60}
-            className="w-56"
-            inputClassName="px-2 text-xs"
-          />
-          <Button
-            type="button"
-            variant="primary"
-            disabled={name.trim() === "" || (pending && acting !== "create")}
-            pending={pending && acting === "create"}
-            onClick={() =>
-              run("create", async () => {
-                const result = await createRoleAction({ name: name.trim() });
-                if (!result.error && !result.fields) {
+        {adding ? (
+          <div className="grid grid-cols-12 gap-x-6 gap-y-4">
+            <div className="col-span-12 md:col-span-9">
+              <TextInput
+                label={t("admin.roles.addRole")}
+                hideLabel
+                // Focused through a ref rather than `autoFocus`, which also
+                // steals focus when a page loads with one of these already open.
+                ref={(node) => node?.focus()}
+                value={name}
+                placeholder={t("admin.roles.namePlaceholder")}
+                disabled={pending}
+                error={nameRefused}
+                onChange={(event) => setName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setName("");
+                    setAdding(false);
+                  }
+                }}
+                maxLength={60}
+                className="w-full"
+                inputClassName="px-2 text-xs"
+              />
+            </div>
+            <div className="col-span-12 flex items-start gap-2 md:col-span-3">
+              <Button
+                type="button"
+                variant="primary"
+                className="flex-1"
+                disabled={
+                  name.trim() === "" || (pending && acting !== "create")
+                }
+                pending={pending && acting === "create"}
+                onClick={() =>
+                  run("create", async () => {
+                    const result = await createRoleAction({
+                      name: name.trim(),
+                    });
+                    if (!result.error && !result.fields) {
+                      setName("");
+                      setAdding(false);
+                    }
+                    return result;
+                  })
+                }
+              >
+                {t("admin.roles.addRole")}
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                disabled={pending}
+                onClick={() => {
                   setName("");
                   setAdding(false);
-                }
-                return result;
-              })
-            }
-          >
-            {t("common.save")}
-          </Button>
-          <Button
-            type="button"
-            disabled={pending}
-            onClick={() => {
-              setName("");
-              setAdding(false);
-            }}
-          >
-            {t("common.cancel")}
-          </Button>
-        </div>
-      ) : (
-        <div>
-          <Button type="button" onClick={() => setAdding(true)}>
-            {t("admin.roles.addRole")}
-          </Button>
-        </div>
-      )}
-    </div>
+                }}
+              >
+                {t("common.cancel")}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </CardBody>
+    </Card>
   );
 }

@@ -59,31 +59,40 @@ export function PasswordCard({
   return (
     <Card data-testid="password-card">
       <CardHeader>
-        <h2 className="text-sm font-bold text-ink">
-          {card.kind === "set"
-            ? t("account.security.password.setTitle")
-            : t("account.security.password.title")}
-        </h2>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2 className="text-sm font-semibold text-ink">
+            {card.kind === "set"
+              ? t("account.security.password.setTitle")
+              : t("account.security.password.title")}
+          </h2>
+          {card.kind === "change" ? (
+            <p className="text-xs text-ink-3">
+              {t("account.security.password.hint")}
+            </p>
+          ) : null}
+        </div>
       </CardHeader>
-      <CardBody className="flex flex-col items-start gap-3">
-        {card.kind === "demo" ? (
-          <p className="max-w-prose text-sm text-ink-3">
-            {t("account.security.password.demo")}
-          </p>
-        ) : card.kind === "enforced" ? (
-          <p className="max-w-prose text-sm text-ink-3">{card.message}</p>
-        ) : card.kind === "change" ? (
-          <ChangePassword />
-        ) : card.recent ? (
-          <SetPassword setPassword={setPassword} />
-        ) : (
-          <SignInAgain
-            providers={card.providers}
-            intro={t("account.security.password.signInAgainFirst")}
-            callbackURL="/account/security"
-          />
-        )}
-      </CardBody>
+      {card.kind === "change" ? (
+        <ChangePassword />
+      ) : card.kind === "set" && card.recent ? (
+        <SetPassword setPassword={setPassword} />
+      ) : (
+        <CardBody className="flex flex-col items-start gap-3">
+          {card.kind === "demo" ? (
+            <p className="max-w-prose text-sm text-ink-3">
+              {t("account.security.password.demo")}
+            </p>
+          ) : card.kind === "enforced" ? (
+            <p className="max-w-prose text-sm text-ink-3">{card.message}</p>
+          ) : card.kind === "set" ? (
+            <SignInAgain
+              providers={card.providers}
+              intro={t("account.security.password.signInAgainFirst")}
+              callbackURL="/account/security"
+            />
+          ) : null}
+        </CardBody>
+      )}
     </Card>
   );
 }
@@ -174,96 +183,113 @@ function ChangePassword() {
   };
 
   return (
-    <form
-      onSubmit={submit}
-      aria-busy={pending}
-      className="flex w-full max-w-md flex-col items-start gap-3"
-    >
-      <SecretInput
-        id="current-password"
-        label={t("account.security.password.current")}
-        autoComplete="current-password"
-        required
-        className="w-full"
-        value={current}
-        error={errors.current ?? null}
-        onChange={(event) => setCurrent(event.target.value)}
-      />
-      <SecretInput
-        id="new-password"
-        label={t("account.security.password.new")}
-        description={t("account.security.password.atLeast")}
-        autoComplete="new-password"
-        required
-        className="w-full"
-        value={next}
-        error={errors.next ?? null}
-        onChange={(event) => setNext(event.target.value)}
-      />
-      <SecretInput
-        id="new-password-again"
-        label={t("account.security.password.again")}
-        autoComplete="new-password"
-        required
-        className="w-full"
-        value={again}
-        error={errors.again ?? null}
-        onChange={(event) => setAgain(event.target.value)}
-      />
-      <label className="flex items-start gap-2.5 text-sm text-ink">
-        <input
-          type="checkbox"
-          name="signOutOthers"
-          checked={signOutOthers}
-          onChange={(event) => setSignOutOthers(event.target.checked)}
-          className="mt-0.5 size-4"
-        />
-        <span className="flex flex-col">
-          <span>{t("account.security.password.signOutOthers")}</span>
-          <span className="text-xs text-ink-3">
-            {t("account.security.password.signOutOthersHelp")}
-          </span>
-        </span>
-      </label>
-      <Button type="submit" variant="primary" size="sm" pending={pending}>
-        {t("account.security.password.change")}
-      </Button>
-      <FormError>
-        {heldMinutes !== null ? (
-          <>
-            {heldMinutes === 1
-              ? t("auth.signIn.heldForAMinute")
-              : t("auth.signIn.heldForMinutes", { minutes: heldMinutes })}{" "}
-            <Link href="/forgot-password" className="underline">
-              {t("auth.signIn.resetYourPassword")}
-            </Link>
-          </>
-        ) : (
-          failure
-        )}
-      </FormError>
-      <div role="status" aria-live="polite" className="contents">
-        {done === null ? null : (
-          <div className="flex flex-col gap-1.5 rounded-md bg-ok-bg px-2.5 py-1.5 text-xs font-medium text-ok">
-            <p>
-              {done === "signedOut"
-                ? t("account.security.password.changedSignedOut")
-                : t("account.security.password.changedStaySignedIn")}
-            </p>
-            {done === "signedOut" ? (
-              <p className="flex gap-3">
-                <Link href="/account/api-tokens" className="underline">
-                  {t("account.security.password.apiTokens")}
+    <>
+      <CardBody>
+        <form
+          id="change-password-form"
+          onSubmit={submit}
+          aria-busy={pending}
+          className="grid grid-cols-12 gap-x-6 gap-y-4"
+        >
+          <SecretInput
+            id="current-password"
+            label={t("account.security.password.current")}
+            autoComplete="current-password"
+            required
+            className="col-span-12"
+            value={current}
+            error={errors.current ?? null}
+            onChange={(event) => setCurrent(event.target.value)}
+          />
+          <SecretInput
+            id="new-password"
+            label={t("account.security.password.new")}
+            description={t("account.security.password.atLeast")}
+            autoComplete="new-password"
+            required
+            className="col-span-12 md:col-span-6"
+            value={next}
+            error={errors.next ?? null}
+            onChange={(event) => setNext(event.target.value)}
+          />
+          <SecretInput
+            id="new-password-again"
+            label={t("account.security.password.again")}
+            autoComplete="new-password"
+            required
+            className="col-span-12 md:col-span-6"
+            value={again}
+            error={errors.again ?? null}
+            onChange={(event) => setAgain(event.target.value)}
+          />
+          <label className="col-span-12 flex items-start gap-2.5 text-sm text-ink">
+            <input
+              type="checkbox"
+              name="signOutOthers"
+              checked={signOutOthers}
+              onChange={(event) => setSignOutOthers(event.target.checked)}
+              className="mt-0.5 size-4"
+            />
+            <span className="flex flex-col">
+              <span>{t("account.security.password.signOutOthers")}</span>
+              <span className="text-xs text-ink-3">
+                {t("account.security.password.signOutOthersHelp")}
+              </span>
+            </span>
+          </label>
+        </form>
+      </CardBody>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-line border-t px-3.5 py-2.5">
+        <div className="flex min-w-0 flex-col gap-1.5 text-sm">
+          <FormError>
+            {heldMinutes !== null ? (
+              <>
+                {heldMinutes === 1
+                  ? t("auth.signIn.heldForAMinute")
+                  : t("auth.signIn.heldForMinutes", {
+                      minutes: heldMinutes,
+                    })}{" "}
+                <Link href="/forgot-password" className="underline">
+                  {t("auth.signIn.resetYourPassword")}
                 </Link>
-                <Link href="/account/connections" className="underline">
-                  {t("account.security.password.connectedApps")}
-                </Link>
-              </p>
-            ) : null}
+              </>
+            ) : (
+              failure
+            )}
+          </FormError>
+          <div role="status" aria-live="polite" className="contents">
+            {done === null ? null : (
+              <div className="flex flex-col gap-1.5 rounded-md bg-ok-bg px-2.5 py-1.5 text-xs font-medium text-ok">
+                <p>
+                  {done === "signedOut"
+                    ? t("account.security.password.changedSignedOut")
+                    : t("account.security.password.changedStaySignedIn")}
+                </p>
+                {done === "signedOut" ? (
+                  <p className="flex gap-3">
+                    <Link href="/account/api-tokens" className="underline">
+                      {t("account.security.password.apiTokens")}
+                    </Link>
+                    <Link href="/account/connections" className="underline">
+                      {t("account.security.password.connectedApps")}
+                    </Link>
+                  </p>
+                ) : null}
+              </div>
+            )}
           </div>
-        )}
+        </div>
+        <Button
+          type="submit"
+          form="change-password-form"
+          variant="primary"
+          size="sm"
+          pending={pending}
+        >
+          {t("account.security.password.change")}
+        </Button>
       </div>
-    </form>
+    </>
   );
 }
 
@@ -286,48 +312,65 @@ function SetPassword({
   };
   if (state?.ok) {
     return (
-      <p
-        role="status"
-        className="rounded-md bg-ok-bg px-2.5 py-1.5 text-xs font-medium text-ok"
-      >
-        {state.message}
-      </p>
+      <CardBody>
+        <p
+          role="status"
+          className="max-w-prose rounded-md bg-ok-bg px-2.5 py-1.5 text-xs font-medium text-ok"
+        >
+          {state.message}
+        </p>
+      </CardBody>
     );
   }
   return (
-    <form
-      action={formAction}
-      onSubmit={submit}
-      aria-busy={pending}
-      className="flex w-full max-w-md flex-col items-start gap-3"
-    >
-      <p className="max-w-prose text-sm text-ink-3">
-        {t("account.security.password.setIntro")}
-      </p>
-      <SecretInput
-        id="set-password"
-        name="newPassword"
-        label={t("account.security.password.new")}
-        description={t("account.security.password.atLeast")}
-        autoComplete="new-password"
-        required
-        className="w-full"
-        error={state?.field === "newPassword" ? state.message : null}
-      />
-      <SecretInput
-        id="set-password-again"
-        name="again"
-        label={t("account.security.password.again")}
-        autoComplete="new-password"
-        required
-        className="w-full"
-        error={state?.field === "again" ? state.message : null}
-      />
-      <Button type="submit" variant="primary" size="sm" pending={pending}>
-        {t("common.save")}
-      </Button>
-      <FormError>{state && !state.field ? state.message : null}</FormError>
-    </form>
+    <>
+      <CardBody>
+        <form
+          id="set-password-form"
+          action={formAction}
+          onSubmit={submit}
+          aria-busy={pending}
+          className="grid grid-cols-12 gap-x-6 gap-y-4"
+        >
+          <p className="col-span-12 max-w-prose text-sm text-ink-3">
+            {t("account.security.password.setIntro")}
+          </p>
+          <SecretInput
+            id="set-password"
+            name="newPassword"
+            label={t("account.security.password.new")}
+            description={t("account.security.password.atLeast")}
+            autoComplete="new-password"
+            required
+            className="col-span-12 md:col-span-6"
+            error={state?.field === "newPassword" ? state.message : null}
+          />
+          <SecretInput
+            id="set-password-again"
+            name="again"
+            label={t("account.security.password.again")}
+            autoComplete="new-password"
+            required
+            className="col-span-12 md:col-span-6"
+            error={state?.field === "again" ? state.message : null}
+          />
+        </form>
+      </CardBody>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-line border-t px-3.5 py-2.5">
+        <div className="min-w-0 text-sm">
+          <FormError>{state && !state.field ? state.message : null}</FormError>
+        </div>
+        <Button
+          type="submit"
+          form="set-password-form"
+          variant="primary"
+          size="sm"
+          pending={pending}
+        >
+          {t("common.save")}
+        </Button>
+      </div>
+    </>
   );
 }
 

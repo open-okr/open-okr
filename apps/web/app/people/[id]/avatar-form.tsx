@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Avatar,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  useTranslations,
-} from "@openokr/ui";
+import { Avatar, Button, useTranslations } from "@openokr/ui";
 import { useActionState, useState, useTransition } from "react";
 import type { ProfileResult } from "../actions.ts";
 
@@ -18,6 +11,11 @@ import type { ProfileResult } from "../actions.ts";
  * set one. The picture goes through the one upload path, so it is re-encoded
  * and given the thumbnail this card and the header show; the file input
  * offers only the four image types that path keeps.
+ *
+ * **Bare, since the account settings layout** (docs/design/
+ * settings-page-layout.md): it draws no card of its own, because it sits in
+ * the "Name and picture" card on Your account. It stays its own form, and it
+ * applies at once, so it has no save bar.
  *
  * **Every state says itself.** Choosing nothing and pressing the button is a
  * sentence, a refusal is the action's own words in an alert, and while the
@@ -47,24 +45,14 @@ export function AvatarForm({
   const state = removing || uploading ? null : (removal ?? uploaded);
 
   return (
-    <Card>
-      <CardHeader>
-        <h2 className="text-sm font-bold text-ink">
-          {t("people.detail.avatarForm.yourPicture")}
-        </h2>
-      </CardHeader>
-      <CardBody className="flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <Avatar
-            name={name}
-            src={avatarUrl}
-            size="lg"
-            className="size-12 text-base"
-          />
-          <p className="text-xs text-ink-3">
-            {t("people.detail.avatarForm.everybodyInThisWorkspace")}
-          </p>
-        </div>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-3">
+        <Avatar
+          name={name}
+          src={avatarUrl}
+          size="lg"
+          className="size-12 text-base"
+        />
         <form
           action={upload}
           onSubmit={() => setRemoval(null)}
@@ -107,18 +95,21 @@ export function AvatarForm({
               {t("people.detail.avatarForm.removePicture")}
             </Button>
           ) : null}
+          <span className="rounded-full bg-raised px-2 text-xs font-semibold text-ink-3">
+            {t("common.appliesAtOnce")}
+          </span>
         </form>
-        {state?.ok === true ? (
-          <p className="text-xs text-good" role="status">
-            {state.message}
-          </p>
-        ) : null}
-        {state?.ok === false ? (
-          <p className="text-xs text-bad" role="alert">
-            {state.message}
-          </p>
-        ) : null}
-      </CardBody>
-    </Card>
+      </div>
+      {state?.ok === true ? (
+        <p className="text-xs text-good" role="status">
+          {state.message}
+        </p>
+      ) : null}
+      {state?.ok === false ? (
+        <p className="text-xs text-bad" role="alert">
+          {state.message}
+        </p>
+      ) : null}
+    </div>
   );
 }

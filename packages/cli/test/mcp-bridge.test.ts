@@ -53,13 +53,14 @@ function instance(
 async function bridge(
   lines: readonly string[],
   fetch: typeof globalThis.fetch,
+  url = "https://okr.example/",
 ): Promise<unknown[]> {
   const input = new PassThrough();
   const output = new PassThrough();
   const written: string[] = [];
   output.on("data", (chunk) => written.push(String(chunk)));
   const done = runMcpBridge({
-    url: "https://okr.example/",
+    url,
     token: "okr_mcp_agenttoken",
     input,
     output,
@@ -258,6 +259,52 @@ describe("okr mcp", () => {
       url: "https://okr.example",
       token: "okr_rest_atokenatoken",
       mcpToken: "okr_mcp_agenttokenagent",
+    });
+  });
+
+  it("refuses an http address that is not the machine's own, before sending anything", async () => {
+    const fake = instance((body) => ({
+      body: { jsonrpc: "2.0", id: body.id, result: {} },
+    }));
+    await expect(
+      bridge(
+        [JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" })],
+        fake.fetch,
+        "http://okr.example/",
+      ),
+    ).rejects.toThrow(/https/);
+    expect(fake.seen).toEqual([]);
+  });
+
+  it("allows http for localhost", async () => {
+    const fake = instance((body) => ({
+      body: { jsonrpc: "2.0", id: body.id, result: {} },
+    }));
+    const answers = await bridge(
+      [JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" })],
+      fake.fetch,
+      "http://localhost:3000",
+    );
+    expect(answers).toEqual([{ jsonrpc: "2.0", id: 1, result: {} }]);
+    expect(fake.seen[0]?.url).toBe("http://localhost:3000/api/mcp");
+  });
+
+  it("refuses a redirect to another origin and says so on the request", async () => {
+    const fake = instance(() => ({
+      status: 302,
+      headers: { location: "https://elsewhere.example/api/mcp" },
+    }));
+    const answers = await bridge(
+      [JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" })],
+      fake.fetch,
+    );
+    // Only the first address was asked, so the token went nowhere else.
+    expect(fake.seen).toHaveLength(1);
+    expect(answers).toHaveLength(1);
+    expect(answers[0]).toMatchObject({
+      jsonrpc: "2.0",
+      id: 1,
+      error: { message: expect.stringContaining("redirect") },
     });
   });
 });

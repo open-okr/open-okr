@@ -37,10 +37,11 @@ test.afterAll(async () => {
   await context?.close();
 });
 
-const instructionsOf = (name: string) =>
-  page.locator("details").filter({
-    has: page.getByText(`Instructions for ${name}`, { exact: true }),
-  });
+/** Opens an agent's tab and returns its cards. */
+const openAgent = async (name: string) => {
+  await page.getByRole("tab", { name: new RegExp(name) }).click();
+  return page.getByRole("tabpanel", { name: new RegExp(name) });
+};
 
 test("a custom agent, made over the API", async () => {
   await signIn(page);
@@ -71,24 +72,21 @@ test("a custom agent, made over the API", async () => {
 
 test("acceptance: a saved version has a name, and an older one can be restored", async () => {
   await goTo(page, "/admin/agents");
-  const details = instructionsOf(AGENT);
-  await details.getByText(`Instructions for ${AGENT}`, { exact: true }).click();
-  const planning = details.locator("section").filter({
+  const panel = await openAgent(AGENT);
+  const planning = panel.locator('[data-testid^="agent-stage-"]').filter({
     hasText: "While planning (phases 0 to 5)",
   });
   await planning
     .getByRole("textbox", { name: "While planning (phases 0 to 5)" })
     .fill(NEW_TEXT);
   await planning.getByRole("button", { name: "Save a new version" }).click();
-  await expect(planning.getByRole("status")).toHaveText("Saved as version 1.", {
+  await expect(planning.getByText("Saved as version 1.")).toBeVisible({
     timeout: 15_000,
   });
 
   await goTo(page, "/admin/agents");
-  await instructionsOf(AGENT)
-    .getByText(`Instructions for ${AGENT}`, { exact: true })
-    .click();
-  const history = instructionsOf(AGENT).getByRole("list", {
+  const reopened = await openAgent(AGENT);
+  const history = reopened.getByRole("list", {
     name: "Versions of While planning (phases 0 to 5)",
   });
   await expect(history).toContainText("Version 1, by");
@@ -96,7 +94,7 @@ test("acceptance: a saved version has a name, and an older one can be restored",
     .getByRole("button", { name: "Restore version 0" })
     .click();
   await expect(
-    instructionsOf(AGENT)
+    reopened
       .getByRole("list", { name: "Versions of While planning (phases 0 to 5)" })
       .getByText(/^Version 2, by/),
   ).toBeVisible({ timeout: 15_000 });
@@ -109,11 +107,7 @@ test("acceptance: with AI off there is no Plan a run, and the Coach's instructio
   });
   await expect(page.getByRole("button", { name: "Plan a run" })).toHaveCount(0);
 
-  const coach = page
-    .locator("details")
-    .filter({ hasText: /follows the method/ })
-    .first();
-  await coach.locator("summary").click();
+  const coach = await openAgent("OKR Coach");
   await expect(coach).toContainText("follows the method");
   await expect(
     coach.getByRole("button", { name: "Save a new version" }),

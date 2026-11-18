@@ -449,16 +449,14 @@ export async function ReviewAndLearn({
                     <p className="text-sm text-ink-2">
                       {t("cycle.reviewAndLearn.closing.started")}
                     </p>
-                    {canEdit ? (
-                      <Button
-                        type="submit"
-                        variant="default"
-                        size="sm"
-                        className="w-fit"
-                      >
-                        {t("cycle.reviewAndLearn.closing.undo")}
-                      </Button>
-                    ) : null}
+                    <Button
+                      type="submit"
+                      variant="default"
+                      size="sm"
+                      className="w-fit"
+                    >
+                      {t("cycle.reviewAndLearn.closing.undo")}
+                    </Button>
                   </ActionForm>
                 )
               ) : (
@@ -471,16 +469,14 @@ export async function ReviewAndLearn({
                   <p className="text-sm text-ink-2">
                     {t("cycle.reviewAndLearn.closing.explains")}
                   </p>
-                  {canEdit ? (
-                    <Button
-                      type="submit"
-                      variant="default"
-                      size="sm"
-                      className="w-fit"
-                    >
-                      {t("cycle.reviewAndLearn.closing.start")}
-                    </Button>
-                  ) : null}
+                  <Button
+                    type="submit"
+                    variant="default"
+                    size="sm"
+                    className="w-fit"
+                  >
+                    {t("cycle.reviewAndLearn.closing.start")}
+                  </Button>
                 </ActionForm>
               )}
             </CardBody>

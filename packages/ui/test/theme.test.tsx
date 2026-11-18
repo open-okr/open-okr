@@ -6,6 +6,7 @@ import {
   resolveTheme,
   THEME_STORAGE_KEY,
   themeInitScript,
+  WIDTH_STORAGE_KEY,
 } from "../src/theme/theme-script.ts";
 
 describe("resolveTheme", () => {
@@ -26,15 +27,29 @@ test("the inline bootstrap script references both storage keys and both DOM attr
   expect(script).toContain(JSON.stringify(DENSITY_STORAGE_KEY));
   expect(script).toContain('data-theme"');
   expect(script).toContain('data-density"');
+  expect(script).toContain(JSON.stringify(WIDTH_STORAGE_KEY));
+  expect(script).toContain('data-width"');
 });
 
 function Probe() {
-  const { theme, resolvedTheme, density, setTheme, setDensity } = useTheme();
+  const {
+    theme,
+    resolvedTheme,
+    density,
+    width,
+    setTheme,
+    setDensity,
+    setWidth,
+  } = useTheme();
   return (
     <div>
       <span data-testid="theme">{theme}</span>
       <span data-testid="resolved">{resolvedTheme}</span>
       <span data-testid="density">{density}</span>
+      <span data-testid="width">{width}</span>
+      <button type="button" onClick={() => setWidth("full")}>
+        full
+      </button>
       <button type="button" onClick={() => setTheme("dark")}>
         dark
       </button>
@@ -90,18 +105,33 @@ describe("ThemeProvider: theme and density persistence end to end", () => {
   });
 
   test("choosing a density persists to localStorage and updates the DOM attribute", async () => {
-    const { getByText } = render(
+    const { getByRole } = render(
       <ThemeProvider>
         <Probe />
       </ThemeProvider>,
     );
     await act(async () => {
-      getByText("compact").click();
+      getByRole("button", { name: "compact" }).click();
     });
     expect(window.localStorage.getItem(DENSITY_STORAGE_KEY)).toBe("compact");
     expect(document.documentElement.getAttribute("data-density")).toBe(
       "compact",
     );
+  });
+
+  test("the width defaults to compact and a choice persists and sets data-width", async () => {
+    const { getByText, getByTestId } = render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    expect(document.documentElement.getAttribute("data-width")).toBe("compact");
+    expect(getByTestId("width").textContent).toBe("compact");
+    await act(async () => {
+      getByText("full").click();
+    });
+    expect(window.localStorage.getItem(WIDTH_STORAGE_KEY)).toBe("full");
+    expect(document.documentElement.getAttribute("data-width")).toBe("full");
   });
 
   test("a stored preference from a previous session is read back on mount", () => {

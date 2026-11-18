@@ -54,15 +54,23 @@ export default async function AdminConnectionsPage({
   );
 
   return (
-    <div className="flex w-full flex-col gap-3.5">
+    <div className="flex w-full flex-col gap-4">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.connections.title")}
+        </h1>
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("admin.connections.lead")}
+        </p>
+      </header>
       <Card>
-        <CardHeader>
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <h1 className="text-lg font-bold text-ink">
-              {t("admin.connections.title")}
-            </h1>
-            <p className="text-xs text-ink-3">{t("admin.connections.lead")}</p>
-          </div>
+        <CardHeader className="flex-col items-stretch gap-0.5">
+          <h2 className="text-sm font-semibold text-ink">
+            {t("admin.connections.cardTitle")}
+          </h2>
+          <p className="text-xs text-ink-3">
+            {t("admin.connections.cardLead")}
+          </p>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
           <nav
@@ -87,7 +95,13 @@ export default async function AdminConnectionsPage({
                 : t("admin.connections.none")}
             </p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+              tabIndex={0}
+              aria-label={t("admin.connections.list")}
+              // Scrolls inside the card after about five rows. The pager stays.
+              className="relative flex max-h-[420px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain"
+            >
               {items.map((item) => (
                 <li
                   key={`${item.kind}-${item.id}`}

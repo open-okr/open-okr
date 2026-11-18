@@ -55,10 +55,10 @@ Adding an event later is additive. Renaming or removing one follows PLAN §5.1's
 
 | Part | What it shows |
 |---|---|
-| List | Each hook's name, URL host, events, owner, state (on, paused by the owner's suspension, turned off after failures), and its last delivery's result and time |
-| Create | Name, URL, events (grouped checkboxes), optionally one space to limit it to. On save the secret shows once with a copy control and the line "You will not see this again" |
-| A hook | Its settings, Rotate secret (asks first, shows the new secret once), Send test, Turn off or on, Remove (asks first) |
-| Deliveries | The last 30 days, newest first: event, subject, status, duration, attempt, and Redeliver on a failed one |
+| List | An "All webhooks" card that scrolls at about five rows. Each hook's name, URL host, events, owner, state (on, paused by the owner's suspension, turned off after failures), and its last delivery's result and time |
+| Create | Name, optionally one space to limit it to, URL, events (grouped checkboxes), with a footer holding Discard and "Add the webhook". On save the secret shows once with a copy control and the line "You will not see this again" |
+| A hook | An Actions card of instant actions: Send test, Turn off or on, Take it over, Rotate secret (asks first in an inline panel, shows the new secret once) and Remove (asks first in an inline panel). A Settings card with the same fields as Create and a footer with Discard and "Save changes" |
+| Deliveries | A card that scrolls at about five rows, with Newer and Older kept. The last 30 days, newest first: event, subject, status, duration, attempt, and Redeliver on a failed one |
 | States | Loading, empty ("No webhooks yet" with what one does), error, and permission-denied for a member below the admin level |
 
 All of it works with AI off; nothing here uses AI.

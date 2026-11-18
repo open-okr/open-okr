@@ -19,12 +19,21 @@
  */
 import type {
   AgentDrafter,
+  ChosenReads,
   GroundedChunk,
   GroundedQuestionContext,
+  ProposalRequestContext,
+  ReadingContext,
+  ReadingTool,
 } from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import {
+  PROPOSAL_ALREADY_TEXT,
+  PROPOSAL_MADE_TEXT,
+} from "../src/copilot/propose-tool.ts";
+import { decodeReason } from "../src/copilot/reasons.ts";
 import { runEmbedJob } from "../src/embeddings/worker.ts";
 import { dispatchOutbox } from "../src/outbox/handlers.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
@@ -34,6 +43,7 @@ const QUESTION = "What is the plan for mid-market activation?";
 
 let workspaceId: string;
 let ownerMemberId: string;
+let goalId: string;
 
 /** Answers whole, which is what the drafter port offers. */
 class FixedDrafter implements AgentDrafter {
@@ -236,7 +246,7 @@ beforeEach(async () => {
   const cycleId = (
     (await call("cycles.current", { mode: "quarterly" })) as { id: string }
   ).id;
-  const goalId = (
+  goalId = (
     (await call("goals.create", {
       title: "Raise mid-market activation to sixty per cent",
       cycleId,
@@ -379,10 +389,17 @@ describe("the run, with nobody watching", () => {
 
     const [answer] = await answers();
     expect(answer?.content).toBe("Sixty per cent");
-    expect(answer?.run_halted_reason).toContain("stopped partway");
+    // Stored as a code (plan 0.9.0 CP10); the published event carries the
+    // English sentence and the code.
+    expect(decodeReason(answer?.run_halted_reason ?? null)).toEqual({
+      code: "stopped_partway",
+    });
     expect(published.at(-1)).toMatchObject({
       event: "copilot.done",
-      data: { haltedReason: expect.stringContaining("stopped partway") },
+      data: {
+        haltedReason: expect.stringContaining("stopped partway"),
+        haltedCode: "stopped_partway",
+      },
     });
   });
 
@@ -621,7 +638,9 @@ describe("the run, with nobody watching", () => {
 
     const [answer] = await answers();
     expect(answer?.run_completed_at).not.toBeNull();
-    expect(answer?.run_halted_reason).toContain("did not answer");
+    expect(decodeReason(answer?.run_halted_reason ?? null)).toEqual({
+      code: "provider_error",
+    });
     // Not left in flight. A run that stopped and still said "still writing"
     // is a reader waiting for ever.
     expect(answer?.content).toBe("");
@@ -646,7 +665,10 @@ describe("the run, with nobody watching", () => {
     await drive(null);
 
     const [answer] = await answers();
-    expect(answer?.run_halted_reason).toContain("No AI provider is configured");
+    expect(decodeReason(answer?.run_halted_reason ?? null)).toEqual({
+      code: "ai_off",
+      params: { offReason: "no_provider" },
+    });
     expect(answer?.run_completed_at).not.toBeNull();
   });
 });
@@ -670,7 +692,9 @@ describe("the budget", () => {
     // Not a token spent: the drafter was never called.
     expect(drafter.seen).toEqual([]);
     const [answer] = await answers();
-    expect(answer?.run_halted_reason).toContain("may not spend");
+    expect(decodeReason(answer?.run_halted_reason ?? null)).toMatchObject({
+      code: "cost_cap_before",
+    });
     expect(answer?.run_completed_at).not.toBeNull();
     expect(skipped[0]).toContain("may not spend");
   });
@@ -689,6 +713,309 @@ describe("the budget", () => {
     // The answer is kept: the money is already spent and throwing it away
     // would charge the workspace for nothing.
     expect(answer?.content).toBe("An expensive answer.");
-    expect(answer?.run_halted_reason).toContain("will halt before starting");
+    expect(decodeReason(answer?.run_halted_reason ?? null)).toMatchObject({
+      code: "cost_cap_after",
+    });
+  });
+});
+
+/**
+ * The proposal as a tool in the read loop (plan 0.9.0 A4, design section 11).
+ *
+ * The drafter below plays the model: it runs a script of tool calls, one
+ * array per round, through the same `read` the loop hands every drafter, and
+ * it counts how often the 0.8.1 proposal call (`proposeAction`) is made.
+ * Like the real drafter it leaves first-round-only tools out of every round
+ * after the first, and it still sends a call to one in a later round when the
+ * script says to, which is what a provider that was not offered the tool could
+ * do.
+ */
+type Call = readonly [name: string, args: Record<string, unknown>];
+
+const AUTHORED = {
+  action: "goals.addKeyResult",
+  fields: {
+    title: "Weekly active teams",
+    unit: "teams",
+    direction: "increase",
+    indicatorType: "leading",
+    baseline: 0,
+    target: 50,
+    objectiveNumber: 1,
+  },
+  why: "The member asked for a key result on weekly active teams.",
+};
+
+class ToolDrafter implements AgentDrafter {
+  readonly seen: GroundedQuestionContext[] = [];
+  readonly proposeCalls: ProposalRequestContext[] = [];
+  readonly asked: ReadingContext[] = [];
+  readonly offered: string[][] = [];
+  readonly results: string[] = [];
+  readonly #script: readonly (readonly Call[])[];
+  readonly #authored: typeof AUTHORED | null;
+
+  constructor(
+    script: readonly (readonly Call[])[],
+    authored: typeof AUTHORED | null = null,
+  ) {
+    this.#script = script;
+    this.#authored = authored;
+  }
+
+  async proposeAction(context: ProposalRequestContext) {
+    this.proposeCalls.push(context);
+    return this.#authored;
+  }
+
+  async chooseReads(
+    context: ReadingContext,
+    tools: readonly ReadingTool[],
+    read: (name: string, args: unknown) => Promise<string>,
+    beforeRound: () => Promise<boolean>,
+  ): Promise<ChosenReads> {
+    this.asked.push(context);
+    let reads = 0;
+    for (const [index, calls] of this.#script.entries()) {
+      await beforeRound();
+      this.offered.push(
+        tools
+          .filter((tool) => index === 0 || tool.firstRoundOnly !== true)
+          .map((tool) => tool.name),
+      );
+      for (const [name, args] of calls) {
+        this.results.push(await read(name, args));
+        reads += 1;
+      }
+    }
+    return { reads, limited: false, costUsd: 0, tokensIn: 1, tokensOut: 1 };
+  }
+
+  async answerGrounded(context: GroundedQuestionContext) {
+    this.seen.push(context);
+    return {
+      text: "Done.",
+      usedSourceIndexes: [0],
+      model: "test-model",
+      tokensIn: 10,
+      tokensOut: 20,
+      costUsd: 0.01,
+    };
+  }
+
+  spentUsd() {
+    return 0;
+  }
+}
+
+/** A drafter that cannot call tools: only the 0.8.1 proposal call. */
+class ProposalOnlyDrafter implements AgentDrafter {
+  readonly seen: GroundedQuestionContext[] = [];
+  calls = 0;
+
+  async proposeAction() {
+    this.calls += 1;
+    return AUTHORED;
+  }
+
+  async answerGrounded(context: GroundedQuestionContext) {
+    this.seen.push(context);
+    return {
+      text: "Done.",
+      usedSourceIndexes: [0],
+      model: "test-model",
+      tokensIn: 10,
+      tokensOut: 20,
+      costUsd: 0.01,
+    };
+  }
+
+  spentUsd() {
+    return 0;
+  }
+}
+
+const proposedRows = async () => {
+  const wb = await workerDb();
+  const { rows } = await wb.admin.query<{ action: string }>(
+    "select action from proposed_changes where workspace_id = $1",
+    [workspaceId],
+  );
+  return rows;
+};
+
+const proposeCallRows = async () => {
+  const wb = await workerDb();
+  const { rows } = await wb.admin.query<{
+    tool: string | null;
+    scope: string | null;
+    outcome: string;
+  }>(
+    `select tool, scope, outcome from ai_tool_calls
+      where workspace_id = $1 and source = 'copilot' and tool = 'propose_change'
+      order by called_at, id`,
+    [workspaceId],
+  );
+  return rows;
+};
+
+const askInBackground = async (question: string, extra = {}) =>
+  call("copilot.ask", { question, background: true, ...extra });
+
+describe("the proposal as a tool in the loop (plan 0.9.0 A4)", () => {
+  it("makes no proposal call for a question that asks for no change", async () => {
+    await askInBackground("How is my activation key result doing?");
+    const drafter = new ToolDrafter([[["goals.list", { mine: true }]]]);
+
+    const published = await drive(drafter);
+
+    // The tool was offered in round one and the model did not call it.
+    expect(drafter.offered[0]).toContain("propose_change");
+    expect(drafter.proposeCalls).toHaveLength(0);
+    expect(eventsOf(published)).not.toContain("copilot.proposal");
+    expect(drafter.seen[0]?.proposal).toEqual({ made: false });
+    expect(await proposedRows()).toEqual([]);
+    expect(await proposeCallRows()).toEqual([]);
+    // No separate "proposing" step either: nothing was being built.
+    expect(
+      published.filter(
+        (one) => one.event === "copilot.step" && one.data?.step === "proposing",
+      ),
+    ).toEqual([]);
+  });
+
+  it("makes one card in round one, before the answer, with no proposal call", async () => {
+    await askInBackground("Add a key result for weekly active teams");
+    const drafter = new ToolDrafter([[["propose_change", AUTHORED]]]);
+
+    const published = await drive(drafter);
+
+    expect(drafter.proposeCalls).toHaveLength(0);
+    expect(drafter.results[0]).toBe(PROPOSAL_MADE_TEXT);
+    const events = eventsOf(published);
+    expect(events.filter((event) => event === "copilot.proposal")).toHaveLength(
+      1,
+    );
+    expect(events.indexOf("copilot.proposal")).toBeLessThan(
+      events.indexOf("copilot.text"),
+    );
+    // Shown while it is built, and only then.
+    expect(
+      published.filter(
+        (one) => one.event === "copilot.step" && one.data?.step === "proposing",
+      ),
+    ).toHaveLength(1);
+    expect(await proposedRows()).toEqual([{ action: "goals.addKeyResult" }]);
+    expect(await proposeCallRows()).toEqual([
+      { tool: "propose_change", scope: "write", outcome: "ok" },
+    ]);
+    // The answer is told a card exists, and still has the passages: the call
+    // opened no record, so it was not a read.
+    expect(drafter.seen[0]?.proposal).toMatchObject({
+      made: true,
+      label: "Add a key result",
+    });
+    expect(drafter.seen[0]?.reading).toBeUndefined();
+    expect(drafter.seen[0]?.sources.length).toBeGreaterThan(0);
+  });
+
+  it("answers propose_change in round two as an unknown tool and makes no card", async () => {
+    await askInBackground("What did the check-in say?");
+    const drafter = new ToolDrafter([
+      [["goals.list", { mine: true }]],
+      [["propose_change", AUTHORED]],
+    ]);
+
+    const published = await drive(drafter);
+
+    // Not offered after round one, and refused if it comes anyway (A4-D4).
+    expect(drafter.offered[1]).not.toContain("propose_change");
+    expect(drafter.results[1]).toBe("That tool is not available.");
+    expect(await proposedRows()).toEqual([]);
+    expect(eventsOf(published)).not.toContain("copilot.proposal");
+    expect(drafter.proposeCalls).toHaveLength(0);
+    expect(drafter.seen[0]?.proposal).toEqual({ made: false });
+    expect(await proposeCallRows()).toEqual([
+      { tool: "propose_change", scope: "write", outcome: "unknown_tool" },
+    ]);
+  });
+
+  it("refuses a second call in the same answer and builds nothing", async () => {
+    await askInBackground("Add a key result for weekly active teams");
+    const drafter = new ToolDrafter([
+      [
+        ["propose_change", AUTHORED],
+        ["propose_change", AUTHORED],
+      ],
+    ]);
+
+    const published = await drive(drafter);
+
+    expect(drafter.results).toEqual([
+      PROPOSAL_MADE_TEXT,
+      PROPOSAL_ALREADY_TEXT,
+    ]);
+    expect(await proposedRows()).toHaveLength(1);
+    expect(
+      eventsOf(published).filter((event) => event === "copilot.proposal"),
+    ).toHaveLength(1);
+    expect((await proposeCallRows()).map((row) => row.outcome)).toEqual([
+      "ok",
+      "refused",
+    ]);
+  });
+
+  it("gives no card and names why when the builder refuses", async () => {
+    await askInBackground("Add a key result for weekly active teams");
+    const drafter = new ToolDrafter([
+      [
+        [
+          "propose_change",
+          { ...AUTHORED, fields: { ...AUTHORED.fields, objectiveNumber: 99 } },
+        ],
+      ],
+    ]);
+
+    const published = await drive(drafter);
+
+    expect(drafter.results[0]).toMatch(/^That change could not be prepared: /);
+    expect(await proposedRows()).toEqual([]);
+    expect(eventsOf(published)).not.toContain("copilot.proposal");
+    // The answer is told no card exists, so it cannot claim one.
+    expect(drafter.seen[0]?.proposal).toEqual({ made: false });
+    expect((await proposeCallRows()).map((row) => row.outcome)).toEqual([
+      "refused",
+    ]);
+  });
+
+  it("keeps the 0.8.1 path for a provider that cannot call tools", async () => {
+    await askInBackground("Add a key result for weekly active teams");
+    const drafter = new ProposalOnlyDrafter();
+
+    const published = await drive(drafter);
+
+    expect(drafter.calls).toBe(1);
+    expect(eventsOf(published)).toContain("copilot.proposal");
+    expect(drafter.seen[0]?.proposal).toMatchObject({ made: true });
+    expect(await proposedRows()).toEqual([{ action: "goals.addKeyResult" }]);
+  });
+
+  it("keeps the 0.8.1 path for a conversation anchored to a page", async () => {
+    // Its round one holds the anchored record's read text, and A4-D4 says no
+    // read result may be in the context that starts a proposal.
+    await askInBackground("Add a key result for weekly active teams", {
+      subjectType: "goal",
+      subjectId: goalId,
+    });
+    const drafter = new ToolDrafter([[]], AUTHORED);
+
+    const published = await drive(drafter);
+
+    expect(drafter.asked[0]?.subject).toBeDefined();
+    expect(drafter.offered[0]).not.toContain("propose_change");
+    expect(drafter.proposeCalls).toHaveLength(1);
+    expect(eventsOf(published)).toContain("copilot.proposal");
+    expect(drafter.seen[0]?.proposal).toMatchObject({ made: true });
+    expect(await proposeCallRows()).toEqual([]);
   });
 });
