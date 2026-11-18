@@ -249,6 +249,7 @@ export function Board({
     status: string,
     afterTaskId: string | null,
     before: readonly BoardColumn[] = shown,
+    said?: { accepted: string; refused: string },
   ) => {
     setOptimistic(reorder(shown, id, status, afterTaskId));
     setError(null);
@@ -258,7 +259,15 @@ export function Board({
         setOptimistic(before === columns ? null : before);
         // Said by the alert below, once. The live region would say it twice.
         setError(state.error);
+        if (said) {
+          // The visible alert carries the server's reason. The live region
+          // says only that the card is back, so the reason is not read twice.
+          setAnnouncement(said.refused);
+        }
         return;
+      }
+      if (said) {
+        setAnnouncement(said.accepted);
       }
       router.refresh();
     });
@@ -332,12 +341,10 @@ export function Board({
     const slot = slotOf(shown, id);
     const was = slotOf(before, id);
     const afterTaskId = afterTaskIdOf(shown, id);
-    setAnnouncement(
-      t("board.board.dropped", {
-        title: titleOf(id),
-        where: whereIs(shown, id),
-      }),
-    );
+    const accepted = t("board.board.dropped", {
+      title: titleOf(id),
+      where: whereIs(shown, id),
+    });
     if (
       !slot ||
       (was &&
@@ -346,9 +353,18 @@ export function Board({
     ) {
       // Put down where it was picked up. Nothing moved, so nothing is written.
       setOptimistic(before === columns ? null : before);
+      setAnnouncement(accepted);
       return;
     }
-    move(id, slot.status, afterTaskId, before);
+    // Said only once the server accepts, so a refused drop is never heard as
+    // a success first.
+    move(id, slot.status, afterTaskId, before, {
+      accepted,
+      refused: t("board.board.dropRefused", {
+        title: titleOf(id),
+        where: whereIs(before, id),
+      }),
+    });
   };
 
   /** `keepFocus` is false when the reader is tabbing away and focus should go with them. */
