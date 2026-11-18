@@ -56,7 +56,12 @@ const rowsFor = async (cycleId: string) => {
   return { activity: activity.rows, audit: audit.rows };
 };
 
-/** A quarterly cycle with these dates, made directly as an old instance would hold it. */
+/**
+ * A quarterly cycle with these dates, made directly as an old instance would hold it.
+ * The derived start is day 2 of the month two before the end. Provisioning makes the
+ * quarter that holds today, which starts on a quarter's first day, and a cycle may not
+ * share that start (cycles_period_idx), so day 2 cannot collide whatever today's date is.
+ */
 const cycleEnding = async (
   endsOn: string,
   status: "planning" | "active" | "closed" = "active",
@@ -65,7 +70,7 @@ const cycleEnding = async (
   const wb = await workerDb();
   const startsOn =
     startsOnOverride ??
-    `${endsOn.slice(0, 4)}-${String(Number(endsOn.slice(5, 7)) - 2).padStart(2, "0")}-01`;
+    `${endsOn.slice(0, 4)}-${String(Number(endsOn.slice(5, 7)) - 2).padStart(2, "0")}-02`;
   const { rows } = await wb.admin.query(
     `insert into cycles (id, workspace_id, name, mode, cadence, starts_on, ends_on, status, phase, published_at, short_id)
      values (gen_random_uuid(), $1, $2, 'quarterly', 'quarterly', $3, $4, $5, 6,
