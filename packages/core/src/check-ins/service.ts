@@ -708,7 +708,11 @@ export async function deleteCheckInInTx<
             eq(keyResultValues.keyResultId, row),
           ),
         )
-        .orderBy(desc(keyResultValues.at))
+        // Recorded order, not `at`: a value's `at` can be dated to the day the
+        // story wrote it (the demo builder does), so a baseline stamped later by
+        // the database would sort after the check-in values that followed it and
+        // undo would put the key result back to its baseline.
+        .orderBy(desc(keyResultValues.createdAt), desc(keyResultValues.at))
         .limit(1);
       if (previous) {
         // openokr:allow-mutation: same transaction.

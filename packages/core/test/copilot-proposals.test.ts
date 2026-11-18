@@ -1480,6 +1480,66 @@ describe("a check-in and a KPI value (plan 0.9.0 L4c)", () => {
       expect((await storedProposals())[0]?.undone_at).not.toBeNull();
     });
 
+    it("undo puts the value, progress, health and confidence back to what they were before the apply", async () => {
+      const note = (text: string) => ({
+        type: "doc",
+        content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+      });
+      // Earlier history: 25 then 27 then 28, so the value before the apply is 28
+      // and is neither the baseline (18) nor the first recorded value.
+      for (const value of [25, 27, 28]) {
+        await call("goals.publishDraftedCheckIn", {
+          goalId,
+          status: "on_track",
+          confidence: 0.7,
+          narrative: note(`At ${value}`),
+          values: [{ keyResultId, value }],
+        });
+      }
+      // The demo builder dates its history to the day the story wrote it, so the
+      // baseline row the database stamped at creation can be newer by `at` than
+      // the check-in values that came after it. Walking back by `at` then found
+      // the baseline. Back-date the three values the same way.
+      const wb = await workerDb();
+      await wb.admin.query(
+        "update key_result_values set at = at - interval '30 days' where key_result_id = $1 and check_in_id is not null",
+        [keyResultId],
+      );
+      const snapshot = async () => {
+        const goal = (await call("goals.read", { id: goalId })) as {
+          progressPct: number;
+          health: string;
+          confidence: number | null;
+          keyResults: { id: string; currentValue: number }[];
+        };
+        return {
+          progressPct: goal.progressPct,
+          health: goal.health,
+          confidence: goal.confidence,
+          value: goal.keyResults.find((entry) => entry.id === keyResultId)
+            ?.currentValue,
+        };
+      };
+      const before = await snapshot();
+      expect(before.value).toBe(28);
+
+      const proposed = await propose(
+        new ProposingDrafter(
+          checkInFields({
+            confidence: 0.4,
+            keyResultValues: [
+              { keyResultNumber: 1, value: 29, confidence: null },
+            ],
+          }),
+        ),
+      );
+      await apply(proposed?.id as string);
+      expect((await snapshot()).value).toBe(29);
+
+      await undo(proposed?.id as string);
+      expect(await snapshot()).toEqual(before);
+    });
+
     it("refuses to undo once a newer check-in exists", async () => {
       const proposed = await propose(new ProposingDrafter(checkInFields()));
       await apply(proposed?.id as string);
