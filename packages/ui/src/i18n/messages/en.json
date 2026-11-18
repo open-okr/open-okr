@@ -4439,6 +4439,7 @@
   "session.detail.scoring.weight": "weight {weight}",
   "session.detail.someoneNoLongerHere": "Someone no longer in this session",
   "session.detail.stageGap.answersMany": "{count} of the {asked} management questions have no answer yet.",
+  "session.detail.stageAnnounced": "Step {step} of {total}: {name}",
   "session.detail.stageGap.answersOne": "{count} of the {asked} management questions has no answer yet.",
   "session.detail.stageGap.causesMany": "{count} {termKeyResultsLower} below their threshold have no cause.",
   "session.detail.stageGap.causesOne": "{count} {termKeyResultLower} below its threshold has no cause.",

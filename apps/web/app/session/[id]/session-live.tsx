@@ -13,15 +13,21 @@
  * session, when the facilitator advances a stage, then both see the new
  * stage without a reload."
  */
+import { useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSessionLive } from "../../../hooks/use-session-live";
 
 interface SessionLiveProps {
   readonly sessionId: string;
+  /** The stage the session is on now, as the server rendered it. */
+  readonly stageKey: string | null;
+  /** The ritual's stages in order, so the announcement can name and count. */
+  readonly stages: readonly { readonly key: string; readonly title: string }[];
 }
 
-export function SessionLive({ sessionId }: SessionLiveProps) {
+export function SessionLive({ sessionId, stageKey, stages }: SessionLiveProps) {
+  const { t } = useTranslations();
   const router = useRouter();
   const handleUpdate = useCallback(() => {
     router.refresh();
@@ -29,6 +35,30 @@ export function SessionLive({ sessionId }: SessionLiveProps) {
 
   useSessionLive(sessionId, handleUpdate);
 
-  // Renders nothing — pure behaviour.
-  return null;
+  // A stage change reached this page as a refreshed prop, which a screen
+  // reader never hears on its own. The region starts empty and is written only
+  // when the stage differs from the one already shown, so the first render and
+  // a refresh that changes nothing (the participant's own action) stay silent.
+  // Focus is left where it is.
+  const previous = useRef(stageKey);
+  const [announcement, setAnnouncement] = useState("");
+  useEffect(() => {
+    if (previous.current === stageKey) return;
+    previous.current = stageKey;
+    const index = stages.findIndex((stage) => stage.key === stageKey);
+    if (index < 0) return;
+    setAnnouncement(
+      t("session.detail.stageAnnounced", {
+        step: index + 1,
+        total: stages.length,
+        name: stages[index]?.title ?? "",
+      }),
+    );
+  }, [stageKey, stages, t]);
+
+  return (
+    <div role="status" aria-live="polite" className="sr-only">
+      {announcement}
+    </div>
+  );
 }

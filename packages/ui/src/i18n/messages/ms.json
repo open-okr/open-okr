@@ -4439,6 +4439,7 @@
   "session.detail.scoring.weight": "pemberat {weight}",
   "session.detail.someoneNoLongerHere": "Seseorang yang tidak lagi dalam sesi ini",
   "session.detail.stageGap.answersMany": "{count} daripada {asked} soalan pengurusan belum dijawab.",
+  "session.detail.stageAnnounced": "Langkah {step} daripada {total}: {name}",
   "session.detail.stageGap.answersOne": "{count} daripada {asked} soalan pengurusan belum dijawab.",
   "session.detail.stageGap.causesMany": "{count} {termKeyResultsLower} di bawah ambangnya belum ada punca.",
   "session.detail.stageGap.causesOne": "{count} {termKeyResultLower} di bawah ambangnya belum ada punca.",
