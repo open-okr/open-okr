@@ -1,5 +1,15 @@
 # @openokr/agents
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies [[`3a8e7a0`](https://github.com/open-okr/open-okr/commit/3a8e7a002a9142115f634437328af24cc3769f8b)]:
+  - @openokr/method@0.9.0
+  - @openokr/core@0.9.0
+  - @openokr/adapters@0.9.0
+  - @openokr/db@0.9.0
+
 ## 0.8.1
 
 ### Patch Changes
