@@ -559,8 +559,10 @@ somewhere else."
       # has never been the one anybody restored.
       backup_root="${OPENOKR_BACKUP_DIR:-./backups}"
       if [ -d "$backup_root" ]; then
+        # awk instead of `head -n -3`: a negative count is GNU only and BSD
+        # head (macOS) rejects it, so nothing was pruned there.
         # shellcheck disable=SC2012
-        ls -1d "$backup_root"/*/ 2>/dev/null | sort | head -n -3 | while read -r old; do
+        ls -1d "$backup_root"/*/ 2>/dev/null | sort | awk '{ a[NR] = $0 } END { for (i = 1; i <= NR - 3; i++) print a[i] }' | while read -r old; do
           log "removing old backup ${old}"
           rm -rf "$old"
         done
