@@ -38,6 +38,7 @@ Status: **approved by Agung on 13 November 2026** ("design approved"). Q1 (decid
 | Member named facilitator, suspended | refused by `resolveActor` | | No |
 | Viewer | `view` | yes | **No** (Q1, decided 13 November 2026) |
 | A role a workspace made | its own workspace level | either | Yes when it grants `edit` or more, otherwise only as facilitator |
+| Human member with no role (`role_id` null: `demo:prepare`, older or imported members) | skipped on purpose: the floor would fall back to the self-service binding (`edit`) every member holds | either: no role is not "Member or above" | **No, new** (F-05) |
 | Guest | none | n/a: a guest cannot be named facilitator | No |
 | Agent | none | never | No |
 | Support session | the level the owner granted | never | Yes when the owner granted `edit` or more, as for R1 |

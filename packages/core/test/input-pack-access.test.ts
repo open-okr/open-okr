@@ -24,6 +24,8 @@ const VIEWER_FACILITATOR = "pack-viewer-facilitator";
 const SUSPENDED_FACILITATOR = "pack-suspended-facilitator";
 const EDITOR = "pack-editor";
 const GUEST = "pack-guest";
+const NO_ROLE = "pack-no-role";
+const NO_ROLE_FACILITATOR = "pack-no-role-facilitator";
 
 let workspaceId: string;
 let cycleId: string;
@@ -88,6 +90,8 @@ beforeEach(async () => {
     SUSPENDED_FACILITATOR,
     EDITOR,
     GUEST,
+    NO_ROLE,
+    NO_ROLE_FACILITATOR,
   ];
   for (const id of people) {
     await wb.admin.query(
@@ -106,6 +110,8 @@ beforeEach(async () => {
     VIEWER_FACILITATOR,
     SUSPENDED_FACILITATOR,
     EDITOR,
+    NO_ROLE,
+    NO_ROLE_FACILITATOR,
   ]) {
     const row = await wb.admin.query<{ id: string }>(
       `insert into workspace_members (id, workspace_id, user_id, name, status, kind)
@@ -234,6 +240,22 @@ describe("who may change the pack (§3)", () => {
     await expect(mark(OWNER)).resolves.toMatchObject({ itemKey: 1 });
   });
 
+  it("a member with no role may not, facilitator or not (F-05)", async () => {
+    // role_id is null here: what demo:prepare and imported members have.
+    await setFacilitator(null);
+    await expect(mark(NO_ROLE)).rejects.toThrow(INPUT_PACK_REFUSAL);
+    await expect(distribute(NO_ROLE)).rejects.toThrow(INPUT_PACK_REFUSAL);
+    // A named facilitator with no role fails isMemberOrAbove (no role is
+    // not Member), as the rule's own comment says.
+    await setFacilitator(NO_ROLE_FACILITATOR);
+    await expect(mark(NO_ROLE_FACILITATOR)).rejects.toThrow(INPUT_PACK_REFUSAL);
+    await expect(distribute(NO_ROLE_FACILITATOR)).rejects.toThrow(
+      INPUT_PACK_REFUSAL,
+    );
+    // Another no-role member is refused while a no-role one is facilitator.
+    await expect(mark(NO_ROLE)).rejects.toThrow(INPUT_PACK_REFUSAL);
+  });
+
   it("a guest and an agent may not", async () => {
     await expect(mark(GUEST)).rejects.toThrow();
     const wb = await workerDb();
@@ -265,6 +287,7 @@ describe("workflow.read packAccess agrees with the writes", () => {
       [FACILITATOR]: true,
       [MEMBER]: false,
       [VIEWER_FACILITATOR]: false,
+      [NO_ROLE]: false,
     };
     for (const [id, canChange] of Object.entries(expected)) {
       const read = await callAction(await as(id), "workflow.read", {

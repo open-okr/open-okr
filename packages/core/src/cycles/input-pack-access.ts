@@ -108,6 +108,34 @@ async function qualifyingFacilitator(
   return row;
 }
 
+/** A human member whose `role_id` is null (demo personas, older or imported members). */
+async function isRolelessHuman(
+  tx: OperationTx,
+  input: { readonly workspaceId: string; readonly actor: ActorInput },
+): Promise<boolean> {
+  const { actor } = input;
+  if (actor.kind !== "human") {
+    return false;
+  }
+  const [row] = await tx
+    .select({ id: workspaceMembers.id, roleId: workspaceMembers.roleId })
+    .from(workspaceMembers)
+    .where(
+      and(
+        activeOnly(
+          workspaceMembers,
+          eq(workspaceMembers.workspaceId, input.workspaceId),
+          eq(workspaceMembers.kind, "human"),
+          actor.memberId !== undefined
+            ? eq(workspaceMembers.id, actor.memberId)
+            : eq(workspaceMembers.userId, actor.userId ?? ""),
+        ),
+      ),
+    )
+    .limit(1);
+  return row !== undefined && row.roleId === null;
+}
+
 export async function inputPackAccess(
   tx: OperationTx,
   input: {
@@ -124,12 +152,16 @@ export async function inputPackAccess(
   const facilitatorName = facilitator?.name ?? null;
 
   // R1's floor first: the Owner and Admins pass by role, and a system actor
-  // by its own `full`.
-  const floor = await writeFloorFor(tx, {
-    workspaceId: input.workspaceId,
-    actor: input.actor,
-    domain: "workspace",
-  });
+  // by its own `full`. A human member with no role is skipped: the floor
+  // would fall back to the self-service binding every member holds (`edit`),
+  // which is the very grant this rule narrows (F-05).
+  const floor = (await isRolelessHuman(tx, input))
+    ? 0
+    : await writeFloorFor(tx, {
+        workspaceId: input.workspaceId,
+        actor: input.actor,
+        domain: "workspace",
+      });
   if (floor >= ACCESS_LEVELS.edit) {
     return { canChange: true, facilitatorName };
   }
