@@ -127,6 +127,15 @@ describe("profiles", () => {
     expect(PROFILES.recommended.thresholds).toEqual({});
   });
 
+  it("links only Google-style and Radical Focus to their sources", () => {
+    const linked = PROFILE_KEYS.filter((key) => PROFILES[key].source);
+    expect(linked).toEqual(["googleStyle", "radicalFocus"]);
+    for (const key of linked) {
+      expect(PROFILES[key].source?.url, key).toMatch(/^https:\/\//);
+      expect(PROFILES[key].source?.title, key).not.toBe("");
+    }
+  });
+
   it("sets only valid practice values and valid thresholds", () => {
     for (const key of PROFILE_KEYS) {
       const profile = PROFILES[key];

@@ -1174,6 +1174,7 @@
   "admin.practice.profile.keeps": "Dikekalkan, kerana ruang kerja ini memilihnya: {names}.",
   "admin.practice.profile.nothingChanges": "Tiada apa yang dijalankan oleh ruang kerja ini akan berubah.",
   "admin.practice.profile.saveFirst": "Simpan atau buang perubahan anda dahulu.",
+  "admin.practice.profile.source": "Sumber: {title}",
   "admin.practice.profile.title": "Profil",
   "admin.practice.profile.use": "Gunakan profil ini",
   "admin.practice.profileValue": "Profil menetapkan {value}.",

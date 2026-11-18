@@ -658,6 +658,11 @@ export interface ProfileDefinition {
    * layer at read time, and P9-T05 decides that write with its screen.
    */
   readonly thresholds: ThresholdOverrides;
+  /**
+   * The published work the profile follows, for the two profiles §12.2 links
+   * to one. `method:check` compares it with the document word for word.
+   */
+  readonly source?: { readonly title: string; readonly url: string };
 }
 
 /** §12.2. Each profile sets only what differs from Recommended. */
@@ -671,6 +676,10 @@ export const PROFILES: Readonly<Record<ProfileKey, ProfileDefinition>> = {
   googleStyle: {
     label: "Google-style",
     for: "Organisations following Google's playbook closely",
+    source: {
+      title: 'Google re:Work, "Set goals with OKRs"',
+      url: "https://rework.withgoogle.com/en/guides/set-goals-with-okrs",
+    },
     practice: {
       "levels.individual": "on",
       "levels.department": "off",
@@ -683,6 +692,10 @@ export const PROFILES: Readonly<Record<ProfileKey, ProfileDefinition>> = {
   radicalFocus: {
     label: "Radical Focus",
     for: "Small companies and teams starting out, following Wodtke",
+    source: {
+      title: 'Christina Wodtke, "Radical Focus" (second edition)',
+      url: "https://eleganthack.com/radical-focus",
+    },
     practice: {
       // Confidence as x in 10 and weekly wins are the defaults already.
       "phases.enforcement": "hidden",

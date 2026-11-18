@@ -1174,6 +1174,7 @@
   "admin.practice.profile.keeps": "Kept, because this workspace chose them: {names}.",
   "admin.practice.profile.nothingChanges": "Nothing this workspace runs would change.",
   "admin.practice.profile.saveFirst": "Save or discard your changes first.",
+  "admin.practice.profile.source": "Source: {title}",
   "admin.practice.profile.title": "Profile",
   "admin.practice.profile.use": "Use this profile",
   "admin.practice.profileValue": "The profile says {value}.",

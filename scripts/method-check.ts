@@ -434,6 +434,31 @@ if (documentedProfiles.join("|") !== registeredProfiles.join("|")) {
   );
 }
 
+// §12.2's source links, compared word for word in both directions: a link in
+// the document the package lacks, or one the package has that the document
+// lacks, fails. Each is `- **Profile:** [title](url)`.
+const documentedSources = section(method, "### 12.2 Profiles", "### 12.3")
+  .split(NEWLINE)
+  .map((line) => /^-\s+\*\*([^*]+):\*\*\s+\[([^\]]+)\]\(([^)]+)\)\s*$/.exec(line))
+  .filter((match): match is RegExpExecArray => match !== null)
+  .map((match) => `${match[1]}|${match[2]}|${match[3]}`);
+const registeredSources = PROFILE_KEYS.flatMap((key) => {
+  const { label, source } = PROFILES[key];
+  return source ? [`${label}|${source.title}|${source.url}`] : [];
+});
+if (documentedSources.length === 0) {
+  fail(
+    "practice",
+    "no profile source link found in METHOD.md §12.2; the parse is wrong, not the document",
+  );
+}
+if (documentedSources.join("\n") !== registeredSources.join("\n")) {
+  fail(
+    "practice",
+    `METHOD.md §12.2 links ${documentedSources.join("; ") || "(none)"}; the package defines ${registeredSources.join("; ") || "(none)"}`,
+  );
+}
+
 // --- 2c. The profiles compared ----------------------------------------------
 //
 // §12.3's table against `compareProfiles`, cell by cell, row order included,

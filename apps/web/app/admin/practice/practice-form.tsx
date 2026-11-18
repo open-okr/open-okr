@@ -122,6 +122,7 @@ function ProfileCard({
   nameOf,
   comparison,
   methodLinks,
+  profileSources,
   canManage,
   dirty,
 }: {
@@ -131,6 +132,10 @@ function ProfileCard({
   readonly nameOf: (setting: Setting) => string;
   readonly comparison: readonly ProfileComparisonRow[];
   readonly methodLinks: Readonly<Record<string, string>>;
+  /** The work a profile follows, for the profiles §12.2 links to one. */
+  readonly profileSources?: Readonly<
+    Record<string, { readonly title: string; readonly url: string }>
+  >;
   readonly canManage: boolean;
   /** The settings form has unsaved changes, which a switch would discard. */
   readonly dirty: boolean;
@@ -191,28 +196,47 @@ function ProfileCard({
                       : "border-line",
                   )}
                 >
-                  <label className="flex flex-1 items-start gap-2.5">
-                    <input
-                      type="radio"
-                      name="profile"
-                      value={profile.key}
-                      checked={chosen === profile.key}
-                      disabled={!canManage}
-                      onChange={() => setChosen(profile.key)}
-                      className="mt-1"
-                    />
-                    <span className="flex flex-col gap-0.5">
-                      <span className="flex items-center gap-2 font-medium text-ink">
-                        {profile.label}
-                        {profile.key === practice.profile ? (
-                          <Chip tone="brand">
-                            {t("admin.practice.profile.inUse")}
-                          </Chip>
-                        ) : null}
+                  <div className="flex flex-1 flex-col gap-1">
+                    <label className="flex items-start gap-2.5">
+                      <input
+                        type="radio"
+                        name="profile"
+                        value={profile.key}
+                        checked={chosen === profile.key}
+                        disabled={!canManage}
+                        onChange={() => setChosen(profile.key)}
+                        className="mt-1"
+                      />
+                      <span className="flex flex-col gap-0.5">
+                        <span className="flex items-center gap-2 font-medium text-ink">
+                          {profile.label}
+                          {profile.key === practice.profile ? (
+                            <Chip tone="brand">
+                              {t("admin.practice.profile.inUse")}
+                            </Chip>
+                          ) : null}
+                        </span>
+                        <span className="text-ink-3">{profile.for}</span>
                       </span>
-                      <span className="text-ink-3">{profile.for}</span>
-                    </span>
-                  </label>
+                    </label>
+                    {profileSources?.[profile.key] ? (
+                      <a
+                        href={profileSources[profile.key]?.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid={`practice-profile-source-${profile.key}`}
+                        className="pl-6 text-xs font-semibold text-brand-text underline"
+                      >
+                        {t("admin.practice.profile.source", {
+                          title: profileSources[profile.key]?.title ?? "",
+                        })}
+                        <span className="sr-only">
+                          {" "}
+                          {t("admin.practice.opensInNewTab")}
+                        </span>
+                      </a>
+                    ) : null}
+                  </div>
                   <MethodHint name={profile.label} href={methodLinks["12.2"]}>
                     {sets.length === 0 ? (
                       <p>{t("admin.practice.hint.recommended")}</p>
@@ -526,6 +550,7 @@ export function PracticeForm({
   settingNames,
   comparison,
   methodLinks,
+  profileSources,
   canManage,
 }: {
   readonly practice: Practice;
@@ -539,6 +564,10 @@ export function PracticeForm({
   readonly comparison: readonly ProfileComparisonRow[];
   /** METHOD.md's address for each section a setting or row cites. */
   readonly methodLinks: Readonly<Record<string, string>>;
+  /** The work two profiles follow, from §12.2. Optional: absent shows no link. */
+  readonly profileSources?: Readonly<
+    Record<string, { readonly title: string; readonly url: string }>
+  >;
   /**
    * `full`, which every practice write requires. The server refuses either
    * way; this says so before somebody fills a card in.
@@ -643,6 +672,7 @@ export function PracticeForm({
         nameOf={nameOf}
         comparison={comparison}
         methodLinks={methodLinks}
+        profileSources={profileSources}
         canManage={canManage}
         dirty={dirty}
       />
