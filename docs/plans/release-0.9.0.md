@@ -165,6 +165,18 @@ Carried from 0.8.1 and still open, plus what 0.9.0 itself needs.
 
 **UAT-Q: an acceptance test before 0.9.0 ships? Decided by Akmal on 12 November 2026: yes, by anyone, not necessarily Obed.** This release changes what the copilot can read and what it can propose to change. Obed's test of 0.8.0 found eleven things no suite had. Whoever runs it uses a 0.9.0 image and writes the report beside `docs/report/uat-0.8.0-report.md`.
 
+### 7.1 Known issues to name in the release notes
+
+Found by the checks on a 0.9.0 image on 17 and 18 November 2026. Agung chose on 18 November to release with them named and fix them in 0.9.1.
+
+| Issue | What a person meets | Why not fixed in 0.9.0 |
+|---|---|---|
+| A Viewer can create a task or a session in a space they belong to, and a Viewer who champions an objective can add a key result to it | `tasks.create`, `sessions.create` and `goals.addKeyResult` declare no domain, so the role floor in the Operation pipeline does not apply and every member gets edit. `docs/design/workspace-roles.md` §3 gives a Viewer view on tasks and goals. Initiatives and KPIs are refused as they should be; the "+ New" menu still offers them | A change to access needs a design and "design approved" first. Sessions have no domain in the role matrix, and whether a champion binding should raise a Viewer is a product decision. Likely present since the roles shipped, not new in 0.9.0 |
+| Safari on a self-hosted instance served over plain `http://` loads unstyled and sign-in does nothing | The Content-Security-Policy's `upgrade-insecure-requests` makes Safari fetch every asset over https. Instances behind TLS, as the Compose target's Caddy serves them, are not affected | A change to a security header needs a design first |
+| The copilot's first word takes about 11 s on GPT-6 Luna (median of five), against a target of about 2 s | The step line appears at once; the read rounds take most of the time | The cost is now the tool loop, not the proposal call A4 removed. Needs its own design work |
+| The Goals page with 1,000 objectives freezes about 1.4 s when one write starts and again when it settles | Every row rerenders: `usePendingOkrIds` builds a new set each render and rows are not memoised | A change to the main list, safer released on its own and measured again |
+| The copilot gives no card for "create a task", and links a different key result than asked when creating an initiative | Prompt and proposal tuning | Tuning work for 0.9.1 |
+
 ## 8. Outside the release
 
 Not code in this repository, so no row and no commit here. Listed so nothing found during 0.8.1 is lost.
