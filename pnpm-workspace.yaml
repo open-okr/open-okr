@@ -35,17 +35,17 @@ catalog:
   drizzle-orm: ^0.45.4
   pg: ^8.23.1
   "@types/pg": ^8.23.1
-  pg-boss: ^12.38.1
-  ws: ^8.22.1
+  pg-boss: ^12.38.2
+  ws: ^8.23.0
   "@types/ws": ^8.18.2
-  better-auth: ^1.7.22
-  "@better-auth/passkey": ^1.7.22
-  "@better-auth/sso": ^1.7.22
+  better-auth: ^1.7.25
+  "@better-auth/passkey": ^1.7.25
+  "@better-auth/sso": ^1.7.25
   samlify: ^2.15.1
   # The SMTP client, approved in P1-T09. MIT-0, and it carries no runtime
   # dependencies of its own. Confined to packages/adapters like every vendor
   # SDK, behind the Mailer port.
-  nodemailer: ^10.3.1
+  nodemailer: ^10.5.0
   "@types/nodemailer": ^8.0.2
   # Image re-encoding and thumbnails (completeness review M-24), approved by
   # the human on 28 September 2026. Apache-2.0, and its prebuilt libvips
@@ -62,9 +62,9 @@ catalog:
   # openrouter, ollama and openai-compatible: all three speak the same
   # OpenAI-shaped chat completions API, just a different base URL and key,
   # so one client covers four of the six real drivers.
-  "@anthropic-ai/sdk": ^1.6.0
-  openai: ^7.53.0
-  "@google/genai": ^3.0.0
+  "@anthropic-ai/sdk": ^1.8.0
+  openai: ^7.57.0
+  "@google/genai": ^3.3.0
   # The design system (P2-T10), approved by the human alongside P2-T11's
   # TipTap. CLAUDE.md's locked stack already names Tailwind, Base UI and
   # SmoothUI on Motion; these are the concrete packages that stack resolves
@@ -75,10 +75,10 @@ catalog:
   # them is written against this trio.
   tailwindcss: ^4.3.5
   "@tailwindcss/postcss": ^4.3.5
-  postcss: ^8.5.32
+  postcss: ^8.5.33
   "@base-ui-components/react": 1.0.0-rc.0
-  motion: ^14.10.1
-  lucide-react: ^1.70.0
+  motion: ^14.14.0
+  lucide-react: ^1.73.0
   clsx: ^2.1.1
   tailwind-merge: ^3.7.0
   class-variance-authority: ^0.7.1
@@ -100,13 +100,13 @@ catalog:
   # design-system deps. Every @tiptap/* package in v3 peer-pins its
   # siblings to the exact same version string, not a range, so all four
   # pin identically rather than each getting its own `^` range.
-  "@tiptap/core": 3.33.0
-  "@tiptap/pm": 3.33.0
-  "@tiptap/react": 3.33.0
-  "@tiptap/starter-kit": 3.33.0
-  "@tiptap/extension-table": 3.33.0
-  "@tiptap/extension-mention": 3.33.0
-  "@tiptap/suggestion": 3.33.0
+  "@tiptap/core": 3.34.0
+  "@tiptap/pm": 3.34.0
+  "@tiptap/react": 3.34.0
+  "@tiptap/starter-kit": 3.34.0
+  "@tiptap/extension-table": 3.34.0
+  "@tiptap/extension-mention": 3.34.0
+  "@tiptap/suggestion": 3.34.0
   # The OKR diagram (P9-T09a), approved by Akmal on 2 October 2026 as
   # decision D1 of the Phase 9 design gate. MIT, bundled at build time, so an
   # air-gapped install is unaffected; its own dependencies are MIT and ISC.
