@@ -29,6 +29,9 @@ export const SAME_AS_ENGLISH: Record<string, Record<string, string>> = {
       '"Demo" is the word Malay uses, as for logo and favicon above; the pill\'s full sentence is translated (plan 0.8.0 D1).',
     "method.detail.okrCoach":
       '"Demo" is the word Malay uses, as for logo and favicon above; the pill\'s full sentence is translated (plan 0.8.0 D1).',
+    "nudge.champion":
+      "Method role title Champion retained in Malay (languages §13).",
+    "nudge.coach": "Method role title Coach retained in Malay (languages §13).",
     "admin.ai.providerAnthropic":
       '"Demo" is the word Malay uses, as for logo and favicon above; the pill\'s full sentence is translated (plan 0.8.0 D1).',
     "admin.ai.providerGoogle":

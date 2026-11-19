@@ -32,6 +32,7 @@ import { coachLineFor, coachSentence, trigger } from "@openokr/method";
 import { eq } from "drizzle-orm";
 import type { MessageButton, MessageDraft } from "../channels/builder.ts";
 import type { ChannelProviderKey } from "../channels/capabilities.ts";
+import { serverTranslate } from "../i18n/catalogue.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
 
@@ -152,14 +153,19 @@ export async function nudgeDraft(
     readonly baseUrl?: string;
     /** What the instance calls itself (M-33). Absent says "OpenOKR". */
     readonly instanceName?: string;
+    readonly locale?: string;
   },
 ): Promise<MessageDraft> {
+  const locale = input.locale ?? "en";
   const name = instanceNameOr(input.instanceName);
   const title = trigger(input.ruleKey)?.title ?? input.ruleKey;
   const subject = await subjectOf(tx, input);
   const link = input.baseUrl
     ? `${withoutTrailingSlashes(input.baseUrl)}${subject.path}`
     : null;
+
+  const checkInLabel = serverTranslate(locale, "nudge.checkIn");
+  const openInLabel = serverTranslate(locale, "nudge.openIn", { name });
 
   const buttons: MessageButton[] = [];
   if (
@@ -168,22 +174,25 @@ export async function nudgeDraft(
   ) {
     if (input.provider === "email") {
       if (link) {
-        buttons.push({ label: "Check in", url: link });
+        buttons.push({ label: checkInLabel, url: link });
       }
     } else {
       // No goal named: the chat check-in offers the goals that are due.
       buttons.push({
-        label: "Check in",
+        label: checkInLabel,
         url: subject.goalId ? `okr:checkin ${subject.goalId}` : "okr:checkin",
       });
     }
   }
   if (link && !(input.provider === "email" && buttons.length > 0)) {
-    buttons.push({ label: `Open in ${name}`, url: link });
+    buttons.push({ label: openInLabel, url: link });
   }
 
   const headline = subject.name ? `${title}: ${subject.name}` : title;
   const line = coachLineFor(input.ruleKey);
+  const ruleLine = serverTranslate(locale, "nudge.rule", {
+    ruleKey: input.ruleKey,
+  });
   return {
     subject: `${name}: ${headline}`,
     text: [
@@ -191,7 +200,7 @@ export async function nudgeDraft(
       "",
       ...(line ? [coachSentence(line), ""] : []),
       // The rule key, on this message as on every other proactive message.
-      `Rule: ${input.ruleKey}`,
+      ruleLine,
     ].join("\n"),
     ...(buttons.length > 0 ? { buttons } : {}),
   };

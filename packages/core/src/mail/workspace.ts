@@ -3,6 +3,7 @@ import {
   type WorkspaceSettings,
   type WorkspaceTx,
   withWorkspace,
+  workspaceMembers,
   workspaces,
 } from "@openokr/db";
 import { eq } from "drizzle-orm";
@@ -19,8 +20,9 @@ import {
 
 /**
  * Who a workspace mail is from: the workspace's name, its colour and its
- * language (docs/design/email-templates.md §10). Read when the mail is
- * built, so a rename or a new colour reaches the next mail.
+ * language (docs/design/email-templates.md §10, docs/design/languages.md §13).
+ * Read when the mail is built, rendering in the recipient's resolved language
+ * when known, or the workspace language for workspace-wide messages and invitations.
  */
 export interface WorkspaceMail {
   readonly name: string;
@@ -32,6 +34,7 @@ export interface WorkspaceMail {
 export async function workspaceMailInTx(
   tx: WorkspaceTx,
   workspaceId: string,
+  recipientMemberId?: string | null,
 ): Promise<WorkspaceMail> {
   const [row] = await tx
     .select({ name: workspaces.name, settings: workspaces.settings })
@@ -46,7 +49,26 @@ export async function workspaceMailInTx(
     readonly language?: string;
     readonly branding?: { readonly primaryColor?: string | null };
   };
-  const locale = mailLocale(settings.language);
+
+  let recipientLanguage: string | undefined;
+  if (recipientMemberId) {
+    const [memberRow] = await tx
+      .select({ language: workspaceMembers.language })
+      .from(workspaceMembers)
+      .where(
+        activeOnly(
+          workspaceMembers,
+          eq(workspaceMembers.id, recipientMemberId),
+          eq(workspaceMembers.workspaceId, workspaceId),
+        ),
+      )
+      .limit(1);
+    if (memberRow?.language) {
+      recipientLanguage = memberRow.language;
+    }
+  }
+
+  const locale = mailLocale(recipientLanguage ?? settings.language);
   return {
     name: row?.name ?? "",
     color: settings.branding?.primaryColor ?? null,
@@ -58,9 +80,11 @@ export async function workspaceMailInTx(
 export function workspaceMail(
   pool: Pool,
   workspaceId: string,
+  recipientMemberId?: string | null,
 ): Promise<WorkspaceMail> {
-  return withWorkspace(drizzle(pool), workspaceId, (tx) =>
-    workspaceMailInTx(tx, workspaceId),
+  const db = drizzle(pool);
+  return withWorkspace(db, workspaceId, (tx) =>
+    workspaceMailInTx(tx, workspaceId, recipientMemberId),
   );
 }
 

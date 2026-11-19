@@ -942,7 +942,7 @@ const sendDigest: OutboxHandler = async (delivery, deps) => {
   // the cap from hiding them. Both parts say it now: the line used to be in
   // the text part only.
   const built = notificationDigestMail({
-    mail: await workspaceMail(deps.pool, workspaceId),
+    mail: await workspaceMail(deps.pool, workspaceId, memberId),
     baseUrl: deps.baseUrl,
     items: contents.items,
     omitted: contents.omitted,
@@ -1053,7 +1053,7 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
     typeof payload.email === "object" &&
     deps.baseUrl
       ? renderStoredEmail({
-          mail: await workspaceMail(deps.pool, workspaceId),
+          mail: await workspaceMail(deps.pool, workspaceId, row.memberId),
           baseUrl: deps.baseUrl,
           stored: payload.email as StoredEmail,
         }).html
