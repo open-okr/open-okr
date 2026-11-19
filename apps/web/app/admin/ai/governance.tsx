@@ -14,6 +14,7 @@ import {
   BUDGET_PERIODS,
   MODEL_TIERS,
 } from "@openokr/db";
+import { intlTagFor } from "@openokr/formats";
 import {
   Button,
   Card,
@@ -241,13 +242,20 @@ export async function UsageCard({
   readonly days: number;
   readonly evaluations: readonly PromptEvaluationRow[];
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  const intlTag = intlTagFor(locale);
 
   const figures: readonly (readonly [string, string])[] = [
-    ["Calls", usage.totalCalls.toLocaleString("en-GB")],
-    ["Tokens in", usage.totalInputTokens.toLocaleString("en-GB")],
-    ["Tokens out", usage.totalOutputTokens.toLocaleString("en-GB")],
-    ["Cost", `${usage.totalCost.toFixed(2)} USD`],
+    [t("admin.ai.governance.calls"), usage.totalCalls.toLocaleString(intlTag)],
+    [
+      t("admin.ai.governance.tokensIn"),
+      usage.totalInputTokens.toLocaleString(intlTag),
+    ],
+    [
+      t("admin.ai.governance.tokensOut"),
+      usage.totalOutputTokens.toLocaleString(intlTag),
+    ],
+    [t("admin.ai.governance.cost"), `${usage.totalCost.toFixed(2)} USD`],
   ];
   return (
     <Card>

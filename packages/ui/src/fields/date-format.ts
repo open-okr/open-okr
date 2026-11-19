@@ -1,4 +1,4 @@
-import { isLocalDate } from "@openokr/formats";
+import { intlTagFor, isLocalDate } from "@openokr/formats";
 
 /**
  * A date as words beside its field (docs/design/guided-inputs.md §4.9,
@@ -77,7 +77,7 @@ export function dueDayLabel(
     }).format(at);
   }
   const today = new Date(at.getTime() - daysAway * 86_400_000);
-  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : locale, {
+  return new Intl.DateTimeFormat(intlTagFor(locale), {
     day: "numeric",
     month: "short",
     ...(today.getUTCFullYear() === at.getUTCFullYear()

@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import {
   canonThresholds,
   defaultPractice,
@@ -101,7 +102,7 @@ export default async function CyclePage({
     team?: string;
   }>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -985,8 +986,11 @@ export default async function CyclePage({
                         ) : (
                           (decision.keyResultTitle ?? decision.goalTitle)
                         )}{" "}
-                        · {new Date(decision.at).toLocaleDateString()} ·{" "}
-                        {decision.authorName}
+                        ·{" "}
+                        {new Date(decision.at).toLocaleDateString(
+                          intlTagFor(locale),
+                        )}{" "}
+                        · {decision.authorName}
                       </span>
                     </li>
                   ))}

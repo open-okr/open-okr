@@ -242,6 +242,7 @@ const estimateTokens = (request: ChatRequest): number =>
     ) / CHARACTERS_PER_TOKEN,
   );
 
+// engineer evaluation report, may stay en-GB
 const figure = (value: number): string => value.toLocaleString("en-GB");
 
 /** A value short enough to quote in a refusal. */

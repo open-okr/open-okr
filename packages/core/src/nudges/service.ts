@@ -1078,6 +1078,7 @@ async function snoozeHoursAway(
 
 /** The member's local hour and minute, for the quiet-hours check. */
 const localTimeIn = (now: Date, timeZone: string) => {
+  // machine use: extracting time parts
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone,
     hour: "2-digit",

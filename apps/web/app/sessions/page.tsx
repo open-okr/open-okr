@@ -1,4 +1,5 @@
 import { callAction } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import {
   buttonVariants,
   Card,
@@ -39,8 +40,8 @@ export const generateMetadata = pageTitle("pageTitle.sessions");
 type Row = Awaited<ReturnType<typeof callAction<"sessions.mine">>>[number];
 
 /** The date a member reads, in the workspace's own words rather than an ISO string. */
-function whenLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
+function whenLabel(iso: string, locale?: string): string {
+  return new Date(iso).toLocaleDateString(intlTagFor(locale), {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -48,7 +49,7 @@ function whenLabel(iso: string): string {
 }
 
 async function SessionRow({ row }: { readonly row: Row }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const running = row.state === "running";
   return (
@@ -73,7 +74,7 @@ async function SessionRow({ row }: { readonly row: Row }) {
         <p className="truncate text-xs text-ink-3">
           {nameOf(SESSION_KIND_NAME_KEYS, row.kind, t)}
           {row.spaceName ? ` · ${row.spaceName}` : ""}
-          {` · ${whenLabel(row.scheduledFor)}`}
+          {` · ${whenLabel(row.scheduledFor, locale)}`}
           {running && row.stageKey ? (
             <> · {t("sessions.onStage", { stage: row.stageKey })}</>
           ) : null}

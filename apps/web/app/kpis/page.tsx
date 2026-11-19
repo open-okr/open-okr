@@ -175,6 +175,7 @@ export default async function KpisPage({
   // Today in the workspace calendar, resolved on the server. The grid needs it to
   // draw a column for the current period, and the browser clock is the wrong one.
   const settings = await callAction(context, "settings.readForMember", {});
+  // machine use: ISO date for today
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: String(settings.settings.timezone ?? "UTC"),
   }).format(new Date());

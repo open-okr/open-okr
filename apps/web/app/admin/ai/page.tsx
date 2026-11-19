@@ -5,6 +5,7 @@ import {
   readHostedAccess,
 } from "@openokr/core";
 import { AI_PROVIDER_KINDS, MODEL_TIERS } from "@openokr/db";
+import { intlTagFor } from "@openokr/formats";
 import {
   Button,
   Card,
@@ -146,7 +147,7 @@ export default async function AdminAIPage({
 }: {
   readonly searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
   const ratingsParams = ratingsQuery(await searchParams);
   // A value the schema adds before the catalogue knows it is shown as itself
   // rather than hidden.
@@ -502,7 +503,7 @@ export default async function AdminAIPage({
                         {providerWord(model.provider)}
                       </td>
                       <td className="py-1.5 pr-3 tabular-nums">
-                        {model.contextWindow.toLocaleString("en-GB")}
+                        {model.contextWindow.toLocaleString(intlTagFor(locale))}
                       </td>
                       <td className="py-1.5 pr-3 tabular-nums">
                         {model.costInPerMillion} / {model.costOutPerMillion}

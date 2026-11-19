@@ -5,6 +5,7 @@ import {
   type BindingSource,
   callAction,
 } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import { TRIGGER_CATALOGUE } from "@openokr/method";
 import {
   Button,
@@ -87,18 +88,19 @@ const STATE_TONE: Record<string, "ok" | "bad" | "neutral"> = {
   disabled: "neutral",
 };
 
-const when = (iso: string | null): string =>
-  iso
-    ? new Date(iso).toLocaleString("en-GB", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "never";
-
 export default async function ChannelsPage() {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  const intlTag = intlTagFor(locale);
+
+  const when = (iso: string | null): string =>
+    iso
+      ? new Date(iso).toLocaleString(intlTag, {
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : t("admin.channels.never");
 
   const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(

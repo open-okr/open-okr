@@ -22,10 +22,12 @@ export function stamper(timeZone: string): {
   };
   let format: Intl.DateTimeFormat;
   try {
+    // machine use: extracting timestamp parts
     format = new Intl.DateTimeFormat("en-GB", { ...options, timeZone });
   } catch {
     // A zone this runtime does not know. UTC is at least a zone the header
     // can name truthfully.
+    // machine use: extracting timestamp parts
     format = new Intl.DateTimeFormat("en-GB", { ...options, timeZone: "UTC" });
   }
   return {

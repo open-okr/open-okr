@@ -44,6 +44,7 @@
 import {
   type Catalogue,
   translate as formatTranslate,
+  type LocaleCode,
   type MessageValues,
   messageHoles,
 } from "@openokr/formats";
@@ -53,7 +54,7 @@ import { fillTermHole } from "./terms.ts";
 
 export { type Catalogue, type MessageValues, messageHoles };
 
-export type Locale = "en" | "ms";
+export type Locale = LocaleCode;
 
 export const SOURCE_LOCALE: Locale = "en";
 

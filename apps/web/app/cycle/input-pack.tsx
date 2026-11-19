@@ -1,3 +1,4 @@
+import { intlTagFor } from "@openokr/formats";
 import { SUGGESTED_TIMELINE } from "@openokr/method";
 import {
   Button,
@@ -60,7 +61,7 @@ export async function InputPack({
     readonly facilitatorName: string | null;
   };
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
   const canEdit = packAccess.canChange;
 
   const gathered = items.filter((item) => item.gathered).length;
@@ -244,7 +245,9 @@ export async function InputPack({
           {distributedAt ? (
             <p className="text-xs text-ink-3">
               {t("common.sent", {
-                distributedAt: new Date(distributedAt).toLocaleString(),
+                distributedAt: new Date(distributedAt).toLocaleString(
+                  intlTagFor(locale),
+                ),
               })}
             </p>
           ) : null}

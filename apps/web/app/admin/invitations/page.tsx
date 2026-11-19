@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import {
   Card,
   CardBody,
@@ -54,15 +55,6 @@ export const generateMetadata = pageTitle("pageTitle.adminInvitations");
  * the form says "copy this now" before the button rather than after.
  */
 
-const shortDate = (value: string | null): string =>
-  value
-    ? new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }).format(new Date(value))
-    : "";
-
 /**
  * What a link is doing right now, in the order the states actually matter.
  * The label is a catalogue key, so the page says it in the reader's language.
@@ -86,7 +78,16 @@ function stateOf(link: {
 }
 
 export default async function InvitationsPage() {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+
+  const shortDate = (value: string | null): string =>
+    value
+      ? new Intl.DateTimeFormat(intlTagFor(locale), {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        }).format(new Date(value))
+      : "";
 
   const header = (
     <header className="flex flex-col gap-1">

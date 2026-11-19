@@ -6,6 +6,7 @@ import {
   REVIEW_ASSIST_KEYS,
   THREAD_SUMMARY_MINIMUM,
 } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import {
   alignmentMapped,
   type ResolvedPractice,
@@ -791,8 +792,10 @@ export default async function GoalPage({
                       {decision.keyResultTitle
                         ? `${decision.keyResultTitle} · `
                         : ""}
-                      {new Date(decision.at).toLocaleDateString()} ·{" "}
-                      {decision.authorName}
+                      {new Date(decision.at).toLocaleDateString(
+                        intlTagFor(locale),
+                      )}{" "}
+                      · {decision.authorName}
                     </span>
                   </li>
                 ))}

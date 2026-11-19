@@ -1,4 +1,5 @@
 import type { callAction } from "@openokr/core";
+import { LOCALE_CODES } from "@openokr/formats";
 import { dueDayLabel } from "@openokr/ui";
 import type { MapNode } from "./work-map.tsx";
 
@@ -118,7 +119,7 @@ export function mapNodesFor(
   goal: Goal,
   depth: number,
   note?: string,
-  locale = "en",
+  locale: string = LOCALE_CODES[0],
 ): MapNode[] {
   const confidences = goal.keyResults
     .map((keyResult) => keyResult.confidence)
@@ -193,7 +194,7 @@ export function mapNodesFor(
 export function goalTreeNodes(
   t: Translate,
   goals: readonly Goal[],
-  locale = "en",
+  locale: string = LOCALE_CODES[0],
 ): MapNode[] {
   const present = new Set(goals.map((goal) => goal.id));
   const childrenOf = new Map<string, Goal[]>();

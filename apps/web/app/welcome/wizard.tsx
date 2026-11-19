@@ -1,6 +1,6 @@
 "use client";
 
-import { isEmailAddress } from "@openokr/formats";
+import { intlTagFor, isEmailAddress } from "@openokr/formats";
 import type { CheckInFrequency } from "@openokr/method";
 import {
   Button,
@@ -90,9 +90,9 @@ const FREQUENCIES = [
 ] as const;
 
 /** The time now on a zone's clock, so the reader can tell the zone is theirs. */
-function localTimeIn(zone: string): string | null {
+function localTimeIn(zone: string, locale?: string): string | null {
   try {
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(intlTagFor(locale), {
       hour: "2-digit",
       minute: "2-digit",
       timeZone: zone,
@@ -121,7 +121,7 @@ export function Wizard({
    */
   readonly frequency: CheckInFrequency;
 }) {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
   const router = useRouter();
   const [step, setStep] = useState<Step>("basics");
   const [pending, start] = useTransition();
@@ -221,10 +221,10 @@ export function Wizard({
             {/* The clock it keeps, so a wrong zone shows before it is saved
                 (usability review W1). Continue stays enabled: every step
                 is skippable (UIUX-PLAN S-34). */}
-            {zone && localTimeIn(zone) ? (
+            {zone && localTimeIn(zone, locale) ? (
               <span className="text-xs text-ink-3" data-testid="local-time">
                 {t("welcome.basics.localTime", {
-                  time: localTimeIn(zone) ?? "",
+                  time: localTimeIn(zone, locale) ?? "",
                 })}
               </span>
             ) : null}

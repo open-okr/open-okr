@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { pageTitle } from "../../../lib/page-title.ts";
@@ -27,7 +28,7 @@ export const generateMetadata = pageTitle("pageTitle.adminAudit");
  * of claims, and a verdict with nothing to look at is a reassurance.
  */
 export default async function AuditPage() {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
@@ -75,7 +76,7 @@ export default async function AuditPage() {
 
   const members = directory
     .map((member) => ({ id: member.id, name: member.name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => a.name.localeCompare(b.name, intlTagFor(locale)));
   const timeZone = String(settings.settings.timezone ?? "UTC");
 
   return (

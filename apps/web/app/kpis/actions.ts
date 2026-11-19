@@ -297,6 +297,7 @@ export async function addSuggestedKpiAction(
           "settings.readForMember",
           {},
         );
+        // machine use: ISO date for today
         const today = new Intl.DateTimeFormat("en-CA", {
           timeZone: String(settings.settings.timezone ?? "UTC"),
         }).format(new Date());

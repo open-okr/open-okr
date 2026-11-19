@@ -143,6 +143,7 @@ export default async function KpiDetailPage({
     throw error;
   }
   const settings = await callAction(context, "settings.readForMember", {});
+  // machine use: ISO date for today
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: String(settings.settings.timezone ?? "UTC"),
   }).format(new Date());

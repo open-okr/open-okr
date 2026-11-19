@@ -1,3 +1,4 @@
+import { intlTagFor } from "@openokr/formats";
 import {
   Button,
   Card,
@@ -105,7 +106,7 @@ export async function Gates({
    */
   readonly pinnedCycleId: string | null;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const judged = gates.filter((gate) => gate.level !== "off");
   const green = judged.filter((gate) => gate.evaluable && gate.passed).length;
@@ -205,7 +206,9 @@ export async function Gates({
         {publishedAt ? (
           <p className="text-sm text-ok">
             {t("cycle.gates.published", {
-              publishedAt: new Date(publishedAt).toLocaleString(),
+              publishedAt: new Date(publishedAt).toLocaleString(
+                intlTagFor(locale),
+              ),
             })}
           </p>
         ) : canPublish ? (
@@ -213,7 +216,9 @@ export async function Gates({
             {companyPublishedAt ? (
               <p className="text-sm text-ok">
                 {t("cycle.gates.companySetPublished", {
-                  publishedAt: new Date(companyPublishedAt).toLocaleString(),
+                  publishedAt: new Date(companyPublishedAt).toLocaleString(
+                    intlTagFor(locale),
+                  ),
                 })}
               </p>
             ) : null}

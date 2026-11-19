@@ -17,6 +17,7 @@
  * **The link is Better Auth's own**, as it was handed to the callback. Nothing
  * here invents a url.
  */
+import { intlTagFor } from "@openokr/formats";
 import type { BuiltMail } from "./mails.ts";
 import { renderEmail } from "./render.ts";
 import { type MailLocale, mailWords } from "./words.ts";
@@ -197,21 +198,21 @@ function dateAndTime(
 ): { readonly date: string; readonly time: string; readonly zone: string } {
   let zone = timeZone;
   try {
+    // machine use: validating timezone
     new Intl.DateTimeFormat("en-GB", { timeZone: zone });
   } catch {
     zone = "UTC";
   }
   return {
-    date: at.toLocaleDateString(locale === "ms" ? "ms-MY" : "en-GB", {
+    date: at.toLocaleDateString(intlTagFor(locale), {
       day: "numeric",
       month: "long",
       year: "numeric",
       timeZone: zone,
     }),
-    time: at.toLocaleTimeString("en-GB", {
+    time: at.toLocaleTimeString(intlTagFor(locale), {
       hour: "2-digit",
       minute: "2-digit",
-      hourCycle: "h23",
       timeZone: zone,
     }),
     zone,

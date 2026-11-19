@@ -1,4 +1,5 @@
 import { listUserSessions, type UserSession } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import { Button, Card, CardBody, CardHeader } from "@openokr/ui";
 import { Laptop, Smartphone } from "lucide-react";
 import { revalidatePath } from "next/cache";
@@ -45,7 +46,7 @@ async function revoke(formData: FormData): Promise<void> {
 }
 
 export async function Sessions({ userId }: { userId: string }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   let sessions: UserSession[] | null = null;
   try {
@@ -118,7 +119,10 @@ export async function Sessions({ userId }: { userId: string }) {
                         t("account.security.sessions.unknownDevice")}
                     </span>
                     <span className="text-xs text-ink-3">
-                      {[session.ipAddress, session.createdAt.toLocaleString()]
+                      {[
+                        session.ipAddress,
+                        session.createdAt.toLocaleString(intlTagFor(locale)),
+                      ]
                         .filter((one) => one)
                         .join(" · ")}
                     </span>

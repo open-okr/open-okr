@@ -664,6 +664,7 @@ function summaryHour(value: string): number {
 
 /** The member's own local hour, for the one comparison that decides morning. */
 function localHourIn(now: Date, timeZone: string): number {
+  // machine use: extracting time parts
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone,
     hour: "2-digit",

@@ -10,6 +10,7 @@
 
 /** How far ahead of UTC a zone is at an instant, in milliseconds. */
 export function zoneOffsetAt(instant: number, timeZone: string): number {
+  // machine use: extracting ISO date parts
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     hour12: false,

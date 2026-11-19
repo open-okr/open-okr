@@ -1,5 +1,6 @@
 "use client";
 
+import { LOCALES } from "@openokr/formats";
 import {
   Button,
   Card,
@@ -192,11 +193,15 @@ export function GeneralSettingsForm({
               change({ language: event.currentTarget.value })
             }
           >
-            <option value="en">{t("appearance.english")}</option>
-            <option value="ms">{t("appearance.bahasaMelayu")}</option>
+            {LOCALES.filter((l) => l.shipped).map((l) => (
+              <option key={l.code} value={l.code}>
+                {t(l.endonymKey)}
+              </option>
+            ))}
             {settings.language &&
-            settings.language !== "en" &&
-            settings.language !== "ms" ? (
+            !LOCALES.filter((l) => l.shipped).some(
+              (l) => l.code === settings.language,
+            ) ? (
               <option value={String(settings.language)}>
                 {String(settings.language)}
               </option>
