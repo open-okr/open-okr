@@ -31,7 +31,7 @@ export interface CopilotTimingSummary {
 const recentTimings: CopilotTimingSummary[] = [];
 const MAX_RECENT_TIMINGS = 50;
 
-export function recordTimingSummary(summary: CopilotTimingSummary): void {
+function recordTimingSummary(summary: CopilotTimingSummary): void {
   recentTimings.push(summary);
   if (recentTimings.length > MAX_RECENT_TIMINGS) {
     recentTimings.shift();
@@ -76,10 +76,6 @@ export function recordTimingSummary(summary: CopilotTimingSummary): void {
 
 export function getLastCopilotTiming(): CopilotTimingSummary | null {
   return recentTimings.at(-1) ?? null;
-}
-
-export function getRecentCopilotTimings(): readonly CopilotTimingSummary[] {
-  return recentTimings;
 }
 
 export function clearCopilotTimings(): void {
@@ -131,7 +127,7 @@ export class CopilotRunTimer {
     this.checksEnd = performance.now();
   }
 
-  startRound(roundIndex: number): void {
+  startRound(roundIndex = 0): void {
     this.currentRound = roundIndex;
     this.roundStart = performance.now();
     this.currentTools = [];
