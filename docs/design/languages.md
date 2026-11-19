@@ -1,139 +1,200 @@
 # Adding languages to OpenOKR
 
-Status: **written, waiting for design approved**.
+Status: **ready for design approved, 19 November 2026**.
 
-Owner: Akmal. Written 19 November 2026 for the [0.10.0 plan](../plans/release-0.10.0.md). Section 2 records the planning decisions Akmal approved on 19 November. Schema and subsystem changes wait for explicit approval before code.
+Owner: Akmal. Written 19 November 2026 for the [release 0.10.0 plan](../plans/release-0.10.0.md).
+Section 2 records the planning decisions Akmal approved on 19 November 2026 (L-Q1 to L-Q10). This document establishes the detailed design across language infrastructure, catalogues, RTL presentation, offline fonts, ICU MessageFormat, METHOD.md conformance, copilot/agent localization, delivery templates, and mixed-version rollout. It awaits explicit "design approved" before code (CLAUDE.md).
 
-## 1. What is true today
+## 1. Context and current state
 
-| Area | Current behaviour | Where |
+| Area | Current behaviour | Where checked |
 |---|---|---|
-| Instance default | `instance.language` has a stored value, an `OPENOKR_DEFAULT_LANGUAGE` bootstrap value and an English default, in that order. Provisioning uses the resolved value for the new workspace. The current self-host General and cloud Instance screens have no instance-language picker. | `packages/core/src/{secrets/instance-registry,settings/workspace-defaults,workspaces/provisioning}.ts`, `apps/web/app/admin/general/page.tsx`, `apps/web/app/operator/instance/page.tsx`, [settings map](../specification/TECHNICAL-PLAN.md#414-the-settings-map) |
-| Workspace default | `workspaces.settings.language` is stored in workspace settings. General offers `en` and `ms`, and preserves a saved value outside those choices. The settings schema accepts a string. | `packages/db/src/schema/workspaces.ts`, `packages/core/src/settings/registry.ts`, `packages/core/src/actions/settings.ts`, `apps/web/app/admin/general/general-settings-form.tsx` |
-| Member preference | `workspace_members.language` is nullable. Null follows the workspace. The schema, profile actions and account UI know `en` and `ms`. The column has a database check for those values. | `packages/db/migrations/0078_member_language.sql`, `packages/db/src/schema/workspaces.ts`, `packages/core/src/actions/people.ts`, `apps/web/lib/appearance.tsx`, `apps/web/lib/appearance-action.ts` |
-| Request locale | A signed-in workspace request tries member, workspace and English. A visitor or signed-in user without a workspace tries browser, instance and English. Browser matching uses the primary language tag. The root sets `lang`. | `apps/web/lib/{locale,accept-language}.ts`, `apps/web/app/layout.tsx`, `apps/web/test/locale.test.ts` |
-| Catalogues | `en.json` and `ms.json` each have 4,986 flat keys. `CATALOGUES` imports both. `translate` fills named values, including terms from workspace overrides. Callers choose count variants. Missing keys throw. | `packages/ui/src/i18n/{catalogue,terms}.ts`, `packages/ui/src/i18n/messages/`, `packages/ui/src/i18n/use-translations.tsx`, `apps/web/lib/translations.ts` |
-| Catalogue checks | The UI tests check Malay key and placeholder coverage, forbid unapproved English copies using `SAME_IN_MALAY`, and exercise a pseudo-locale. The web tests check hardcoded text, key consumers, Malay coverage and fragments. | `packages/ui/test/catalogue.test.tsx`, `apps/web/test/catalogue-coverage.test.ts` |
-| Fonts and formatting | Geist ships as a local font. Its checked file has no Han or Arabic glyphs. `packages/formats` handles local date shapes and timezone arithmetic. Some screen helpers take a locale, some name English or Malay, and `formatMeasure` uses fixed grouping to keep exact decimal precision. | `apps/web/app/fonts/README.md`, `apps/web/app/layout.tsx`, `packages/formats/src/{date,timezone,zoned}.ts`, `apps/web/lib/{day-label,format-price}.ts`, `packages/ui/src/{fields/date-format,lib/format-measure}.ts` |
-| Delivery | Workspace mail uses its workspace's language. Account mail without workspace context uses the instance default. Mail words cover two locales. Chat templates have a language field. The minutes PDF has an English page footer. | `packages/core/src/mail/{words,workspace,account}.ts`, `apps/web/lib/account-mail.ts`, `packages/core/src/channels/template-mappings.ts`, `apps/web/app/session/[id]/minutes/pdf/render.tsx` |
-| Method and model replies | Some Draft Coach rules use English word lists. The [acceptance report](../report/uat-0.9.0-report.md) F-04 records an Indonesian answer to a member using Malay. | [METHOD.md](../specification/METHOD.md) §§4, 11 and 12, `packages/method/src/{quality,word-lists}.ts`, `packages/core/src/copilot/{answer,reading}.ts`, `packages/agents/src/drafter.ts` |
+| Instance default | `instance.language` has a stored value in instance settings, an `OPENOKR_DEFAULT_LANGUAGE` bootstrap value, and an English fallback. Workspace provisioning uses the resolved instance value. The current self-host General screen and cloud Instance screen have no instance-language picker. | `packages/core/src/secrets/instance-registry.ts`, `packages/core/src/settings/workspace-defaults.ts`, `packages/core/src/workspaces/provisioning.ts`, `apps/web/app/admin/general/page.tsx`, `apps/web/app/operator/instance/page.tsx`, [settings map](../specification/TECHNICAL-PLAN.md#414-the-settings-map) |
+| Workspace default | `workspaces.settings.language` stores the workspace default. The general settings form offers `en` and `ms`, preserving any unknown saved string. | `packages/db/src/schema/workspaces.ts`, `packages/core/src/settings/workspace-defaults.ts`, `apps/web/app/admin/general/general-settings-form.tsx` |
+| Member preference | `workspace_members.language` is nullable (null follows workspace). The column check constraint restricts values to `('en', 'ms')`. Profile actions and account UI know only `en` and `ms`. | `packages/db/migrations/0078_member_language.sql`, `packages/db/src/schema/workspaces.ts`, `packages/core/src/actions/people.ts`, `apps/web/lib/appearance.tsx` |
+| Request locale | Signed-in workspace requests try member, workspace, then English. Visitors or requests without workspace context try browser `Accept-Language`, instance default, then English. The root layout sets `lang`. | `apps/web/lib/locale.ts`, `apps/web/lib/accept-language.ts`, `apps/web/app/layout.tsx` |
+| Catalogues | `en.json` and `ms.json` contain 4,986 flat keys each. `CATALOGUES` imports both eagerly. `translate` fills named arguments and workspace term holes. Callers choose count variants manually. Missing keys throw. | `packages/ui/src/i18n/catalogue.ts`, `packages/ui/src/i18n/terms.ts`, `packages/ui/src/i18n/use-translations.tsx`, `apps/web/lib/translations.ts` |
+| Quality gates | UI tests check Malay key parity, argument compatibility, forbid unapproved English copies using `SAME_IN_MALAY`, and test pseudo-locales. Web tests check hardcoded text and coverage. | `packages/ui/test/catalogue.test.tsx`, `apps/web/test/catalogue-coverage.test.ts` |
+| Fonts and formatting | Geist ships locally but lacks Han and Arabic glyphs. `packages/formats` formats dates and times. `formatMeasure` uses fixed grouping. | `apps/web/app/fonts/README.md`, `apps/web/app/layout.tsx`, `packages/formats/src/date.ts`, `packages/formats/src/timezone.ts`, `packages/formats/src/zoned.ts`, `packages/ui/src/lib/format-measure.ts` |
+| Delivery | Workspace mail uses workspace language; account mail uses instance default. Mail words cover English and Malay. External chat templates have a language field. Minutes PDF has an English footer. | `packages/core/src/mail/words.ts`, `packages/core/src/mail/workspace.ts`, `packages/core/src/mail/account.ts`, `packages/core/src/channels/template-mappings.ts`, `apps/web/app/session/[id]/minutes/pdf/render.tsx` |
+| Method & AI replies | Quality rules OBJ-1, KR-5, and KR-2 use English word lists. Copilot answers have occasionally replied in Indonesian to a Malay query. | [METHOD.md](../specification/METHOD.md) §§4, 11 and 12, `packages/method/src/quality.ts`, `packages/method/src/word-lists.ts`, `packages/core/src/copilot/answer.ts`, `packages/core/src/copilot/reading.ts`, `packages/agents/src/drafter.ts`, `packages/agents/src/evaluation/sets.ts` |
 
-## 2. Planning decisions
+## 2. Planning decisions (19 November 2026)
 
-See [0.10.0 §7](../plans/release-0.10.0.md#7-decisions) for the full questions, alternatives and costs.
+The following decisions were approved by Akmal in [release 0.10.0 plan](../plans/release-0.10.0.md) §7:
 
-| Decision | Direction approved on 19 November 2026 |
+| Decision | Summary |
 |---|---|
-| L-Q1 | Reuse the instance, workspace and member settings. Offer the instance default to an instance admin on self-host or an operator on managed cloud. Workspace admins can set or clear their default. Members can follow it or choose their own per workspace. |
-| L-Q2 | Extend the existing member column and its check. Prove automatic activation of writes for the new codes after incompatible pods are gone. |
-| L-Q3 | Use the code and format choices in sections 3 and 8 and add the signed-out switcher specified in UIUX-PLAN §8. |
-| L-Q4 | Apply full right-to-left support for Arabic. |
-| L-Q5 | Bundle local Noto Sans SC and Noto Sans Arabic, with measured size and PDF tests. |
-| L-Q6 | Use ICU MessageFormat. Bring back any specific new runtime dependency for approval after its licence and size review. |
-| L-Q7 | Use machine translation for the initial release. Run the automated checks and ship without native sign-off. Improve the wording gradually after release. |
-| L-Q8 | Keep the English word-list checks for English text, with a translated notice when skipped. Settle text-language selection, score, strict mode and gate behaviour in METHOD.md before implementation. |
-| L-Q9 | Use the receiving member's resolved locale and allow explicit language requests in direct conversation. Use per-locale fixtures to test reply language, grounding and safe proposals. |
-| L-Q10 | Resolve private messages and files for the recipient or requester and choose an approved fallback for unknown recipients and shared channels. |
+| **L-Q1** | **Authority over defaults.** Instance admin on self-host and cloud operator on managed cloud set the deployment default. Workspace admins set workspace default or clear it to inherit. Members choose per workspace or select "Follow workspace". Saved values are preserved. |
+| **L-Q2** | **Mixed-version rollout.** Forward migration `0172_member_language_codes.sql` widens the check constraint on `workspace_members.language` to all 10 locales. Writes of new member language codes are gated until old pods (whose action schemas only accept `en` and `ms`) are out of service, verified with mixed-version acceptance tests. |
+| **L-Q3** | **Locale conventions & signed-out switcher.** Ship 10 locales (section 3). In human-facing number inputs, accept locale-specific decimal separators with an error on ambiguous input. Add a signed-out switcher (UIUX-PLAN §8) prioritizing: explicit device cookie preference (`openokr_locale`) > browser `Accept-Language` > instance default > English. |
+| **L-Q4** | **Full RTL for Arabic.** Full right-to-left layout for Arabic (`dir="rtl"` on `<html>`, logical CSS start/end, mirrored directional icons/charts, `dir="auto"` / `<bdi>` for bidirectional text). Visual review of all screens on mobile and desktop. |
+| **L-Q5** | **Local font bundling.** Bundle Noto Sans SC and Noto Sans Arabic locally for air-gap compliance and reliable PDF shaping. Measured image footprint is ~20–25 MB uncompressed (~10 MB WOFF2). SIL Open Font License 1.1. |
+| **L-Q6** | **ICU MessageFormat.** Smallest compatible implementation. Candidate: `@formatjs/intl` / `intl-messageformat` (BSD-3-Clause, ~14 kB min+gzip, pure JS, offline). Marked as **requiring owner's approval**; no dependency added yet. |
+| **L-Q7** | **Machine translation for 0.10.0.** Machine translation for the initial release across the 8 new locales and Malay additions. Automated catalogue gates enforce zero missing keys and valid plurals. Native translation review is optional post-release. |
+| **L-Q8** | **METHOD.md word-list checks.** Run English word-list checks only on English text; skip them with a translated notice for non-English text. Structural checks run in all locales. Skipped checks are excluded from the score denominator and do not block strict mode/gates. (Exact METHOD.md text proposed below for Akmal's approval). |
+| **L-Q9** | **Copilot & agents language.** Default to the receiving member's resolved locale. Honour explicit language requests in conversation. Localize drafts, proposals, and nudges. Include evaluation fixtures per locale; maintain deterministic AI-off path. |
+| **L-Q10** | **Outward messages & files.** Private email/notifications use recipient's resolved workspace locale. Shared channel posts and invitations use workspace default. Account-level mail uses instance default. Human-facing exports and PDFs use requester's locale. Machine-readable identifiers/keys remain stable English strings. |
 
-## 3. Locale list
+## 3. Supported locales
 
-The web font column lists the face for the script. PDF coverage is verified separately against the renderer. Number, date and count forms follow the chosen locale in section 8.
-
-| Language | Code | Direction | Web font | Convention |
+| Language | Code | Direction | Web & PDF Font | Number / Date Convention |
 |---|---|---|---|---|
-| English | `en` | LTR | Geist | Existing copy and date conventions |
-| Malay | `ms` | LTR | Geist | Bahasa Melayu, Malaysia |
-| Simplified Chinese | `zh-Hans` | LTR | Noto Sans SC, with Geist for Latin UI | Simplified script |
-| Spanish | `es` | LTR | Geist | Neutral Spanish copy, `es` date and number formats |
-| Arabic | `ar` | RTL | Noto Sans Arabic, with Geist for Latin UI | Modern Standard Arabic, `ar` date and number formats |
-| German | `de` | LTR | Geist | German |
-| Portuguese | `pt` | LTR | Geist | Brazilian Portuguese conventions |
-| French | `fr` | LTR | Geist | French |
-| Italian | `it` | LTR | Geist | Italian |
-| Indonesian | `id` | LTR | Geist | Bahasa Indonesia |
+| English | `en` | LTR | Geist (Latin) | US / UK conventions (`1,234.56`, `MM/DD/YYYY` or `DD/MM/YYYY`) |
+| Malay | `ms` | LTR | Geist (Latin) | Bahasa Melayu (`1,234.56`, `DD/MM/YYYY`) |
+| Simplified Chinese | `zh-Hans` | LTR | Noto Sans SC (bundled) + Geist | Simplified Han (`1,234.56`, `YYYY/MM/DD`) |
+| Spanish | `es` | LTR | Geist (Latin) | Neutral Spanish (`1.234,56`, `DD/MM/YYYY`) |
+| Arabic | `ar` | RTL | Noto Sans Arabic (bundled) + Geist | Modern Standard Arabic (`١٬٢٣٤٫٥٦` or `1,234.56`, `DD/MM/YYYY`) |
+| German | `de` | LTR | Geist (Latin) | Standard German (`1.234,56`, `DD.MM.YYYY`) |
+| Portuguese | `pt` | LTR | Geist (Latin) | Brazilian Portuguese (`1.234,56`, `DD/MM/YYYY`) |
+| French | `fr` | LTR | Geist (Latin) | Standard French (`1 234,56`, `DD/MM/YYYY`) |
+| Italian | `it` | LTR | Geist (Latin) | Standard Italian (`1.234,56`, `DD/MM/YYYY`) |
+| Indonesian | `id` | LTR | Geist (Latin) | Bahasa Indonesia (`1.234,56`, `DD/MM/YYYY`) |
 
-## 4. Catalogue layout and loading
+## 4. Architecture and catalogue loading
 
-| Piece | Proposed design |
-|---|---|
-| Files | Keep one flat JSON file per locale under `packages/ui/src/i18n/messages/`, named with the locale code. English is the source contract for keys and argument names. Keep namespace keys and whole sentences. Fold count variants into a single message when their call sites move to ICU plurals. |
-| Locale registry | Put code, display name and direction in shared lightweight metadata usable by web, UI and core without importing JSON. `packages/formats` already provides a pure shared package for both core and UI. Keep full catalogue loading in `packages/ui`. |
-| Loading | Replace the eager import map with an explicit loader per locale. The server resolves the locale once per request, loads its catalogue and passes it to the client provider. Server translation and client revalidation use the same locale and terminology overrides. Check the built chunks for language payloads. |
-| Delivery words | Keep the delivery translations usable in server workers without React. Reuse locale resolution and formatting across mail, notifications, chat, human-facing exports and PDFs. Include those keys in parity and argument tests. Start from `packages/core/src/mail/words.ts` and the existing templates. |
-| Argument compatibility | Preserve existing `{name}` arguments and the workspace term holes from `packages/ui/src/i18n/terms.ts`. For count-based messages, use ICU plural branches, where the formatter selects a phrase for the count. Compile or parse only local assets. Keep both server and client on the same formatter and verify pseudo-locale behaviour. |
-| Missing messages | Fail the build for incomplete shipping catalogues. Keep the error for a missing key. English is the last locale in preference resolution. |
+1. **Lightweight Locale Registry (`packages/formats/src/locales.ts`)**:
+   - Contains metadata (code, label, native label, script direction, font family) without importing messages.
+   - Usable across core, web, db, and formats without bundle bloat.
 
-## 5. Settings and fallback
+2. **Decoupled Dynamic Catalogue Loading (`packages/ui/src/i18n/loader.ts`)**:
+   - Replace eager static import of all JSON files in `packages/ui/src/i18n/catalogue.ts` with explicit per-locale chunk loaders.
+   - The web server resolves the locale once per request, dynamically loads the single matching catalogue (`packages/ui/src/i18n/messages/<locale>.json`), and hydrates the client `TranslationProvider`.
+   - Browser client bundles download only the active locale's messages.
 
-| Context | Proposed order or behaviour |
-|---|---|
-| Signed in with a workspace | **Member → workspace → instance → English.** Skip absent, unsupported or unreadable choices. Preserve absence in the workspace resolver so a synthetic English settings default cannot hide the instance fallback. Read the instance only if the member and workspace do not resolve. |
-| Signed out or without a workspace | **Explicit device choice → browser → instance → English.** Keep the existing browser order beneath the proposed switcher. Match canonical supported tags first. Accept explicit Simplified Chinese tags and common Simplified regions such as `zh-CN` and `zh-SG`. A bare `zh` may select `zh-Hans`. Skip Traditional tags or regions and continue the preference list. |
-| Saved values | Keep saved workspace choices, including values copied at creation, and saved `en` and `ms` member choices. Null member language follows the workspace. Preserve unsupported legacy strings and skip them during resolution. Offer locales that pass the release checks and are enabled for the deployment. |
-| Role and storage | Use existing permissions at each setting's scope. Reuse `instance.language`, workspace settings and `workspace_members.language`. Record and verify the setting paths in TECHNICAL-PLAN §4.14. Extend the member profile input and output contracts and regenerate their projections. |
-| Rolling upgrade | Use a forward migration to widen the member check. Establish a rollout condition before enabling new writes, because an older `people.readMember` output schema can reject a new code even after the database accepts it. Test web and worker overlap on one database. Preserve the existing stored values. See [PLAN.md](../specification/PLAN.md) §5.1. |
-| Private outputs | Use the member recipient's locale in the relevant workspace. Use the workspace default for an invite without a preference. Without a workspace context, account mail uses the instance default. Use the requester for an inline or queued export and PDF. Shared chat uses the workspace default and an approved channel template. |
+3. **Plural handling & ICU compatibility**:
+   - For simple strings, keep `{name}` named placeholders and workspace terminology tags (`{term:objective}`).
+   - For count-based messages, replace ad-hoc `key_one` / `key_other` branching with standard ICU MessageFormat plural syntax:
+     `{count, plural, one {# item} other {# items}}`.
+   - Arabic includes full 6-category plural forms: `zero`, `one`, `two`, `few`, `many`, `other`.
 
-## 6. Right-to-left layout
+## 5. Schema change and mixed-version rollout
 
-| Area | Proposed design |
-|---|---|
-| Direction | Set `lang` and `dir` on `<html>` in `apps/web/app/layout.tsx` from the resolved locale. Ensure dialogs, popovers, menus, tooltips and other portalled content inherit the direction. Use the same language and direction in rendered mail and PDF output where the format supports it. |
-| Layout | Audit both `apps/web` and `packages/ui`. Replace direction-dependent left/right spacing, alignment, borders and positioning with logical start/end properties. Check navigation, drawers, tables, forms, boards, editors and tooltips at desktop and mobile widths. Keep keyboard and reading order aligned. |
-| Icons and charts | Mirror icons that express direction, such as next and back. Mirror chart layout and label placement when it follows reading order. Check time, value axes, scale and series semantics with the chart's data and preserve their meaning. Check dragging and keyboard movement on the board. |
-| Mixed text | Let content direction follow the text where appropriate, using `dir="auto"` or bidirectional isolation for names and embedded values. Give code, URLs and identifiers an LTR context. Check Arabic text beside dates, numbers, Latin names and citation chips. |
-| Visual pass | Use the route inventory in `e2e/s43-accessibility.spec.ts` as the starting list. Capture and review every user-facing screen in Arabic at desktop and mobile widths. Include auth, admin and operator screens, shared overlays, errors, empty states and the main interactive flows. Check focus, labels and clipping. |
+### Database schema migration
+- **Migration file**: `packages/db/migrations/0172_member_language_codes.sql`.
+- **DDL change**:
+  ```sql
+  alter table workspace_members
+    drop constraint if exists workspace_members_language_check;
 
-## 7. Fonts and the air gap
+  alter table workspace_members
+    add constraint workspace_members_language_check
+    check (language in ('en', 'ms', 'zh-Hans', 'es', 'ar', 'de', 'pt', 'fr', 'it', 'id'));
+  ```
+- **RLS and Tenant Floor**:
+  Table `workspace_members` already has `workspace_id`, `force row level security`, and policy `tenant_isolation` (created in `0001_core.sql`). No new table is added.
 
-| Choice | Design and checks |
-|---|---|
-| Local assets, recommended | Commit Noto Sans SC and Noto Sans Arabic with version, checksum, licence and provenance beside the fonts. Serve local faces by script and load them when used. Use only offline build inputs. Measure the added image size, first page transfer and PDF size. |
-| System web fonts | Fallback on devices with suitable installed faces. The PDF renderer uses the chosen local faces for shaping and embedding. |
-| PDF | Verify the font formats supported by the existing renderer before selecting assets. Check Arabic shaping, line ordering and text extraction, and Simplified Chinese wrapping and coverage. Test user-authored text alongside translated labels. |
-| Offline verification | Run the [air-gap checks](../runbooks/air-gap.md) and verify a cold build and a cold page request with external access disabled. Check Chinese and Arabic examples for missing glyphs. |
+### Mixed-version rollout strategy (L-Q2)
+1. **The incompatibility risk**:
+   Older pods running 0.9.1 have schemas in `packages/core/src/actions/people.ts` (`readMember`, `updateMemberProfile`) validating `language: z.enum(["en", "ms"]).nullable()`. If a user on a 0.10.0 pod saves a new language code (e.g. `ar`), an older pod reading that member row will throw a schema validation error.
+2. **Rollout execution**:
+   - Phase 1: Apply migration `0172_member_language_codes.sql` to the database. The database now allows all 10 codes.
+   - Phase 2: Deploy 0.10.0 application pods. During rolling update, UI language pickers restrict member selection to `en` and `ms` (or new choices remain disabled).
+   - Phase 3: Once all old 0.9.1 pods are completely decommissioned and drained, automated activation enables the new 8 language choices in member settings.
+   - Verified by mixed-version integration test: old pod reads member with null/en/ms; old pod does not encounter new codes until drained.
 
-## 8. Dates, numbers and plurals
+## 6. Right-to-Left (RTL) layout implementation (L-Q4)
 
-| Kind | Proposed design |
-|---|---|
-| Dates and times | Use the resolved locale with `Intl.DateTimeFormat` and pass the timezone explicitly. Use the workspace timezone for workspace presentation and preserve the existing timezone rules for other contexts. Keep date-only values as calendar dates so changing the locale or timezone cannot shift the day. Reuse `packages/formats/src/{date,timezone,zoned}.ts`. |
-| Numbers | Use `Intl.NumberFormat` for display, with an explicit locale and unit or currency where applicable. Preserve the precision of stored decimal strings from `packages/ui/src/lib/format-measure.ts`. Under L-Q3, accept local decimals and digits in human-facing number inputs, reject ambiguous values and store canonical numeric values. Keep human display separate from machine-readable formats. |
-| Plurals | Use `Intl.PluralRules` through ICU MessageFormat for each locale. Require `other` and verify each supported category with fixture counts. Arabic needs `zero`, `one`, `two`, `few`, `many` and `other`. Malay, Simplified Chinese and Indonesian can use `other` for cardinal plurals in the checked Node runtime. Derive the remaining categories from the runtime and test them. Do not assume an English singular and plural pair works everywhere. |
-| Consistency | Pass the same locale and timezone to client, server and worker rendering. Test decimals, grouping, zero, negatives, count agreement and ambiguous dates. Verify date-only round trips and that browser hydration agrees with server output. |
+1. **Document root**:
+   - In `apps/web/app/layout.tsx`:
+     ```tsx
+     <html lang={locale} dir={localeDirection(locale)}>
+     ```
+   - When `locale === "ar"`, `dir="rtl"`.
+2. **CSS Logical Properties refactor**:
+   - Systematically replace physical directional CSS utilities in `apps/web` and `packages/ui`:
+     - `ml-*` / `mr-*` -> `ms-*` / `me-*` (`margin-inline-start`, `margin-inline-end`).
+     - `pl-*` / `pr-*` -> `ps-*` / `pe-*` (`padding-inline-start`, `padding-inline-end`).
+     - `border-l` / `border-r` -> `border-s` / `border-e` (`border-inline-start`, `border-inline-end`).
+     - `left-*` / `right-*` -> `start-*` / `end-*` (`inset-inline-start`, `inset-inline-end`).
+     - `text-left` / `text-right` -> `text-start` / `text-end`.
+3. **Directional icon mirroring**:
+   - Direction-conveying icons (back/forward arrows, breadcrumb chevrons, collapse/expand carats) receive `rtl:rotate-180` or conditional SVG mirroring.
+   - Non-directional icons (search, settings, checkmarks, trash, user avatars) do not mirror.
+4. **Interactive components**:
+   - Task boards: Columns render from right to left; keyboard navigation (`ArrowRight` moves leftward in visual space) aligns with RTL reading order.
+   - Charts: Progress bars, timeline charts, and category axes orient from right to left where time/sequence represents reading flow. Value axes preserve standard mathematical orientation.
+5. **Bidirectional text isolation**:
+   - Wrap dynamic user text (goal titles, KPI names, user notes) with `<bdi>` or `dir="auto"`.
+   - Ensure URLs, code blocks, UUIDs, and email addresses retain explicit `dir="ltr"`.
 
-## 9. Translation workflow and maintenance
+## 7. Bundled local fonts and air-gap verification (L-Q5)
 
-| Step | Work |
-|---|---|
-| Prepare | Generate translations in batches by screen or template. Provide complete messages, screen context, placeholder notes and an OKR glossary tied to METHOD.md. Include strings for G4 and outward delivery. |
-| Generate | Use machine translation for the initial release. Keep values, markup and workspace term placeholders intact. Record intended English matches by locale and key, with a reason. |
-| Validate | Run catalogue, placeholder, plural, format and delivery checks for every shipping language. Verify the RTL layout and offline fonts. Native translation sign-off is optional after release. |
-| Method and replies | Translate method labels and messages subject to the approved policy. Ask Akmal before changing the checks, thresholds or profiles. Exercise per-locale fixtures in `packages/agents/src/evaluation/sets.ts` and deterministic outputs with the provider off. |
-| Maintain | Record reported wording issues by locale and key. Fix them in batches and keep the glossary current. Start the Malay follow-up with the [13 review items](../report/malay-review-0.9.0.md) still open after 0.9.1. |
+1. **Font assets**:
+   - **Noto Sans SC** (Simplified Chinese): WOFF2 subset (~8–10 MB; uncompressed OTF ~15–20 MB) placed in `apps/web/app/fonts/noto-sans-sc/`.
+   - **Noto Sans Arabic**: WOFF2 for web and TTF for PDF engine (~1.5 MB) placed in `apps/web/app/fonts/noto-sans-arabic/`.
+   - **Licence**: SIL Open Font License 1.1 (`OFL.txt` stored alongside fonts).
+   - **Docker footprint**: Increases container image size by ~20–25 MB uncompressed.
+2. **Air-gap compliance**:
+   - In accordance with `docs/runbooks/air-gap.md`, zero external font CDNs (Google Fonts, Adobe Fonts) are used.
+   - Cold builds and cold page requests function completely offline without network access.
+3. **PDF rendering & shaping**:
+   - In `apps/web/app/session/[id]/minutes/pdf/render.tsx`, register local TTF fonts with the PDF engine.
+   - Validate Arabic glyph shaping (proper joining of initial, medial, final, isolated forms) and Bidi reordering.
+   - Validate Simplified Chinese text wrapping and font embedding to prevent character drop.
 
-## 10. Tests
+## 8. ICU MessageFormat runtime dependency proposal (L-Q6)
 
-| Gate | What it checks |
-|---|---|
-| Catalogue completeness | Parameterise `packages/ui/test/catalogue.test.tsx` and `apps/web/test/catalogue-coverage.test.ts` over the release registry. Require the same keys as English, including detection of extra keys. Retain consumer, hardcoded-text, fragment and pseudo-locale checks. Apply parity to delivery catalogues too. |
-| English matches | Generalise `SAME_IN_MALAY` into locale-specific exceptions with a reason per key. Fail on an unapproved match and on a stale exception. Address wording quality as issues are reported. |
-| Placeholders and ICU | Parse each message, compare required argument names and compatible types with English, including term holes, and verify valid plural branches for that locale. Render representative counts and nested values. Fail on malformed syntax, missing `other` or an unresolved placeholder. Check pseudo-localisation preserves the syntax. |
-| Settings and upgrade | Extend `apps/web/test/locale.test.ts` and test settings writes and reads through their existing paths. Check clearing, permissions, signed-out negotiation and data from before the change. Exercise a mixed-version rollout with new codes gated until safe. |
-| RTL and formats | Run the screenshot pass in section 6 and locale-format tests in the browser and server. Check PDFs and cold offline font loading. |
-| Delivery and evaluation | Check workspace and instance fallbacks and two different recipients of one event. Verify chat template choice, inline and queued export parity, offline rendering, and per-locale copilot and agent fixtures, including provider off. |
+> [!IMPORTANT]
+> **Pending Owner Approval**: In accordance with CLAUDE.md and L-Q6, no new runtime dependency is added to `package.json` until explicit approval from the owner.
+
+### Proposed Candidate: `@formatjs/intl` / `intl-messageformat`
+- **Package**: `intl-messageformat`
+- **Licence**: **BSD-3-Clause** (permissive, commercial-friendly).
+- **Bundle size**: **~14 kB minified + gzipped** (~45 kB unpacked).
+- **Dependencies**: None. Pure JavaScript. Directly uses native ECMAScript `Intl.PluralRules` available in Node 22 and modern evergreen browsers.
+- **Suitability**: Handles full cardinal and ordinal plural categories across all 10 locales, including Arabic's 6 plural forms. Runs identically in browser clients, Node.js SSR, background mail workers, and PDF generation.
+
+## 9. Draft Coach & METHOD.md conformance (L-Q8)
+
+In `packages/method/src/word-lists.ts` and `packages/method/src/quality.ts`, quality rules OBJ-1 ("Outcome, not output"), KR-5 ("Movement or milestone"), and parts of KR-2 match words from English-specific word lists (output verbs, movement verbs, state words).
+
+### Language-dependent behavior
+- For **English text**: Word-list checks execute normally against the quality canon.
+- For **Non-English text** (determined by drafting member's session locale or explicit language tag):
+  - Word-list matching is skipped.
+  - A translated informational notice is displayed in the coaching panel: *"Word-list quality checks are skipped for non-English draft."*
+  - **Structural checks** (character length bounds, numeric metric targets, baseline/target distinction, timeframe presence) continue to execute for all locales.
+  - **Strength score**: Skipped word-list checks are excluded from the evaluated checks denominator so the score is neither penalized nor artificially inflated.
+  - **Strict mode & publish gates**: Skipped word-list checks do not block draft progression or publication.
+
+### Proposed METHOD.md amendment (Requires Akmal's explicit approval)
+
+> ### Proposed wording for `docs/specification/METHOD.md` §4:
+>
+> "The word-list checks in OBJ-1, KR-5 and parts of KR-2 evaluate English vocabulary only. When drafting in another language (determined by the drafting member's resolved locale or explicit language tag), word-list evaluations are skipped, and a translated advisory notice is presented: *'Word-list quality checks are skipped for non-English text.'*
+>
+> Skipped word-list checks are excluded from the strength score evaluation denominator (neither penalizing nor artificially inflating the score). Structural checks—including character bounds, numeric targets, baseline-target differences, and timeframe constraints—continue to execute across all languages. Under strict mode or publishing gates, skipped word-list checks do not block progression."
+
+*(Note: In accordance with standing instructions, `docs/specification/METHOD.md` is not modified directly in this task; this wording awaits Akmal's formal approval.)*
+
+## 10. Copilot, agents, and outward messages (L-Q9 & L-Q10)
+
+### Copilot and agents (L-Q9)
+- **Context passing**: `packages/core/src/copilot/answer.ts`, `packages/core/src/copilot/reading.ts`, and `packages/agents/src/drafter.ts` receive the member's resolved session locale in their context payload.
+- **Model prompt instruction**: Prompts instruct the LLM to reply in the user's requested language while grounding on repository facts. If a user explicitly converses in another language (e.g. asking in English while using an Arabic UI), the assistant replies in the conversed language.
+- **AI evaluation**: Extend `packages/agents/src/evaluation/sets.ts` and `docs/design/ai-evaluation.md` with golden evaluation fixtures in each supported locale, testing reply language, terminology adherence, grounding, and proposal safety.
+- **AI-off path**: When AI is disabled, all deterministic agent nudges and fallback system responses use static localized strings from the UI catalogue.
+
+### Outward communications (L-Q10)
+- **Private email and in-app notifications**: Rendered in the individual recipient's resolved workspace locale (`packages/core/src/mail/workspace.ts`, `packages/core/src/notifications/templates.ts`).
+- **Workspace invitations and public broadcast posts**: Rendered in the workspace default language.
+- **Account-level security alerts** (password resets, passkey registrations): Rendered in the instance default language (`packages/core/src/mail/account.ts`).
+- **Exports and PDFs**: Rendered in the requester's resolved locale (`packages/core/src/exports/lists.ts`, `apps/web/app/session/[id]/minutes/pdf/render.tsx`).
+- **Machine-readable formats**: CSV export columns, JSON API payloads, and internal audit tags remain stable canonical English identifiers.
+- **Channel template fallback**: If an external channel (e.g. WhatsApp, Slack) lacks an approved template for a given locale, it falls back to the workspace default template.
 
 ## 11. Acceptance criteria
 
-| Given | When | Then |
-|---|---|---|
-| An instance admin changes the deployment default | A workspace is provisioned and a member with no override signs in | The workspace starts with that language, and the member can select any enabled locale. |
-| A member chose `fr`, their workspace chose `ms` and the instance chose `en` | The member clears their preference, then a workspace admin clears the workspace default | They first see Malay and then English. A second workspace keeps its own preference. |
-| A request presents an unsupported member or workspace value and the instance uses an enabled locale | The locale is resolved | It skips the unsupported values and uses the instance locale. It uses English when no earlier choice resolves. |
-| A signed-out visitor has no explicit choice and the browser requests `zh-TW`, then `zh-CN` | The visitor opens sign-in | The first range is skipped and sign-in renders in Simplified Chinese. A later explicit device choice wins. |
-| A pod on the old release is still serving | A new pod renders the account settings | New locale writes stay unavailable and existing English and Malay settings work on both. The new choices become writable after safe activation. |
-| A member uses Arabic on an isolated instance | They open the board, an editor and a PDF with Arabic and Latin text | Arabic reads right to left, directional controls follow the reading order, and glyphs render from local assets. Chart scales and mixed text remain legible. |
-| An enabled translation has a missing key, broken plural branch or renamed argument | The catalogue tests run | The gate reports the locale and message key and fails. |
-| A machine-translated catalogue and its delivery templates pass all applicable release checks | The release enables that locale | Members can select it. Wording issues can be fixed in later catalogue updates. |
-| Two recipients prefer different languages | The same event reaches each by private message | The system text uses each recipient's locale. Shared posts use the workspace default. File labels follow the requester, and stable data fields keep their canonical format. |
-| A member uses a non-English language and the provider is off | They use the Draft Coach and receive a deterministic nudge | The approved method policy runs and any skipped word-list checks are explained. System words use the resolved locale and the rule keys still resolve. |
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | An instance admin on self-host or operator on cloud | They set the instance default language to `de` (German) | Newly provisioned workspaces default to German; visitors without preferences see German. |
+| AC-2 | A workspace member with preference `fr`, in a workspace defaulting to `ms`, on an instance defaulting to `en` | The member clears their preference to "Follow workspace", then an admin clears workspace default | The member first sees Malay (`ms`), and after workspace default is cleared, sees English (`en`). |
+| AC-3 | A signed-out visitor with browser `Accept-Language: zh-CN, zh;q=0.9, en;q=0.8` and no device cookie | The visitor navigates to `/sign-in` | The page renders in Simplified Chinese (`zh-Hans`). When the visitor chooses English from the signed-out switcher, an `openokr_locale` cookie is set and English renders on subsequent visits. |
+| AC-4 | A deployment undergoing rolling upgrade from 0.9.1 to 0.10.0 | An active 0.9.1 pod handles a member profile query | The 0.9.1 pod succeeds; new language code writes remain gated until all 0.9.1 pods are decommissioned. |
+| AC-5 | A member with language set to Arabic (`ar`) | They open the application | Root `<html>` sets `dir="rtl"` and `lang="ar"`, layouts use logical start/end positioning, directional icons mirror, chart sequences flow right-to-left, and local Noto Sans Arabic fonts render offline without missing glyphs. |
+| AC-6 | A member drafting an OKR in French (`fr`) with AI provider turned off | They enter a French objective and view the Draft Coach panel | English word-list checks (OBJ-1, KR-5) are skipped with the translated notice; structural checks execute; the strength score excludes skipped checks from the denominator; and the member is not blocked from publishing. |
+| AC-7 | A member using Indonesian (`id`) asking a question in the Copilot chat | The Copilot generates an answer | The response is written in Indonesian adhering to OKR terminology, grounded in workspace records. If the member explicitly says "Reply in English", the response switches to English. |
+| AC-8 | Two members in the same workspace: Member A prefers `pt` (Portuguese) and Member B prefers `it` (Italian) | An action triggers a private notification to both members | Member A receives email/notification in Portuguese; Member B receives email/notification in Italian. |
+| AC-9 | A workspace member requesting a Minutes PDF export in Arabic | The PDF worker generates the PDF document | The PDF is shaped correctly with local Noto Sans Arabic, includes RTL text layout, and displays dates and numbers in Arabic conventions. |
+| AC-10 | Automated CI catalogue tests running against all 10 locales | A message key is missing or has a broken ICU plural syntax in any locale | The catalogue test fails with the exact file, key, and syntax error. |
