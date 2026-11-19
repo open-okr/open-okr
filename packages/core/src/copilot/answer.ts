@@ -56,6 +56,7 @@ import {
   reasonFields,
   reasonText,
 } from "./reasons.ts";
+import { CopilotRunTimer, type CopilotTimingSummary } from "./timing.ts";
 
 /**
  * How many passages a grounded answer is given.
@@ -325,21 +326,29 @@ export async function answerQuestion(
   context: ActionCallContext,
   input: AnswerQuestionInput,
 ): Promise<AnswerQuestionResult> {
+  const timer = new CopilotRunTimer();
+  timer.startPreparation();
   const groundedFirst = await prepare(context, input, (drafter) =>
     Boolean(drafter.answerGrounded),
   );
+  timer.endPreparation();
   // The read loop, which leaves the passages as they were when it cannot run.
-  const reading = await drainReading(readLiveData(context, groundedFirst));
+  const reading = await drainReading(
+    readLiveData(context, groundedFirst, {}, timer),
+  );
   const prepared = reading?.prepared ?? groundedFirst;
-  const nothing = (reason: ReasonLike): AnswerQuestionResult => ({
-    threadId: prepared.threadId,
-    questionMessageId: prepared.questionMessageId,
-    answerMessageId: null,
-    answer: null,
-    sources: prepared.sources,
-    unavailableReason: reasonText(reason),
-    ...(typeof reason === "string" ? {} : { unavailableCode: reason }),
-  });
+  const nothing = (reason: ReasonLike): AnswerQuestionResult => {
+    timer.finish();
+    return {
+      threadId: prepared.threadId,
+      questionMessageId: prepared.questionMessageId,
+      answerMessageId: null,
+      answer: null,
+      sources: prepared.sources,
+      unavailableReason: reasonText(reason),
+      ...(typeof reason === "string" ? {} : { unavailableCode: reason }),
+    };
+  };
 
   // Called through the drafter, never as a detached function. A host's drafter
   // is very often a class instance, and `const f = drafter.answerGrounded`
@@ -357,12 +366,16 @@ export async function answerQuestion(
   }
 
   let answer: Awaited<ReturnType<NonNullable<AgentDrafter["answerGrounded"]>>>;
+  timer.startStreamWait();
   try {
     answer = await drafter.answerGrounded(prepared.ask);
+    timer.recordFirstToken();
   } catch {
     // A model having a bad minute leaves the question recorded and the passages
     // on screen, which is the same place a provider-off workspace stands.
     return nothing({ code: "provider_error" });
+  } finally {
+    timer.finish();
   }
   if (!answer || answer.text.trim() === "") {
     return nothing({ code: "nothing_to_add" });
@@ -496,6 +509,7 @@ export type CopilotEvent =
       readonly kind: "done";
       readonly answerMessageId: string | null;
       readonly stopped: boolean;
+      readonly timing?: CopilotTimingSummary;
     };
 
 /**
@@ -516,6 +530,8 @@ export async function* streamAnswer(
   input: AnswerQuestionInput,
   signal?: AbortSignal,
 ): AsyncGenerator<CopilotEvent> {
+  const timer = new CopilotRunTimer();
+  timer.startPreparation();
   // Recorded first, as `prepare` does, and split from the retrieval here so
   // the reader is told the search has started while it runs (plan 0.8.1 W2).
   const asked = await callAction(context, "copilot.ask", {
@@ -540,6 +556,7 @@ export async function* streamAnswer(
     },
     (drafter) => Boolean(drafter.streamGrounded),
   );
+  timer.endPreparation();
   yield { kind: "step", step: "found", count: groundedFirst.sources.length };
   yield { kind: "sources", sources: groundedFirst.sources };
 
@@ -548,11 +565,18 @@ export async function* streamAnswer(
   // `proceed` ends the loop when the reader has gone, before the next round.
   // What the member may propose is read first: the loop offers it as a tool
   // (plan 0.9.0 A4), and the card is sent the moment the call finishes.
+  timer.startChecks();
   const offers = await offersToPropose(context);
-  const readingRun = readLiveData(context, groundedFirst, {
-    proceed: async () => !signal?.aborted,
-    proposal: { offers },
-  });
+  timer.endChecks();
+  const readingRun = readLiveData(
+    context,
+    groundedFirst,
+    {
+      proceed: async () => !signal?.aborted,
+      proposal: { offers },
+    },
+    timer,
+  );
   let readingNext = await readingRun.next();
   while (!readingNext.done) {
     const event = readingNext.value;
@@ -581,7 +605,8 @@ export async function* streamAnswer(
       reason: reasonText(why),
       ...reasonFields(why),
     };
-    yield { kind: "done", answerMessageId: null, stopped: false };
+    const timing = timer.finish();
+    yield { kind: "done", answerMessageId: null, stopped: false, timing };
     return;
   }
 
@@ -594,6 +619,7 @@ export async function* streamAnswer(
     if (offers !== null) {
       yield { kind: "step", step: "proposing" };
     }
+    timer.startChecks();
     proposal = await proposeBeforeAnswering(
       context,
       {
@@ -602,6 +628,7 @@ export async function* streamAnswer(
       },
       offers,
     );
+    timer.endChecks();
     if (proposal.proposalId !== null) {
       yield { kind: "proposal", proposalId: proposal.proposalId };
     }
@@ -647,9 +674,13 @@ export async function* streamAnswer(
     answerMessageId = written.messageId;
   };
 
+  timer.startStreamWait();
   try {
     for await (const chunk of drafter.streamGrounded(ask, signal)) {
       if (chunk.kind === "text") {
+        if (chunk.text.trim().length > 0) {
+          timer.recordFirstToken();
+        }
         text += chunk.text;
         yield { kind: "text", text: chunk.text };
         continue;
@@ -676,7 +707,8 @@ export async function* streamAnswer(
       ...reasonFields(why),
     };
   }
-  yield { kind: "done", answerMessageId, stopped: cited === null };
+  const timing = timer.finish();
+  yield { kind: "done", answerMessageId, stopped: cited === null, timing };
 }
 
 /** The last few turns of the thread, oldest first, excluding this question. */

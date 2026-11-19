@@ -265,6 +265,13 @@ export const METRIC = {
    * stores an integer and this passes it through unchanged.
    */
   aiCostTotal: "openokr_ai_cost_total",
+  /**
+   * Copilot stage durations, by stage name (preparation, checks, round, tool, first_token)
+   * (docs/design/copilot-first-word.md).
+   */
+  copilotStageDuration: "openokr_copilot_stage_duration_seconds",
+  /** Copilot turns by path (fast_path, loop, passages). */
+  copilotTurnsTotal: "openokr_copilot_turns_total",
 
   // Capacity metrics (P8-T06c). The three series below answer "how much
   // room is left" and "are limits engaging", which is a different question

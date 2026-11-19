@@ -27,6 +27,7 @@ import {
   streamAnswer,
 } from "../src/copilot/answer.ts";
 import { drainReading, readLiveData } from "../src/copilot/reading.ts";
+import { getLastCopilotTiming } from "../src/copilot/timing.ts";
 import { runEmbedJob } from "../src/embeddings/worker.ts";
 import { dispatchOutbox } from "../src/outbox/handlers.ts";
 import { writeSettings } from "../src/secrets/instance-settings.ts";
@@ -913,5 +914,89 @@ describe("a conversation anchored to a page (plan 0.9.0 CP11)", () => {
         target_ids: [],
       },
     ]);
+  });
+});
+
+describe("fast path for anchored single-record questions (docs/design/copilot-first-word.md)", () => {
+  it("bypasses model tool selection on eligible English prompt and grounds on anchor [1]", async () => {
+    let chooseReadsCalled = false;
+    const drafter = new AnchoredDrafter(async () => {
+      chooseReadsCalled = true;
+      return spent(0);
+    });
+
+    const result = await answerQuestion(await contextFor(drafter), {
+      workspaceId,
+      question: "What is the health of this objective?",
+      subjectType: "goal",
+      subjectId: goalId,
+    });
+
+    expect(chooseReadsCalled).toBe(false);
+    expect(result.sources[0]?.entityType).toBe("goal");
+    expect(result.sources[0]?.label).toBe(GOAL_TITLE);
+    expect(drafter.seen[0]?.sources[0]?.label).toBe(GOAL_TITLE);
+
+    const timing = getLastCopilotTiming();
+    expect(timing).not.toBeNull();
+    expect(timing?.fastPath).toBe(true);
+    expect(timing?.rounds.length).toBe(0);
+  });
+
+  it("bypasses model tool selection on eligible Malay prompt and grounds on anchor [1]", async () => {
+    let chooseReadsCalled = false;
+    const drafter = new AnchoredDrafter(async () => {
+      chooseReadsCalled = true;
+      return spent(0);
+    });
+
+    const result = await answerQuestion(await contextFor(drafter), {
+      workspaceId,
+      question: "Apakah status objektif ini?",
+      subjectType: "goal",
+      subjectId: goalId,
+    });
+
+    expect(chooseReadsCalled).toBe(false);
+    expect(result.sources[0]?.entityType).toBe("goal");
+    expect(result.sources[0]?.label).toBe(GOAL_TITLE);
+
+    const timing = getLastCopilotTiming();
+    expect(timing).not.toBeNull();
+    expect(timing?.fastPath).toBe(true);
+  });
+
+  it("routes proposal prompts on anchored record through normal read loop", async () => {
+    let chooseReadsCalled = false;
+    const drafter = new AnchoredDrafter(async () => {
+      chooseReadsCalled = true;
+      return spent(0);
+    });
+
+    await answerQuestion(await contextFor(drafter), {
+      workspaceId,
+      question: "Propose a check-in for this goal",
+      subjectType: "goal",
+      subjectId: goalId,
+    });
+
+    expect(chooseReadsCalled).toBe(true);
+  });
+
+  it("routes ambiguous or comparative prompts through normal read loop", async () => {
+    let chooseReadsCalled = false;
+    const drafter = new AnchoredDrafter(async () => {
+      chooseReadsCalled = true;
+      return spent(0);
+    });
+
+    await answerQuestion(await contextFor(drafter), {
+      workspaceId,
+      question: "Compare this with other objectives",
+      subjectType: "goal",
+      subjectId: goalId,
+    });
+
+    expect(chooseReadsCalled).toBe(true);
   });
 });
