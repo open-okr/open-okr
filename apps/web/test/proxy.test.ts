@@ -1,5 +1,6 @@
+import { resetEnvCache } from "@openokr/config";
 import { NextRequest } from "next/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { config, proxy } from "../proxy";
 
 /**
@@ -15,6 +16,89 @@ const request = (path: string, cookie?: string) =>
 
 /** A cookie shaped like Better Auth's, which is all the proxy inspects. */
 const SESSION_COOKIE = "better-auth.session_token=token.signature";
+
+beforeEach(() => {
+  vi.stubEnv("DATABASE_URL", "postgres://openokr@localhost/openokr_test");
+  resetEnvCache();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  resetEnvCache();
+});
+
+describe("proxy CSP transport", () => {
+  it.each([
+    ["http://openokr.example:8080", "https", false],
+    ["https://openokr.example", "http", true],
+    [undefined, "https", false],
+    ["ftp://openokr.example", "http", true],
+  ] as const)(
+    "uses the configured public origin %s on pages and redirects",
+    (origin, offeredScheme, upgrades) => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv(
+        "BETTER_AUTH_SECRET",
+        "a-test-secret-of-sufficient-length-for-signing",
+      );
+      vi.stubEnv("BETTER_AUTH_URL", origin);
+
+      const headers = {
+        host: "internal.example",
+        forwarded: `host=offered.example;proto=${offeredScheme}`,
+        "x-forwarded-proto": offeredScheme,
+      };
+      const url = `${offeredScheme}://upstream.example:3000`;
+      const page = proxy(new NextRequest(`${url}/sign-in`, { headers }));
+      const redirect = proxy(
+        new NextRequest(`${url}/goals?tab=all`, { headers }),
+      );
+
+      const policy = page.headers.get("content-security-policy");
+      const nonce = page.headers.get("x-middleware-request-x-nonce");
+      expect(nonce).toBeTruthy();
+      expect(policy).toContain(
+        `script-src 'self' 'nonce-${nonce}' 'strict-dynamic';`,
+      );
+      expect(policy).toContain(`style-src 'self' 'nonce-${nonce}';`);
+      expect(policy).toContain("frame-ancestors 'none';");
+      expect(
+        page.headers.get("x-middleware-request-content-security-policy"),
+      ).toBe(policy);
+      expect(page.headers.get("x-frame-options")).toBe("DENY");
+      expect(page.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(page.headers.get("referrer-policy")).toBe(
+        "strict-origin-when-cross-origin",
+      );
+      expect(page.headers.get("strict-transport-security")).toBe(
+        "max-age=63072000; includeSubDomains",
+      );
+      expect(policy?.includes("upgrade-insecure-requests;")).toBe(upgrades);
+
+      expect(redirect.status).toBe(307);
+      const location = new URL(redirect.headers.get("location") ?? "");
+      expect(location.pathname).toBe("/sign-in");
+      expect(location.searchParams.get("next")).toBe("/goals?tab=all");
+      const redirectPolicy = redirect.headers.get("content-security-policy");
+      expect(redirectPolicy?.includes("upgrade-insecure-requests;")).toBe(
+        upgrades,
+      );
+      expect(redirectPolicy).toContain("'strict-dynamic'");
+      expect(redirectPolicy).not.toContain(`'nonce-${nonce}'`);
+    },
+  );
+
+  it("omits upgrades and keeps development allowances with a public HTTPS origin", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("BETTER_AUTH_URL", "https://openokr.example");
+    const policy = proxy(request("/sign-in")).headers.get(
+      "content-security-policy",
+    );
+    expect(policy).not.toContain("upgrade-insecure-requests");
+    expect(policy).toContain("'unsafe-eval'");
+    expect(policy).toContain("style-src 'self' 'unsafe-inline';");
+  });
+});
 
 describe("proxy", () => {
   it("sends an unauthenticated visitor to sign in", () => {
