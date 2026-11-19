@@ -164,8 +164,8 @@ export const COPILOT_SYSTEM =
   "note is true. When it says a card was made, the change is prepared for the " +
   "person to review and apply: say that first, in one sentence, and do not " +
   "say the passages lack it. When it says none was made and the message asks " +
-  "for a change, say plainly that you cannot make that change from here yet " +
-  "and where the person makes it, as the note says. " +
+  "for a change, follow the note: ask for a missing detail or explain where " +
+  "an unavailable change is made. " +
   // The panel renders this subset and nothing else (plan 0.8.1 CP4).
   "You may use bold, italics, bullet or numbered lists and inline code. Never " +
   "write headings, tables or links. " +
@@ -243,8 +243,13 @@ function proposalNoteFor(
   }
   return (
     "From the product, not the person: no change card was made for this " +
-    "message. If it asks you to create or change something, say plainly that " +
-    "you cannot make that change from here yet, and say where the person " +
+    "message. If the member asks for a check-in without overall confidence, " +
+    "ask for that confidence in one focused question, for example 70%. " +
+    "A key result's value or confidence is separate. If the check-in target " +
+    "is ambiguous, ask which objective or key result they meant. " +
+    "For a supported task or initiative request with missing or " +
+    "ambiguous details, ask one focused question for the task title, space " +
+    "or exact key result you need. If the action is unavailable, say where the person " +
     `makes it: ${WHERE_CHANGES_ARE_MADE}. Never describe or promise a card.`
   );
 }
@@ -286,6 +291,8 @@ const PROPOSE_NOTE =
   "You may also have a tool that prepares a change for the person to review. " +
   "Call it in your first reply only, at most once, and only when the " +
   "person's latest message plainly asks for one of the changes it offers. A " +
+  "reply supplying missing overall confidence can complete the person's " +
+  "immediately preceding check-in request. A " +
   "question is not a request. It only makes a card: the person applies it " +
   "themselves. When it asks you to choose from a list, pass the number.";
 
@@ -357,8 +364,13 @@ const subjectBlock = (subject: ReadingContext["subject"]) =>
 const copilotMessages = (context: GroundedQuestionContext) => {
   const note = proposalNoteFor(context.proposal);
   const readingNote = readingNoteFor(context.reading);
+  const language =
+    context.locale === "ms" ? "Malay (Bahasa Melayu)" : "English";
   return [
-    { role: "system" as const, content: COPILOT_SYSTEM },
+    {
+      role: "system" as const,
+      content: `${COPILOT_SYSTEM} Write the answer in ${language}. Use human-readable health names, preserve record names and the SOURCES line.`,
+    },
     ...askerNote(context.asker),
     ...context.history.map((turn) => ({
       role: turn.role === "member" ? ("user" as const) : ("assistant" as const),
@@ -546,7 +558,10 @@ const PROPOSAL_SYSTEM =
   // "my activation key result" when no activation key result was on the
   // list, it chose the nearest one, a different measure.
   "When the request names an item that is not on the list, propose nothing " +
-  "rather than choosing the nearest one. Fill in the fields the action you " +
+  "rather than choosing the nearest one. When several key results could match, " +
+  "propose nothing so the answer can ask which one. For a standalone task, " +
+  "write the title the person asked for and leave its key result empty. " +
+  "Use the named space or the only one offered. Fill in the fields the action you " +
   "chose takes, and set every other field to null. " +
   // Tuned to GPT-6 Luna, 12 November 2026: one sentence asked to leave a
   // reason out and another to give one, so Luna left the top-level why empty
@@ -556,9 +571,11 @@ const PROPOSAL_SYSTEM =
   "words saying why the change is wanted now, and set it to null when they " +
   "did not say. The top-level why is separate and is always one sentence of " +
   "your own saying why this change answers this request. It is never empty " +
-  "when you propose. For a check-in, give a key result a value only when the " +
-  "person's words state a number, and write every confidence as a number " +
-  "from 0 to 1. " +
+  "when you propose. For a check-in on a named key result, select that result " +
+  "from checkInTargets. Use only overall confidence the member supplied. " +
+  "If it is missing, propose nothing and let the answer ask. Write a key " +
+  "result's value or confidence only when the person gave it. Express " +
+  "confidence as a number from 0 to 1. " +
   `When you propose nothing, the action is "${NO_ACTION}".`;
 
 /** The offered actions, their fields and their numbered choices, as text. */

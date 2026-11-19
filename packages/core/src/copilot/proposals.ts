@@ -63,7 +63,11 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { visibleResourceIds } from "../access/reads.ts";
 import type { ActionCallContext } from "../actions/define.ts";
 import { callAction } from "../actions/registry.ts";
-import type { ProposalDrop, ProposalNote } from "../agents/drafter.ts";
+import type {
+  GroundedQuestionContext,
+  ProposalDrop,
+  ProposalNote,
+} from "../agents/drafter.ts";
 import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { cyclesOpenForWork } from "../cycles/open-for-work.ts";
 import { workspaceTimeZone } from "../cycles/service.ts";
@@ -157,6 +161,7 @@ interface ProposableAction {
     context: ActionCallContext,
     fields: Record<string, unknown>,
     choices: ProposalOffer["choices"],
+    request: string,
   ): Promise<BuiltProposal>;
   /**
    * One more sentence for the model about this offer, read as the member:
@@ -468,12 +473,13 @@ const startInitiative: ProposableAction = {
   action: "initiatives.create",
   label: "Start an initiative",
   whatItDoes:
-    "Starts an initiative, owned by the person asking, behind one key result, in the space its objective belongs to.",
+    "Starts an initiative, owned by the person asking, behind the key result they name. Copy their wording into keyResultName. Ask which key result if the name could mean more than one.",
   authored: z.object({
     title: z.string().trim().min(1).max(500),
     description: z.string().trim().max(2000).optional(),
     /** One-based, into the `keyResults` list the model was shown. */
     keyResultNumber: z.number().int().min(1),
+    keyResultName: z.string().trim().min(1).max(500).optional(),
   }) as unknown as z.ZodType<Record<string, unknown>>,
   fields: {
     type: "object",
@@ -483,18 +489,23 @@ const startInitiative: ProposableAction = {
       title: { type: "string", maxLength: 500 },
       description: { type: "string", maxLength: 2000 },
       keyResultNumber: { type: "integer", minimum: 1 },
+      keyResultName: { type: "string", maxLength: 500 },
     },
   },
   async offer(scope) {
     return { keyResults: await scope.workKeyResults() };
   },
-  async build(context, fields, choices) {
+  async build(context, fields, choices, request) {
     const authored = fields as {
       title: string;
       description?: string;
       keyResultNumber: number;
+      keyResultName?: string;
     };
-    const keyResult = picked(choices, "keyResults", authored.keyResultNumber);
+    const keyResult = workKeyResult(choices, request, authored);
+    if (!keyResult) {
+      throw new Error("Which key result should the initiative serve?");
+    }
     const memberId = await askingMember(context);
     return {
       action: "initiatives.create",
@@ -527,7 +538,82 @@ const startInitiative: ProposableAction = {
 };
 
 /**
- * Adding a task behind a key result (M-09).
+ * Match a name only inside the member's words and the offered labels. The
+ * number still selects from that access-scoped list. A unique full title
+ * takes priority over a shorter title that it contains.
+ */
+const normaliseName = (value: string) =>
+  value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+const containsName = (text: string, name: string) =>
+  name !== "" && ` ${text} `.includes(` ${name} `);
+
+function namedChoices(
+  choices: readonly NumberedChoice[],
+  request: string,
+  hint?: string,
+): NumberedChoice[] {
+  const text = normaliseName(request);
+  const title = (choice: NumberedChoice) =>
+    normaliseName(choice.with?.title ?? choice.label);
+  const exact = choices.filter((choice) => containsName(text, title(choice)));
+  const candidates = exact.length
+    ? exact.filter(
+        (choice) =>
+          !exact.some(
+            (other) =>
+              title(other) !== title(choice) &&
+              containsName(title(other), title(choice)),
+          ),
+      )
+    : choices.filter((choice) => {
+        const name = normaliseName(hint ?? "");
+        return containsName(text, name) && containsName(title(choice), name);
+      });
+  if (candidates.length < 2) {
+    return candidates;
+  }
+  const contextual = candidates.filter((choice) =>
+    [choice.with?.goalTitle, choice.with?.cycleName].some(
+      (name) => name && containsName(text, normaliseName(name)),
+    ),
+  );
+  return contextual.length > 0 ? contextual : candidates;
+}
+
+function workKeyResult(
+  choices: ProposalOffer["choices"],
+  request: string,
+  authored: {
+    readonly keyResultNumber?: number;
+    readonly keyResultName?: string;
+  },
+): NumberedChoice | undefined {
+  const offered = choices.keyResults ?? [];
+  const selected =
+    authored.keyResultNumber === undefined
+      ? undefined
+      : picked(choices, "keyResults", authored.keyResultNumber);
+  const named = namedChoices(offered, request, authored.keyResultName);
+  if (named.length === 1) {
+    return named[0];
+  }
+  if (
+    named.length > 1 ||
+    authored.keyResultName !== undefined ||
+    (selected && offered.length > 1)
+  ) {
+    throw new Error("Which key result should this work serve?");
+  }
+  return selected;
+}
+
+/**
+ * Adding a task in a space, with an optional key result (M-09, plan 0.9.1 C2).
  *
  * The smallest write on the list, and the one a sentence asks for most often.
  * Assigned to the asking member, for the reason an objective is championed by
@@ -538,42 +624,78 @@ const addTask: ProposableAction = {
   action: "tasks.create",
   label: "Add a task",
   whatItDoes:
-    "Adds a task for the person asking, behind one key result, in the space its objective belongs to.",
+    "Adds a task for the person asking. For a standalone task, leave the key result fields empty and use the space they name, or the only space offered. If they ask to link a key result, copy its name into keyResultName and choose it by number. The linked task goes in that objective's space.",
   authored: z.object({
     title: z.string().trim().min(1).max(500),
     /** One-based, into the `keyResults` list the model was shown. */
-    keyResultNumber: z.number().int().min(1),
+    keyResultNumber: z.number().int().min(1).optional(),
+    keyResultName: z.string().trim().min(1).max(500).optional(),
+    spaceNumber: z.number().int().min(1).optional(),
   }) as unknown as z.ZodType<Record<string, unknown>>,
   fields: {
     type: "object",
     additionalProperties: false,
-    required: ["title", "keyResultNumber"],
+    required: ["title"],
     properties: {
       title: { type: "string", maxLength: 500 },
       keyResultNumber: { type: "integer", minimum: 1 },
+      keyResultName: { type: "string", maxLength: 500 },
+      spaceNumber: { type: "integer", minimum: 1 },
     },
   },
   async offer(scope) {
-    return { keyResults: await scope.workKeyResults() };
+    const spaces = await scope.taskSpaces();
+    if (spaces.length === 0) {
+      return { spaces };
+    }
+    const usable = new Set(spaces.map((space) => space.id));
+    const keyResults = (await scope.workKeyResults()).filter((choice) =>
+      usable.has(carried(choice, "spaceId")),
+    );
+    return { spaces, ...(keyResults.length > 0 ? { keyResults } : {}) };
   },
-  async build(context, fields, choices) {
-    const authored = fields as { title: string; keyResultNumber: number };
-    const keyResult = picked(choices, "keyResults", authored.keyResultNumber);
+  async build(context, fields, choices, request) {
+    const authored = fields as {
+      title: string;
+      keyResultNumber?: number;
+      keyResultName?: string;
+      spaceNumber?: number;
+    };
+    const keyResult = workKeyResult(choices, request, authored);
+    const spaces = choices.spaces ?? [];
+    const named = namedChoices(spaces, request);
+    const selected =
+      authored.spaceNumber === undefined
+        ? undefined
+        : picked(choices, "spaces", authored.spaceNumber);
+    const space = keyResult
+      ? spaces.find(
+          (candidate) => candidate.id === carried(keyResult, "spaceId"),
+        )
+      : named.length === 1
+        ? named[0]
+        : spaces.length === 1
+          ? spaces[0]
+          : undefined;
+    if (!space || (selected && selected.id !== space.id)) {
+      throw new Error("Which space should the task be in?");
+    }
     const memberId = await askingMember(context);
     return {
       action: "tasks.create",
       payload: {
-        spaceId: carried(keyResult, "spaceId"),
+        spaceId: space.id,
         title: authored.title,
-        keyResultId: keyResult.id,
+        ...(keyResult ? { keyResultId: keyResult.id } : {}),
         assigneeIds: [memberId],
       },
       preview: [
         { label: "Task", value: authored.title },
-        { label: "Key result", value: keyResult.label },
+        { label: "Space", value: space.label },
+        ...(keyResult ? [{ label: "Key result", value: keyResult.label }] : []),
       ],
-      subjectType: "goal",
-      subjectId: carried(keyResult, "goalId"),
+      subjectType: keyResult ? "goal" : null,
+      subjectId: keyResult ? carried(keyResult, "goalId") : null,
     };
   },
   reverse(result) {
@@ -900,6 +1022,63 @@ const CHECK_IN_STATUS_WORD: Readonly<Record<string, string>> = {
   off_track: "Off track",
 };
 
+const CONFIDENCE_NUMBER = String.raw`-?(?:\d+(?:[.,]\d+)?|[.,]\d+)`;
+const CONFIDENCE_VALUE = String.raw`${CONFIDENCE_NUMBER}(?:\s*(?:%|percent\b|peratus\b|/\s*10|(?:out of|daripada)\s+10))?`;
+const CONFIDENCE_WORD = "(?:confidence|confident|keyakinan|yakin)";
+const BARE_CONFIDENCE = new RegExp(
+  String.raw`^(?:${CONFIDENCE_WORD}\s*:?\s*)?(${CONFIDENCE_VALUE})[.!]?$`,
+  "i",
+);
+const LABELLED_CONFIDENCE = new RegExp(
+  String.raw`\b(?:overall\s+)?${CONFIDENCE_WORD}(?:\s+(?:is|was|of|at|adalah|sebanyak))?\s*[:=]?\s*(${CONFIDENCE_VALUE})(?![\d/%]|[.,]\d)|(?<![-\d.,])(${CONFIDENCE_VALUE})\s+${CONFIDENCE_WORD}\b`,
+  "gi",
+);
+
+function confidenceIn(request: string): number | undefined {
+  const candidates = [...request.matchAll(LABELLED_CONFIDENCE)].filter(
+    (match) => {
+      const before = request.slice(0, match.index);
+      const after = request.slice(match.index + match[0].length);
+      return (
+        !/\b(?:key result|kr|hasil utama)(?:['’]s)?\s*$/i.test(before) &&
+        !/^\s+(?:for|on|pada)\s+(?:the\s+)?(?:key result|kr|hasil utama)\b/i.test(
+          after,
+        )
+      );
+    },
+  );
+  const match =
+    candidates.findLast((candidate) => /^overall\b/i.test(candidate[0])) ??
+    candidates[0];
+  const raw = match?.[1] ?? match?.[2];
+  if (!raw) {
+    return undefined;
+  }
+  const amount = Number.parseFloat(raw.replace(",", "."));
+  const confidence = /(?:%|percent|peratus)$/i.test(raw)
+    ? amount / 100
+    : (/10$/.test(raw) && /[ /]/.test(raw)) || amount > 1
+      ? amount / 10
+      : amount;
+  return confidence >= 0 && confidence <= 1 ? confidence : undefined;
+}
+
+/** A short confidence reply can finish the member's immediately preceding check-in request. */
+export function proposalRequestText(
+  ask: Pick<GroundedQuestionContext, "question" | "history">,
+): string {
+  const reply = BARE_CONFIDENCE.exec(ask.question.trim())?.[1];
+  if (!reply) {
+    return ask.question;
+  }
+  const previous = ask.history.findLast(
+    (turn) => turn.role === "member",
+  )?.content;
+  return previous && /\b(?:check[- ]?in|kemas kini|semakan)\b/i.test(previous)
+    ? `${previous}\nOverall confidence: ${reply}`
+    : ask.question;
+}
+
 /**
  * Checking in on an objective (plan 0.9.0 L4c).
  *
@@ -925,12 +1104,14 @@ const checkIn: ProposableAction = {
   action: "goals.publishDraftedCheckIn",
   label: "Check in on an objective",
   whatItDoes:
-    "Publishes a check-in on one objective the person may edit: a status, an overall confidence from 0 to 1, a narrative and, only where the person gave a number, a key result's new value and confidence from 0 to 1.",
+    "Prepares an objective check-in for review. For a named key result, choose it from checkInTargets using checkInKeyResultNumber and copy its name into keyResultName. Its parent is the objective. Use the person's stated overall confidence, status and narrative. If overall confidence is missing, let the answer ask for it. Only use a key result value or confidence the person supplied.",
   authored: z.object({
     /** One-based, into the `objectives` list the model was shown. */
-    objectiveNumber: z.number().int().min(1),
+    objectiveNumber: z.number().int().min(1).optional(),
+    checkInKeyResultNumber: z.number().int().min(1).optional(),
+    keyResultName: z.string().trim().min(1).max(500).optional(),
     checkInStatus: z.enum(CHECK_IN_STATUSES),
-    confidence: z.number().min(0).max(1),
+    confidence: z.number().min(0).max(1).optional(),
     narrative: z.string().trim().min(1).max(2000),
     keyResultValues: z
       .array(
@@ -947,9 +1128,11 @@ const checkIn: ProposableAction = {
   fields: {
     type: "object",
     additionalProperties: false,
-    required: ["objectiveNumber", "checkInStatus", "confidence", "narrative"],
+    required: ["checkInStatus", "narrative"],
     properties: {
       objectiveNumber: { type: "integer", minimum: 1 },
+      checkInKeyResultNumber: { type: "integer", minimum: 1 },
+      keyResultName: { type: "string", maxLength: 500 },
       checkInStatus: { type: "string", enum: [...CHECK_IN_STATUSES] },
       confidence: { type: "number", minimum: 0, maximum: 1 },
       narrative: { type: "string", maxLength: 2000 },
@@ -975,16 +1158,24 @@ const checkIn: ProposableAction = {
     },
   },
   async offer(scope) {
+    const checkInTargets = await scope.checkInKeyResults();
+    const keyResults = checkInTargets.filter(
+      (result) =>
+        result.with?.kind === "metric" || result.with?.kind === "maintain",
+    );
     return {
       objectives: await scope.editableObjectives(),
-      keyResults: await scope.checkInKeyResults(),
+      ...(checkInTargets.length > 0 ? { checkInTargets } : {}),
+      ...(keyResults.length > 0 ? { keyResults } : {}),
     };
   },
-  async build(context, fields, choices) {
+  async build(context, fields, choices, request) {
     const authored = fields as {
-      objectiveNumber: number;
+      objectiveNumber?: number;
+      checkInKeyResultNumber?: number;
+      keyResultName?: string;
       checkInStatus: (typeof CHECK_IN_STATUSES)[number];
-      confidence: number;
+      confidence?: number;
       narrative: string;
       keyResultValues?: {
         keyResultNumber: number;
@@ -992,7 +1183,37 @@ const checkIn: ProposableAction = {
         confidence?: number | null;
       }[];
     };
-    const objective = picked(choices, "objectives", authored.objectiveNumber);
+    const confidence = confidenceIn(request);
+    if (
+      confidence === undefined ||
+      (authored.confidence !== undefined && confidence !== authored.confidence)
+    ) {
+      throw new Error("The check-in needs the member's overall confidence.");
+    }
+    const targets = choices.checkInTargets ?? [];
+    const objectives = choices.objectives ?? [];
+    const namedObjective = namedChoices(objectives, request);
+    const target =
+      authored.checkInKeyResultNumber !== undefined ||
+      authored.keyResultName !== undefined ||
+      namedObjective.length === 0
+        ? workKeyResult({ keyResults: targets }, request, {
+            keyResultNumber: authored.checkInKeyResultNumber,
+            keyResultName: authored.keyResultName,
+          })
+        : undefined;
+    if (!target && namedObjective.length > 1) {
+      throw new Error("Which objective is the check-in for?");
+    }
+    const objective = target
+      ? objectives.find((choice) => choice.id === carried(target, "goalId"))
+      : (namedObjective[0] ??
+        (authored.objectiveNumber === undefined
+          ? undefined
+          : picked(choices, "objectives", authored.objectiveNumber)));
+    if (!objective) {
+      throw new Error("Which objective or key result is the check-in for?");
+    }
     if (await hasOpenDraft(context, objective.id)) {
       throw new Error(OPEN_DRAFT_REFUSAL);
     }
@@ -1040,7 +1261,7 @@ const checkIn: ProposableAction = {
       payload: {
         goalId: objective.id,
         status: authored.checkInStatus,
-        confidence: authored.confidence,
+        confidence,
         narrative: richTextFromPlainText(authored.narrative),
         values,
       },
@@ -1052,7 +1273,7 @@ const checkIn: ProposableAction = {
             CHECK_IN_STATUS_WORD[authored.checkInStatus] ??
             authored.checkInStatus,
         },
-        { label: "Confidence", value: String(authored.confidence) },
+        { label: "Confidence", value: String(confidence) },
         { label: "Narrative", value: authored.narrative },
         ...rows,
       ],
@@ -1403,6 +1624,7 @@ const CHOICE_LIMIT = 40;
  */
 interface OfferScope {
   editableSpaces(): Promise<NumberedChoice[]>;
+  taskSpaces(): Promise<NumberedChoice[]>;
   editableObjectives(): Promise<NumberedChoice[]>;
   /** Key results new work may be tied to, in spaces the member may edit. */
   workKeyResults(): Promise<NumberedChoice[]>;
@@ -1411,8 +1633,8 @@ interface OfferScope {
   /** Initiatives the member may edit, with their status in the label. */
   editableInitiatives(): Promise<NumberedChoice[]>;
   /**
-   * Metric and maintain key results under the editable objectives, with the
-   * value they hold now beside the label.
+   * Key results under the editable objectives. Only metrics and maintains
+   * may contribute a numeric value to the card.
    */
   checkInKeyResults(): Promise<NumberedChoice[]>;
   /** Non-calculated KPIs, when the member's role lets them record values. */
@@ -1583,17 +1805,14 @@ function offerScope(context: ActionCallContext): OfferScope {
       const choices: NumberedChoice[] = [];
       for (const { goal } of await objectives()) {
         for (const keyResult of goal.keyResults) {
-          // A milestone is checked in as done and a baseline as recorded, not
-          // as a number the model could write.
-          if (keyResult.kind !== "metric" && keyResult.kind !== "maintain") {
-            continue;
-          }
           const unit = keyResult.unit ? ` ${keyResult.unit}` : "";
           choices.push({
             id: keyResult.id,
             label: `${keyResult.title} (${goal.title}, now ${keyResult.currentValue}${unit})`,
             with: {
               goalId: goal.id,
+              goalTitle: goal.title,
+              kind: keyResult.kind,
               title: keyResult.title,
               current: String(keyResult.currentValue),
             },
@@ -1606,6 +1825,16 @@ function offerScope(context: ActionCallContext): OfferScope {
       return choices;
     }),
     editableSpaces: spaces,
+    taskSpaces: once(async () => {
+      const choices = await spaces();
+      const access = await callAction(context, "spaces.creationAccess", {
+        spaceIds: choices.map((space) => space.id),
+      });
+      const allowed = new Set(access.editableSpaceIds);
+      return access.canCreateTask
+        ? choices.filter((space) => allowed.has(space.id))
+        : [];
+    }),
     editableObjectives: once(async () =>
       (await objectives()).map(({ goal, cycleEndsOn }) => ({
         id: goal.id,
@@ -1644,7 +1873,13 @@ function offerScope(context: ActionCallContext): OfferScope {
             choices.push({
               id: keyResult.id,
               label: `${keyResult.title} (${goal.title}, ${cycle.name})`,
-              with: { goalId: goal.id, spaceId: goal.spaceId },
+              with: {
+                goalId: goal.id,
+                spaceId: goal.spaceId,
+                title: keyResult.title,
+                goalTitle: goal.title,
+                cycleName: cycle.name,
+              },
             });
             if (choices.length >= CHOICE_LIMIT) {
               return choices;
@@ -1802,6 +2037,7 @@ export async function buildProposal(
   context: ActionCallContext,
   authored: AuthoredProposal,
   offers: readonly ProposalOffer[],
+  request: string,
 ): Promise<BuiltProposal> {
   const entry = proposableAction(authored.action);
   if (!entry) {
@@ -1813,7 +2049,7 @@ export async function buildProposal(
   const offer = offers.find(
     (candidate) => candidate.action === authored.action,
   );
-  return entry.build(context, fields, offer?.choices ?? {});
+  return entry.build(context, fields, offer?.choices ?? {}, request);
 }
 
 /**
@@ -1895,7 +2131,7 @@ export async function proposeFromRequest(
 
   let built: BuiltProposal;
   try {
-    built = await buildProposal(context, authored, offers);
+    built = await buildProposal(context, authored, offers, input.request);
   } catch {
     // A model that named an action outside the list, wrote a field the schema
     // refuses, or indexed past the end of a list it was shown. No proposal,

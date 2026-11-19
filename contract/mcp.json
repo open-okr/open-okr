@@ -5598,6 +5598,7 @@
               "kpi",
               "initiative",
               "task",
+              "session",
               "comment",
               "space",
               "workspace"
@@ -5670,6 +5671,7 @@
                     "kpi",
                     "initiative",
                     "task",
+                    "session",
                     "comment",
                     "space",
                     "workspace"

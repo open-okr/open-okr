@@ -177,10 +177,27 @@ test("a value typed into the table is recorded and moves the progress", async ()
     name: `Current value for ${KEY_RESULT}`,
   });
   await expect(value).toHaveValue("0");
-  await value.fill("40");
-  await value.press("Enter");
+  let release = () => {};
+  const pause = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/goals**", async (route) => {
+    if (route.request().method() === "POST" && route.request().headers()["next-action"]) {
+      await pause;
+    }
+    await route.continue();
+  });
+  try {
+    await value.fill("40");
+    await value.press("Enter");
+    await expect(page.getByTestId("okr-list")).toHaveAttribute("aria-busy", "true");
+  } finally {
+    release();
+    await page.unrouteAll({ behavior: "wait" });
+  }
 
   // 40 of a 100 target, recorded through the same action a check-in uses.
+  await settled();
   await expect(value).toHaveValue("40", { timeout: 15_000 });
   await expect(page.getByText("40%").first()).toBeVisible();
 });

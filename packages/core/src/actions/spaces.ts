@@ -41,6 +41,7 @@ import {
   accessFilterMember,
   accessScopeFilter,
   getAccessScoped,
+  visibleResourceIds,
 } from "../access/reads.ts";
 import { clearOpenGoalsOfHolidaysInTx } from "../cadence/holidays.ts";
 import { followSpaceFrequencyInTx } from "../cadence/space-frequency.ts";
@@ -48,7 +49,11 @@ import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
-import { OperationError, type OperationTx } from "../operations/operation.ts";
+import {
+  OperationError,
+  type OperationTx,
+  writeFloorsFor,
+} from "../operations/operation.ts";
 import {
   readOf,
   readsEveryChange,
@@ -320,6 +325,66 @@ export const listSpaces = defineReadAction({
           isCompany: row.isCompany === true,
           ownRole: row.ownRole ?? null,
         }));
+      },
+    );
+  },
+});
+
+export const readSpaceCreationAccess = defineReadAction({
+  name: "spaces.creationAccess",
+  summary: "Which supplied spaces the caller can create work and sessions in.",
+  input: z.object({ spaceIds: z.array(z.uuid()) }),
+  output: z.object({
+    editableSpaceIds: z.array(z.uuid()),
+    canCreateTask: z.boolean(),
+    canCreateInitiative: z.boolean(),
+    canScheduleSession: z.boolean(),
+    canCreateKpi: z.boolean(),
+  }),
+  agentSurface: false,
+  async handler(context, { spaceIds }) {
+    const { workspaceId, actor } = context;
+    const none = {
+      editableSpaceIds: [],
+      canCreateTask: false,
+      canCreateInitiative: false,
+      canScheduleSession: false,
+      canCreateKpi: false,
+    };
+    const userId = actor.userId;
+    if (!userId) {
+      return none;
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId, userId },
+      async (tx) => {
+        const {
+          memberId,
+          levels: [task, initiative, session, kpi],
+        } = await writeFloorsFor(tx as OperationTx, {
+          workspaceId,
+          actor,
+          domains: ["task", "initiative", "session", "kpi"],
+          checkWorkspaceState: true,
+        });
+        if (!memberId) {
+          return none;
+        }
+        const editable = await visibleResourceIds(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "space",
+          ids: spaceIds,
+          requires: ACCESS_LEVELS.edit,
+        });
+        return {
+          editableSpaceIds: spaceIds.filter((id) => editable.has(id)),
+          canCreateTask: (task ?? 0) >= ACCESS_LEVELS.edit,
+          canCreateInitiative: (initiative ?? 0) >= ACCESS_LEVELS.edit,
+          canScheduleSession: (session ?? 0) >= ACCESS_LEVELS.edit,
+          canCreateKpi: (kpi ?? 0) >= ACCESS_LEVELS.edit,
+        };
       },
     );
   },

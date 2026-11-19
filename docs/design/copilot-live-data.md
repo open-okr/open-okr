@@ -148,7 +148,7 @@ While reads run, the answer area shows what is being read in words ("Reading New
 | A failed insert never fails the answer | Swallowed and counted in `openokr_agent_tool_call_record_failures_total`, as the agent surface does |
 | No new column (W2-Q) | `copilot.thread` returns `readCount` on each message. For an answer it is the member's copilot rows between the question's `created_at` and the last of the answer's `created_at`, `updated_at`, `run_completed_at` and `stopped_at`; a run in flight has no end. Two questions one member has running at once in two threads share a window and so share a count, which only affects a line of text |
 | After a reload | The panel shows "Searched your workspace, made N reads" under a recorded answer when the live steps are gone and the count is above zero. The live list of steps is still not stored |
-| Administrator (acceptance 10) | The agent calls card on Admin, AI lists the latest 20 copilot reads with the member's name, the tool, the outcome and the time, with the 30-day count and refusals. `ai.readToolCallSummary` returns it as `copilot`, and its own totals now count external agents only. The owner decided on 12 November 2026 that the member is named; agent-tool-calls.md section 9 records the privacy reasoning |
+| Administrator (acceptance 10, release 0.9.1 C6) | The agent calls card on Admin, AI lists the latest 20 copilot calls with the member's name, the tool, the outcome and the time. A proposal is labelled with its own outcome. The 30-day copilot read and refusal totals count the recorded read scope. `ai.readToolCallSummary` returns the activity and read totals as `copilot`. Its external agent totals are separate. The owner decided on 12 November 2026 that the member is named; agent-tool-calls.md section 9 records the privacy reasoning |
 | Erasure, export, archive | Erasure already deleted `ai_tool_calls` by member, which removes these rows. The export label says the copilot too. The workspace archive still excludes the table |
 
 **As built (CP11, "Ask about this page"):** the panel sends only the page's kind and id, once, with the first question of a new conversation (`subjectType`, `subjectId` on `copilot.ask`). It never sends the page's text, so nothing the member cannot read reaches the model (decision CP11-Q). `readLiveData` looks the anchor up from `ai_threads` by thread id, never from the request, and before round 1 reads the record through `readSubject` in `read-tools.ts`: the same action as the matching tool (`goals.read`, `kpis.detail`, `initiatives.read`, `tasks.read`), run as the member with the read scope, rendered by the same renderer, so the record is `[1]`. The result is passed to `chooseReads` as `ReadingContext.subject` and drafted as a block of its own under the `TOOL_RESULTS_ARE_DATA` sentence, never inside the member's question. It is recorded like any loop read, so "made n reads" counts it, and it joins the grounding sources, so a provider without tool calls still answers from it. A read that refuses or finds nothing adds nothing and says nothing. **A key result's page or drawer (`&kr=`) anchors to its objective**, because no access-scoped read returns a key result's title alone and the objective's read already nests its key results.
@@ -162,9 +162,9 @@ While reads run, the answer area shows what is being read in words ("Reading New
 | Create an objective | `goals.create` | Today's | `goals.delete` |
 | Add a key result | `goals.addKeyResult` | Today's | None, as today |
 | Start an initiative | `initiatives.create` | Today's | `initiatives.delete` |
-| Add a task | `tasks.create` | Today's | `tasks.delete` |
+| Add a task | `tasks.create` | Title, with a named or sole eligible space for a standalone task, or the named key result for a linked task | `tasks.delete` |
 | **Rename or redescribe an objective** | `goals.update` | Title, description | `goals.update` with the values before |
-| **Check in** | `goals.publishDraftedCheckIn` | Status, confidence, narrative, and per key result a value and confidence | `goals.deleteCheckIn` while it is the latest |
+| **Check in** | `goals.publishDraftedCheckIn` | Status, the member's overall confidence, narrative, and any stated key result value or confidence. A named key result can point to its parent objective | `goals.deleteCheckIn` while it is the latest |
 | **Record a KPI value** | `kpis.record` | Period, actual value, remark | `kpis.record` with the record before, or none for a new period |
 | **Move a task** | `tasks.move` | Status | `tasks.move` back |
 | **Change an initiative's status** | `initiatives.update` | Status | `initiatives.update` back |
@@ -174,6 +174,10 @@ The undo for a new KPI period is `kpis.deleteRecord` (kpi-engine.md §12). **As 
 Not proposable, on purpose: any delete, anything about people, roles, access, settings, cycles or agents. A copilot that may propose `people.erase` is one a person cannot trust with the apply button.
 
 The model still picks what to change by number from a list, never by identifier. Today the lists are every space, objective and key result the member may edit. With reads, the list for an edit is what the run read and the member may edit, so "move the checklist task to done" points at the task the run just read.
+
+When a check-in request omits overall confidence, the answer asks for it.
+A short confidence reply can complete the preceding request. The resulting
+card names the objective and still needs the member to apply it.
 
 ### 4.2 Undo for an edit
 

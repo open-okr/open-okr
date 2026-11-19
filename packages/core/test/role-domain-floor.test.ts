@@ -1,5 +1,6 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { sessionRolePermissions } from "../../db/src/data-changes/0036_session_role_permissions.ts";
 import { bindGroup, ensureMemberGroup } from "../src/access/contexts.ts";
 import { ACCESS_LEVELS } from "../src/access/levels.ts";
 import { resolveSubjectContext } from "../src/access/reads.ts";
@@ -30,7 +31,7 @@ const as = async (userId: string) => ({
 });
 
 /** A member as an invitation leaves one: `edit` on the workspace context. */
-async function addMember(role: "member" | "viewer"): Promise<void> {
+async function addMember(role: "member" | "viewer"): Promise<string> {
   const wb = await workerDb();
   await wb.admin.query(
     "insert into users (id, name, email) values ($1, $2, $3)",
@@ -79,6 +80,20 @@ async function addMember(role: "member" | "viewer"): Promise<void> {
       },
     },
   );
+  return memberId;
+}
+
+async function joinTestSpace(memberId: string): Promise<string> {
+  const owner = await as(OWNER);
+  const { id } = await callAction(owner, "spaces.create", {
+    name: "Creation access test team",
+  });
+  await callAction(owner, "spaces.addMember", {
+    spaceId: id,
+    memberId,
+    role: "member",
+  });
+  return id;
 }
 
 const hi: RichTextDocument = {
@@ -131,7 +146,78 @@ afterAll(async () => {
 });
 
 describe("a member holding Viewer", () => {
-  beforeEach(() => addMember("viewer"));
+  let memberId: string;
+
+  beforeEach(async () => {
+    memberId = await addMember("viewer");
+  });
+
+  it("cannot create tasks or schedule sessions through a space edit grant", async () => {
+    const spaceId = await joinTestSpace(memberId);
+    const viewer = await as(PERSON);
+    await expect(
+      callAction(viewer, "spaces.creationAccess", { spaceIds: [spaceId] }),
+    ).resolves.toEqual({
+      editableSpaceIds: [spaceId],
+      canCreateTask: false,
+      canCreateInitiative: false,
+      canScheduleSession: false,
+      canCreateKpi: false,
+    });
+    await expect(
+      callAction(viewer, "tasks.create", { spaceId, title: "Follow up" }),
+    ).rejects.toThrow("tasks.create needs a higher access level");
+    await expect(
+      callAction(viewer, "sessions.create", {
+        spaceId,
+        facilitatorId: memberId,
+        kind: "weekly",
+        title: "Weekly check-in",
+        scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+      }),
+    ).rejects.toThrow("sessions.create needs a higher access level");
+    await expect(
+      callAction(viewer, "sessions.bookCycle", {
+        spaceId,
+        cycleId,
+        facilitatorId: memberId,
+        weekday: 1,
+        time: "09:00",
+      }),
+    ).rejects.toThrow("sessions.bookCycle needs a higher access level");
+  });
+
+  it("can add key results only to an objective they can edit", async () => {
+    const owner = await as(OWNER);
+    const { id: editable } = await callAction(owner, "goals.create", {
+      ...objective(),
+      championId: memberId,
+    });
+    const { id: viewOnly } = await callAction(owner, "goals.create", {
+      ...objective(),
+      title: "Reporting is accurate",
+    });
+    const viewer = await as(PERSON);
+    const result = {
+      title: "Reduce time to first value",
+      baselineValue: 10,
+      targetValue: 7,
+      weight: 1,
+      direction: "reduce" as const,
+      indicatorType: "lagging" as const,
+    };
+    await expect(
+      callAction(viewer, "goals.keyResultCreateAccess", {
+        goalIds: [editable, viewOnly],
+      }),
+    ).resolves.toEqual({ editableGoalIds: [editable] });
+    await expect(
+      callAction(viewer, "goals.addKeyResult", { ...result, goalId: editable }),
+    ).resolves.toHaveProperty("id");
+    await expect(
+      callAction(viewer, "goals.addKeyResult", { ...result, goalId: viewOnly }),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
 
   it("cannot comment, though the workspace binding grants edit", async () => {
     await expect(
@@ -170,7 +256,93 @@ describe("a member holding Viewer", () => {
 });
 
 describe("a member holding Member", () => {
-  beforeEach(() => addMember("member"));
+  let memberId: string;
+
+  beforeEach(async () => {
+    memberId = await addMember("member");
+  });
+
+  it("can create tasks and schedule sessions in their editable space", async () => {
+    const spaceId = await joinTestSpace(memberId);
+    const member = await as(PERSON);
+    const { id: otherSpaceId } = await callAction(
+      await as(OWNER),
+      "spaces.create",
+      {
+        name: "Another team",
+      },
+    );
+    await expect(
+      callAction(member, "spaces.creationAccess", {
+        spaceIds: [spaceId, otherSpaceId],
+      }),
+    ).resolves.toMatchObject({
+      editableSpaceIds: [spaceId],
+      canCreateTask: true,
+      canScheduleSession: true,
+    });
+    await expect(
+      callAction(member, "tasks.create", { spaceId, title: "Follow up" }),
+    ).resolves.toHaveProperty("id");
+    await expect(
+      callAction(member, "sessions.create", {
+        spaceId,
+        facilitatorId: memberId,
+        kind: "weekly",
+        title: "Weekly check-in",
+        scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+      }),
+    ).resolves.toHaveProperty("id");
+    await expect(
+      callAction(member, "tasks.create", {
+        spaceId: otherSpaceId,
+        title: "Follow up",
+      }),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("uses the built-in session default until the backfill and preserves saved edits", async () => {
+    const spaceId = await joinTestSpace(memberId);
+    const owner = await as(OWNER);
+    const member = await as(PERSON);
+    const { roles } = await callAction(owner, "roles.list", {});
+    const memberRole = roles.find((role) => role.builtinKey === "member");
+    if (!memberRole) {
+      throw new Error("Missing Member role");
+    }
+    const database = await workerDb();
+    await database.admin.query(
+      "delete from role_permissions where workspace_id = $1 and domain = 'session'",
+      [workspaceId],
+    );
+    await expect(
+      callAction(member, "spaces.creationAccess", { spaceIds: [spaceId] }),
+    ).resolves.toMatchObject({ canScheduleSession: true });
+    await callAction(owner, "roles.setPermission", {
+      roleId: memberRole.id,
+      domain: "session",
+      level: 0,
+    });
+
+    const client = await database.admin.connect();
+    try {
+      await client.query("begin");
+      expect(await sessionRolePermissions.runBatch(client, null)).toMatchObject(
+        { rowsChanged: 3 },
+      );
+      expect(await sessionRolePermissions.runBatch(client, null)).toMatchObject(
+        { rowsChanged: 0 },
+      );
+      await client.query("commit");
+    } finally {
+      await client.query("rollback");
+      client.release();
+    }
+
+    await expect(
+      callAction(member, "spaces.creationAccess", { spaceIds: [spaceId] }),
+    ).resolves.toMatchObject({ canScheduleSession: false });
+  });
 
   it("creates an objective as before, and the screens are told so", async () => {
     await expect(

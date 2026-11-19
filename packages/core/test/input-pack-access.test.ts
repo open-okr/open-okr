@@ -1,7 +1,10 @@
 import { workerDb } from "@openokr/test-support/db";
 import { beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { createAuth } from "../src/auth/auth.ts";
 import { INPUT_PACK_REFUSAL } from "../src/cycles/input-pack-access.ts";
+import { buildDemoWorkspace } from "../src/demo/builder.ts";
+import { prepareDemoPersonas } from "../src/demo/personas.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -318,5 +321,126 @@ describe("workflow.read packAccess agrees with the writes", () => {
       canChange: false,
       facilitatorName: null,
     });
+  });
+});
+
+describe("prepared demo Members and the input pack", () => {
+  it("allows only the named facilitator among prepared demo Members to change the pack", async () => {
+    const wb = await workerDb();
+    const DEMO_OWNER = "demo-pack-owner";
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, $2, $3)",
+      [DEMO_OWNER, "Demo Pack Owner", "demo-pack-owner@example.com"],
+    );
+    const demoWsId = (
+      await provisionWorkspaceForUser(wb.appPool, {
+        id: DEMO_OWNER,
+        name: "Northwind Pack Demo",
+      })
+    ).workspaceId;
+
+    await buildDemoWorkspace({
+      pool: wb.appPool,
+      workspaceId: demoWsId,
+      adminUserId: DEMO_OWNER,
+    });
+
+    const demoAuth = createAuth({
+      pool: wb.appPool,
+      secret: "pack-test-secret-long-enough-for-signing",
+      baseUrl: "http://localhost:3000",
+      rateLimit: { enabled: false },
+    });
+
+    await prepareDemoPersonas({
+      pool: wb.appPool,
+      workspaceId: demoWsId,
+      adminUserId: DEMO_OWNER,
+      auth: demoAuth,
+    });
+
+    // Priya Raman and Daniel Osei
+    const { rows: memberRows } = await wb.admin.query<{
+      id: string;
+      name: string;
+      user_id: string;
+    }>(
+      `select id, name, user_id from workspace_members
+        where workspace_id = $1 and name in ('Priya Raman', 'Daniel Osei')`,
+      [demoWsId],
+    );
+    const priya = memberRows.find((m) => m.name === "Priya Raman");
+    const daniel = memberRows.find((m) => m.name === "Daniel Osei");
+    if (!priya?.user_id || !daniel?.user_id) {
+      throw new Error("Missing Priya or Daniel in seeded demo workspace.");
+    }
+
+    // Active cycle in this seeded demo workspace
+    const { rows: cycleRows } = await wb.admin.query<{ id: string }>(
+      "select id from cycles where workspace_id = $1 and deleted_at is null order by starts_on desc limit 1",
+      [demoWsId],
+    );
+    const targetCycleId = cycleRows[0]?.id;
+    if (!targetCycleId) {
+      throw new Error("Missing active cycle in seeded demo workspace.");
+    }
+
+    // Set Priya as facilitator
+    await wb.admin.query(
+      "update cycles set facilitator_id = $1 where id = $2",
+      [priya.id, targetCycleId],
+    );
+
+    const priyaCtx = {
+      pool: wb.appPool,
+      workspaceId: demoWsId,
+      actor: { kind: "human" as const, userId: priya.user_id },
+    };
+    const danielCtx = {
+      pool: wb.appPool,
+      workspaceId: demoWsId,
+      actor: { kind: "human" as const, userId: daniel.user_id },
+    };
+
+    // Priya (facilitator) reads the pack: canChange is true
+    const priyaRead = await callAction(priyaCtx, "workflow.read", {
+      cycleId: targetCycleId,
+    });
+    expect(priyaRead.packAccess).toEqual({
+      canChange: true,
+      facilitatorName: "Priya Raman",
+    });
+
+    // Priya can write the pack
+    await callAction(priyaCtx, "workflow.setPackItem", {
+      cycleId: targetCycleId,
+      itemKey: 1,
+      gathered: true,
+      note: "Priya gathered this",
+    });
+
+    // Daniel (not facilitator) reads the pack: canChange is false
+    const danielRead = await callAction(danielCtx, "workflow.read", {
+      cycleId: targetCycleId,
+    });
+    expect(danielRead.packAccess).toEqual({
+      canChange: false,
+      facilitatorName: "Priya Raman",
+    });
+
+    // Daniel is refused
+    await expect(
+      callAction(danielCtx, "workflow.setPackItem", {
+        cycleId: targetCycleId,
+        itemKey: 1,
+        gathered: false,
+      }),
+    ).rejects.toThrow(INPUT_PACK_REFUSAL);
+
+    await expect(
+      callAction(danielCtx, "workflow.distributePack", {
+        cycleId: targetCycleId,
+      }),
+    ).rejects.toThrow(INPUT_PACK_REFUSAL);
   });
 });

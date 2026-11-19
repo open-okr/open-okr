@@ -95,6 +95,10 @@ const taskCard = z.object({
   checklist: z.object({ done: z.number().int(), total: z.number().int() }),
 });
 
+const boardTaskCard = taskCard.extend({
+  canMove: z.boolean(),
+});
+
 /** A write reached by something with no member row cannot hold or move work. */
 function requireMemberId(memberId: string | null | undefined): string {
   if (!memberId) {
@@ -376,7 +380,7 @@ export const readBoard = defineReadAction({
     columns: z.array(
       z.object({
         status: z.enum(TASK_STATUSES),
-        cards: z.array(taskCard),
+        cards: z.array(boardTaskCard),
       }),
     ),
     /**
@@ -541,13 +545,32 @@ export const readBoard = defineReadAction({
           railIds,
         );
 
+        const boundedColumns = TASK_STATUSES.map((status) => ({
+          status,
+          cards: cards
+            .filter((card) => card.status === status)
+            .slice(0, perColumn),
+        }));
+
+        const returnedCardIds = boundedColumns.flatMap((col) =>
+          col.cards.map((card) => card.id),
+        );
+        const editableCardIds = await visibleResourceIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "task",
+          requires: ACCESS_LEVELS.edit,
+          ids: returnedCardIds,
+        });
+
         return {
           scope: described,
-          columns: TASK_STATUSES.map((status) => ({
-            status,
-            cards: cards
-              .filter((card) => card.status === status)
-              .slice(0, perColumn),
+          columns: boundedColumns.map((col) => ({
+            status: col.status,
+            cards: col.cards.map((card) => ({
+              ...card,
+              canMove: editableCardIds.has(card.id),
+            })),
           })),
           rail,
         };
@@ -906,6 +929,7 @@ async function assertWhatATaskNames(
 
 export const createTask = defineWriteAction({
   name: "tasks.create",
+  domain: "task",
   summary: "Creates a task in a space, optionally behind a key result.",
   input: z.object({
     spaceId: z.uuid(),

@@ -170,6 +170,13 @@ export default async function GoalPage({
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
+  const { editableGoalIds } = await callAction(
+    context,
+    "goals.keyResultCreateAccess",
+    {
+      goalIds: canEdit ? [goal.id] : [],
+    },
+  );
   const canAdminister = level >= ACCESS_LEVELS.full;
   const members = canAdminister
     ? await callAction(context, "people.directory", {})
@@ -633,7 +640,7 @@ export default async function GoalPage({
             )}
             {/* S-14's "+ Add key result" (P9-T08b), owned by the champion and
              * due at the cycle's end, as a row added from the list is. */}
-            {open ? (
+            {open && editableGoalIds.includes(goal.id) ? (
               <AddKeyResult
                 goalId={goal.id}
                 ownerId={goal.champion.id}

@@ -8991,7 +8991,7 @@
     "/ai/readToolCallSummary": {
       "get": {
         "operationId": "ai.readToolCallSummary",
-        "summary": "How much external agents were used in this workspace over 30 days, and how often refused, with no member named, and the copilot's reads over the same days with the member each was made for.",
+        "summary": "External agent calls, copilot read totals and recent copilot activity over 30 days. Only the copilot activity names members.",
         "tags": [
           "ai"
         ],
@@ -9066,6 +9066,14 @@
                                       "null"
                                     ]
                                   },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "read",
+                                      "proposal",
+                                      "unknown"
+                                    ]
+                                  },
                                   "outcome": {
                                     "type": "string"
                                   },
@@ -9076,6 +9084,7 @@
                                 "required": [
                                   "member",
                                   "tool",
+                                  "kind",
                                   "outcome",
                                   "calledAt"
                                 ],
@@ -24347,6 +24356,109 @@
         }
       }
     },
+    "/spaces/creationAccess": {
+      "get": {
+        "operationId": "spaces.creationAccess",
+        "summary": "Which supplied spaces the caller can create work and sessions in.",
+        "tags": [
+          "spaces"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "editableSpaceIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        },
+                        "canCreateTask": {
+                          "type": "boolean"
+                        },
+                        "canCreateInitiative": {
+                          "type": "boolean"
+                        },
+                        "canScheduleSession": {
+                          "type": "boolean"
+                        },
+                        "canCreateKpi": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "editableSpaceIds",
+                        "canCreateTask",
+                        "canCreateInitiative",
+                        "canScheduleSession",
+                        "canCreateKpi"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "parameters": [
+          {
+            "name": "spaceIds",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            }
+          }
+        ]
+      }
+    },
     "/spaces/read": {
       "get": {
         "operationId": "spaces.read",
@@ -28861,6 +28973,7 @@
                       "kpi",
                       "initiative",
                       "task",
+                      "session",
                       "comment",
                       "space",
                       "workspace"
@@ -28998,6 +29111,7 @@
                             "kpi",
                             "initiative",
                             "task",
+                            "session",
                             "comment",
                             "space",
                             "workspace"
@@ -36162,6 +36276,9 @@
                                         "total"
                                       ],
                                       "additionalProperties": false
+                                    },
+                                    "canMove": {
+                                      "type": "boolean"
                                     }
                                   },
                                   "required": [
@@ -36175,7 +36292,8 @@
                                     "dueOn",
                                     "position",
                                     "assignees",
-                                    "checklist"
+                                    "checklist",
+                                    "canMove"
                                   ],
                                   "additionalProperties": false
                                 }
@@ -43565,6 +43683,93 @@
             "$ref": "#/components/responses/E500"
           }
         }
+      }
+    },
+    "/goals/keyResultCreateAccess": {
+      "get": {
+        "operationId": "goals.keyResultCreateAccess",
+        "summary": "Which supplied objectives the caller can add a key result to.",
+        "tags": [
+          "goals"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "editableGoalIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "editableGoalIds"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "parameters": [
+          {
+            "name": "goalIds",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            }
+          }
+        ]
       }
     },
     "/goals/place": {

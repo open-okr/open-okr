@@ -121,9 +121,22 @@ test("given the Viewer role, nothing offers to add an objective", async () => {
   await expect(main.getByRole("button", { name: "New objective" })).toHaveCount(
     0,
   );
+  await expect(
+    admin.getByRole("button", { name: "Create something new" }),
+  ).toHaveCount(0);
 
   await goTo(admin, "/cycle?phase=4");
   await expect(
     admin.getByRole("main").getByRole("button", { name: "Add objective" }),
   ).toHaveCount(0);
+});
+
+test("a Viewer can read the board and sessions without creation forms", async () => {
+  await goTo(admin, "/board");
+  await expect(admin.getByRole("heading", { name: "Tasks", exact: true })).toBeVisible();
+  await expect(admin.getByRole("heading", { name: "Add a task" })).toHaveCount(0);
+
+  await goTo(admin, "/sessions");
+  await expect(admin.getByRole("main").getByRole("heading").first()).toBeVisible();
+  await expect(admin.getByRole("heading", { name: "Schedule sessions" })).toHaveCount(0);
 });

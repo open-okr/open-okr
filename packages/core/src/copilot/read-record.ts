@@ -1,5 +1,5 @@
 /**
- * Writing down one read the copilot made (docs/design/copilot-live-data.md
+ * Writing down a read or proposal attempt (docs/design/copilot-live-data.md
  * 3.6, decision D6, plan 0.9.0 L3).
  *
  * The same table as the agent surface's record, `source = 'copilot'`, with the
@@ -23,16 +23,8 @@ import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import { PROPOSE_TOOL } from "./propose-tool.ts";
 import { COPILOT_READS, type ReadResult } from "./read-tools.ts";
 
-/** Tools that open one named record, so the row may say which. */
-const SINGLE_RECORD_TOOLS: ReadonlySet<string> = new Set([
-  "goals.read",
-  "kpis.detail",
-  "initiatives.read",
-  "tasks.read",
-]);
-
 /**
- * Records one read. Never throws.
+ * Records one call. Never throws.
  *
  * `tool` is stored only when it is one of the copilot's own tools: a name the
  * model made up is the model's text, and the agent surface keeps it null too.
@@ -53,10 +45,7 @@ export async function recordCopilotRead(
   const proposes = result.tool === PROPOSE_TOOL;
   const known =
     proposes || (COPILOT_READS as readonly string[]).includes(result.tool);
-  const opened =
-    known && SINGLE_RECORD_TOOLS.has(result.tool)
-      ? result.entities[0]?.entityId
-      : undefined;
+  const opened = result.subject?.entityId;
   try {
     // openokr:allow-mutation: an operational record outside the pipeline,
     // as the agent surface's is (agent-tool-calls.md D5): one insert in its

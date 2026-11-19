@@ -39,7 +39,12 @@ import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import type { AnswerSource, CopilotStep, Prepared } from "./answer.ts";
 import { isCitableType } from "./citations.ts";
-import { type ProposalOffer, proposalNoteFor } from "./proposals.ts";
+import { isEligibleForFastPath } from "./fast-path.ts";
+import {
+  type ProposalOffer,
+  proposalNoteFor,
+  proposalRequestText,
+} from "./proposals.ts";
 import {
   createProposer,
   PROPOSE_TOOL,
@@ -57,6 +62,7 @@ import {
   toolsFor,
 } from "./read-tools.ts";
 import { aiOffReason, type ReasonLike } from "./reasons.ts";
+import type { CopilotRunTimer } from "./timing.ts";
 
 /** Most model rounds that may ask for reads (design 3.1). Fixed, not a setting (D7). */
 export const COPILOT_MAX_ROUNDS = 4;
@@ -78,14 +84,6 @@ const SOURCE_CHARS = 1600;
 
 /** Characters of all records together. Later ones keep a label only. */
 const SOURCES_BUDGET_CHARS = 24_000;
-
-/** Tools that read one named record, so the step may say which. */
-const SINGLE_RECORD_TOOLS: ReadonlySet<string> = new Set([
-  "goals.read",
-  "kpis.detail",
-  "initiatives.read",
-  "tasks.read",
-]);
 
 const SEGMENT_START = /^\s*\[(\d+)\] /;
 const NOT_SHOWN_FOOTER = /^\(.* not shown\)$/;
@@ -259,6 +257,7 @@ export async function* readLiveData(
   context: ActionCallContext,
   prepared: Prepared,
   hooks: ReadingHooks = {},
+  timer?: CopilotRunTimer,
 ): AsyncGenerator<ReadingEvent, ReadingOutcome | null> {
   const drafter = context.drafter;
   if (!prepared.ask) {
@@ -299,6 +298,7 @@ export async function* readLiveData(
       ? createProposer(context, {
           threadId: prepared.threadId,
           offers: hooks.proposal.offers,
+          request: proposalRequestText(ask),
         })
       : null;
   // One object rather than three `let`s: they are changed inside callbacks,
@@ -306,13 +306,11 @@ export async function* readLiveData(
   const run = {
     round: 0,
     card: null as ProposedCard | null,
-    // Calls to `propose_change` the drafter counted among its reads.
-    proposalCalls: 0,
+    reads: 0,
   };
 
   const read = async (name: string, args: unknown): Promise<string> => {
     if (name === PROPOSE_TOOL && proposer) {
-      run.proposalCalls += 1;
       if (run.round === 1 && run.card === null) {
         // Shown while the call is being built, and only then (A4-D5).
         queue.push({ step: "proposing" });
@@ -332,7 +330,9 @@ export async function* readLiveData(
       }
       return result.text;
     }
-    const result = await runRead(context, refs, name, args);
+    timer?.startTool();
+    const result = await runRead(context, refs, name, args, ask.locale);
+    timer?.endTool(name);
     // Every read, including a refused or unknown one, is written down as the
     // member's (design 3.6). Never in the way of the answer.
     await recordCopilotRead(context.pool, {
@@ -342,9 +342,8 @@ export async function* readLiveData(
     });
     collectSegments(result.text, segments);
     if ((COPILOT_READS as readonly string[]).includes(name)) {
-      const label = SINGLE_RECORD_TOOLS.has(name)
-        ? result.entities[0]?.label
-        : undefined;
+      run.reads += 1;
+      const label = result.subject?.label;
       queue.push({
         step: "reading",
         tool: name,
@@ -358,17 +357,23 @@ export async function* readLiveData(
   const beforeRound = async (): Promise<boolean> => {
     // Asked once before every model call, so this is the round about to run.
     // It is how a `propose_change` call in round two is told apart (A4-D4).
+    if (run.round > 0) {
+      timer?.endRound();
+    }
     run.round += 1;
+    timer?.startRound(run.round);
     if (hooks.proceed && !(await hooks.proceed())) {
       return false;
     }
-    return (
+    timer?.startChecks();
+    const allowed =
       (await modelBlockedReason(
         context.pool,
         context.workspaceId,
         memberId,
-      )) === null
-    );
+      )) === null;
+    timer?.endChecks();
+    return allowed;
   };
 
   // The anchored record, read as the member before the first round, so it is
@@ -377,15 +382,21 @@ export async function* readLiveData(
   // would tell them. The read is recorded either way, like any loop read.
   let subjectReads = 0;
   if (anchor) {
-    const result = await readSubject(context, refs, anchor.kind, anchor.id);
+    timer?.startTool();
+    const result = await readSubject(
+      context,
+      refs,
+      anchor.kind,
+      anchor.id,
+      ask.locale,
+    );
+    timer?.endTool(result.tool);
     await recordCopilotRead(context.pool, {
       workspaceId: context.workspaceId,
       memberId,
       result,
     });
-    const opened = result.entities.find(
-      (entity) => entity.entityId === anchor.id,
-    );
+    const opened = result.subject;
     const ref = refs.refOf(anchor.id);
     if (result.outcome === "ok" && opened && ref !== undefined) {
       subjectReads = 1;
@@ -404,6 +415,71 @@ export async function* readLiveData(
     } else {
       refs.truncate(0);
     }
+  }
+
+  // Narrow fast path for single-record questions on an anchored record
+  const fastPathDisabled = process.env.OPENOKR_COPILOT_FAST_PATH === "off";
+  const fastPathEligible =
+    !fastPathDisabled &&
+    isEligibleForFastPath({
+      historyLength: ask.history.length,
+      anchorKind: anchor?.kind ?? null,
+      anchorReadOutcome: subject ? "ok" : null,
+      question: ask.question,
+      anchorText: subject?.text,
+    });
+
+  if (fastPathEligible && subject) {
+    timer?.setFastPath(true);
+    for (const step of queue.splice(0)) {
+      yield step;
+    }
+    const reads = 1;
+    const limited = false;
+    const costUsd = 0;
+    const tokensIn = 0;
+    const tokensOut = 0;
+    timer?.startChecks();
+    const blocked = await modelBlockedReason(
+      context.pool,
+      context.workspaceId,
+      memberId,
+    );
+    timer?.endChecks();
+    const proposal = {
+      note: { made: false } as const,
+      proposalId: null,
+    };
+    const spent = { reads, costUsd, tokensIn, tokensOut, blocked, proposal };
+    let budget = SOURCES_BUDGET_CHARS;
+    const entries = refs.entries();
+    const sources: GroundingSource[] = entries.map((entry) => {
+      const own = segments.get(entry.ref);
+      const content =
+        own !== undefined && budget > 0 ? clip(own, SOURCE_CHARS) : entry.label;
+      budget -= content.length;
+      return { label: entry.label, content };
+    });
+    const shown: AnswerSource[] = entries
+      .filter((entry) => isCitableType(entry.entityType))
+      .map((entry) => ({
+        entityType: entry.entityType,
+        entityId: entry.entityId,
+        label: entry.label,
+        excerpt: sources[entry.ref - 1]?.content ?? "",
+      }));
+    return {
+      prepared: {
+        ...prepared,
+        sources: shown,
+        cite: entries.map((entry) => ({
+          entityType: entry.entityType,
+          entityId: entry.entityId,
+        })),
+        ask: { ...ask, sources, reading: { reads, limited } },
+      },
+      ...spent,
+    };
   }
 
   let settled = false;
@@ -448,6 +524,9 @@ export async function* readLiveData(
     });
   }
   const chosen = await running;
+  if (run.round > 0) {
+    timer?.endRound();
+  }
   // A provider with no tools, or a loop that gave up, still has the anchored
   // record: it joins the grounding sources, so the answer can use it.
   // A card that was made stands even when the loop failed after it, so the
@@ -460,22 +539,20 @@ export async function* readLiveData(
     return null;
   }
   const loop = chosen.ok ? chosen.value : null;
-  // A `propose_change` call is one of the loop's calls (A4-D8) but opens no
-  // record, so it is not a read: the answer's sources and the "made n reads"
-  // line count reads only.
-  const reads =
-    Math.max(0, (loop?.reads ?? 0) - run.proposalCalls) + subjectReads;
+  const reads = run.reads + subjectReads;
   const limited = loop?.limited ?? false;
   const costUsd = loop?.costUsd ?? 0;
   const tokensIn = loop?.tokensIn ?? 0;
   const tokensOut = loop?.tokensOut ?? 0;
   // The rounds are model calls and may have spent the last of the credits, so
   // the answer's own call is checked like any other before it is made.
+  timer?.startChecks();
   const blocked = await modelBlockedReason(
     context.pool,
     context.workspaceId,
     memberId,
   );
+  timer?.endChecks();
   // The tool was offered when the proposer exists and round one ran. A loop
   // that returned null (a provider with no tools, a first round that failed)
   // never offered it, and the caller asks the 0.8.1 way.

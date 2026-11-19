@@ -227,6 +227,8 @@ interface Arriving {
   readonly settled: boolean;
   /** The reader stopped it, and the run has not recorded what it kept yet. */
   readonly stopped?: boolean;
+  /** Monotonic time in milliseconds from Send to first non-whitespace word. */
+  readonly ttfwMs?: number | null;
 }
 
 /** A background run being rejoined after a reload (P4-T14b-b). */
@@ -817,6 +819,9 @@ export function CopilotPanel({
       let said: string | null = null;
       let reached = true;
       let stopped = false;
+      const sendMonotonic =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      let firstWordMeasured = false;
       try {
         const response = await fetch("/api/copilot", {
           method: "POST",
@@ -913,7 +918,16 @@ export function CopilotPanel({
               update({ notice: said });
             } else if (event.kind === "text") {
               text += event.text;
-              update({ text });
+              if (!firstWordMeasured && event.text.trim().length > 0) {
+                firstWordMeasured = true;
+                const now =
+                  typeof performance !== "undefined"
+                    ? performance.now()
+                    : Date.now();
+                update({ text, ttfwMs: Math.round(now - sendMonotonic) });
+              } else {
+                update({ text });
+              }
             } else if (event.kind === "done" && event.stopped) {
               // The run stopped where the member pressed Stop (W4), and
               // what it kept is recorded by now.
@@ -1337,7 +1351,10 @@ export function CopilotPanel({
                       })}
 
                       {arriving ? (
-                        <div className="flex flex-col gap-3">
+                        <div
+                          className="flex flex-col gap-3"
+                          data-ttfw-ms={arriving.ttfwMs ?? undefined}
+                        >
                           <MemberTurn text={arriving.question} />
                           <AssistantTurn
                             text={arriving.text}

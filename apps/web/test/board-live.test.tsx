@@ -82,7 +82,7 @@ class FakeEventSource {
 const SPACE = "11111111-1111-4111-8111-111111111111";
 const KEY_RESULT = "22222222-2222-4222-8222-222222222222";
 
-const card = (id: string, title: string, status: string) => ({
+const card = (id: string, title: string, status: string, canMove = true) => ({
   id,
   title,
   status,
@@ -90,6 +90,7 @@ const card = (id: string, title: string, status: string) => ({
   keyResultTitle: null,
   assignees: [],
   checklist: { done: 0, total: 0 },
+  canMove,
 });
 
 const COLUMNS = [
@@ -118,6 +119,7 @@ const onMove = vi.fn(
 const render = async (
   props: Partial<{
     canEdit: boolean;
+    columns: typeof COLUMNS;
     scope: { kind: "space" | "initiative" | "key_result"; id: string };
   }> = {},
 ) => {
@@ -128,7 +130,7 @@ const render = async (
         <KeyboardRegistryProvider>
           <Board
             scope={props.scope ?? { kind: "space", id: SPACE }}
-            columns={COLUMNS}
+            columns={props.columns ?? COLUMNS}
             canEdit={props.canEdit ?? true}
             onMove={onMove}
           />
@@ -408,7 +410,7 @@ describe("moving a card with the keyboard", () => {
     );
   });
 
-  test("tells the keyboard how, and offers no handle to a reader who cannot edit", async () => {
+  test("tells the keyboard how, and offers no handle to a reader who cannot move the card", async () => {
     await render();
     const described = handle("a")?.getAttribute("aria-describedby") ?? "";
     expect(document.getElementById(described)?.textContent).toContain(
@@ -418,8 +420,89 @@ describe("moving a card with the keyboard", () => {
       "Reorder Rewrite the first-run screen",
     );
 
-    await render({ canEdit: false });
+    const nonEditable = COLUMNS.map((col) => ({
+      ...col,
+      cards: col.cards.map((c) => ({ ...c, canMove: false })),
+    }));
+    await render({ columns: nonEditable, canEdit: false });
     expect(handle("a")).toBeNull();
+  });
+
+  test("offers move affordances only for editable cards on a mixed board", async () => {
+    const mixedCols = [
+      { status: "backlog", cards: [] },
+      {
+        status: "todo",
+        cards: [
+          card("a", "Rewrite the first-run screen", "todo", true),
+          card("b", "Email the dormant teams", "todo", false),
+        ],
+      },
+      { status: "in_progress", cards: [] },
+      { status: "done", cards: [] },
+    ];
+    await render({ columns: mixedCols, canEdit: false });
+
+    // Card "a" can move: has handle, draggable, shift buttons
+    expect(handle("a")).not.toBeNull();
+    const cardA = host.querySelector('[data-move-handle="a"]')?.closest("li");
+    expect(cardA?.getAttribute("draggable")).toBe("true");
+    expect(
+      cardA?.querySelector(
+        'button[aria-label="Move Rewrite the first-run screen back a column"]',
+      ),
+    ).not.toBeNull();
+    // Delete is false because canEdit is false
+    expect(
+      cardA?.querySelector('[data-testid="board-card-delete"]'),
+    ).toBeNull();
+
+    // Card "b" is view-only: no handle, not draggable, no shift buttons
+    expect(handle("b")).toBeNull();
+    const cardB = host.querySelectorAll('[data-testid="board-card"]')[1];
+    expect(cardB?.getAttribute("draggable")).toBe("false");
+    expect(
+      cardB?.querySelector(
+        'button[aria-label="Move Email the dormant teams back a column"]',
+      ),
+    ).toBeNull();
+
+    // Card "a" can be moved after card "b" using keyboard
+    await click(handle("a"));
+    await press(handle("a"), "ArrowDown");
+    await click(handle("a"));
+    expect(onMove).toHaveBeenCalledWith("a", "todo", "b");
+  });
+
+  test("cancels active keyboard carry when access is lost on refresh", async () => {
+    await render();
+    await click(handle("b"));
+    expect(handle("b")?.getAttribute("aria-pressed")).toBe("true");
+
+    // Board refreshes with b having canMove: false
+    const revokedCols = [
+      { status: "backlog", cards: [] },
+      {
+        status: "todo",
+        cards: [
+          card("a", "Rewrite the first-run screen", "todo", true),
+          card("b", "Email the dormant teams", "todo", false),
+        ],
+      },
+      {
+        status: "in_progress",
+        cards: [card("c", "Cut the setup form", "in_progress", true)],
+      },
+      { status: "done", cards: [] },
+    ];
+
+    await render({ columns: revokedCols });
+
+    // Held state cancelled and announced
+    expect(handle("b")).toBeNull();
+    expect(announcer()).toContain(
+      "The task you were moving was deleted by somebody else.",
+    );
   });
 });
 

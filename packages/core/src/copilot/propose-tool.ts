@@ -144,7 +144,13 @@ export function proposeChangeTool(
     name: PROPOSE_TOOL,
     description:
       "Prepare one change for the person to review, when their latest message " +
-      "plainly asks for it. Choose a list item by its number. Fill in the " +
+      "plainly asks for it. Choose a list item by its number only when the " +
+      "person's words identify it. Never substitute a similar key result. " +
+      "For a standalone task use its stated title and the named or only space. " +
+      "Leave its key result empty unless the person requested a link. If a " +
+      "required detail is missing or choices are ambiguous, let the answer ask. " +
+      "For a check-in, ask for missing overall confidence and never infer it " +
+      "from a result value. A confidence reply can finish the member's previous check-in request. Fill in the " +
       "fields the action takes and set every other field to null. A field " +
       "called reason is the person's own reason: fill it only from their " +
       "words, otherwise null. why is one sentence of your own saying why " +
@@ -175,6 +181,7 @@ export function createProposer(
   input: {
     readonly threadId: string;
     readonly offers: readonly ProposalOffer[];
+    readonly request: string;
   },
 ) {
   let made = false;
@@ -253,6 +260,7 @@ export function createProposer(
         context,
         { action, fields, why },
         input.offers,
+        input.request,
       );
     } catch {
       return refuse("build_refused", action);

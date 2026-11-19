@@ -19,6 +19,7 @@
 import {
   accessContexts,
   activeOnly,
+  type BuiltinRoleKey,
   comments,
   documents,
   reactions,
@@ -31,6 +32,7 @@ import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { Pool } from "pg";
 import { OperationError } from "../operations/operation.ts";
 import { ACCESS_LEVELS, type AccessLevel } from "./levels.ts";
+import { missingRolePermission } from "./roles.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -184,16 +186,25 @@ export async function resolveMemberRoleLevel<
     readonly domain: string;
   },
 ): Promise<number | null> {
-  const result = await tx.execute<{ has_role: boolean; level: number }>(sql`
+  const result = await tx.execute<{
+    has_role: boolean;
+    builtin_key: BuiltinRoleKey | null;
+    level: number | null;
+  }>(sql`
     select m.role_id is not null as has_role,
-           coalesce((
+           r.builtin_key,
+           (
              select max(rp.level) from role_permissions rp
               where rp.workspace_id = m.workspace_id
                 and rp.role_id = m.role_id
                 and rp.domain = ${input.domain}
                 and rp.deleted_at is null
-           ), 0)::int as level
+           )::int as level
       from workspace_members m
+      left join workspace_roles r
+        on r.workspace_id = m.workspace_id
+       and r.id = m.role_id
+       and r.deleted_at is null
      where m.id = ${input.memberId}
        and m.workspace_id = ${input.workspaceId}
        and m.kind = 'human'
@@ -201,7 +212,9 @@ export async function resolveMemberRoleLevel<
        and m.deleted_at is null
   `);
   const row = result.rows[0];
-  return row?.has_role ? Number(row.level) : null;
+  return row?.has_role
+    ? (row.level ?? missingRolePermission(input.domain, row.builtin_key))
+    : null;
 }
 
 /** Whether a member's effective level on a context meets `level`. */

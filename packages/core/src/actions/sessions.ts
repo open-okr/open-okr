@@ -721,6 +721,7 @@ function scheduledInstant(value: string, timeZone: string): Date {
 
 export const createSession = defineWriteAction({
   name: "sessions.create",
+  domain: "session",
   summary:
     "Creates a scheduled session for a space. A time with no offset is read in the workspace timezone.",
   input: z.object({
@@ -744,16 +745,21 @@ export const createSession = defineWriteAction({
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
-    async execute({ tx, workspaceId, actor }) {
+    async load({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
         throw new OperationError("not_found", "No such workspace.");
       }
-      const contextId = await resolveSpaceContextId(
-        tx,
+      const { contextId } = await getAccessScoped(tx, {
         workspaceId,
-        input.spaceId,
-      );
+        memberId,
+        resourceType: "space",
+        resourceId: input.spaceId,
+        requires: ACCESS_LEVELS.edit,
+      });
+      return contextId;
+    },
+    async execute({ tx, workspaceId, loaded: contextId }) {
       if (input.part && input.kind !== "quarterly") {
         throw new OperationError(
           "not_found",
@@ -776,13 +782,6 @@ export const createSession = defineWriteAction({
         }
       }
 
-      await getAccessScoped(tx, {
-        workspaceId,
-        memberId,
-        resourceType: "space",
-        resourceId: input.spaceId,
-        requires: ACCESS_LEVELS.edit,
-      });
       await requireFacilitatorMember(tx, workspaceId, input.facilitatorId);
       if (input.cycleId) {
         await requireOpenCycle(tx, workspaceId, input.cycleId);
@@ -860,6 +859,7 @@ export const createSession = defineWriteAction({
  */
 export const bookCycleSessions = defineWriteAction({
   name: "sessions.bookCycle",
+  domain: "session",
   summary:
     "Books every weekly check-in, monthly review and the quarterly review a space needs for a whole cycle, around what is already booked.",
   input: z.object({
@@ -880,23 +880,21 @@ export const bookCycleSessions = defineWriteAction({
   }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
-    async execute({ tx, workspaceId, actor }) {
+    async load({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
         throw new OperationError("not_found", "No such workspace.");
       }
-      const contextId = await resolveSpaceContextId(
-        tx,
-        workspaceId,
-        input.spaceId,
-      );
-      await getAccessScoped(tx, {
+      const { contextId } = await getAccessScoped(tx, {
         workspaceId,
         memberId,
         resourceType: "space",
         resourceId: input.spaceId,
         requires: ACCESS_LEVELS.edit,
       });
+      return contextId;
+    },
+    async execute({ tx, workspaceId, loaded: contextId }) {
       await requireFacilitatorMember(tx, workspaceId, input.facilitatorId);
 
       const timeZone = await workspaceTimeZone(tx, workspaceId);

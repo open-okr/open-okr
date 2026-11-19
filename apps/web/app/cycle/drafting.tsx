@@ -141,6 +141,7 @@ export async function Drafting({
   draftingAllowed,
   draftingReasons,
   goals,
+  editableGoalIds,
   members,
   kpis,
   canEdit,
@@ -168,6 +169,7 @@ export async function Drafting({
   /** Why drafting waits, in the policy's words. Empty when it does not. */
   readonly draftingReasons: readonly string[];
   readonly goals: readonly DraftGoal[];
+  readonly editableGoalIds: readonly string[];
   readonly members: readonly MemberLike[];
   /**
    * What a new key result can be measured by, besides a hand-typed value
@@ -220,6 +222,7 @@ export async function Drafting({
   // unit field to offer (guided-inputs §4.8).
   const units = unitsInUse(goals);
   const canDraft = canEdit && draftingAllowed;
+  const editableGoals = new Set(editableGoalIds);
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -492,7 +495,7 @@ export async function Drafting({
                 </ul>
               )}
 
-              {canDraft ? (
+              {draftingAllowed && editableGoals.has(goal.id) ? (
                 <ActionForm
                   action={addKeyResult}
                   label={t("cycle.drafting.addKeyResultTo", {

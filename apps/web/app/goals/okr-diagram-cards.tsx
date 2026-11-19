@@ -49,6 +49,7 @@ export interface DiagramShared {
   readonly okr: OkrWrite;
   readonly coach: Coach;
   readonly canEdit: boolean;
+  readonly canAddKeyResult: (goalId: string) => boolean;
   readonly progressMax: number;
   /** The first card pressed in link mode, or null. */
   readonly linkFrom: string | null;
@@ -230,7 +231,9 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
           {goal.keyResults.map((keyResult) => (
             <KeyResultRow key={keyResult.id} keyResult={keyResult} />
           ))}
-          {drafting ? <KeyResultDraft goal={goal} /> : null}
+          {drafting && shared.canAddKeyResult(goal.id) ? (
+            <KeyResultDraft goal={goal} />
+          ) : null}
         </ul>
       )}
       {/* On an open card only: adding to a folded one would open it anyway,
@@ -240,17 +243,19 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
         <MoveUnder goal={goal} />
       ) : shared.canEdit && goal.closedAt === null && !collapsed ? (
         <span className="mt-auto flex items-center gap-1 border-t border-line px-2 py-1">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              shared.openKeyResultDraft(goal.id);
-            }}
-            aria-label={t("okrDiagram.addKeyResultTo", { title: goal.title })}
-            className="nodrag rounded-control px-1.5 py-0.5 text-[11px] font-semibold text-brand-text hover:bg-brand-weak"
-          >
-            {t("okrDiagram.addKeyResult")}
-          </button>
+          {shared.canAddKeyResult(goal.id) ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                shared.openKeyResultDraft(goal.id);
+              }}
+              aria-label={t("okrDiagram.addKeyResultTo", { title: goal.title })}
+              className="nodrag rounded-control px-1.5 py-0.5 text-[11px] font-semibold text-brand-text hover:bg-brand-weak"
+            >
+              {t("okrDiagram.addKeyResult")}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={(event) => {

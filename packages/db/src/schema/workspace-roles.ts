@@ -35,8 +35,9 @@ export const BUILTIN_ROLE_KEYS = [
 export type BuiltinRoleKey = (typeof BUILTIN_ROLE_KEYS)[number];
 
 /**
- * The resource types a role can speak about: an access context's own
- * `resource_type`, so the matrix needs no translation to reach the resolver.
+ * The domains a role can speak about. They are access context types except
+ * `session`, which controls scheduling and leaves session records scoped to
+ * their space.
  *
  * `blob` is deliberately absent. A file's access follows the goal or space it
  * hangs off, and a role that could grant it separately would be a second
@@ -47,6 +48,7 @@ export const ROLE_DOMAINS = [
   "kpi",
   "initiative",
   "task",
+  "session",
   "comment",
   "space",
   "workspace",

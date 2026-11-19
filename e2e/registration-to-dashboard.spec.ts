@@ -1135,8 +1135,27 @@ test("a signed-out request never reaches the dashboard", async ({ browser }) => 
   const stranger = await browser.newContext();
   try {
     const strangerPage = await stranger.newPage();
-    await strangerPage.goto("/");
+    const redirect = strangerPage.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/" && response.status() === 307,
+    );
+    const style = strangerPage.waitForResponse(
+      (response) =>
+        response.request().resourceType() === "stylesheet" && response.ok(),
+    );
+    const signInPage = await strangerPage.goto("/");
     await expect(strangerPage).toHaveURL(/\/sign-in/);
+    expect((await redirect).headers()["content-security-policy"]).not.toContain(
+      "upgrade-insecure-requests",
+    );
+    expect(signInPage?.headers()["content-security-policy"]).not.toContain(
+      "upgrade-insecure-requests",
+    );
+    expect(new URL((await style).url()).protocol).toBe("http:");
+    await strangerPage.getByLabel("Email").fill(EMAIL);
+    await strangerPage.getByLabel("Password", { exact: true }).fill(PASSWORD);
+    await strangerPage.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(strangerPage.getByRole("heading", { name: "Work map" })).toBeVisible();
   } finally {
     await stranger.close();
   }

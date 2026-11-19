@@ -21,13 +21,21 @@ import {
   workspaceMembers,
   workspaceRoles,
 } from "@openokr/db";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { PROTECTED_ROLE_KEY } from "../access/roles.ts";
-import { OperationError, type OperationTx } from "../operations/operation.ts";
-import { defineReadAction, defineWriteAction } from "./define.ts";
+import { missingRolePermission, PROTECTED_ROLE_KEY } from "../access/roles.ts";
+import {
+  type OperationContext,
+  OperationError,
+  type OperationTx,
+} from "../operations/operation.ts";
+import {
+  type ActionCallContext,
+  defineReadAction,
+  defineWriteAction,
+} from "./define.ts";
 
 /** The §4.1 ladder, plus zero for "this role grants nothing here". */
 const LEVELS = [0, 10, 40, 70, 100] as const;
@@ -106,13 +114,13 @@ export const listRoles = defineReadAction({
           isDefault: role.isDefault,
           editable: role.builtinKey !== PROTECTED_ROLE_KEY,
           // Every domain, so a screen draws a full matrix without filling the
-          // gaps itself and a domain nobody has set reads as the zero it is.
+          // gaps itself. Built-in session defaults also cover rollouts.
           permissions: ROLE_DOMAINS.map((domain) => ({
             domain,
             level:
               permissions.find(
                 (entry) => entry.roleId === role.id && entry.domain === domain,
-              )?.level ?? 0,
+              )?.level ?? missingRolePermission(domain, role.builtinKey),
           })),
           memberCount: members.filter((member) => member.roleId === role.id)
             .length,
@@ -171,37 +179,25 @@ export const setRolePermission = defineWriteAction({
     async execute({ tx, workspaceId }) {
       const role = await editableRole(tx, workspaceId, input.roleId);
 
-      const [existing] = await tx
-        .select({ id: rolePermissions.id })
-        .from(rolePermissions)
-        .where(
-          activeOnly(
-            rolePermissions,
-            and(
-              eq(rolePermissions.workspaceId, workspaceId),
-              eq(rolePermissions.roleId, input.roleId),
-              eq(rolePermissions.domain, input.domain),
-            ),
-          ),
-        )
-        .limit(1);
-
-      // openokr:allow-mutation: the operation's own execute.
-      if (existing) {
-        await tx
-          .update(rolePermissions)
-          .set({ level: input.level, updatedAt: new Date() })
-          .where(
-            activeOnly(rolePermissions, eq(rolePermissions.id, existing.id)),
-          );
-      } else {
-        await tx.insert(rolePermissions).values({
+      // openokr:allow-mutation: the operation's own execute. The session
+      // default can be backfilled concurrently with an administrator's edit.
+      await tx
+        .insert(rolePermissions)
+        .values({
           workspaceId,
           roleId: input.roleId,
           domain: input.domain,
           level: input.level,
+        })
+        .onConflictDoUpdate({
+          target: [
+            rolePermissions.workspaceId,
+            rolePermissions.roleId,
+            rolePermissions.domain,
+          ],
+          targetWhere: sql`deleted_at is null`,
+          set: { level: input.level, updatedAt: new Date() },
         });
-      }
 
       return {
         result: {
@@ -373,14 +369,121 @@ export const deleteRole = defineWriteAction({
   }),
 });
 
-export const assignRole = defineWriteAction({
-  name: "roles.assign",
-  summary: "Gives a member a role, or takes their role away.",
-  input: z.object({ memberId: z.uuid(), roleId: z.uuid().nullable() }),
-  output: z.object({ memberId: z.uuid(), roleId: z.uuid().nullable() }),
-  access: ACCESS_LEVELS.full,
-  operation: (_context, input) => ({
-    async execute({ tx, workspaceId }) {
+export interface AssignRoleCondition {
+  /**
+   * Scoped to demo preparation: only assign if the member is active, matches
+   * this linked user ID, and currently has no role assigned.
+   */
+  readonly ifUnassignedForUserId: string;
+}
+
+/**
+ * Reusable operation spec for `roles.assign`, supporting a conditional write
+ * scoped to demo preparation where concurrent assignment or unmatching account
+ * makes the write a no-op that records no activity or audit.
+ */
+export function assignRoleOperation(
+  _context: ActionCallContext,
+  input: { memberId: string; roleId: string | null },
+  condition?: AssignRoleCondition,
+) {
+  return {
+    async execute({ tx, workspaceId }: OperationContext<undefined>) {
+      if (condition) {
+        const [member] = await tx
+          .select({
+            id: workspaceMembers.id,
+            kind: workspaceMembers.kind,
+            status: workspaceMembers.status,
+            userId: workspaceMembers.userId,
+            roleId: workspaceMembers.roleId,
+          })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              and(
+                eq(workspaceMembers.workspaceId, workspaceId),
+                eq(workspaceMembers.id, input.memberId),
+              ),
+            ),
+          )
+          .limit(1);
+
+        if (
+          member?.kind !== "human" ||
+          member.status !== "active" ||
+          member.userId !== condition.ifUnassignedForUserId ||
+          member.roleId !== null
+        ) {
+          return {
+            result: {
+              memberId: input.memberId,
+              roleId: member?.roleId ?? null,
+            },
+          };
+        }
+
+        if (input.roleId !== null) {
+          const [role] = await tx
+            .select({ id: workspaceRoles.id })
+            .from(workspaceRoles)
+            .where(
+              activeOnly(
+                workspaceRoles,
+                and(
+                  eq(workspaceRoles.workspaceId, workspaceId),
+                  eq(workspaceRoles.id, input.roleId),
+                ),
+              ),
+            )
+            .limit(1);
+          if (!role) {
+            throw new OperationError("not_found", "No such role.");
+          }
+        }
+
+        // openokr:allow-mutation: the operation's own execute.
+        const updated = await tx
+          .update(workspaceMembers)
+          .set({ roleId: input.roleId, updatedAt: new Date() })
+          .where(
+            activeOnly(
+              workspaceMembers,
+              and(
+                eq(workspaceMembers.id, input.memberId),
+                eq(workspaceMembers.workspaceId, workspaceId),
+                eq(workspaceMembers.status, "active"),
+                eq(workspaceMembers.userId, condition.ifUnassignedForUserId),
+                isNull(workspaceMembers.roleId),
+              ),
+            ),
+          )
+          .returning({ id: workspaceMembers.id });
+
+        if (updated.length === 0) {
+          return {
+            result: { memberId: input.memberId, roleId: member.roleId },
+          };
+        }
+
+        return {
+          result: { memberId: input.memberId, roleId: input.roleId },
+          activity: {
+            kind: "role.assigned" as const,
+            subjectType: "member" as const,
+            subjectId: input.memberId,
+            payload: {},
+          },
+          audit: {
+            action: "roles.assign",
+            targetType: "member",
+            targetId: input.memberId,
+            payload: { roleId: input.roleId },
+          },
+        };
+      }
+
       const [member] = await tx
         .select({ id: workspaceMembers.id, kind: workspaceMembers.kind })
         .from(workspaceMembers)
@@ -450,5 +553,14 @@ export const assignRole = defineWriteAction({
         },
       };
     },
-  }),
+  };
+}
+
+export const assignRole = defineWriteAction({
+  name: "roles.assign",
+  summary: "Gives a member a role, or takes their role away.",
+  input: z.object({ memberId: z.uuid(), roleId: z.uuid().nullable() }),
+  output: z.object({ memberId: z.uuid(), roleId: z.uuid().nullable() }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => assignRoleOperation(context, input),
 });

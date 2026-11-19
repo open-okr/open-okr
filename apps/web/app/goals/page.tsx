@@ -342,6 +342,13 @@ export default async function GoalsPage({
     : null;
 
   const canEdit = accessLevel >= ACCESS_LEVELS.edit;
+  const { editableGoalIds } = await callAction(
+    context,
+    "goals.keyResultCreateAccess",
+    {
+      goalIds: canEdit ? (okrTree?.goals.map((goal) => goal.id) ?? []) : [],
+    },
+  );
   const canAdminister = accessLevel >= ACCESS_LEVELS.full;
   // Adding an objective asks the role's goal level, which a Viewer lacks
   // although `canEdit` is `edit` for every member (workspace-roles.md §13,
@@ -578,6 +585,7 @@ export default async function GoalsPage({
             level={levelForNew}
             canEdit={canEdit}
             canCreate={canCreate}
+            editableGoalIds={editableGoalIds}
             canAdminister={canAdminister}
             progressMax={progressMax}
             empty={
@@ -600,6 +608,7 @@ export default async function GoalsPage({
             filters={filters}
             cycleId={cycleId}
             canEdit={canEdit}
+            editableGoalIds={editableGoalIds}
             canAdminister={canAdminister}
             progressMax={progressMax}
             members={members}

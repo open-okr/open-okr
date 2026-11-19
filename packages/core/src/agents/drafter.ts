@@ -111,6 +111,7 @@ export interface GroundingSource {
 
 /** What the copilot is asked, and what it is allowed to read while answering. */
 export interface GroundedQuestionContext {
+  readonly locale?: import("../settings/member-language.ts").MemberLanguage;
   readonly question: string;
   /** Earlier turns in this thread, oldest first, so a follow-up makes sense. */
   readonly history: readonly {

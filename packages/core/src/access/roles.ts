@@ -42,6 +42,23 @@ interface BuiltinRole {
 
 const { view, comment, edit, full } = ACCESS_LEVELS;
 
+/** The default also applies while an older workspace awaits the backfill. */
+const BUILTIN_SESSION_LEVELS = {
+  owner: full,
+  admin: full,
+  member: edit,
+  viewer: view,
+} as const satisfies Record<BuiltinRoleKey, RoleLevel>;
+
+export function missingRolePermission(
+  domain: string,
+  builtinKey: BuiltinRoleKey | null,
+): RoleLevel {
+  return domain === "session" && builtinKey !== null
+    ? BUILTIN_SESSION_LEVELS[builtinKey]
+    : 0;
+}
+
 /**
  * The seeded matrix.
  *
@@ -62,6 +79,7 @@ const BUILTIN_ROLES: readonly BuiltinRole[] = [
       kpi: full,
       initiative: full,
       task: full,
+      session: BUILTIN_SESSION_LEVELS.owner,
       comment: full,
       space: full,
       workspace: full,
@@ -76,6 +94,7 @@ const BUILTIN_ROLES: readonly BuiltinRole[] = [
       kpi: full,
       initiative: full,
       task: full,
+      session: BUILTIN_SESSION_LEVELS.admin,
       comment: full,
       space: full,
       // Not `full`: the workspace context is what carries the settings and the
@@ -92,6 +111,7 @@ const BUILTIN_ROLES: readonly BuiltinRole[] = [
       kpi: edit,
       initiative: edit,
       task: edit,
+      session: BUILTIN_SESSION_LEVELS.member,
       comment,
       space: view,
       workspace: view,
@@ -106,6 +126,7 @@ const BUILTIN_ROLES: readonly BuiltinRole[] = [
       kpi: view,
       initiative: view,
       task: view,
+      session: BUILTIN_SESSION_LEVELS.viewer,
       comment: view,
       space: view,
       workspace: view,

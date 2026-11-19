@@ -143,6 +143,22 @@ seals identity-provider tokens stored before they were encrypted needs the
 root key, and refuses to finish without it rather than report them sealed.
 [Security](../admin/security.md#what-is-encrypted-at-rest) says more.
 
+## 0.9.0 to 0.9.1
+
+Data change `0036_session_role_permissions` fills the Sessions permission on
+existing built-in roles. Owner and Admin get Manage, Member gets Edit and
+Viewer gets View. The application uses these defaults during the upgrade.
+Already saved permission levels are preserved. Assign Edit on Sessions to a
+custom role in Admin, Roles if its members should schedule sessions in the
+spaces they can edit. See [workspace-roles.md](../design/workspace-roles.md) §14.
+
+The Content Security Policy uses the scheme in `BETTER_AUTH_URL`.
+Public HTTP installations can load scripts and styles and sign in on
+Safari. Public HTTPS installations still request secure assets, including
+when a reverse proxy terminates TLS and connects to the app over HTTP.
+If you manage your own reverse proxy, set `BETTER_AUTH_URL` to the
+browser-facing origin, including its scheme and any nondefault port.
+
 ## 0.8 to 0.9
 
 Four migrations, **0168 to 0171**, all additive. No data change is new, and

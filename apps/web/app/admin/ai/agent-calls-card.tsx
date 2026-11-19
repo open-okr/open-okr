@@ -32,9 +32,8 @@ function outcomeWords(
  * usage area (agent-tool-calls.md D15, plan 0.7.0 A2). Totals only for
  * agents: no member is named, and a member's own calls are on their own pages.
  *
- * Below them, the copilot's latest reads with the member each was made for
- * (plan 0.9.0 L3, copilot-live-data.md acceptance 10). The copilot reads as a
- * person, so the person is what an administrator needs to see.
+ * Below them, the copilot's read totals and its recent activity with the
+ * member each call was made for (plan 0.9.0 L3 and plan 0.9.1 C6).
  */
 export async function AgentCallsCard({
   summary,
@@ -55,6 +54,7 @@ export async function AgentCallsCard({
       readonly recent: readonly {
         readonly member: string;
         readonly tool: string | null;
+        readonly kind: "read" | "proposal" | "unknown";
         readonly outcome: string;
         readonly calledAt: string;
       }[];
@@ -102,34 +102,45 @@ export async function AgentCallsCard({
             {t("admin.ai.agentCalls.copilotNone")}
           </p>
         ) : (
-          <>
-            <p className="text-ink-2">
-              {t("admin.ai.agentCalls.copilotTotals", {
-                calls: summary.copilot.calls,
-                refused: summary.copilot.refused,
-              })}
-            </p>
-            <ul
-              // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
-              tabIndex={0}
-              aria-label={t("admin.ai.agentCalls.copilotTitle")}
-              // Scrolls inside the card at about five rows.
-              className="relative flex max-h-[200px] flex-col gap-1 overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line px-3 py-2 text-xs text-ink-3"
-            >
-              {summary.copilot.recent.map((read, index) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: a read has no id of its own here; the list is fixed per render.
-                <li key={index}>
-                  {t("admin.ai.agentCalls.copilotRead", {
-                    time: stamp(read.calledAt),
-                    member: read.member,
-                    outcome: outcomeWords(read.outcome, t),
-                  })}{" "}
-                  <code className="font-mono">{read.tool ?? "?"}</code>
-                </li>
-              ))}
-            </ul>
-          </>
+          <p className="text-ink-2">
+            {t("admin.ai.agentCalls.copilotTotals", {
+              calls: summary.copilot.calls,
+              refused: summary.copilot.refused,
+            })}
+          </p>
         )}
+        {summary.copilot.recent.length > 0 ? (
+          <ul
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
+            tabIndex={0}
+            aria-label={t("admin.ai.agentCalls.copilotTitle")}
+            // Scrolls inside the card at about five rows.
+            className="relative flex max-h-[200px] flex-col gap-1 overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line px-3 py-2 text-xs text-ink-3"
+          >
+            {summary.copilot.recent.map((call, index) => {
+              const values = {
+                time: stamp(call.calledAt),
+                member: call.member,
+                outcome: outcomeWords(call.outcome, t),
+              };
+              return (
+                // biome-ignore lint/suspicious/noArrayIndexKey: a call has no id of its own here; the list is fixed per render.
+                <li key={index}>
+                  {call.kind === "proposal"
+                    ? t("admin.ai.agentCalls.copilotProposal", {
+                        ...values,
+                        outcome:
+                          call.outcome === "ok"
+                            ? t("admin.ai.agentCalls.proposalPrepared")
+                            : values.outcome,
+                      })
+                    : t("admin.ai.agentCalls.copilotRead", values)}{" "}
+                  <code className="font-mono">{call.tool ?? "?"}</code>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
       </CardBody>
     </Card>
   );

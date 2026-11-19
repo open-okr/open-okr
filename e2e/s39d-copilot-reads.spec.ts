@@ -56,6 +56,9 @@ const KR_TITLE = "Activated accounts in the first 14 days";
 const SECRET_TITLE = "Quietly merge the Lisbon office";
 const ACTIVATION_QUESTION = "How is my activation key result doing?";
 const SECRET_QUESTION = "How is my secret restructuring objective doing?";
+const LOCALE_QUESTION = "What is the current health of my activation objective?";
+const TASK_TITLE = "Draft the activation handover";
+const CHECK_IN_REQUEST = `Check in on "${KR_TITLE}". We're on track after the new flow shipped.`;
 
 /** One request the scripted model received. */
 interface Received {
@@ -122,10 +125,10 @@ function toolReply(
 }
 
 /** The model's choice of reads: find the objective, then open it. */
-function chooseRound(
+async function chooseRound(
   res: http.ServerResponse,
   messages: NonNullable<Received["body"]["messages"]>,
-): void {
+): Promise<void> {
   const question = textOf(
     [...messages].reverse().find((m) => m.role === "user")?.content,
   );
@@ -133,6 +136,33 @@ function chooseRound(
   const round = messages.filter(
     (m) => m.role === "assistant" && (m.tool_calls?.length ?? 0) > 0,
   ).length;
+  if (question.includes(TASK_TITLE)) {
+    toolReply(res, round === 0 ? {
+      name: "propose_change",
+      args: {
+        action: "tasks.create",
+        fields: { title: TASK_TITLE },
+        why: "The member asked for this task.",
+      },
+    } : null);
+    return;
+  }
+  if (question === CHECK_IN_REQUEST || question === "80%") {
+    toolReply(res, round === 0 ? {
+      name: "propose_change",
+      args: {
+        action: "goals.publishDraftedCheckIn",
+        fields: {
+          keyResultName: KR_TITLE,
+          checkInStatus: "on_track",
+          narrative: "The new flow shipped.",
+          confidence: question === "80%" ? 0.8 : null,
+        },
+        why: "The member requested a check-in.",
+      },
+    } : null);
+    return;
+  }
   if (round === 0) {
     toolReply(res, { name: "goals.list", args: { mine: true, limit: 50 } });
     return;
@@ -157,6 +187,9 @@ function chooseRound(
     }
     toolReply(res, { name: "goals.read", args: { id: Number(found[1]) } });
     return;
+  }
+  if (round >= 2 && answerDelayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
   }
   toolReply(res, null);
 }
@@ -183,9 +216,18 @@ async function streamAnswer(
   const keyResult = prompt.includes("secret restructuring")
     ? undefined
     : passages.find((one) => one.label === KR_TITLE);
-  const text = keyResult
+  const goal = passages.find((one) => one.label === GOAL_TITLE);
+  const malay = messages.some(
+    (message) => message.role === "system" && textOf(message.content).includes("Write the answer in Malay (Bahasa Melayu)"),
+  );
+  const healthAnswer = prompt.includes(LOCALE_QUESTION) && malay && keyResult && goal?.content.includes("Di landasan")
+    ? `Objektif berada di landasan.[${goal.index}][${keyResult.index}]\nSOURCES: ${goal.index}, ${keyResult.index}`
+    : null;
+  const text = healthAnswer ?? (prompt.includes(`Question: ${CHECK_IN_REQUEST}`) && prompt.includes("ask for that confidence")
+    ? "What is your overall confidence for this check-in?\nSOURCES: none"
+    : keyResult
     ? `${keyResult.content} [${keyResult.index}]\nSOURCES: ${keyResult.index}`
-    : "I could not find that objective, so I cannot say how it is doing.\nSOURCES: none";
+    : "I could not find that objective, so I cannot say how it is doing.\nSOURCES: none");
 
   res.writeHead(200, {
     "content-type": "text/event-stream",
@@ -245,7 +287,7 @@ function startModel(): Promise<http.Server> {
       }
       if ((body.tools?.length ?? 0) > 0) {
         received.push({ kind: "tools", body });
-        chooseRound(res, messages);
+        void chooseRound(res, messages);
         return;
       }
       if (body.stream) {
@@ -301,6 +343,7 @@ let providerId = "";
 let goalId = "";
 let secretGoalId = "";
 let keyResultId = "";
+let taskSpaceName = "";
 let startedAt = new Date();
 
 const authed = () => ({ authorization: `Bearer ${token}` });
@@ -397,8 +440,9 @@ test("set up: the objectives are real, and the workspace's provider is the scrip
   };
 
   const spaces = await api.get("/api/v1/spaces/list", { headers: authed() });
-  const spaceId = ((await spaces.json()).data as { id: string }[])[0]
-    ?.id as string;
+  const availableSpaces = (await spaces.json()).data as { id: string; name: string }[];
+  const spaceId = availableSpaces[0]?.id as string;
+  taskSpaceName = availableSpaces[0]?.name ?? "";
   const cycles = await api.get("/api/v1/cycles/current?mode=quarterly", {
     headers: authed(),
   });
@@ -450,6 +494,7 @@ test("set up: the objectives are real, and the workspace's provider is the scrip
 });
 
 test("the panel says what it is reading, then answers from the stored values with a link to the key result", async () => {
+  answerDelayMs = 4_000;
   startedAt = new Date();
   const panel = await openFreshPanel();
   await ask(panel, ACTIVATION_QUESTION);
@@ -459,6 +504,7 @@ test("the panel says what it is reading, then answers from the stored values wit
   await expect(
     panel.getByText(/^(Looking through objectives|Reading .+|Writing the answer)…$/),
   ).toBeVisible({ timeout: 15_000 });
+  await expect(panel.getByText(`Reading ${GOAL_TITLE}…`, { exact: true })).toBeVisible({ timeout: 15_000 });
   // The polite status line is the panel's own region for it.
   await expect(panel.getByRole("status").first()).toBeAttached();
 
@@ -538,12 +584,77 @@ test("an objective the member cannot read is not named, in a tool result or in t
     timeout: 30_000,
   });
   await expect(panel.getByText(SECRET_TITLE)).toHaveCount(0);
+  await panel.getByText("Searched your workspace, made 2 reads", { exact: true }).click();
+  await expect(panel.getByText("Reading an objective", { exact: true })).toBeVisible();
   await expect(page.getByText(SECRET_TITLE)).toHaveCount(0);
 
   // Nothing the model was sent, in a tool result or in the passages, held it.
   const sent = JSON.stringify(received.slice(before).map((one) => one.body));
   expect(sent).not.toContain(SECRET_TITLE);
   expect(sent).toContain("That is not something you were shown.");
+});
+
+test("the copilot offers a standalone task without choosing a key result", async () => {
+  const panel = await openFreshPanel();
+  await ask(panel, `Create a task called "${TASK_TITLE}" in "${taskSpaceName}".`);
+  const turn = panel.locator("article").last();
+  await expect(turn.getByText(TASK_TITLE, { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(turn.getByText(taskSpaceName, { exact: true })).toBeVisible();
+  await expect(turn.getByRole("button", { name: "Apply", exact: true })).toBeVisible();
+});
+
+test("a named key result gets an objective check-in card after a confidence reply", async () => {
+  const panel = await openFreshPanel();
+  await ask(panel, CHECK_IN_REQUEST);
+  await expect(panel.getByText("What is your overall confidence for this check-in?")).toBeVisible({ timeout: 30_000 });
+  await expect(panel.getByRole("button", { name: "Apply", exact: true })).toHaveCount(0);
+  await ask(panel, "80%");
+  const turn = panel.locator("article").last();
+  await expect(turn.getByRole("button", { name: "Apply", exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(turn.getByText(GOAL_TITLE, { exact: true })).toBeVisible();
+});
+
+test("the provider gets the member's Malay locale and health labels, and adjacent citations stay apart", async () => {
+  const panel = await openFreshPanel();
+  const post = async (path: string, data: object) => {
+    const response = await api.post(`/api/v1/${path}`, { headers: authed(), data });
+    expect(response.ok(), `${path}: ${await response.text()}`).toBe(true);
+  };
+  await post("goals/publishDraftedCheckIn", {
+    goalId,
+    status: "on_track",
+    confidence: 0.8,
+    narrative: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Activation is progressing." }] }] },
+    values: [],
+  });
+  await post("people/updateOwnProfile", { language: "ms" });
+  try {
+    await ask(panel, LOCALE_QUESTION);
+    const turn = panel.locator("article").last();
+    await expect(turn).toContainText(/Objektif berada di landasan\. \d+ \d+/, { timeout: 30_000 });
+    await expect(turn).not.toContainText("on_track");
+  } finally {
+    await post("people/updateOwnProfile", { language: "en" });
+  }
+});
+
+test("Admin AI labels proposal outcomes and counts only reads", async () => {
+  const admin = await context.newPage();
+  try {
+    await goTo(admin, "/admin/ai");
+    const recent = admin.getByRole("list", { name: "Copilot activity, last 30 days" });
+    await expect(recent.getByText("proposal refused", { exact: false })).toBeVisible();
+    await expect(recent.getByText("proposal prepared", { exact: false })).toHaveCount(2);
+    const { rows } = await pool.query<{ reads: number }>(
+      `select count(*)::int as reads from ai_tool_calls
+       where workspace_id = $1 and source = 'copilot' and scope = 'read'
+       and called_at >= now() - interval '30 days'`,
+      [workspaceId],
+    );
+    await expect(admin.getByText(`${rows[0]?.reads} reads made for members`, { exact: false })).toBeVisible();
+  } finally {
+    await admin.close();
+  }
 });
 
 test("with the provider off, the same question returns matching passages and the reason, and no model is called", async () => {

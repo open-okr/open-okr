@@ -33,7 +33,7 @@ import {
   useToast,
   useTranslations,
 } from "@openokr/ui";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type OkrConflict,
   type OkrDetail,
@@ -72,13 +72,14 @@ const OKR_WRITE_KEY = ["okr-tree", "write"] as const;
 /** How long a burst of other members' writes is gathered into one re-read. */
 const LIVE_WINDOW_MS = 1_500;
 
-export function useOkrTree(input: {
+export function useOkrTree<T = OkrTree>(input: {
   readonly cycleId: string;
   readonly scope: OkrScope;
   /** The server's render of the same tree, and when it was read. */
   readonly initial: OkrTree;
   readonly initialAt: number;
-}): OkrTree {
+  readonly select?: (tree: OkrTree) => T;
+}): T {
   const queryClient = useQueryClient();
   const key = okrTreeKey(input.cycleId, input.scope);
   const { data } = useQuery({
@@ -86,6 +87,7 @@ export function useOkrTree(input: {
     queryFn: () => readOkrTree({ cycleId: input.cycleId, scope: input.scope }),
     initialData: input.initial,
     initialDataUpdatedAt: input.initialAt,
+    select: input.select,
     meta: { persist: false },
   });
 
@@ -336,16 +338,17 @@ export function useOkrMutation(input: {
   }, [key, queryClient]);
 
   /** Send a refused change again, as it was typed. */
+  const mutate = mutation.mutate;
   const retry = useCallback(() => {
     if (failed) {
-      mutation.mutate(failed.mutation);
+      mutate(failed.mutation);
     }
-  }, [failed, mutation]);
+  }, [failed, mutate]);
 
   const discard = useCallback(() => setFailed(null), []);
 
   return {
-    mutate: mutation.mutate,
+    mutate,
     pending: mutation.isPending,
     problem,
     failed,
@@ -367,7 +370,7 @@ export function usePendingOkrIds(): ReadonlySet<string> {
     filters: { mutationKey: OKR_WRITE_KEY, status: "pending" },
     select: (mutation) => (mutation.state.variables as OkrMutation).id,
   });
-  return new Set(ids);
+  return useMemo(() => new Set(ids), [ids]);
 }
 
 /** What every surface that edits the tree is handed: the list, the drawer. */

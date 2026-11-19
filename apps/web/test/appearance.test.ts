@@ -155,12 +155,16 @@ describe("the appearance control", () => {
     // often no workspace, so a locale resolved inline there would turn sign-in
     // into an error page.
     const locale = at("../lib/locale.ts");
+    const memberLanguage = at(
+      "../../../packages/core/src/settings/member-language.ts",
+    );
     expect(locale).toContain("} catch {");
     expect(locale).toContain('return "en"');
+    expect(locale).toContain("resolveMemberLanguage");
     // Member first, then the workspace: the more specific answer wins, and an
     // organisation that set a language meant it for the people in it.
-    expect(locale.indexOf("people.readMember")).toBeLessThan(
-      locale.indexOf("settings.readWorkspaceSettings"),
+    expect(memberLanguage.indexOf("people.readMember")).toBeLessThan(
+      memberLanguage.indexOf("workspace.overview"),
     );
     const layout = at("../app/layout.tsx");
     expect(layout).toContain("lang={locale}");

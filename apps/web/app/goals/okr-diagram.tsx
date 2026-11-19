@@ -90,6 +90,7 @@ export function OkrDiagram(props: {
   readonly filters: OkrFilters;
   readonly cycleId: string | null;
   readonly canEdit: boolean;
+  readonly editableGoalIds: readonly string[];
   readonly canAdminister: boolean;
   readonly progressMax: number;
   readonly members: readonly Person[];
@@ -127,6 +128,7 @@ function LiveDiagram({
   filters,
   cycleId,
   canEdit,
+  editableGoalIds,
   canAdminister,
   progressMax,
   members,
@@ -141,6 +143,7 @@ function LiveDiagram({
   readonly filters: OkrFilters;
   readonly cycleId: string;
   readonly canEdit: boolean;
+  readonly editableGoalIds: readonly string[];
   readonly canAdminister: boolean;
   readonly progressMax: number;
   readonly members: readonly Person[];
@@ -472,6 +475,10 @@ function LiveDiagram({
   // The tree is read through a ref: a card asks it only when it adds.
   const treeRef = useRef(tree);
   treeRef.current = tree;
+  const editableGoals = useMemo(
+    () => new Set(editableGoalIds),
+    [editableGoalIds],
+  );
   const mutate = okr.mutate;
   const linkFrom = linking?.from ?? null;
   const shared = useMemo<DiagramShared>(() => {
@@ -501,6 +508,7 @@ function LiveDiagram({
       okr: { mutate },
       coach,
       canEdit,
+      canAddKeyResult: (goalId) => editableGoals.has(goalId),
       progressMax,
       linkFrom,
       editingTitle,
@@ -585,6 +593,7 @@ function LiveDiagram({
     mutate,
     coach,
     canEdit,
+    editableGoals,
     progressMax,
     linkFrom,
     editingTitle,

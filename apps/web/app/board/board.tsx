@@ -73,6 +73,7 @@ interface BoardCard {
   readonly keyResultTitle: string | null;
   readonly assignees: readonly { readonly id: string; readonly name: string }[];
   readonly checklist: { readonly done: number; readonly total: number };
+  readonly canMove: boolean;
 }
 
 export interface BoardColumn {
@@ -158,7 +159,11 @@ export function Board({
   const [seen, setSeen] = useState(columns);
   if (seen !== columns) {
     setSeen(columns);
-    const holding = held ? slotOf(optimistic ?? seen, held.id) : null;
+    const heldCard = held
+      ? columns.flatMap((column) => column.cards).find((c) => c.id === held.id)
+      : null;
+    const holding =
+      held && heldCard?.canMove ? slotOf(optimistic ?? seen, held.id) : null;
     const kept =
       held && holding
         ? placeAt(columns, held.id, holding.status, holding.index)
@@ -170,8 +175,18 @@ export function Board({
       if (held) {
         setHeld(null);
         setAnnouncement(t("board.board.cardGone"));
+        refocus.current = held.id;
       }
       setOptimistic(null);
+    }
+    if (dragging) {
+      const draggingCard = columns
+        .flatMap((column) => column.cards)
+        .find((c) => c.id === dragging);
+      if (!draggingCard?.canMove) {
+        setDragging(null);
+        refocus.current = dragging;
+      }
     }
   }
 
@@ -221,9 +236,12 @@ export function Board({
       return;
     }
     refocus.current = null;
-    root.current
-      ?.querySelector<HTMLElement>(`[data-move-handle="${id}"]`)
-      ?.focus();
+    const target =
+      root.current?.querySelector<HTMLElement>(`[data-move-handle="${id}"]`) ??
+      root.current?.querySelector<HTMLElement>(`a[href="/tasks/${id}"]`) ??
+      root.current?.querySelector<HTMLElement>("[data-keyboard-row]") ??
+      root.current;
+    target?.focus();
   });
 
   const shown = optimistic ?? columns;
@@ -248,7 +266,7 @@ export function Board({
     id: string,
     status: string,
     afterTaskId: string | null,
-    before: readonly BoardColumn[] = shown,
+    _before: readonly BoardColumn[] = shown,
     said?: { accepted: string; refused: string },
   ) => {
     setOptimistic(reorder(shown, id, status, afterTaskId));
@@ -256,7 +274,7 @@ export function Board({
     startTransition(async () => {
       const state = await onMove(id, status, afterTaskId);
       if (state.error) {
-        setOptimistic(before === columns ? null : before);
+        setOptimistic(null);
         // Said by the alert below, once. The live region would say it twice.
         setError(state.error);
         if (said) {
@@ -293,6 +311,12 @@ export function Board({
   };
 
   const pickUp = (id: string) => {
+    const card = shown
+      .flatMap((column) => column.cards)
+      .find((c) => c.id === id);
+    if (!card?.canMove) {
+      return;
+    }
     setHeld({ id, before: shown });
     setOptimistic(shown);
     setError(null);
@@ -433,7 +457,7 @@ export function Board({
         </p>
       ) : null}
 
-      {canEdit ? (
+      {canEdit || shown.some((col) => col.cards.some((c) => c.canMove)) ? (
         <>
           <p id={instructionsId} className="sr-only">
             {t("board.board.moveInstructions")}
@@ -458,13 +482,13 @@ export function Board({
             aria-label={columnLabel(column.status)}
             className="flex min-h-24 flex-col gap-2 rounded-lg border border-line bg-raised p-2"
             onDragOver={(event) => {
-              if (canEdit && dragging) {
+              if (dragging) {
                 event.preventDefault();
               }
             }}
             onDrop={(event) => {
               event.preventDefault();
-              if (canEdit && dragging) {
+              if (dragging) {
                 const last = column.cards[column.cards.length - 1];
                 move(
                   dragging,
@@ -493,7 +517,7 @@ export function Board({
                   onDragStart={() => setDragging(card.id)}
                   onDragEnd={() => setDragging(null)}
                   onDropAfter={() => {
-                    if (canEdit && dragging && dragging !== card.id) {
+                    if (dragging && dragging !== card.id) {
                       move(dragging, column.status, card.id);
                       setDragging(null);
                     }
@@ -559,13 +583,15 @@ function Card({
     <li
       data-testid="board-card"
       data-keyboard-row
-      draggable={canEdit}
-      onDragStart={onDragStart}
+      draggable={card.canMove}
+      onDragStart={() => {
+        if (card.canMove) {
+          onDragStart();
+        }
+      }}
       onDragEnd={onDragEnd}
       onDragOver={(event) => {
-        if (canEdit) {
-          event.preventDefault();
-        }
+        event.preventDefault();
       }}
       onDrop={(event) => {
         event.preventDefault();
@@ -579,7 +605,7 @@ function Card({
     >
       <div className="flex items-start justify-between gap-2">
         <span className="flex min-w-0 items-start gap-1">
-          {canEdit ? (
+          {card.canMove ? (
             <button
               type="button"
               data-move-handle={card.id}
@@ -602,39 +628,45 @@ function Card({
             {card.title}
           </Link>
         </span>
-        {canEdit ? (
+        {card.canMove || canEdit ? (
           // The pointer path §9 asks for beside the drag: a column at a time,
           // for a touch screen where native drag does not reach.
           <span className="flex flex-none gap-1">
-            <button
-              type="button"
-              aria-label={t("board.board.moveBack", { title: card.title })}
-              onClick={() => onShift(-1)}
-              className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand"
-            >
-              ←
-            </button>
-            <button
-              type="button"
-              aria-label={t("board.board.moveOn", { title: card.title })}
-              onClick={() => onShift(1)}
-              className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand"
-            >
-              →
-            </button>
-            <button
-              type="button"
-              aria-label={t("board.board.delete", { title: card.title })}
-              title={t("board.board.delete", { title: card.title })}
-              aria-disabled={deleting || undefined}
-              aria-busy={deleting || undefined}
-              onClick={guardPress(deleting, onDelete)}
-              data-testid="board-card-delete"
-              className="inline-flex items-center gap-1 rounded border border-line px-1 text-ink-3 hover:border-bad hover:text-bad"
-            >
-              {deleting ? <Spinner className="size-3" /> : null}
-              <Trash2 aria-hidden="true" className="size-3" />
-            </button>
+            {card.canMove ? (
+              <>
+                <button
+                  type="button"
+                  aria-label={t("board.board.moveBack", { title: card.title })}
+                  onClick={() => onShift(-1)}
+                  className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  aria-label={t("board.board.moveOn", { title: card.title })}
+                  onClick={() => onShift(1)}
+                  className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand"
+                >
+                  →
+                </button>
+              </>
+            ) : null}
+            {canEdit ? (
+              <button
+                type="button"
+                aria-label={t("board.board.delete", { title: card.title })}
+                title={t("board.board.delete", { title: card.title })}
+                aria-disabled={deleting || undefined}
+                aria-busy={deleting || undefined}
+                onClick={guardPress(deleting, onDelete)}
+                data-testid="board-card-delete"
+                className="inline-flex items-center gap-1 rounded border border-line px-1 text-ink-3 hover:border-bad hover:text-bad"
+              >
+                {deleting ? <Spinner className="size-3" /> : null}
+                <Trash2 aria-hidden="true" className="size-3" />
+              </button>
+            ) : null}
           </span>
         ) : null}
       </div>

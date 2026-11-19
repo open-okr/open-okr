@@ -1267,14 +1267,38 @@ describe("the streaming look (plan 0.8.1 CP9)", () => {
           ...recorded(
             "a1",
             "assistant",
-            "It is on track.",
+            "It is on track.[1][2]",
             "2026-11-12T10:00:04.000Z",
           ),
           citations: [
-            { entityType: "key_result", entityId: "kr-1", label: "Rate" },
-            { entityType: "initiative", entityId: "in-1", label: "Setup" },
-            { entityType: "task", entityId: "t-1", label: "Checklist" },
-            { entityType: "check_in", entityId: "ci-1", label: "Check-in" },
+            {
+              entityType: "key_result",
+              entityId: "kr-1",
+              label: "Rate",
+              n: 1,
+              href: null,
+            },
+            {
+              entityType: "initiative",
+              entityId: "in-1",
+              label: "Setup",
+              n: 2,
+              href: "/initiatives/in-1",
+            },
+            {
+              entityType: "task",
+              entityId: "t-1",
+              label: "Checklist",
+              n: 3,
+              href: "/tasks/t-1",
+            },
+            {
+              entityType: "check_in",
+              entityId: "ci-1",
+              label: "Check-in",
+              n: 4,
+              href: null,
+            },
           ],
         },
       ],
@@ -1285,6 +1309,7 @@ describe("the streaming look (plan 0.8.1 CP9)", () => {
     await settle();
 
     const turn = panel()?.querySelector("article");
+    expect(turn?.textContent).toContain("on track. 1 2");
     const hrefs = [...(turn?.querySelectorAll("a") ?? [])].map((link) =>
       link.getAttribute("href"),
     );

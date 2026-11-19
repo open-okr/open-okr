@@ -98,6 +98,12 @@ export default async function InitiativesPage({
 
   const spaces = await callAction(context, "spaces.list", {});
   const space = spaces.find((one) => one.id === query.space);
+  const creation = await callAction(context, "spaces.creationAccess", {
+    spaceIds: spaces.map((one) => one.id),
+  });
+  const editable = new Set(creation.editableSpaceIds);
+  const initiativeSpaces = spaces.filter((one) => editable.has(one.id));
+  const canCreate = creation.canCreateInitiative && initiativeSpaces.length > 0;
 
   // The key results "Add an initiative" may name, by the rule every picker
   // follows (plan 0.8.0 I1), and the one this list is narrowed to when it was
@@ -106,7 +112,7 @@ export default async function InitiativesPage({
   const keyResultId =
     query.keyResult && UUID.test(query.keyResult) ? query.keyResult : null;
   const keyResults =
-    canEdit || keyResultId ? await linkableKeyResults(context) : [];
+    canCreate || keyResultId ? await linkableKeyResults(context) : [];
   const keyResult = keyResultId
     ? (keyResults.find((one) => one.id === keyResultId) ?? null)
     : null;
@@ -123,7 +129,7 @@ export default async function InitiativesPage({
   // Only people. Every workspace ships with two agent members, and an agent is
   // not somebody who can be accountable for a project (AI-NATIVE-PLAN.md §1.3).
   // The action refuses one too; this is what stops the picker offering it.
-  const members = canEdit
+  const members = canCreate
     ? (await callAction(context, "people.directory", {})).filter(
         (one) => one.kind === "human",
       )
@@ -235,7 +241,7 @@ export default async function InitiativesPage({
           </CardBody>
         </Card>
 
-        {canEdit ? (
+        {canCreate ? (
           <Card>
             <CardHeader>
               <h2 className="text-sm font-bold text-ink">
@@ -263,8 +269,8 @@ export default async function InitiativesPage({
                     label={t("initiatives.space")}
                     name="spaceId"
                     required
-                    defaultValue={spaces[0]?.id ?? null}
-                    options={spaces.map(namedOption)}
+                    defaultValue={initiativeSpaces[0]?.id ?? null}
+                    options={initiativeSpaces.map(namedOption)}
                     className="w-56"
                   />
                   <EntityPicker

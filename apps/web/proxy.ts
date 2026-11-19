@@ -1,3 +1,4 @@
+import { loadEnv } from "@openokr/config";
 import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -23,9 +24,9 @@ import { type NextRequest, NextResponse } from "next/server";
  * Three directives differ in development, each for a stated reason on
  * `buildContentSecurityPolicy` below: `'unsafe-eval'` is added because React
  * needs `eval` to reconstruct server error stacks and neither React nor Next
- * uses it in production, `style-src` accepts inline styles the dev bundler
- * injects, and `upgrade-insecure-requests` is left out because it makes every
- * development host other than `localhost` unusable.
+ * uses it in production, and `style-src` accepts inline styles the dev bundler
+ * injects. Development also omits `upgrade-insecure-requests` so assets can
+ * load on plain HTTP dev hosts.
  */
 const PUBLIC_PREFIXES = [
   "/sign-in",
@@ -148,24 +149,6 @@ const PUBLIC_PREFIXES = [
 ];
 
 /**
- * A fresh nonce and the CSP header built around it, one pair per request.
- *
- * **`upgrade-insecure-requests` is production-only.** It tells the browser to
- * fetch every subresource over https, which is right for a deployed instance and
- * unusable in development: browsers exempt `localhost` and `127.0.0.1` from the
- * upgrade and nothing else. So a developer serving the app on any other name
- * over http gets every stylesheet and script requested over https, refused, and
- * a page rendered as raw HTML with no styling at all.
- *
- * Two ordinary development setups hit that. A local domain through a reverse
- * proxy (`http://openokr.test`), and testing on a real phone over the LAN
- * address (`http://192.168.1.20:3000`), which is the only way to check the
- * mobile tab bar on a real device. Neither is exotic and both were broken.
- *
- * Production is untouched: the directive is still sent whenever `NODE_ENV` is
- * not development, which is what the Docker and Helm targets both run as.
- */
-/**
  * The one route whose form must be allowed to submit somewhere else
  * (screen S-40, P5-T08c).
  *
@@ -233,6 +216,10 @@ function buildContentSecurityPolicy(request?: NextRequest): {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV === "development";
   const formAction = request ? formActionFor(request) : "'self'";
+  // The configured public origin keeps this decision the same behind a TLS
+  // terminator and for requests carrying caller-supplied forwarding headers.
+  const upgradeInsecureRequests =
+    !isDev && new URL(loadEnv().BETTER_AUTH_URL).protocol !== "http:";
 
   const cspHeader = `
     default-src 'self';
@@ -244,7 +231,7 @@ function buildContentSecurityPolicy(request?: NextRequest): {
     object-src 'none';
     base-uri 'self';
     form-action ${formAction};
-    frame-ancestors 'none';${isDev ? "" : "\n    upgrade-insecure-requests;"}
+    frame-ancestors 'none';${upgradeInsecureRequests ? "\n    upgrade-insecure-requests;" : ""}
   `;
   return { nonce, header: cspHeader.replace(/\s{2,}/g, " ").trim() };
 }

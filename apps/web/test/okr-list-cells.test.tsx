@@ -14,6 +14,7 @@ import {
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { OkrOutcome } from "../lib/okr-tree/actions.ts";
 import type { OkrTree } from "../lib/okr-tree/cache.ts";
 
 /**
@@ -31,6 +32,13 @@ import type { OkrTree } from "../lib/okr-tree/cache.ts";
  */
 
 const runOkrMutation = vi.fn();
+const renderHealthChip = vi.fn();
+vi.mock("../app/goals/health-chip.tsx", () => ({
+  HealthChip: () => {
+    renderHealthChip();
+    return null;
+  },
+}));
 vi.mock("../lib/okr-tree/actions.ts", () => ({
   readOkrDetail: vi.fn(),
   readOkrTree: vi.fn(),
@@ -41,10 +49,13 @@ vi.mock("../app/goals/editor-actions.ts", () => ({
   addObjective: vi.fn(),
   removeGoal: vi.fn(),
 }));
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: () => undefined, push: () => undefined }),
-  useSearchParams: () => new URLSearchParams(),
-}));
+vi.mock("next/navigation", () => {
+  const router = { refresh: () => undefined, push: () => undefined };
+  return {
+    useRouter: () => router,
+    useSearchParams: () => new URLSearchParams(),
+  };
+});
 
 class Quiet {
   onmessage = null;
@@ -136,10 +147,23 @@ async function render(options: {
   canEdit?: boolean;
   practice?: ReturnType<typeof defaultPractice>;
   keyResult?: Partial<FixtureKeyResult>;
+  goalCount?: number;
 }) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  const initial = tree(options.keyResult);
+  const first = initial.goals[0];
+  if (first && options.goalCount) {
+    initial.goals.push(
+      ...Array.from({ length: options.goalCount - 1 }, (_, index) => ({
+        ...first,
+        id: `g-${index + 1}`,
+        title: `Objective ${index + 2}`,
+        keyResults: [],
+      })),
+    );
+  }
   await act(async () => {
     root.render(
       <QueryClientProvider client={client}>
@@ -148,7 +172,7 @@ async function render(options: {
           <KeyboardRegistryProvider>
             <ToastProvider>
               <OkrTable
-                initialTree={tree(options.keyResult)}
+                initialTree={initial}
                 initialAt={Date.now()}
                 scope="all"
                 filters={{ includeClosed: false }}
@@ -532,6 +556,50 @@ describe("the other cells", () => {
 });
 
 describe("the states", () => {
+  test("a single save on a thousand objectives leaves unrelated rows idle", async () => {
+    await render({ goalCount: 1_000 });
+    const input = await type(
+      "Objective title",
+      "Make onboarding easier to finish",
+    );
+    let finishWrite: (outcome: OkrOutcome) => void = () => undefined;
+    const write = new Promise<OkrOutcome>((resolve) => {
+      finishWrite = resolve;
+    });
+    runOkrMutation.mockReturnValueOnce(write);
+    renderHealthChip.mockClear();
+    const started = performance.now();
+    await leave(input);
+    const start = {
+      ms: performance.now() - started,
+      renders: renderHealthChip.mock.calls.length,
+    };
+    expect(
+      container
+        .querySelector('[data-testid="okr-list"]')
+        ?.getAttribute("aria-busy"),
+    ).toBe("true");
+
+    renderHealthChip.mockClear();
+    const finishing = performance.now();
+    await act(async () => finishWrite({ ok: true, goal: null }));
+    await act(async () => new Promise((done) => setTimeout(done)));
+    const settle = {
+      ms: performance.now() - finishing,
+      renders: renderHealthChip.mock.calls.length,
+    };
+    expect(
+      container
+        .querySelector('[data-testid="okr-list"]')
+        ?.getAttribute("aria-busy"),
+    ).toBe("false");
+    if (process.env.OPENOKR_PROFILE_GOALS === "1") {
+      console.info("1,000 objectives, one write", { start, settle });
+    }
+    expect(start.renders).toBeLessThanOrEqual(8);
+    expect(settle.renders).toBeLessThanOrEqual(8);
+  }, 60_000);
+
   test("a reader who cannot edit sees values, and nothing to edit them with", async () => {
     await render({ canEdit: false });
     expect(container.querySelectorAll("input, select")).toHaveLength(0);

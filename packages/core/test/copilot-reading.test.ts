@@ -27,6 +27,7 @@ import {
   streamAnswer,
 } from "../src/copilot/answer.ts";
 import { drainReading, readLiveData } from "../src/copilot/reading.ts";
+import { getLastCopilotTiming } from "../src/copilot/timing.ts";
 import { runEmbedJob } from "../src/embeddings/worker.ts";
 import { dispatchOutbox } from "../src/outbox/handlers.ts";
 import { writeSettings } from "../src/secrets/instance-settings.ts";
@@ -265,6 +266,34 @@ afterAll(async () => {
 });
 
 describe("a whole answer (the chat Ask path)", () => {
+  it("uses the member's interface locale and renders health in words", async () => {
+    await call("people.updateOwnProfile", { language: "ms" });
+    await call("goals.publishDraftedCheckIn", {
+      goalId,
+      status: "on_track",
+      confidence: 0.8,
+      narrative: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "The trial is progressing." }],
+          },
+        ],
+      },
+      values: [],
+    });
+    const drafter = new ReadingDrafter(readTheGoal);
+    await answerQuestion(await contextFor(drafter), {
+      workspaceId,
+      question: QUESTION,
+    });
+    expect(drafter.seen[0]?.locale).toBe("ms");
+    const records = drafter.results.join("\n");
+    expect(records).toContain("Di landasan");
+    expect(records).not.toContain("on_track");
+  });
+
   it("answers from the records it read and cites them", async () => {
     const drafter = new ReadingDrafter(readTheGoal);
     const result = await answerQuestion(await contextFor(drafter), {
@@ -528,7 +557,9 @@ describe("a reading step off the wire", () => {
     expect(
       copilotStepFrom({ step: "reading", tool: "goals.read", subject: "Grow" }),
     ).toEqual({ step: "reading", tool: "goals.read", subject: "Grow" });
-    expect(copilotStepFrom({ step: "reading", tool: "goals.list" })).toEqual({
+    expect(
+      copilotStepFrom({ step: "reading", tool: "goals.list", subject: "Grow" }),
+    ).toEqual({
       step: "reading",
       tool: "goals.list",
     });
@@ -883,5 +914,89 @@ describe("a conversation anchored to a page (plan 0.9.0 CP11)", () => {
         target_ids: [],
       },
     ]);
+  });
+});
+
+describe("fast path for anchored single-record questions (docs/design/copilot-first-word.md)", () => {
+  it("bypasses model tool selection on eligible English prompt and grounds on anchor [1]", async () => {
+    let chooseReadsCalled = false;
+    const drafter = new AnchoredDrafter(async () => {
+      chooseReadsCalled = true;
+      return spent(0);
+    });
+
+    const result = await answerQuestion(await contextFor(drafter), {
+      workspaceId,
+      question: "What is the health of this objective?",
+      subjectType: "goal",
+      subjectId: goalId,
+    });
+
+    expect(chooseReadsCalled).toBe(false);
+    expect(result.sources[0]?.entityType).toBe("goal");
+    expect(result.sources[0]?.label).toBe(GOAL_TITLE);
+    expect(drafter.seen[0]?.sources[0]?.label).toBe(GOAL_TITLE);
+
+    const timing = getLastCopilotTiming();
+    expect(timing).not.toBeNull();
+    expect(timing?.fastPath).toBe(true);
+    expect(timing?.rounds.length).toBe(0);
+  });
+
+  it("bypasses model tool selection on eligible Malay prompt and grounds on anchor [1]", async () => {
+    let chooseReadsCalled = false;
+    const drafter = new AnchoredDrafter(async () => {
+      chooseReadsCalled = true;
+      return spent(0);
+    });
+
+    const result = await answerQuestion(await contextFor(drafter), {
+      workspaceId,
+      question: "Apakah status objektif ini?",
+      subjectType: "goal",
+      subjectId: goalId,
+    });
+
+    expect(chooseReadsCalled).toBe(false);
+    expect(result.sources[0]?.entityType).toBe("goal");
+    expect(result.sources[0]?.label).toBe(GOAL_TITLE);
+
+    const timing = getLastCopilotTiming();
+    expect(timing).not.toBeNull();
+    expect(timing?.fastPath).toBe(true);
+  });
+
+  it("routes proposal prompts on anchored record through normal read loop", async () => {
+    let chooseReadsCalled = false;
+    const drafter = new AnchoredDrafter(async () => {
+      chooseReadsCalled = true;
+      return spent(0);
+    });
+
+    await answerQuestion(await contextFor(drafter), {
+      workspaceId,
+      question: "Propose a check-in for this goal",
+      subjectType: "goal",
+      subjectId: goalId,
+    });
+
+    expect(chooseReadsCalled).toBe(true);
+  });
+
+  it("routes ambiguous or comparative prompts through normal read loop", async () => {
+    let chooseReadsCalled = false;
+    const drafter = new AnchoredDrafter(async () => {
+      chooseReadsCalled = true;
+      return spent(0);
+    });
+
+    await answerQuestion(await contextFor(drafter), {
+      workspaceId,
+      question: "Compare this with other objectives",
+      subjectType: "goal",
+      subjectId: goalId,
+    });
+
+    expect(chooseReadsCalled).toBe(true);
   });
 });

@@ -1,4 +1,7 @@
-import { callAction, resolveInstanceDefaultLanguage } from "@openokr/core";
+import {
+  resolveInstanceDefaultLanguage,
+  resolveMemberLanguage,
+} from "@openokr/core";
 import { CATALOGUES, type Locale } from "@openokr/ui";
 import { headers } from "next/headers";
 import { browserLocale } from "./accept-language.ts";
@@ -40,33 +43,14 @@ export async function resolveLocale(): Promise<Locale> {
 
   const { session, workspace } = signedIn;
   try {
-    const me = await callAction(
+    return await resolveMemberLanguage(
       {
         pool: getPool(),
         workspaceId: workspace.workspaceId,
         actor: { kind: "human", userId: session.user.id },
       },
-      "people.readMember",
-      { memberId: workspace.memberId },
+      workspace.memberId,
     );
-    if (isShipped(me.language)) {
-      return me.language;
-    }
-
-    const settings = await callAction(
-      {
-        pool: getPool(),
-        workspaceId: workspace.workspaceId,
-        actor: { kind: "human", userId: session.user.id },
-      },
-      "settings.readWorkspaceSettings",
-      {},
-    );
-    const workspaceLanguage = settings.settings.language;
-    if (isShipped(workspaceLanguage)) {
-      return workspaceLanguage;
-    }
-    return "en";
   } catch {
     return "en";
   }
