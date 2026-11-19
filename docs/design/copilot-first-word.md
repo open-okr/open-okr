@@ -1,6 +1,6 @@
 # Time to the copilot's first word
 
-Status: **design written, waiting for design approved**. Release 0.9.1 C1.
+Status: **design approved by Agung on 19 November 2026**. Live AI measurement is capped at 5 USD on OpenRouter. Release 0.9.1 C1.
 
 The 0.9.0 release check reported a median of about 11 seconds over five GPT-6 Luna turns. The step line appeared earlier. A turn can pay for retrieval, offer preparation, the first model call, up to four tool rounds and a separate answer call. The elapsed time of each part has not been measured on the same live sample.
 

@@ -66,6 +66,14 @@ Akmal answered the questions on 19 November 2026. The initial translation pass u
 | C3-Q | Should the copilot accept a key-result request and ask for missing confidence? | Yes. Resolve the parent objective and ask a focused question before offering the objective check-in card. | Adds a turn when input is missing and needs evaluation for ambiguous names. | Approved as recommended |
 | C4-Q | Should a 0.9.1 copilot answer use the member's resolved interface locale? | Yes. Use English or Malay as resolved by the app. The 0.10.0 plan covers explicit requests for another language. | A deliberate mixture of languages in a prompt still gets the chosen interface locale by default. | Approved. Use machine translation for the initial copy and improve the wording gradually. |
 
+**Design approvals, Agung, 19 November 2026.** The three designs written for this release were approved as written:
+
+| Row | Design | Answer |
+|---|---|---|
+| A3 | [Demo persona roles](../design/demo-persona-roles.md) | **Design approved** |
+| W2 | [Board card moves](../design/board-card-moves.md) | **Design approved**. The `tasks.board` contract gains an additive `canMove`; the generated artifacts are regenerated in the same change |
+| C1 | [Copilot first word](../design/copilot-first-word.md) | **Design approved, with a spending cap**: live AI measurement, baseline and candidate together, may cost at most 5 USD on OpenRouter. The run stops before the cap and reports what it measured |
+
 ## 7. Suggested order
 
 1. **A1** first. Follow the approved [workspace-roles.md §14](../design/workspace-roles.md#14-task-and-session-creation-and-key-results-plan-091-a1) and test the Viewer gap across the shared write paths.
@@ -81,9 +89,9 @@ Statuses: **to do**, **design written**, **in verification**, **done**, **merged
 |---|---|---|
 | A1 | done | Committed as `abc5db70` on 19 November 2026. Task creation and both session writes use role floors. Data change `0036_session_role_permissions` fills the new permission. The production build, `check:fast`, and 37 browser checks passed. The changed-test run passed 8,136 source tests, including the PgBouncer and password checks. It also picked up 194 generated test copies from the concurrent build. After moving the build output, the affected web run passed all 1,113 tests. |
 | A2 | in verification | Approved on 19 November 2026. The proxy uses the configured public origin on pages and sign-in redirects. Regression tests cover both schemes, the default and conflicting request headers. Browser checks are grouped at the end of the patch. |
-| A3 | design written, waiting for design approved | [Demo persona roles](../design/demo-persona-roles.md) gives verified roleless demo accounts built-in Member through the existing assignment path. |
-| W2 | design written, waiting for design approved | [Board card moves](../design/board-card-moves.md) adds an effective task Edit flag and clears an active move when a refresh revokes access. |
-| C1 | design written, waiting for design approved | [Copilot first word](../design/copilot-first-word.md) times each stage and tests a one-call answer for simple questions grounded in an already read anchor. |
+| A3 | design approved, to do | [Demo persona roles](../design/demo-persona-roles.md) gives verified roleless demo accounts built-in Member through the existing assignment path. |
+| W2 | design approved, to do | [Board card moves](../design/board-card-moves.md) adds an effective task Edit flag and clears an active move when a refresh revokes access. |
+| C1 | design approved, to do (AI spend capped at 5 USD) | [Copilot first word](../design/copilot-first-word.md) times each stage and tests a one-call answer for simple questions grounded in an already read anchor. |
 | W1 | in verification | The Goals list passes each card its own pending and refused state. In the same 1,000-objective jsdom fixture, one title save took about 903 ms to start and 1,196 ms to settle before the change, and 16 ms and 6 ms after. The browser spec checks the busy state and the settled value. |
 | C2 | in verification | Task proposals can use the named or sole eligible space. Initiative and task links resolve against scoped choices and decline ambiguous matches. |
 | C3 | in verification | A named key result resolves to its editable parent objective. A check-in needs the member's overall confidence, and a short confidence reply can complete the previous request before the card is offered. |

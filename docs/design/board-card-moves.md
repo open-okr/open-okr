@@ -1,6 +1,6 @@
 # Move affordances on task boards
 
-Status: **design written, waiting for design approved**. Release 0.9.1 W2.
+Status: **design approved by Agung on 19 November 2026**. Release 0.9.1 W2.
 
 ## Decisions
 

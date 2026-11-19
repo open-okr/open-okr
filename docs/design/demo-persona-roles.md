@@ -1,6 +1,6 @@
 # Member roles for demo personas
 
-Status: **design written, waiting for design approved**. Release 0.9.1 A3.
+Status: **design approved by Agung on 19 November 2026**. Release 0.9.1 A3.
 
 ## Scope
 
