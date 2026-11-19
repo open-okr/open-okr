@@ -265,6 +265,8 @@
   "activity.aMember": "A member",
   "activity.backToTheNewest": "Back to the newest",
   "activity.editsTogether": "{aggregatedCount} edits together",
+  "activity.kpi.shared": "A KPI was shared",
+  "activity.kpi.unshared": "A KPI share was removed",
   "activity.nothingFurtherBack": "Nothing further back than this.",
   "activity.nothingYet": "Nothing yet. Every check-in, goal, session and setting change lands here as it happens.",
   "activity.older": "Older",

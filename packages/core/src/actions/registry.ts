@@ -349,6 +349,7 @@ import {
   listKpis,
   readKpiDetail,
   readKpiGrid,
+  readKpiShares,
   readKpiTree,
   readRecoveryBoard,
   readRecoveryDraft,
@@ -356,6 +357,8 @@ import {
   recordKpiResponse,
   recordKpiValue,
   setKpiFormulaAction,
+  shareKpi,
+  unshareKpi,
   updateKpi,
 } from "./kpis.ts";
 import { readLeave, setMemberLeave, setOwnLeave } from "./leave.ts";
@@ -967,6 +970,9 @@ export const ACTION_MAP = {
   "kpis.tree": readKpiTree,
   "kpis.spaceTrees": readSpaceKpiTrees,
   "kpis.detail": readKpiDetail,
+  "kpis.shares": readKpiShares,
+  "kpis.share": shareKpi,
+  "kpis.unshare": unshareKpi,
   "kpis.update": updateKpi,
   "alignment.dismissFinding": dismissAlignmentFinding,
   "alignment.applyFinding": applyAlignmentFinding,

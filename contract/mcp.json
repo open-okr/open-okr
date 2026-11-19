@@ -11634,6 +11634,32 @@
       }
     },
     {
+      "name": "kpis.shares",
+      "description": "Lists the owner and individual shares on a KPI.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kpiId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The KPI's id, from kpis.list."
+          }
+        },
+        "required": [
+          "kpiId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "kpiId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "kpis.update",
       "description": "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {

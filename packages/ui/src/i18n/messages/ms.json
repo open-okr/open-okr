@@ -265,6 +265,8 @@
   "activity.aMember": "Seorang ahli",
   "activity.backToTheNewest": "Kembali ke yang terbaharu",
   "activity.editsTogether": "{aggregatedCount} edit sekali gus",
+  "activity.kpi.shared": "KPI telah dikongsi",
+  "activity.kpi.unshared": "Perkongsian KPI telah dialih keluar",
   "activity.nothingFurtherBack": "Tiada apa-apa yang lebih lama daripada ini.",
   "activity.nothingYet": "Belum ada apa-apa. Setiap kemas kini, matlamat, sesi dan perubahan tetapan muncul di sini sebaik sahaja ia berlaku.",
   "activity.older": "Lebih lama",

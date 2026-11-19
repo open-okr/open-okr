@@ -633,6 +633,15 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // moves a corridor state, and a state change is what a nudge reads later.
   "kpi.category_created": z.object({ name: z.string() }),
   "kpi.created": z.object({ title: z.string(), frequency: z.string() }),
+  // KPI sharing (0.10.0 K6, KA-D6, §7.2).
+  "kpi.shared": z.object({
+    memberId: z.string(),
+    level: z.enum(["view", "edit"]),
+    imported: z.boolean().optional(),
+  }),
+  "kpi.unshared": z.object({
+    memberId: z.string(),
+  }),
   // How an unhealthy KPI was answered (§6.5, P9-T18b).
   "kpi.responded": z.object({ response: z.enum(["fix_now", "key_result"]) }),
   "kpi.value_recorded": z.object({

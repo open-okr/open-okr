@@ -9,6 +9,7 @@
  * - Champion and Coach at view (10) when spaceless (KA-D9)
  */
 import {
+  accessBindings,
   accessContexts,
   activeOnly,
   kpis,
@@ -392,4 +393,112 @@ export async function requireKpiRole<
       "Your role does not grant enough access on KPIs.",
     );
   }
+}
+
+export interface SetKpiShareInput {
+  readonly workspaceId: string;
+  readonly contextId: string;
+  readonly memberId: string;
+  readonly level: AccessLevel;
+}
+
+/**
+ * Sets an individual KPI share (0.10.0 K6, §5).
+ * Ensures member group, then inserts or updates the live `share` binding to exactly `level`.
+ * Lowering level is allowed for the `share` tag (KA-D6).
+ */
+export async function setKpiShareInTx<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: WorkspaceTx<TSchema>,
+  input: SetKpiShareInput,
+): Promise<{ previous: AccessLevel | null }> {
+  const groupId = await ensureMemberGroup(tx, {
+    workspaceId: input.workspaceId,
+    memberId: input.memberId,
+  });
+
+  const [held] = await tx
+    .select({ id: accessBindings.id, level: accessBindings.level })
+    .from(accessBindings)
+    .where(
+      activeOnly(
+        accessBindings,
+        eq(accessBindings.workspaceId, input.workspaceId),
+        eq(accessBindings.groupId, groupId),
+        eq(accessBindings.contextId, input.contextId),
+        eq(accessBindings.tag, "share"),
+      ),
+    )
+    .limit(1);
+
+  if (held) {
+    const previous = held.level as AccessLevel;
+    if (held.level !== input.level) {
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      await tx
+        .update(accessBindings)
+        .set({ level: input.level })
+        .where(activeOnly(accessBindings, eq(accessBindings.id, held.id)));
+    }
+    return { previous };
+  }
+
+  // openokr:allow-mutation: the calling Operation's own transaction.
+  await tx.insert(accessBindings).values({
+    workspaceId: input.workspaceId,
+    groupId,
+    contextId: input.contextId,
+    level: input.level,
+    tag: "share",
+  });
+  return { previous: null };
+}
+
+export interface RemoveKpiShareInput {
+  readonly workspaceId: string;
+  readonly contextId: string;
+  readonly memberId: string;
+}
+
+/**
+ * Removes an individual KPI share (0.10.0 K6, §5).
+ * Soft-deletes the `share` binding tagged 'share'.
+ * Returns previous level (or null) and whether a binding was removed.
+ */
+export async function removeKpiShareInTx<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: WorkspaceTx<TSchema>,
+  input: RemoveKpiShareInput,
+): Promise<{ previous: AccessLevel | null; removed: boolean }> {
+  const groupId = await ensureMemberGroup(tx, {
+    workspaceId: input.workspaceId,
+    memberId: input.memberId,
+  });
+
+  const [held] = await tx
+    .select({ id: accessBindings.id, level: accessBindings.level })
+    .from(accessBindings)
+    .where(
+      activeOnly(
+        accessBindings,
+        eq(accessBindings.workspaceId, input.workspaceId),
+        eq(accessBindings.groupId, groupId),
+        eq(accessBindings.contextId, input.contextId),
+        eq(accessBindings.tag, "share"),
+      ),
+    )
+    .limit(1);
+
+  if (held) {
+    // openokr:allow-mutation: the calling Operation's own transaction.
+    await tx
+      .update(accessBindings)
+      .set({ deletedAt: sql`now()` })
+      .where(activeOnly(accessBindings, eq(accessBindings.id, held.id)));
+    return { previous: held.level as AccessLevel, removed: true };
+  }
+
+  return { previous: null, removed: false };
 }

@@ -536,6 +536,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `A KPI category "${String(p.name ?? "")}" was added`,
   "kpi.created": (p) =>
     `A ${String(p.frequency ?? "")} KPI "${String(p.title ?? "")}" was added`,
+  "kpi.shared": (p) => `A KPI was shared at ${asString(p.level, "view")}`,
+  "kpi.unshared": () => "A KPI share was removed",
   "kpi.responded": (p) =>
     p.response === "fix_now"
       ? "An unhealthy KPI is being fixed now, as a task with an owner and a date"

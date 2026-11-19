@@ -14,6 +14,8 @@
  */
 
 import {
+  accessBindings,
+  accessGroups,
   activeOnly,
   goals,
   KPI_AGGREGATES,
@@ -69,8 +71,10 @@ import {
 import {
   ensureKpiContextInTx,
   rebindKpiOwnerInTx,
+  removeKpiShareInTx,
   requireKpiAccess,
   requireKpiRole,
+  setKpiShareInTx,
   visibleKpiIds,
 } from "../kpis/access.ts";
 import {
@@ -2832,6 +2836,372 @@ export const readRecoveryDraft = defineReadAction({
               keyResults: [...draft.keyResults],
             }
           : null;
+      },
+    );
+  },
+});
+
+export const shareKpi = defineWriteAction({
+  name: "kpis.share",
+  domain: "kpi",
+  agentSurface: false,
+  summary: "Shares a KPI with a workspace member at view or edit.",
+  input: z.object({
+    kpiId: z.uuid(),
+    memberId: z.uuid(),
+    level: z.enum(["view", "edit"]),
+  }),
+  output: z.object({
+    kpiId: z.uuid(),
+    memberId: z.uuid(),
+    level: z.enum(["view", "edit"]),
+    previousLevel: z.enum(["view", "edit"]).nullable(),
+    coveredByRole: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => ({
+    subject: { type: "kpi", id: input.kpiId },
+    async execute({ tx, workspaceId }) {
+      const actorMemberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+
+      const contextId = await ensureKpiContextInTx(tx, {
+        workspaceId,
+        kpiId: input.kpiId,
+      });
+
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId: actorMemberId,
+        kpiId: input.kpiId,
+        requires: ACCESS_LEVELS.full,
+      });
+
+      const [target] = await tx
+        .select({
+          id: workspaceMembers.id,
+          kind: workspaceMembers.kind,
+          status: workspaceMembers.status,
+        })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.memberId),
+          ),
+        )
+        .limit(1);
+
+      if (!target || target.status !== "active") {
+        throw new OperationError("not_found", "No such member.");
+      }
+      if (target.kind === "agent") {
+        throw new OperationError(
+          "forbidden",
+          "Agents cannot be granted individual KPI shares.",
+        );
+      }
+
+      const [kpi] = await tx
+        .select({ id: kpis.id, ownerMemberId: kpis.ownerMemberId })
+        .from(kpis)
+        .where(
+          activeOnly(
+            kpis,
+            eq(kpis.workspaceId, workspaceId),
+            eq(kpis.id, input.kpiId),
+          ),
+        )
+        .limit(1);
+
+      if (!kpi) {
+        throw new OperationError("not_found", "No such KPI.");
+      }
+      if (kpi.ownerMemberId === input.memberId) {
+        throw new OperationError("forbidden", "Member already owns this KPI.");
+      }
+
+      const roleLevel = await resolveMemberRoleLevel(tx, {
+        workspaceId,
+        memberId: input.memberId,
+        domain: "kpi",
+      });
+      const shareLevel =
+        input.level === "edit" ? ACCESS_LEVELS.edit : ACCESS_LEVELS.view;
+      const coveredByRole = roleLevel !== null && roleLevel >= shareLevel;
+
+      const { previous } = await setKpiShareInTx(tx, {
+        workspaceId,
+        contextId,
+        memberId: input.memberId,
+        level: shareLevel,
+      });
+
+      const previousLevel =
+        previous === ACCESS_LEVELS.edit
+          ? ("edit" as const)
+          : previous === ACCESS_LEVELS.view
+            ? ("view" as const)
+            : null;
+
+      return {
+        result: {
+          kpiId: input.kpiId,
+          memberId: input.memberId,
+          level: input.level,
+          previousLevel,
+          coveredByRole,
+        },
+        activity: {
+          kind: "kpi.shared" as const,
+          subjectType: "kpi" as const,
+          subjectId: input.kpiId,
+          payload: {
+            memberId: input.memberId,
+            level: input.level,
+          },
+        },
+        audit: {
+          action: "kpis.share",
+          targetType: "kpi",
+          targetId: input.kpiId,
+          payload: {
+            memberId: input.memberId,
+            level: input.level,
+            previousLevel,
+          },
+        },
+      };
+    },
+  }),
+});
+
+export const unshareKpi = defineWriteAction({
+  name: "kpis.unshare",
+  domain: "kpi",
+  agentSurface: false,
+  summary: "Removes an individual share from a KPI.",
+  input: z.object({
+    kpiId: z.uuid(),
+    memberId: z.uuid(),
+  }),
+  output: z.object({
+    kpiId: z.uuid(),
+    memberId: z.uuid(),
+    removed: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => ({
+    subject: { type: "kpi", id: input.kpiId },
+    async execute({ tx, workspaceId }) {
+      const actorMemberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+
+      const contextId = await ensureKpiContextInTx(tx, {
+        workspaceId,
+        kpiId: input.kpiId,
+      });
+
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId: actorMemberId,
+        kpiId: input.kpiId,
+        requires: ACCESS_LEVELS.full,
+      });
+
+      const { previous, removed } = await removeKpiShareInTx(tx, {
+        workspaceId,
+        contextId,
+        memberId: input.memberId,
+      });
+
+      const previousLevel =
+        previous === ACCESS_LEVELS.edit
+          ? ("edit" as const)
+          : previous === ACCESS_LEVELS.view
+            ? ("view" as const)
+            : null;
+
+      return {
+        result: {
+          kpiId: input.kpiId,
+          memberId: input.memberId,
+          removed,
+        },
+        activity: {
+          kind: "kpi.unshared" as const,
+          subjectType: "kpi" as const,
+          subjectId: input.kpiId,
+          payload: {
+            memberId: input.memberId,
+          },
+        },
+        audit: {
+          action: "kpis.unshare",
+          targetType: "kpi",
+          targetId: input.kpiId,
+          payload: {
+            memberId: input.memberId,
+            previousLevel,
+          },
+        },
+      };
+    },
+  }),
+});
+
+export const readKpiShares = defineReadAction({
+  name: "kpis.shares",
+  summary: "Lists the owner and individual shares on a KPI.",
+  input: z.object({
+    kpiId: z.uuid(),
+  }),
+  output: z.object({
+    owner: z
+      .object({
+        memberId: z.uuid(),
+        name: z.string(),
+        kind: z.string(),
+      })
+      .nullable(),
+    shares: z.array(
+      z.object({
+        memberId: z.uuid(),
+        name: z.string(),
+        kind: z.enum(["human", "guest", "placeholder"]),
+        status: z.string(),
+        level: z.enum(["view", "edit"]),
+        sharedAt: z.string(),
+        roleLevel: z.number().nullable(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx as OperationTx, context.workspaceId, userId));
+        const { contextId } = await requireKpiAccess(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          kpiId: input.kpiId,
+          requires: ACCESS_LEVELS.view,
+        });
+
+        const [kpi] = await tx
+          .select({
+            id: kpis.id,
+            ownerMemberId: kpis.ownerMemberId,
+          })
+          .from(kpis)
+          .where(
+            activeOnly(
+              kpis,
+              eq(kpis.workspaceId, context.workspaceId),
+              eq(kpis.id, input.kpiId),
+            ),
+          )
+          .limit(1);
+
+        if (!kpi) {
+          throw new OperationError("not_found", "No such KPI.");
+        }
+
+        let owner: { memberId: string; name: string; kind: string } | null =
+          null;
+        if (kpi.ownerMemberId) {
+          const [ownerMember] = await tx
+            .select({
+              id: workspaceMembers.id,
+              name: workspaceMembers.name,
+              kind: workspaceMembers.kind,
+            })
+            .from(workspaceMembers)
+            .where(
+              activeOnly(
+                workspaceMembers,
+                eq(workspaceMembers.workspaceId, context.workspaceId),
+                eq(workspaceMembers.id, kpi.ownerMemberId),
+              ),
+            )
+            .limit(1);
+          if (ownerMember) {
+            owner = {
+              memberId: ownerMember.id,
+              name: ownerMember.name,
+              kind: ownerMember.kind,
+            };
+          }
+        }
+
+        if (!contextId) {
+          return { owner, shares: [] };
+        }
+
+        const shareRows = await tx
+          .select({
+            bindingId: accessBindings.id,
+            level: accessBindings.level,
+            createdAt: accessBindings.createdAt,
+            memberId: workspaceMembers.id,
+            name: workspaceMembers.name,
+            kind: workspaceMembers.kind,
+            status: workspaceMembers.status,
+          })
+          .from(accessBindings)
+          .innerJoin(accessGroups, eq(accessGroups.id, accessBindings.groupId))
+          .innerJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, accessGroups.memberId),
+          )
+          .where(
+            activeOnly(
+              accessBindings,
+              eq(accessBindings.workspaceId, context.workspaceId),
+              eq(accessBindings.contextId, contextId),
+              eq(accessBindings.tag, "share"),
+            ),
+          )
+          .orderBy(accessBindings.createdAt);
+
+        const shares = await Promise.all(
+          shareRows.map(async (row) => {
+            const roleLevel = await resolveMemberRoleLevel(tx as OperationTx, {
+              workspaceId: context.workspaceId,
+              memberId: row.memberId,
+              domain: "kpi",
+            });
+            return {
+              memberId: row.memberId,
+              name: row.name,
+              kind: row.kind as "human" | "guest" | "placeholder",
+              status: row.status,
+              level:
+                row.level === ACCESS_LEVELS.edit
+                  ? ("edit" as const)
+                  : ("view" as const),
+              sharedAt: row.createdAt.toISOString(),
+              roleLevel,
+            };
+          }),
+        );
+
+        return { owner, shares };
       },
     );
   },
