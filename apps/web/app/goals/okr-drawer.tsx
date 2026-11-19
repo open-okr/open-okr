@@ -101,56 +101,58 @@ const TAB_LABEL: Readonly<Record<DrawerTab, string>> = {
   alignment: "okrDrawer.tab.alignment",
 };
 
+/** Read the live address so row handlers can stay stable across renders. */
+function writeDrawerAddress(
+  patch: Readonly<Record<string, string | null>>,
+  opening = false,
+) {
+  const next = new URLSearchParams(window.location.search);
+  const push = opening && !next.has("okr");
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) {
+      next.delete(key);
+    } else {
+      next.set(key, value);
+    }
+  }
+  const query = next.toString();
+  const url = `${window.location.pathname}${query ? `?${query}` : ""}`;
+  if (push) {
+    window.history.pushState(null, "", url);
+  } else {
+    window.history.replaceState(null, "", url);
+  }
+}
+
+/** Opening is a step Back can undo; switching objectives keeps that step. */
+export function openOkrDrawer(
+  id: string,
+  options: { readonly tab?: DrawerTab; readonly keyResultId?: string } = {},
+) {
+  writeDrawerAddress(
+    {
+      okr: id,
+      tab: options.tab && options.tab !== "details" ? options.tab : null,
+      kr: options.keyResultId ?? null,
+    },
+    true,
+  );
+}
+
 /** The drawer's place in the address, and the three ways to change it. */
 export function useDrawerAddress() {
   const params = useSearchParams();
-  const goalId = params.get("okr");
   const asked = params.get("tab");
   const tab: DrawerTab =
     DRAWER_TABS.find((entry) => entry === asked) ?? "details";
-  const keyResultId = params.get("kr");
-
-  const write = (
-    patch: Readonly<Record<string, string | null>>,
-    how: "push" | "replace",
-  ) => {
-    const next = new URLSearchParams(params.toString());
-    for (const [key, value] of Object.entries(patch)) {
-      if (value === null) {
-        next.delete(key);
-      } else {
-        next.set(key, value);
-      }
-    }
-    const query = next.toString();
-    const url = `${window.location.pathname}${query ? `?${query}` : ""}`;
-    if (how === "push") {
-      window.history.pushState(null, "", url);
-    } else {
-      window.history.replaceState(null, "", url);
-    }
-  };
-
   return {
-    goalId,
+    goalId: params.get("okr"),
     tab,
-    keyResultId,
-    /** Opening is a step Back can undo; switching objectives is not. */
-    open: (
-      id: string,
-      options: { readonly tab?: DrawerTab; readonly keyResultId?: string } = {},
-    ) =>
-      write(
-        {
-          okr: id,
-          tab: options.tab && options.tab !== "details" ? options.tab : null,
-          kr: options.keyResultId ?? null,
-        },
-        goalId === null ? "push" : "replace",
-      ),
+    keyResultId: params.get("kr"),
+    open: openOkrDrawer,
     choose: (next: DrawerTab) =>
-      write({ tab: next === "details" ? null : next }, "replace"),
-    close: () => write({ okr: null, tab: null, kr: null }, "replace"),
+      writeDrawerAddress({ tab: next === "details" ? null : next }),
+    close: () => writeDrawerAddress({ okr: null, tab: null, kr: null }),
   };
 }
 

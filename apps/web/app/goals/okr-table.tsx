@@ -23,7 +23,7 @@ import {
 } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { dayLabel } from "../../lib/day-label.ts";
 import { focusOnMount } from "../../lib/focus-on-mount.ts";
 import {
@@ -63,7 +63,7 @@ import {
   VerdictChips,
   WaitingDraft,
 } from "./okr-cells.tsx";
-import { OkrDrawer, useDrawerAddress } from "./okr-drawer.tsx";
+import { OkrDrawer, openOkrDrawer } from "./okr-drawer.tsx";
 import {
   type Coach,
   useKeyResultCells,
@@ -348,7 +348,21 @@ export function OkrTable({
   );
 }
 
-type Okr = OkrHandle;
+type RowWrite = Pick<OkrHandle, "mutate" | "failed" | "retry" | "discard">;
+type DropHint = { readonly id: string; readonly after: boolean };
+type MoverFor = (
+  siblings: readonly string[],
+  index: number,
+  parent: string | null,
+  label: string,
+) => Mover | null;
+
+// TanStack Query keeps the unit list's reference when a write only changes a
+// value or title. Cards can then skip updates to choices they already have.
+const treeWithUnits = (tree: OkrTree) => ({
+  tree,
+  units: unitsInUse(tree.goals),
+});
 
 /**
  * The table on the cache (P9-T06c, P9-T07a-a).
@@ -421,19 +435,17 @@ function LiveOkrTable({
   } | null>(null);
   const [regrip, setRegrip] = useState<{ id: string; at: number } | null>(null);
   // Where the dragged row would land: the row it is over, and which side.
-  const [hint, setHint] = useState<{
-    readonly id: string;
-    readonly after: boolean;
-  } | null>(null);
-  const tree = useOkrTree({
+  const [hint, setHint] = useState<DropHint | null>(null);
+  const { tree, units } = useOkrTree({
     cycleId,
     scope,
     initial: initialTree,
     initialAt,
+    select: treeWithUnits,
   });
   useOkrLive(cycleId);
   const okr = useOkrMutation({ cycleId, scope });
-  const drawer = useDrawerAddress();
+  const { mutate } = okr;
   // §2.9: once the plan is set, an addition says why where the workspace
   // asks it to, before the write rather than after a refusal.
   const reasonSetting = coach.practice["reasons.midCycleAddition"];
@@ -445,8 +457,10 @@ function LiveOkrTable({
   const saving = useIsMutating() > 0 || pending;
   // The rows whose change the server has not answered yet.
   const savingIds = usePendingOkrIds();
-  const goals = filterGoals(tree.goals, filters);
-  const units = unitsInUse(tree.goals);
+  const goals = useMemo(
+    () => filterGoals(tree.goals, filters),
+    [tree.goals, filters],
+  );
   const problem = okr.problem;
 
   useEffect(() => {
@@ -466,115 +480,126 @@ function LiveOkrTable({
    * the server places the row after its new neighbour and renumbers the
    * whole set, so a row a filter hides keeps its place there.
    */
-  const moverFor = (
-    siblings: readonly { readonly id: string }[],
-    index: number,
-    parent: string | null,
-    label: string,
-  ): Mover | null => {
-    if (!canEdit) {
-      return null;
-    }
-    const id = siblings[index]?.id as string;
-    const place = (afterId: string | null) => {
-      okr.mutate(
-        parent === null
-          ? { kind: "placeGoal", id, afterId }
-          : { kind: "placeKeyResult", id, afterId },
-      );
-      setRegrip({ id, at: Date.now() });
-    };
-    return {
-      label,
-      move: (by) => {
-        if (by < 0 && index > 0) {
-          place(siblings[index - 2]?.id ?? null);
-        }
-        if (by > 0 && index < siblings.length - 1) {
-          place(siblings[index + 1]?.id ?? null);
-        }
-      },
-      onDragStart: () => {
-        dragged.current = { id, parent };
-      },
-      onDragEnd: () => {
-        dragged.current = null;
-        setHint(null);
-      },
-      accepts: () => {
-        const from = dragged.current;
-        return from !== null && from.parent === parent && from.id !== id;
-      },
-      onHover: (after) =>
-        setHint((now) =>
-          now?.id === id && now.after === after ? now : { id, after },
-        ),
-      onDrop: (after) => {
-        const from = dragged.current;
-        dragged.current = null;
-        setHint(null);
-        if (!from || from.parent !== parent || from.id === id) {
-          return;
-        }
-        const rest = siblings.filter((row) => row.id !== from.id);
-        const at = rest.findIndex((row) => row.id === id);
-        okr.mutate(
+  const moverFor: MoverFor = useCallback(
+    (siblings, index, parent, label) => {
+      if (!canEdit) {
+        return null;
+      }
+      const id = siblings[index] ?? "";
+      const place = (afterId: string | null) => {
+        mutate(
           parent === null
-            ? {
-                kind: "placeGoal",
-                id: from.id,
-                afterId: after ? id : (rest[at - 1]?.id ?? null),
-              }
-            : {
-                kind: "placeKeyResult",
-                id: from.id,
-                afterId: after ? id : (rest[at - 1]?.id ?? null),
-              },
+            ? { kind: "placeGoal", id, afterId }
+            : { kind: "placeKeyResult", id, afterId },
         );
-      },
-    };
-  };
+        setRegrip({ id, at: Date.now() });
+      };
+      return {
+        label,
+        move: (by) => {
+          if (by < 0 && index > 0) {
+            place(siblings[index - 2] ?? null);
+          }
+          if (by > 0 && index < siblings.length - 1) {
+            place(siblings[index + 1] ?? null);
+          }
+        },
+        onDragStart: () => {
+          dragged.current = { id, parent };
+        },
+        onDragEnd: () => {
+          dragged.current = null;
+          setHint(null);
+        },
+        accepts: () => {
+          const from = dragged.current;
+          return from !== null && from.parent === parent && from.id !== id;
+        },
+        onHover: (after) =>
+          setHint((now) =>
+            now?.id === id && now.after === after ? now : { id, after },
+          ),
+        onDrop: (after) => {
+          const from = dragged.current;
+          dragged.current = null;
+          setHint(null);
+          if (!from || from.parent !== parent || from.id === id) {
+            return;
+          }
+          const rest = siblings.filter((rowId) => rowId !== from.id);
+          const at = rest.indexOf(id);
+          mutate(
+            parent === null
+              ? {
+                  kind: "placeGoal",
+                  id: from.id,
+                  afterId: after ? id : (rest[at - 1] ?? null),
+                }
+              : {
+                  kind: "placeKeyResult",
+                  id: from.id,
+                  afterId: after ? id : (rest[at - 1] ?? null),
+                },
+          );
+        },
+      };
+    },
+    [canEdit, mutate],
+  );
 
   // An add: the draft row keeps its title and shows the sentence on a
   // refusal, and on success the page renders again for the same reason a
   // structural change does.
-  const add = async (
-    work: () => Promise<{ error: string | null; id?: string | null }>,
-  ): Promise<string | null> => {
-    setPending(true);
-    try {
-      const result = await work();
-      if (result.error) {
-        return result.error;
+  const add = useCallback(
+    async (
+      work: () => Promise<{ error: string | null; id?: string | null }>,
+    ): Promise<string | null> => {
+      setPending(true);
+      try {
+        const result = await work();
+        if (result.error) {
+          return result.error;
+        }
+        await queryClient.invalidateQueries({ queryKey: okrCycleKey(cycleId) });
+        router.refresh();
+        return null;
+      } finally {
+        setPending(false);
       }
-      await queryClient.invalidateQueries({ queryKey: okrCycleKey(cycleId) });
-      router.refresh();
-      return null;
-    } finally {
-      setPending(false);
-    }
-  };
+    },
+    [cycleId, queryClient, router],
+  );
 
-  const toggle = (id: string) =>
-    setCollapsed((current) =>
-      current.includes(id)
-        ? current.filter((entry) => entry !== id)
-        : [...current, id],
-    );
+  const toggle = useCallback(
+    (id: string) =>
+      setCollapsed((current) =>
+        current.includes(id)
+          ? current.filter((entry) => entry !== id)
+          : [...current, id],
+      ),
+    [],
+  );
 
   // Key results are open by default, because they are the proof (METHOD.md
   // §1, owner decision Q3). "Collapse all" is remembered in this browser, so
   // somebody who reads objectives only gets that view back.
-  const goalIds = goals.map((goal) => goal.id).join(",");
+  const goalIds = useMemo(
+    () => goals.map((goal) => goal.id).join(","),
+    [goals],
+  );
+  const goalOrder = useMemo(
+    () => (goalIds === "" ? [] : goalIds.split(",")),
+    [goalIds],
+  );
   useEffect(() => {
     try {
       if (window.localStorage.getItem(FOLD_KEY) === "collapsed") {
-        setCollapsed(goalIds === "" ? [] : goalIds.split(","));
+        setCollapsed(goalOrder);
       }
     } catch {
       // Storage refused: the default, every card open.
     }
-  }, [goalIds]);
+  }, [goalOrder]);
   const allCollapsed =
     goals.length > 0 && goals.every((goal) => collapsed.includes(goal.id));
   const foldAll = (fold: boolean) => {
@@ -665,117 +690,54 @@ function LiveOkrTable({
          * puts the caret in the row's title (plan 0.7.0, U2). */}
         <KeyboardList edit={canEdit} className="flex flex-col gap-3">
           {goals.map((goal, goalIndex) => {
-            const open = !collapsed.includes(goal.id);
-            // The whole card takes a dragged objective, not only its head.
-            const objectiveMover = moverFor(
-              goals,
-              goalIndex,
-              null,
-              t("okrList.moveObjective", { title: goal.title }),
-            );
+            const contains = (id: string) =>
+              id === goal.id || goal.keyResults.some((row) => row.id === id);
+            const failed =
+              okr.failed && contains(okr.failed.mutation.id)
+                ? okr.failed
+                : null;
             return (
-              <section
+              <ObjectiveCard
                 key={goal.id}
-                aria-label={goal.title}
-                className="relative rounded-xl border border-line bg-surface"
-                {...moverHandlers(objectiveMover)}
-              >
-                <DropLine at={hint?.id === goal.id ? hint.after : null} gap />
-                <ObjectiveRow
-                  goal={goal}
-                  open={open}
-                  onToggle={() => toggle(goal.id)}
-                  okr={okr}
-                  canEdit={canEdit}
-                  canAdminister={canAdminister}
-                  busy={pending}
-                  saving={savingIds.has(goal.id)}
-                  progressMax={progressMax}
-                  members={members}
-                  coach={coach}
-                  spaces={spaces}
-                  viewerId={tree.viewerId}
-                  mover={objectiveMover}
-                  onDelete={() =>
-                    okr.mutate({ kind: "deleteGoal", id: goal.id })
-                  }
-                  onOpen={() => drawer.open(goal.id)}
-                  onCheckIn={() => drawer.open(goal.id, { tab: "check-in" })}
-                />
-                {open ? (
-                  <>
-                    {goal.keyResults.length > 0 ? (
-                      // The column names over the rows, so "5 in 10" reads as
-                      // a confidence. On a phone only the count stays.
-                      <div
-                        className={`grid gap-x-3.5 border-y border-line bg-bg py-1.5 pr-3.5 pl-3 text-[11.5px] font-semibold text-ink-3 md:pl-[42px] [&>span:not(:first-child)]:hidden md:[&>span:not(:first-child)]:block ${KEY_RESULT_GRID}`}
-                      >
-                        <span>
-                          {t("okrList.keyResultsBand", {
-                            count: goal.keyResults.length,
-                          })}
-                        </span>
-                        <span>{t("goals.editor.columnValue")}</span>
-                        <span>{t("goals.editor.columnProgress")}</span>
-                        <span>{t("okrDrawer.confidenceLabel")}</span>
-                        <span />
-                      </div>
-                    ) : null}
-                    {goal.keyResults.map((keyResult, keyResultIndex) => (
-                      <KeyResultRow
-                        key={keyResult.id}
-                        dropAt={hint?.id === keyResult.id ? hint.after : null}
-                        mover={moverFor(
-                          goal.keyResults,
-                          keyResultIndex,
-                          goal.id,
-                          t("okrList.moveKeyResult", {
-                            title: keyResult.title,
-                          }),
-                        )}
-                        keyResult={keyResult}
-                        units={units}
-                        cycle={tree.cycle}
-                        onOpen={() =>
-                          drawer.open(goal.id, { keyResultId: keyResult.id })
-                        }
-                        okr={okr}
-                        canEdit={canEdit}
-                        canAdminister={canAdminister}
-                        saving={savingIds.has(keyResult.id)}
-                        progressMax={progressMax}
-                        members={members}
-                        coach={coach}
-                      />
-                    ))}
-                    {(editableGoals
-                      ? editableGoals.has(goal.id) || draftUnder === goal.id
-                      : canEdit) && goal.closedAt === null ? (
-                      <AddRow
-                        label={t("goals.editor.addKeyResult")}
-                        placeholder={t("goals.editor.keyResultPlaceholder")}
-                        disabled={pending}
-                        indented
-                        // An objective just added opens with one key result
-                        // draft under it (design §4.3).
-                        initiallyOpen={draftUnder === goal.id}
-                        askReason={askReason}
-                        onAdd={(title, reason) =>
-                          add(() =>
-                            addKeyResult({
-                              goalId: goal.id,
-                              title,
-                              ownerId: goal.champion.id,
-                              dueOn: tree.cycle.endsOn,
-                              ...(reason ? { reason } : {}),
-                            }),
-                          )
-                        }
-                      />
-                    ) : null}
-                  </>
-                ) : null}
-              </section>
+                goal={goal}
+                goalOrder={goalOrder}
+                goalIndex={goalIndex}
+                open={!collapsed.includes(goal.id)}
+                onToggle={toggle}
+                mutate={mutate}
+                failed={failed}
+                retry={failed ? okr.retry : okr.discard}
+                discard={okr.discard}
+                canEdit={canEdit}
+                canAdminister={canAdminister}
+                busy={pending}
+                saving={savingIds.has(goal.id)}
+                savingKeyResults={
+                  savingIds.size === 0
+                    ? ""
+                    : goal.keyResults
+                        .filter((row) => savingIds.has(row.id))
+                        .map((row) => row.id)
+                        .join(",")
+                }
+                progressMax={progressMax}
+                members={members}
+                coach={coach}
+                spaces={spaces}
+                viewerId={tree.viewerId}
+                moverFor={moverFor}
+                hint={hint && contains(hint.id) ? hint : null}
+                units={units}
+                cycle={tree.cycle}
+                canAdd={
+                  editableGoals
+                    ? editableGoals.has(goal.id) || draftUnder === goal.id
+                    : canEdit
+                }
+                startDraft={draftUnder === goal.id}
+                askReason={askReason}
+                add={add}
+              />
             );
           })}
         </KeyboardList>
@@ -823,8 +785,174 @@ function LiveOkrTable({
   );
 }
 
+/** One card receives the calculated save and refusal state of its own rows. */
+const ObjectiveCard = memo(function ObjectiveCard({
+  goal,
+  goalOrder,
+  goalIndex,
+  open,
+  onToggle,
+  mutate,
+  failed,
+  retry,
+  discard,
+  canEdit,
+  canAdminister,
+  busy,
+  saving,
+  savingKeyResults,
+  progressMax,
+  members,
+  coach,
+  spaces,
+  viewerId,
+  moverFor,
+  hint,
+  units,
+  cycle,
+  canAdd,
+  startDraft,
+  askReason,
+  add,
+}: {
+  readonly goal: OkrGoal;
+  readonly goalOrder: readonly string[];
+  readonly goalIndex: number;
+  readonly open: boolean;
+  readonly onToggle: (id: string) => void;
+  readonly mutate: RowWrite["mutate"];
+  readonly failed: RowWrite["failed"];
+  readonly retry: RowWrite["retry"];
+  readonly discard: RowWrite["discard"];
+  readonly canEdit: boolean;
+  readonly canAdminister: boolean;
+  readonly busy: boolean;
+  readonly saving: boolean;
+  readonly savingKeyResults: string;
+  readonly progressMax: number;
+  readonly members: readonly Person[];
+  readonly coach: Coach;
+  readonly spaces: readonly { readonly id: string; readonly name: string }[];
+  readonly viewerId: string;
+  readonly moverFor: MoverFor;
+  readonly hint: DropHint | null;
+  readonly units: readonly string[];
+  readonly cycle: OkrTree["cycle"];
+  readonly canAdd: boolean;
+  readonly startDraft: boolean;
+  readonly askReason: "optional" | "required" | null;
+  readonly add: (
+    work: () => Promise<{ error: string | null; id?: string | null }>,
+  ) => Promise<string | null>;
+}) {
+  const { t } = useTranslations();
+  const okr = useMemo(
+    () => ({ mutate, failed, retry, discard }),
+    [mutate, failed, retry, discard],
+  );
+  const keyResultIds = goal.keyResults.map((row) => row.id).join(",");
+  const keyResultOrder = useMemo(() => keyResultIds.split(","), [keyResultIds]);
+  const savingIds = new Set(savingKeyResults.split(","));
+  // The whole card takes a dragged objective, including its key result rows.
+  const mover = moverFor(
+    goalOrder,
+    goalIndex,
+    null,
+    t("okrList.moveObjective", { title: goal.title }),
+  );
+  return (
+    <section
+      aria-label={goal.title}
+      className="relative rounded-xl border border-line bg-surface"
+      {...moverHandlers(mover)}
+    >
+      <DropLine at={hint?.id === goal.id ? hint.after : null} gap />
+      <ObjectiveRow
+        goal={goal}
+        open={open}
+        onToggle={() => onToggle(goal.id)}
+        okr={okr}
+        canEdit={canEdit}
+        canAdminister={canAdminister}
+        busy={busy}
+        saving={saving}
+        progressMax={progressMax}
+        members={members}
+        coach={coach}
+        spaces={spaces}
+        viewerId={viewerId}
+        mover={mover}
+        onDelete={() => mutate({ kind: "deleteGoal", id: goal.id })}
+        onOpen={() => openOkrDrawer(goal.id)}
+        onCheckIn={() => openOkrDrawer(goal.id, { tab: "check-in" })}
+      />
+      {open ? (
+        <>
+          {goal.keyResults.length > 0 ? (
+            // The column names over the rows, so "5 in 10" reads as a
+            // confidence. On a phone only the count stays.
+            <div
+              className={`grid gap-x-3.5 border-y border-line bg-bg py-1.5 pr-3.5 pl-3 text-[11.5px] font-semibold text-ink-3 md:pl-[42px] [&>span:not(:first-child)]:hidden md:[&>span:not(:first-child)]:block ${KEY_RESULT_GRID}`}
+            >
+              <span>
+                {t("okrList.keyResultsBand", { count: goal.keyResults.length })}
+              </span>
+              <span>{t("goals.editor.columnValue")}</span>
+              <span>{t("goals.editor.columnProgress")}</span>
+              <span>{t("okrDrawer.confidenceLabel")}</span>
+              <span />
+            </div>
+          ) : null}
+          {goal.keyResults.map((keyResult, index) => (
+            <KeyResultRow
+              key={keyResult.id}
+              dropAt={hint?.id === keyResult.id ? hint.after : null}
+              keyResult={keyResult}
+              parentId={goal.id}
+              index={index}
+              siblings={keyResultOrder}
+              moverFor={moverFor}
+              units={units}
+              cycle={cycle}
+              okr={okr}
+              canEdit={canEdit}
+              canAdminister={canAdminister}
+              saving={savingIds.has(keyResult.id)}
+              progressMax={progressMax}
+              members={members}
+              coach={coach}
+            />
+          ))}
+          {canAdd && goal.closedAt === null ? (
+            <AddRow
+              label={t("goals.editor.addKeyResult")}
+              placeholder={t("goals.editor.keyResultPlaceholder")}
+              disabled={busy}
+              indented
+              // A new objective opens with a key result draft (design §4.3).
+              initiallyOpen={startDraft}
+              askReason={askReason}
+              onAdd={(title, reason) =>
+                add(() =>
+                  addKeyResult({
+                    goalId: goal.id,
+                    title,
+                    ownerId: goal.champion.id,
+                    dueOn: cycle.endsOn,
+                    ...(reason ? { reason } : {}),
+                  }),
+                )
+              }
+            />
+          ) : null}
+        </>
+      ) : null}
+    </section>
+  );
+});
+
 /** A refused change on this row: what was typed, why, and a second try. */
-function Refused({ okr, id }: { readonly okr: Okr; readonly id: string }) {
+function Refused({ okr, id }: { readonly okr: RowWrite; readonly id: string }) {
   const { t } = useTranslations();
   if (okr.failed?.mutation.id !== id) {
     return null;
@@ -878,7 +1006,7 @@ function ObjectiveRow({
   readonly goal: OkrGoal;
   readonly open: boolean;
   readonly onToggle: () => void;
-  readonly okr: Okr;
+  readonly okr: RowWrite;
   readonly canEdit: boolean;
   readonly canAdminister: boolean;
   readonly busy: boolean;
@@ -1104,10 +1232,12 @@ function ObjectiveRow({
   );
 }
 
-function KeyResultRow({
+const KeyResultRow = memo(function KeyResultRow({
   dropAt,
   keyResult,
-  onOpen,
+  parentId,
+  index,
+  siblings,
   okr,
   canEdit,
   canAdminister,
@@ -1115,15 +1245,17 @@ function KeyResultRow({
   progressMax,
   members,
   coach,
-  mover,
+  moverFor,
   units,
   cycle,
 }: {
   /** Where a dragged key result would land: above, below, or not here. */
   readonly dropAt: boolean | null;
   readonly keyResult: OkrGoal["keyResults"][number];
-  readonly onOpen: () => void;
-  readonly okr: Okr;
+  readonly parentId: string;
+  readonly index: number;
+  readonly siblings: readonly string[];
+  readonly okr: RowWrite;
   readonly canEdit: boolean;
   readonly canAdminister: boolean;
   /** A change to this key result is still on its way to the server. */
@@ -1131,13 +1263,19 @@ function KeyResultRow({
   readonly progressMax: number;
   readonly members: readonly Person[];
   readonly coach: Coach;
-  readonly mover: Mover | null;
+  readonly moverFor: MoverFor;
   /** The units the cycle already uses, for the unit cell to offer. */
   readonly units: readonly string[];
   /** The cycle's dates, which a due date outside of is warned about. */
   readonly cycle: { readonly startsOn: string; readonly endsOn: string };
 }) {
   const { t } = useTranslations();
+  const mover = moverFor(
+    siblings,
+    index,
+    parentId,
+    t("okrList.moveKeyResult", { title: keyResult.title }),
+  );
   const cells = useKeyResultCells(keyResult, okr, coach);
   const patch = cells.patch;
   // A value a KPI supplies is the KPI's to change, not this cell's (§4.2).
@@ -1370,7 +1508,9 @@ function KeyResultRow({
           <RowActions
             title={keyResult.title}
             href={`/goals/${keyResult.goalId}#kr-${keyResult.id}`}
-            onOpen={onOpen}
+            onOpen={() =>
+              openOkrDrawer(parentId, { keyResultId: keyResult.id })
+            }
             initiativesHref={`/initiatives?keyResult=${keyResult.id}`}
             tasksHref={`/board?keyResult=${keyResult.id}`}
             openLabel={t("goals.editor.openKeyResult")}
@@ -1393,7 +1533,7 @@ function KeyResultRow({
       <Refused okr={okr} id={keyResult.id} />
     </>
   );
-}
+});
 
 function Chevron({ open }: { readonly open: boolean }) {
   return (
