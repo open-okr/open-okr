@@ -68,13 +68,9 @@ function describe(
               // reviewer needs to know something is there, and the run log is
               // where the whole thing lives.
               Array.isArray(value)
-              ? value.length === 1
-                ? t("admin.agents.proposalQueue.itemsOne", {
-                    count: value.length,
-                  })
-                : t("admin.agents.proposalQueue.itemsOther", {
-                    count: value.length,
-                  })
+              ? t("admin.agents.proposalQueue.items", {
+                  count: value.length,
+                })
               : t("admin.agents.proposalQueue.anObject");
       return `${key}: ${rendered}`;
     });

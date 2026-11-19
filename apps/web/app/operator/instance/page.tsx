@@ -170,13 +170,9 @@ export default async function OperatorInstancePage() {
                     </span>
                     {message.targetWorkspaceIds ? (
                       <span className="text-ink-3 text-xs">
-                        {message.targetWorkspaceIds.length === 1
-                          ? t("operator.instance.workspacesOne", {
-                              count: message.targetWorkspaceIds.length,
-                            })
-                          : t("operator.instance.workspacesOther", {
-                              count: message.targetWorkspaceIds.length,
-                            })}
+                        {t("operator.instance.workspaces", {
+                          count: message.targetWorkspaceIds.length,
+                        })}
                       </span>
                     ) : (
                       <span className="text-ink-3 text-xs">

@@ -253,9 +253,7 @@ export function DraftCoach({
           />
           {firing > 0 ? (
             <span className="inline-flex h-5 flex-none items-center rounded-full bg-bad-bg px-2 text-xs font-bold text-bad">
-              {firing === 1
-                ? t("cycle.draftCoach.rulesFiringOne", { count: firing })
-                : t("cycle.draftCoach.rulesFiringOther", { count: firing })}
+              {t("cycle.draftCoach.rulesFiring", { count: firing })}
             </span>
           ) : null}
         </span>

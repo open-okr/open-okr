@@ -140,13 +140,9 @@ export function ForwardPanel({
             {t("common.carried2", { carried: forward.carried })}
           </Chip>
           <Chip tone={forward.actions.length === 0 ? "warn" : "ok"}>
-            {forward.actions.length === 1
-              ? t("session.detail.forward.actionCountOne", {
-                  count: forward.actions.length,
-                })
-              : t("session.detail.forward.actionCountOther", {
-                  count: forward.actions.length,
-                })}
+            {t("session.detail.forward.actionCount", {
+              count: forward.actions.length,
+            })}
           </Chip>
         </span>
       </CardHeader>
@@ -195,13 +191,9 @@ export function ForwardPanel({
                       {note.text}
                     </span>
                     <Chip tone={note.votes === 0 ? "neutral" : "ok"}>
-                      {note.votes === 1
-                        ? t("session.detail.dotCountOne", {
-                            count: note.votes,
-                          })
-                        : t("session.detail.dotCountOther", {
-                            count: note.votes,
-                          })}
+                      {t("session.detail.dotCount", {
+                        count: note.votes,
+                      })}
                     </Chip>
                     <Button
                       type="button"

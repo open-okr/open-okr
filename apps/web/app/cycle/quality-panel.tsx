@@ -190,23 +190,14 @@ export function QualityPanel({
       ) : total === 0 ? (
         <p className="text-xs text-ok">
           {t("cycle.qualityPanel.everyCheckPassesAcrossObjective", {
-            objectives:
-              set.length === 1
-                ? t("common.count.objectiveOne", { count: set.length })
-                : t("common.count.objectiveOther", { count: set.length }),
+            objectives: t("common.count.objective", { count: set.length }),
           })}
         </p>
       ) : (
         <p className="text-xs text-ink-3">
           {t("cycle.qualityPanel.issueAcrossObjectiveEachOne", {
-            issues:
-              total === 1
-                ? t("common.count.issueOne", { count: total })
-                : t("common.count.issueOther", { count: total }),
-            objectives:
-              withIssues === 1
-                ? t("common.count.objectiveOne", { count: withIssues })
-                : t("common.count.objectiveOther", { count: withIssues }),
+            issues: t("common.count.issue", { count: total }),
+            objectives: t("common.count.objective", { count: withIssues }),
           })}
         </p>
       )}

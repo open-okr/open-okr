@@ -327,13 +327,9 @@ export default async function InvitationsPage() {
                       ? t("admin.invitations.modePersonal")
                       : t("workspaceSwitcher.workspace"),
                   link.maxUses === null
-                    ? link.useCount === 1
-                      ? t("admin.invitations.usesOne", {
-                          count: link.useCount,
-                        })
-                      : t("admin.invitations.usesOther", {
-                          count: link.useCount,
-                        })
+                    ? t("admin.invitations.uses", {
+                        count: link.useCount,
+                      })
                     : t("admin.invitations.usesOfMax", {
                         count: link.useCount,
                         max: link.maxUses,

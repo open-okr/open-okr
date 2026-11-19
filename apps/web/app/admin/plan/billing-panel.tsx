@@ -207,9 +207,7 @@ export function BillingPanel({
                   <span className="text-ink-2 text-sm">
                     {plan.seats === null
                       ? t("admin.plan.unlimitedSeats")
-                      : plan.seats === 1
-                        ? t("admin.plan.seatCountOne", { count: plan.seats })
-                        : t("admin.plan.seatCountOther", { count: plan.seats })}
+                      : t("admin.plan.seatCount", { count: plan.seats })}
                     {price ? ` · ${price}` : ""}
                   </span>
                 </div>

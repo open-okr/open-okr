@@ -51,9 +51,7 @@ export function AdoptWaiting({
       data-testid="adoption-waiting"
     >
       <p className="min-w-0 flex-1">
-        {count === 1
-          ? t("operator.workspaces.waitingOne")
-          : t("operator.workspaces.waitingOther", { count })}
+        {t("operator.workspaces.waiting", { count })}
       </p>
       <form action={formAction} aria-busy={pending}>
         <Button type="submit" variant="primary">

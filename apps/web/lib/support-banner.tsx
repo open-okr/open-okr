@@ -64,9 +64,7 @@ function remaining(
   const minutes = Math.floor(ms / 60000);
   const hours = Math.floor(minutes / 60);
   if (hours === 0) {
-    return minutes === 1
-      ? t("common.count.minuteOne", { count: minutes })
-      : t("common.count.minuteOther", { count: minutes });
+    return t("common.count.minute", { count: minutes });
   }
   return t("lib.supportBanner.hoursAndMinutes", {
     hours,

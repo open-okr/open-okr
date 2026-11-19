@@ -121,9 +121,7 @@ export default async function PlanPage({
   const seatsOf = (count: number | null): string =>
     count === null
       ? t("admin.plan.unlimitedSeats")
-      : count === 1
-        ? t("admin.plan.seatCountOne", { count })
-        : t("admin.plan.seatCountOther", { count });
+      : t("admin.plan.seatCount", { count });
 
   const bigFigure = "font-semibold text-ink text-xl tabular-nums";
   const listBox =
@@ -225,9 +223,7 @@ export default async function PlanPage({
         <CardBody className="flex flex-col gap-3">
           <p className={bigFigure}>
             {seats.limit === null
-              ? seats.used === 1
-                ? t("common.count.personOne", { count: seats.used })
-                : t("common.count.personOther", { count: seats.used })
+              ? t("common.count.person", { count: seats.used })
               : t("admin.plan.seatsUsedOf", {
                   used: seats.used,
                   limit: seats.limit,

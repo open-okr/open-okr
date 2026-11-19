@@ -261,10 +261,7 @@ export async function Gates({
               {/* The server's 20 to 2000 (cycle.publish's override). */}
               <TextArea
                 label={t("cycle.gates.whyIsThisSetPublished", {
-                  gates:
-                    unmet === 1
-                      ? t("common.count.gateOne", { count: unmet })
-                      : t("common.count.gateOther", { count: unmet }),
+                  gates: t("common.count.gate", { count: unmet }),
                 })}
                 name="override.reason"
                 required

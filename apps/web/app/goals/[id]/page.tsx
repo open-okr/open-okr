@@ -472,14 +472,9 @@ export default async function GoalPage({
                 {goal.daysPastDue !== null && goal.daysPastDue > 0
                   ? t("goals.detail.nextCheckInDueOverdue", {
                       date: goal.nextCheckInOn,
-                      days:
-                        goal.daysPastDue === 1
-                          ? t("common.count.dayOne", {
-                              count: goal.daysPastDue,
-                            })
-                          : t("common.count.dayOther", {
-                              count: goal.daysPastDue,
-                            }),
+                      days: t("common.count.day", {
+                        count: goal.daysPastDue,
+                      }),
                     })
                   : t("goals.detail.nextCheckInDueOn", {
                       date:

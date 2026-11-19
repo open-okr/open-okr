@@ -138,10 +138,9 @@ function recoverySummary(
   },
   t: Translate,
 ): string {
-  const keyResults =
-    recovery.keyResults === 1
-      ? t("common.count.keyResultOne", { count: recovery.keyResults })
-      : t("common.count.keyResultOther", { count: recovery.keyResults });
+  const keyResults = t("common.count.keyResult", {
+    count: recovery.keyResults,
+  });
   return recovery.startedPct === null
     ? keyResults
     : t("kpis.recovery.keyResultsLaunchedAt", {
@@ -233,13 +232,9 @@ export default async function RecoveryBoardPage() {
             <p className="text-xs text-ink-3">
               {board.cards.length === 0
                 ? t("kpis.recovery.allKpisHealthy")
-                : board.cards.length === 1
-                  ? t("kpis.recovery.measuresBelowOne", {
-                      count: board.cards.length,
-                    })
-                  : t("kpis.recovery.measuresBelowOther", {
-                      count: board.cards.length,
-                    })}
+                : t("kpis.recovery.measuresBelow", {
+                    count: board.cards.length,
+                  })}
             </p>
           </div>
           <GoalsToolbar

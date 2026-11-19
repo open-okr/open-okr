@@ -223,13 +223,9 @@ export default async function DocumentPage({
             <span className="text-xs text-ink-3">
               {document.versionCount === 0
                 ? t("documents.detail.neverPublished")
-                : document.versionCount === 1
-                  ? t("common.count.versionOne", {
-                      count: document.versionCount,
-                    })
-                  : t("common.count.versionOther", {
-                      count: document.versionCount,
-                    })}
+                : t("common.count.version", {
+                    count: document.versionCount,
+                  })}
             </span>
           </CardHeader>
           <CardBody className="flex flex-col gap-3">

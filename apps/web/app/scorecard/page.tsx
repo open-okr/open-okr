@@ -116,13 +116,9 @@ export default async function ScorecardPage() {
             <p className="text-xs text-ink-3">
               {scorecard.rows.length === 0
                 ? t("scorecard.noCycleHasBeen")
-                : scorecard.rows.length === 1
-                  ? t("scorecard.archivedCyclesOne", {
-                      count: scorecard.rows.length,
-                    })
-                  : t("scorecard.archivedCyclesOther", {
-                      count: scorecard.rows.length,
-                    })}
+                : t("scorecard.archivedCycles", {
+                    count: scorecard.rows.length,
+                  })}
             </p>
           </div>
           {scorecard.rows.length > 0 ? (

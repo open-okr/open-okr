@@ -49,9 +49,7 @@ export interface ScopeTab {
 type Translate = (key: string, values?: MessageValues) => string;
 
 const daysPhrase = (count: number, t: Translate): string =>
-  count === 1
-    ? t("common.count.dayOne", { count })
-    : t("common.count.dayOther", { count });
+  t("common.count.day", { count });
 
 export async function WorkMapContextStrip({
   context,
@@ -100,7 +98,7 @@ export async function WorkMapContextStrip({
                 gate: context.unmetGates[0] ?? "",
               })
             : t("workMapHeader.gatesUnmet", {
-                gates: t("common.count.gateOther", {
+                gates: t("common.count.gate", {
                   count: context.unmetGates.length,
                 }),
               })}
@@ -210,22 +208,12 @@ export async function WorkMapHeader({
         <p className="text-xs text-ink-3">
           {t("workMapHeader.scopeSummary", {
             scopeLabel,
-            objectives:
-              stats.objectiveCount === 1
-                ? t("common.count.objectiveOne", {
-                    count: stats.objectiveCount,
-                  })
-                : t("common.count.objectiveOther", {
-                    count: stats.objectiveCount,
-                  }),
-            keyResults:
-              stats.keyResultCount === 1
-                ? t("common.count.keyResultOne", {
-                    count: stats.keyResultCount,
-                  })
-                : t("common.count.keyResultOther", {
-                    count: stats.keyResultCount,
-                  }),
+            objectives: t("common.count.objective", {
+              count: stats.objectiveCount,
+            }),
+            keyResults: t("common.count.keyResult", {
+              count: stats.keyResultCount,
+            }),
           })}
         </p>
       </div>
@@ -256,11 +244,9 @@ export async function WorkMapHeader({
           label={t("workMapHeader.outdated")}
           hint={t("workMapHeader.outdatedHint")}
           value={String(stats.outdatedGoals)}
-          unit={
-            stats.outdatedGoals === 1
-              ? t("workMapHeader.outdatedUnitOne")
-              : t("workMapHeader.outdatedUnitOther")
-          }
+          unit={t("workMapHeader.outdatedUnit", {
+            count: stats.outdatedGoals,
+          })}
           tone={stats.outdatedGoals > 0 ? "warn" : undefined}
         />
         <Stat

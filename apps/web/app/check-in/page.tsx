@@ -132,18 +132,14 @@ export default async function CheckInPage({
             <p className="text-xs text-ink-3">
               {due.length === 0
                 ? t("checkIn.nothingOfYoursIsDue")
-                : due.length === 1
-                  ? t("checkIn.goalsDueOne", { count: due.length })
-                  : t("checkIn.goalsDueOther", { count: due.length })}
+                : t("checkIn.goalsDue", { count: due.length })}
             </p>
             <p className="text-xs font-semibold text-ink-2">
               {streak.pausedBy
                 ? t("checkIn.streak.paused", { title: streak.pausedBy.title })
                 : streak.periods === 0
                   ? t("checkIn.streak.none")
-                  : streak.periods === 1
-                    ? t("checkIn.streak.one")
-                    : t("checkIn.streak.other", { count: streak.periods })}
+                  : t("checkIn.streak", { count: streak.periods })}
             </p>
           </div>
           <Chip tone={due.length === 0 ? "ok" : "brand"}>
@@ -182,25 +178,15 @@ export default async function CheckInPage({
                           : "checkIn.walkerLine",
                         {
                           level: goal.level,
-                          keyResults:
-                            goal.keyResultCount === 1
-                              ? t("common.count.keyResultOne", {
-                                  count: goal.keyResultCount,
-                                })
-                              : t("common.count.keyResultOther", {
-                                  count: goal.keyResultCount,
-                                }),
+                          keyResults: t("common.count.keyResult", {
+                            count: goal.keyResultCount,
+                          }),
                           when:
                             goal.daysPastDue !== null && goal.daysPastDue > 0
                               ? t("checkIn.overdueBy", {
-                                  days:
-                                    goal.daysPastDue === 1
-                                      ? t("common.count.dayOne", {
-                                          count: goal.daysPastDue,
-                                        })
-                                      : t("common.count.dayOther", {
-                                          count: goal.daysPastDue,
-                                        }),
+                                  days: t("common.count.day", {
+                                    count: goal.daysPastDue,
+                                  }),
                                 })
                               : t("checkIn.dueOn", {
                                   date: dueOn(goal, locale),

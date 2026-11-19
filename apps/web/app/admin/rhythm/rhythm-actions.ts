@@ -275,8 +275,6 @@ export async function saveRhythm(
     saved:
       changed === 0
         ? t("admin.rhythm.actions.savedAllDefault")
-        : changed === 1
-          ? t("admin.rhythm.actions.savedDifferOne", { count: changed })
-          : t("admin.rhythm.actions.savedDifferOther", { count: changed }),
+        : t("admin.rhythm.actions.savedDiffer", { count: changed }),
   };
 }

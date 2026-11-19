@@ -766,10 +766,7 @@ function countChip(
 ): string {
   // "Objectives", the word the page's own heading uses (usability review G1,
   // owner decision Q2).
-  const goals =
-    count === 1
-      ? t("common.count.objectiveOne", { count })
-      : t("common.count.objectiveOther", { count });
+  const goals = t("common.count.objective", { count });
   if (filtered && tree) {
     return t("goals.countFilteredAsATree", { goals });
   }

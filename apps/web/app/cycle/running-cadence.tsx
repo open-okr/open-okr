@@ -321,12 +321,7 @@ export async function RunningCadence({
                 </span>
                 <Chip tone={blocker.ageDays >= 14 ? "bad" : "warn"}>
                   {t("cycle.runningCadence.ageOld", {
-                    days:
-                      blocker.ageDays === 1
-                        ? t("common.count.dayOne", { count: blocker.ageDays })
-                        : t("common.count.dayOther", {
-                            count: blocker.ageDays,
-                          }),
+                    days: t("common.count.day", { count: blocker.ageDays }),
                   })}
                 </Chip>
               </div>

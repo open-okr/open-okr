@@ -35,14 +35,10 @@ function dueText(t: Translate, days: number): string {
     return t("shell.cycleStrip.dueToday");
   }
   if (days > 0) {
-    return days === 1
-      ? t("shell.cycleStrip.toPublishOne", { count: days })
-      : t("shell.cycleStrip.toPublishOther", { count: days });
+    return t("shell.cycleStrip.toPublish", { count: days });
   }
   const late = Math.abs(days);
-  return late === 1
-    ? t("shell.cycleStrip.overdueOne", { count: late })
-    : t("shell.cycleStrip.overdueOther", { count: late });
+  return t("shell.cycleStrip.overdue", { count: late });
 }
 
 export async function loadCycleStrip(

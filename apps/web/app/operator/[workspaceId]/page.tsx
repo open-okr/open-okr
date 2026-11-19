@@ -481,15 +481,10 @@ export default async function OperatorWorkspacePage({
                   ? t("operator.workspace.planUnlimitedSeats", {
                       name: plan.name,
                     })
-                  : plan.seats === 1
-                    ? t("operator.workspace.planSeatsOne", {
-                        name: plan.name,
-                        count: plan.seats,
-                      })
-                    : t("operator.workspace.planSeatsOther", {
-                        name: plan.name,
-                        count: plan.seats,
-                      }),
+                  : t("operator.workspace.planSeats", {
+                      name: plan.name,
+                      count: plan.seats,
+                    }),
             }))}
             workspaceId={tenant.workspaceId}
             workspaceName={tenant.name}

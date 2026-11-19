@@ -323,11 +323,9 @@ export default async function InitiativePage({
               ))}
               {unseen > 0 ? (
                 <li className="py-2 text-xs text-ink-3">
-                  {unseen === 1
-                    ? t("initiatives.detail.unseenKeyResultOne")
-                    : t("initiatives.detail.unseenKeyResultOther", {
-                        count: unseen,
-                      })}
+                  {t("initiatives.detail.unseenKeyResult", {
+                    count: unseen,
+                  })}
                 </li>
               ) : null}
             </ul>

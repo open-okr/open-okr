@@ -104,7 +104,7 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   // Words Bahasa Melayu uses as they are.
   "kpis.suggestion.unit",
   "admin.agents.levelEdit",
-  "admin.agents.proposalQueue.itemsOne",
+  "admin.agents.proposalQueue.items.one",
   "admin.ai.model",
   "admin.imports.import",
   "admin.imports.wizard.importRows",
@@ -146,10 +146,10 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "common.confidence",
   "common.count",
   "areaTabs.goals.kpis",
-  "common.count.keyResultOne",
-  "common.count.keyResultOther",
-  "common.count.objectiveOne",
-  "common.count.objectiveOther",
+  "common.count.keyResult.one",
+  "common.count.keyResult.other",
+  "common.count.objective.one",
+  "common.count.objective.other",
   "common.keyResult",
   "common.kpis",
   "kpis.countOne",
@@ -213,8 +213,8 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   // The owner column heading is the champion term's own hole.
   "okrList.champion",
   // The Outdated stat's unit is the objective term's own hole.
-  "workMapHeader.outdatedUnitOne",
-  "workMapHeader.outdatedUnitOther",
+  "workMapHeader.outdatedUnit.one",
+  "workMapHeader.outdatedUnit.other",
 ]);
 
 describe("Bahasa Melayu is translated (completeness review M-15)", () => {

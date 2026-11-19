@@ -87,10 +87,7 @@ export function ImportWizard({
     .filter((field) => field.required && !claimed.has(field.field))
     .map((field) => field.field);
 
-  const rowsPhrase = (count: number) =>
-    count === 1
-      ? t("common.count.rowOne", { count })
-      : t("common.count.rowOther", { count });
+  const rowsPhrase = (count: number) => t("common.count.row", { count });
 
   const mappingOf = (): Record<string, string | null> =>
     Object.fromEntries(columns.map((c) => [c.header, c.field]));
@@ -308,13 +305,10 @@ export function ImportWizard({
                 data-testid="import-missing"
                 className="rounded-md bg-warn-bg px-2.5 py-2 text-xs text-warn"
               >
-                {missing.length === 1
-                  ? t("admin.imports.wizard.nothingCarriesRequiredOne", {
-                      missing: missing.join(", "),
-                    })
-                  : t("admin.imports.wizard.nothingCarriesRequiredOther", {
-                      missing: missing.join(", "),
-                    })}
+                {t("admin.imports.wizard.nothingCarriesRequired", {
+                  count: missing.length,
+                  missing: missing.join(", "),
+                })}
               </p>
             ) : null}
             <div className="flex gap-2">

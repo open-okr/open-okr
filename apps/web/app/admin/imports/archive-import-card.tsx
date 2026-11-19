@@ -107,14 +107,8 @@ export function ArchiveImportCard() {
     Object.values(diff.created).reduce((sum, n) => sum + n, 0);
   const totalSkipped = (diff: ImportResult["difference"]) =>
     Object.values(diff.skipped).reduce((sum, n) => sum + n, 0);
-  const rowsPhrase = (count: number) =>
-    count === 1
-      ? t("common.count.rowOne", { count })
-      : t("common.count.rowOther", { count });
-  const membersPhrase = (count: number) =>
-    count === 1
-      ? t("common.count.memberOne", { count })
-      : t("common.count.memberOther", { count });
+  const rowsPhrase = (count: number) => t("common.count.row", { count });
+  const membersPhrase = (count: number) => t("common.count.member", { count });
 
   return (
     <Card>

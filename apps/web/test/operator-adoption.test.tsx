@@ -122,12 +122,12 @@ describe("the console", () => {
 
   test("says it in Malay too", () => {
     for (const key of [
-      "operator.workspaces.waitingOne",
-      "operator.workspaces.waitingOther",
+      "operator.workspaces.waiting.one",
+      "operator.workspaces.waiting.other",
       "operator.workspaces.adoptNow",
       "operator.workspaces.adoptedNone",
-      "operator.workspaces.adoptedOne",
-      "operator.workspaces.adoptedOther",
+      "operator.workspaces.adopted.one",
+      "operator.workspaces.adopted.other",
     ]) {
       expect(CATALOGUES.ms[key]).toBeTruthy();
       expect(CATALOGUES.ms[key]).not.toBe(CATALOGUES.en[key]);

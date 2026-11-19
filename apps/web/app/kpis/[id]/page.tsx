@@ -413,28 +413,16 @@ export default async function KpiDetailPage({
               viewBox={`0 0 ${width} ${height}`}
               className="h-36 w-full min-w-[32rem]"
               role="img"
-              aria-label={
-                series.length === 1
-                  ? t("kpis.detail.chartLabelOne", {
-                      title: kpi.title,
-                      count: series.length,
-                    })
-                  : t("kpis.detail.chartLabelOther", {
-                      title: kpi.title,
-                      count: series.length,
-                    })
-              }
+              aria-label={t("kpis.detail.chartLabel", {
+                title: kpi.title,
+                count: series.length,
+              })}
             >
               <title>
-                {series.length === 1
-                  ? t("kpis.detail.chartTitleOne", {
-                      title: kpi.title,
-                      count: series.length,
-                    })
-                  : t("kpis.detail.chartTitleOther", {
-                      title: kpi.title,
-                      count: series.length,
-                    })}
+                {t("kpis.detail.chartTitle", {
+                  title: kpi.title,
+                  count: series.length,
+                })}
               </title>
               {/* The two bands, drawn from the target rather than from the
                   achievement, because a reader compares the value they typed

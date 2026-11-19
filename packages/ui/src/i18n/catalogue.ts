@@ -40,46 +40,22 @@
  * no way to know what it attaches to. A message now says `{hour}` where the
  * value goes and the translator moves the hole to wherever their own language
  * needs it.
- *
- * **Named holes and nothing else.** No plural selection, no number or date
- * formatting, no nesting: that is ICU MessageFormat, and it is a library, a
- * parser and a dependency. What these sentences need is a hole with a name in
- * it. A sentence whose wording changes with a count picks its key at the call
- * site instead, which is visible in the source rather than hidden in a format
- * string.
- *
- * **213 keys are still fragments, in 319 places across 85 files.** They are
- * listed by name in `apps/web/test/fragmented-messages.ts` as a debt that only
- * shrinks, and emptying it is P6-G22d-b. The machinery above is what makes
- * emptying it possible.
  */
+import {
+  type Catalogue,
+  translate as formatTranslate,
+  type MessageValues,
+  messageHoles,
+} from "@openokr/formats";
 import type { TerminologyOverrides } from "@openokr/method";
 import en from "./messages/en.json";
-import { fillTermHole, isTermHole } from "./terms.ts";
+import { fillTermHole } from "./terms.ts";
 
-export type Catalogue = Readonly<Record<string, string>>;
+export { type Catalogue, type MessageValues, messageHoles };
+
 export type Locale = "en" | "ms";
 
 export const SOURCE_LOCALE: Locale = "en";
-
-/** What a message's named holes are filled with. */
-export type MessageValues = Readonly<Record<string, string | number>>;
-
-/**
- * A named hole: `{count}`, `{champion}`.
- *
- * Deliberately narrow. `${a}` inside a message is a template literal somebody
- * is describing rather than a hole, and `{` followed by anything that is not
- * an identifier stays the character it is.
- */
-const HOLE = /(?<!\$)\{([A-Za-z][A-Za-z0-9]*)\}/g;
-
-/** The holes a message has, in the order it has them, without duplicates. */
-export function messageHoles(message: string): readonly string[] {
-  return [
-    ...new Set([...message.matchAll(HOLE)].map((match) => match[1] ?? "")),
-  ];
-}
 
 /**
  * The message, with its holes filled.
@@ -94,46 +70,10 @@ export function translate(
   key: string,
   values?: MessageValues,
   renamed?: TerminologyOverrides,
+  locale?: string,
 ): string {
-  const value = catalogue[key];
-  if (value === undefined) {
-    // A missing key is a build-time defect (missingKeys above catches it
-    // for every non-source locale before this ever runs), not a runtime
-    // one to hide behind a fallback string that looks like real content.
-    throw new Error(`No catalogue entry for "${key}".`);
-  }
-
-  const every = messageHoles(value);
-  if (every.length === 0 && values === undefined) {
-    return value;
-  }
-
-  // Term holes are filled by the catalogue and the workspace, never by the
-  // caller, so they are left out of both checks below.
-  const holes = every.filter((hole) => !isTermHole(hole));
-  const supplied = values ?? {};
-  // **Both directions, and the second one is the useful one.** A missing value
-  // would render "{count}" on a screen, which is the defect this replaces. A
-  // value nobody asked for means the message was reworded and its hole
-  // renamed, which otherwise fails silently in one locale at a time.
-  const missing = holes.filter((hole) => !(hole in supplied));
-  if (missing.length > 0) {
-    throw new Error(
-      `The message "${key}" has no value for ${missing.map((one) => `{${one}}`).join(", ")}.`,
-    );
-  }
-  const unused = Object.keys(supplied).filter((name) => !holes.includes(name));
-  if (unused.length > 0) {
-    throw new Error(
-      `The message "${key}" has no hole for ${unused.join(", ")}.`,
-    );
-  }
-
-  return value.replace(
-    HOLE,
-    (_, name: string) =>
-      fillTermHole(catalogue, name, renamed) ?? String(supplied[name]),
-  );
+  const fillHole = (name: string) => fillTermHole(catalogue, name, renamed);
+  return formatTranslate(catalogue, key, values, fillHole, locale);
 }
 
 /** Splits a message into its holes and the text between them. */

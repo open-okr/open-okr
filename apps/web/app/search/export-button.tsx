@@ -78,23 +78,16 @@ export function ExportButton({
       if (outcome.queued || !bytes) {
         setMessage(
           t("search.exportButton.tooManyToBuild", {
-            rows:
-              outcome.rowCount === 1
-                ? t("common.count.rowOne", { count: outcome.rowCount })
-                : t("common.count.rowOther", { count: outcome.rowCount }),
+            rows: t("common.count.row", { count: outcome.rowCount }),
           }),
         );
         return;
       }
       download(outcome.filename, bytes, CONTENT_TYPES[chosen]);
       setMessage(
-        outcome.rowCount === 1
-          ? t("search.exportButton.rowsDownloadedOne", {
-              count: outcome.rowCount,
-            })
-          : t("search.exportButton.rowsDownloadedOther", {
-              count: outcome.rowCount,
-            }),
+        t("search.exportButton.rowsDownloaded", {
+          count: outcome.rowCount,
+        }),
       );
     });
   };

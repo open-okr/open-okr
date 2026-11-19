@@ -78,25 +78,16 @@ async function Objective({
           <Chip tone={objective.keyResultCount > 0 ? "neutral" : "warn"}>
             {objective.keyResultCount === 0
               ? t("cycle.annualObjectives.noKeyResults")
-              : objective.keyResultCount === 1
-                ? t("common.count.keyResultOne", {
-                    count: objective.keyResultCount,
-                  })
-                : t("common.count.keyResultOther", {
-                    count: objective.keyResultCount,
-                  })}
+              : t("common.count.keyResult", {
+                  count: objective.keyResultCount,
+                })}
           </Chip>
           {objective.sentForward > 0 ? (
             <Chip tone="ok">
               {t("cycle.annualObjectives.inQuarters", {
-                quarters:
-                  objective.sentForward === 1
-                    ? t("common.count.quarterOne", {
-                        count: objective.sentForward,
-                      })
-                    : t("common.count.quarterOther", {
-                        count: objective.sentForward,
-                      }),
+                quarters: t("common.count.quarter", {
+                  count: objective.sentForward,
+                }),
               })}
             </Chip>
           ) : null}

@@ -34,12 +34,11 @@ export function phaseProgress(
     return { text: t("cycle.phaseRail.openOnly", { open }), complete: false };
   }
   return {
-    text: t(
-      done.length === 1
-        ? "cycle.phaseRail.doneAndOpenOne"
-        : "cycle.phaseRail.doneAndOpenOther",
-      { phases: done.join(", "), open },
-    ),
+    text: t("cycle.phaseRail.doneAndOpen", {
+      count: done.length,
+      phases: done.join(", "),
+      open,
+    }),
     complete: false,
   };
 }

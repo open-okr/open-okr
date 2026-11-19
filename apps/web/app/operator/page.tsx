@@ -168,13 +168,9 @@ export default async function OperatorWorkspacesPage({
           {t("operator.workspaces.title")}
         </h1>
         <p className="text-ink-2 text-sm">
-          {tenants.length === 1
-            ? t("operator.workspaces.tenantsCountedOne", {
-                count: tenants.length,
-              })
-            : t("operator.workspaces.tenantsCountedOther", {
-                count: tenants.length,
-              })}
+          {t("operator.workspaces.tenantsCounted", {
+            count: tenants.length,
+          })}
         </p>
       </header>
 
@@ -185,9 +181,7 @@ export default async function OperatorWorkspacesPage({
           data-testid="no-plan-notice"
         >
           <span>
-            {withoutAPlan === 1
-              ? t("operator.workspaces.noPlanOne")
-              : t("operator.workspaces.noPlanOther", { count: withoutAPlan })}
+            {t("operator.workspaces.noPlan", { count: withoutAPlan })}
           </span>
           {defaultPlan ? (
             <Link
@@ -209,9 +203,7 @@ export default async function OperatorWorkspacesPage({
           className="rounded-lg border-y border-r border-l-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn"
           role="status"
         >
-          {overdue === 1
-            ? t("operator.workspaces.overdueOne")
-            : t("operator.workspaces.overdueOther", { count: overdue })}
+          {t("operator.workspaces.overdue", { count: overdue })}
         </p>
       ) : null}
 

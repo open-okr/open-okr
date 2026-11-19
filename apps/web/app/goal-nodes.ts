@@ -37,9 +37,7 @@ function nextStepFor(t: Translate, goal: Goal, locale: string): string {
       : t("goalNodes.closedNoOutcome");
   }
   if (goal.daysPastDue !== null && goal.daysPastDue > 0) {
-    return goal.daysPastDue === 1
-      ? t("goalNodes.checkInOverdueOne", { count: goal.daysPastDue })
-      : t("goalNodes.checkInOverdueOther", { count: goal.daysPastDue });
+    return t("goalNodes.checkInOverdue", { count: goal.daysPastDue });
   }
   if (goal.nextCheckInOn) {
     // "check in by Mon" rather than an ISO date (OKRGoal UX review, N7).

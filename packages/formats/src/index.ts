@@ -55,6 +55,12 @@ export {
   type ShippedLocaleCode,
 } from "./locales.ts";
 export {
+  type Catalogue,
+  type MessageValues,
+  messageHoles,
+  translate,
+} from "./messages.ts";
+export {
   type MentionName,
   richTextAsLine,
   richTextLength,

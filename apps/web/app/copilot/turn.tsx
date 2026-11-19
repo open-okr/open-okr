@@ -145,9 +145,7 @@ export function stepWords(
     case "found":
       return step.count === 0
         ? t("copilot.copilotPanel.step.foundNone")
-        : step.count === 1
-          ? t("copilot.copilotPanel.step.foundOne", { count: step.count })
-          : t("copilot.copilotPanel.step.foundOther", { count: step.count });
+        : t("copilot.copilotPanel.step.found", { count: step.count });
     case "reading":
       return readingWords(step, t);
     case "proposing":

@@ -115,7 +115,7 @@ export function TranslationsProvider({
     return {
       locale,
       t: (key: string, values?: MessageValues) =>
-        translate(activeCatalogue, key, values, renamed),
+        translate(activeCatalogue, key, values, renamed, locale),
     };
   }, [locale, catalogue, catalogueOverride, dynCatalogue, renamed]);
 
