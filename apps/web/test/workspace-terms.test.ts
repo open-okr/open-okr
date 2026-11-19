@@ -1,6 +1,7 @@
 import { ACCESS_LEVELS, navigationFor } from "@openokr/core";
 import { TERM_KEYS, TERMINOLOGY } from "@openokr/method";
-import { CATALOGUES, TranslationsProvider, translate } from "@openokr/ui";
+import { TranslationsProvider, translate } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 import { type ComponentProps, createElement, type ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";

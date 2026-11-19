@@ -1,4 +1,5 @@
-import { CATALOGUES, TranslationsProvider, translate } from "@openokr/ui";
+import { TranslationsProvider, translate } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";

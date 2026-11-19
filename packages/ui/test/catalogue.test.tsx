@@ -2,13 +2,12 @@ import { render } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import {
   buildPseudoCatalogue,
-  CATALOGUES,
   findUnwrappedText,
   messageHoles,
-  missingKeys,
   toPseudoLocale,
   translate,
 } from "../src/i18n/catalogue.ts";
+import { CATALOGUES, missingKeys } from "../src/i18n/catalogues.ts";
 import { isTermHole } from "../src/i18n/terms.ts";
 import {
   TranslationsProvider,

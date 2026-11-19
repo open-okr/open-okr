@@ -1,6 +1,5 @@
 import { loadEnv } from "@openokr/config";
 import {
-  CATALOGUES,
   QueryProvider,
   ThemeProvider,
   ToastProvider,
@@ -18,6 +17,7 @@ import { ClientErrorReporter } from "../lib/client-error-reporter";
 import { getInstanceName } from "../lib/instance-name";
 import { InstanceNameProvider } from "../lib/instance-name-context";
 import { resolveLocale } from "../lib/locale";
+import { getCatalogue } from "../lib/translations";
 import {
   workspaceBrandImages,
   workspaceBrandStyleSheet,
@@ -109,6 +109,7 @@ export default async function RootLayout({
   // never throw, and are empty before sign-in.
   const renamed = await workspaceTerms();
   const brandStyle = await workspaceBrandStyleSheet();
+  const catalogue = getCatalogue(locale);
 
   return (
     <html
@@ -157,7 +158,7 @@ export default async function RootLayout({
              * else, and has to still be there when you arrive.
              */}
             <ToastProvider
-              dismissLabel={translate(CATALOGUES[locale], "common.dismiss")}
+              dismissLabel={translate(catalogue, "common.dismiss")}
             >
               <QueryProvider buildId={loadEnv().APP_BUILD_ID}>
                 <InstanceNameProvider name={instanceName}>

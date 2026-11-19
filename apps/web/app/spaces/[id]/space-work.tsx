@@ -106,7 +106,7 @@ export async function SpaceKpiTrees({
       <CardBody className="flex flex-col gap-3 p-0">
         {trees.length === 0 ? (
           <p className="p-3 text-sm text-ink-3">
-            {t("spaces.detail.noKpisYouCanSee")}
+            {t("spaces.detail.noKpisYet")}
           </p>
         ) : (
           trees.map((tree) => {

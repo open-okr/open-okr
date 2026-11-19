@@ -1,5 +1,6 @@
 "use client";
 
+import { LOCALES, type LocaleCode } from "@openokr/formats";
 import { Tooltip, useTheme, useTranslations } from "@openokr/ui";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -39,18 +40,12 @@ const DENSITIES = [
 ] as const;
 
 /**
- * The locales with a catalogue (P6-G22a).
- *
- * A literal list rather than `CATALOGUES`, because this is a client component
- * and importing a value from the catalogue module would pull it into the
- * bundle. The keys it would give are the same two, and `catalogue.test.tsx`
- * fails if a locale is added without a stub, so a third one cannot arrive
- * unnoticed.
+ * The locales with a catalogue, read from the registry (docs/design/languages.md §4.2).
  */
-const LANGUAGES = [
-  { value: "en", label: "appearance.english" },
-  { value: "ms", label: "appearance.bahasaMelayu" },
-] as const;
+const LANGUAGES = LOCALES.filter((l) => l.shipped).map((l) => ({
+  value: l.code,
+  label: l.endonymKey,
+}));
 
 export function AppearanceControl({
   compact = false,
@@ -70,12 +65,12 @@ export function AppearanceControl({
    * (P6-G22a). Passed in from the server, because unlike the theme there is
    * no provider holding it: the catalogue is chosen while the page renders.
    */
-  readonly language?: "en" | "ms" | null;
+  readonly language?: LocaleCode | null;
 }) {
   const { t } = useTranslations();
   const { theme, density, width, setTheme, setDensity, setWidth } = useTheme();
   const [problem, setProblem] = useState<string | null>(null);
-  const [pendingLanguage, setPendingLanguage] = useState<"en" | "ms" | null>(
+  const [pendingLanguage, setPendingLanguage] = useState<LocaleCode | null>(
     language,
   );
 

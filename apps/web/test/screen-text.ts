@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { CATALOGUES, fillTermHole } from "@openokr/ui";
+import { fillTermHole } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 
 /**
  * What a screen says, read from its source (P6-G22c).

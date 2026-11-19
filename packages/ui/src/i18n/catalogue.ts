@@ -55,24 +55,12 @@
  */
 import type { TerminologyOverrides } from "@openokr/method";
 import en from "./messages/en.json";
-import ms from "./messages/ms.json";
 import { fillTermHole, isTermHole } from "./terms.ts";
 
 export type Catalogue = Readonly<Record<string, string>>;
 export type Locale = "en" | "ms";
 
-export const CATALOGUES: Readonly<Record<Locale, Catalogue>> = { en, ms };
-
 export const SOURCE_LOCALE: Locale = "en";
-
-/** Keys present in the source but missing from another locale's catalogue.
- * Empty means every locale is at least "stubbed": present, not necessarily
- * translated. */
-export function missingKeys(locale: Locale): readonly string[] {
-  const source = CATALOGUES[SOURCE_LOCALE];
-  const target = CATALOGUES[locale];
-  return Object.keys(source).filter((key) => !(key in target));
-}
 
 /** What a message's named holes are filled with. */
 export type MessageValues = Readonly<Record<string, string | number>>;
@@ -192,9 +180,7 @@ export function toPseudoLocale(value: string): string {
   return `[${accented}${padding}]`;
 }
 
-export function buildPseudoCatalogue(
-  source: Catalogue = CATALOGUES[SOURCE_LOCALE],
-): Catalogue {
+export function buildPseudoCatalogue(source: Catalogue = en): Catalogue {
   return Object.fromEntries(
     Object.entries(source).map(([key, value]) => [key, toPseudoLocale(value)]),
   );

@@ -3,11 +3,11 @@ import { render } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import {
   buildPseudoCatalogue,
-  CATALOGUES,
   findUnwrappedText,
   messageHoles,
   translate,
 } from "../src/i18n/catalogue.ts";
+import { CATALOGUES } from "../src/i18n/catalogues.ts";
 import {
   inRunningText,
   isTermHole,

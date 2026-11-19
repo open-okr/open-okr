@@ -8,7 +8,7 @@ import {
   KPI_STATES,
   TRIGGER_CATALOGUE,
 } from "@openokr/method";
-import { CATALOGUES } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 import { describe, expect, test } from "vitest";
 import {
   ASSIST_NAME_KEYS,

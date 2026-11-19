@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { CATALOGUES, translate } from "@openokr/ui";
+import { translate } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 import { describe, expect, test } from "vitest";
 
 /**

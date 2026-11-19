@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CATALOGUES, missingKeys } from "@openokr/ui";
+import { CATALOGUES, missingKeys } from "@openokr/ui/catalogues";
 import { describe, expect, test } from "vitest";
 import {
   beginsMidSentence,
