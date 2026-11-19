@@ -81,6 +81,7 @@ Statuses: **to do**, **design written**, **in verification**, **done**, **merged
 |---|---|---|
 | A1 | done | Committed as `abc5db70` on 19 November 2026. Task creation and both session writes use role floors. Data change `0036_session_role_permissions` fills the new permission. The production build, `check:fast`, and 37 browser checks passed. The changed-test run passed 8,136 source tests, including the PgBouncer and password checks. It also picked up 194 generated test copies from the concurrent build. After moving the build output, the affected web run passed all 1,113 tests. |
 | A2 | in verification | Approved on 19 November 2026. The proxy uses the configured public origin on pages and sign-in redirects. Regression tests cover both schemes, the default and conflicting request headers. Browser checks are grouped at the end of the patch. |
-| A3, W2, C1 | to do | Design and explicit approval before code. |
+| A3 | design written, waiting for design approved | [Demo persona roles](../design/demo-persona-roles.md) gives verified roleless demo accounts built-in Member through the existing assignment path. |
+| W2, C1 | to do | Design and explicit approval before code. |
 | W1, C2, C3, C4, C5, C6 | to do | Findings carried forward on 19 November 2026. |
 | Section 6 | decided | Akmal approved the directions on 19 November 2026 and chose machine translation for the initial copy. |
