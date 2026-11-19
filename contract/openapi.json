@@ -8991,7 +8991,7 @@
     "/ai/readToolCallSummary": {
       "get": {
         "operationId": "ai.readToolCallSummary",
-        "summary": "How much external agents were used in this workspace over 30 days, and how often refused, with no member named, and the copilot's reads over the same days with the member each was made for.",
+        "summary": "External agent calls, copilot read totals and recent copilot activity over 30 days. Only the copilot activity names members.",
         "tags": [
           "ai"
         ],
@@ -9066,6 +9066,14 @@
                                       "null"
                                     ]
                                   },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "read",
+                                      "proposal",
+                                      "unknown"
+                                    ]
+                                  },
                                   "outcome": {
                                     "type": "string"
                                   },
@@ -9076,6 +9084,7 @@
                                 "required": [
                                   "member",
                                   "tool",
+                                  "kind",
                                   "outcome",
                                   "calledAt"
                                 ],

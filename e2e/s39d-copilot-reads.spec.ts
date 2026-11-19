@@ -634,6 +634,25 @@ test("the provider gets the member's Malay locale and health labels, and adjacen
   }
 });
 
+test("Admin AI labels proposal outcomes and counts only reads", async () => {
+  const admin = await context.newPage();
+  try {
+    await goTo(admin, "/admin/ai");
+    const recent = admin.getByRole("list", { name: "Copilot activity, last 30 days" });
+    await expect(recent.getByText("proposal refused", { exact: false })).toBeVisible();
+    await expect(recent.getByText("proposal prepared", { exact: false })).toHaveCount(2);
+    const { rows } = await pool.query<{ reads: number }>(
+      `select count(*)::int as reads from ai_tool_calls
+       where workspace_id = $1 and source = 'copilot' and scope = 'read'
+       and called_at >= now() - interval '30 days'`,
+      [workspaceId],
+    );
+    await expect(admin.getByText(`${rows[0]?.reads} reads made for members`, { exact: false })).toBeVisible();
+  } finally {
+    await admin.close();
+  }
+});
+
 test("with the provider off, the same question returns matching passages and the reason, and no model is called", async () => {
   await pool.query("update ai_providers set enabled = false where id = $1", [
     providerId,

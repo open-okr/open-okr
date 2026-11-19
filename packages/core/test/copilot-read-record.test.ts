@@ -259,6 +259,28 @@ describe("what the loop records", () => {
 });
 
 describe("the line under an answer after a reload", () => {
+  it("counts a read and excludes successful and refused proposals", async () => {
+    const { threadId } = (await call("copilot.ask", {
+      question: QUESTION,
+    })) as { threadId: string };
+    const { appPool } = await workerDb();
+    for (const [tool, outcome] of [
+      ["goals.list", "ok"],
+      ["propose_change", "ok"],
+      ["propose_change", "refused"],
+    ] as const) {
+      await recordCopilotRead(appPool, {
+        workspaceId,
+        memberId: priyaMemberId,
+        result: { tool, outcome, durationMs: 4, text: "", entities: [] },
+      });
+    }
+    await call("copilot.recordAnswer", { threadId, text: "One read." });
+    expect(
+      (await answers(threadId)).map((message) => message.readCount),
+    ).toEqual([0, 1]);
+  });
+
   it("counts the reads behind each recorded answer, and none for a question", async () => {
     const first = await answerQuestion(await contextFor(new ReadingDrafter()), {
       workspaceId,
@@ -364,6 +386,57 @@ describe("the line under an answer after a reload", () => {
 });
 
 describe("what an administrator sees", () => {
+  it("labels logged proposals separately from the read totals", async () => {
+    await answerQuestion(await contextFor(new ReadingDrafter(true)), {
+      workspaceId,
+      question: QUESTION,
+    });
+    const { appPool } = await workerDb();
+    for (const outcome of ["ok", "refused"] as const) {
+      await recordCopilotRead(appPool, {
+        workspaceId,
+        memberId: priyaMemberId,
+        result: {
+          tool: "propose_change",
+          outcome,
+          durationMs: 4,
+          text: "",
+          entities: [],
+        },
+      });
+    }
+    const summary = await callAction(
+      await contextFor(),
+      "ai.readToolCallSummary",
+      {},
+    );
+    expect(summary.copilot).toMatchObject({ calls: 2, refused: 0 });
+    expect(summary.copilot.recent).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tool: "propose_change",
+          kind: "proposal",
+          outcome: "refused",
+        }),
+        expect.objectContaining({
+          tool: "propose_change",
+          kind: "proposal",
+          outcome: "ok",
+        }),
+        expect.objectContaining({
+          tool: "goals.read",
+          kind: "read",
+          outcome: "ok",
+        }),
+        expect.objectContaining({
+          tool: null,
+          kind: "unknown",
+          outcome: "unknown_tool",
+        }),
+      ]),
+    );
+  });
+
   it("lists each copilot read with the member, the tool, the outcome and the time", async () => {
     await answerQuestion(await contextFor(new ReadingDrafter()), {
       workspaceId,

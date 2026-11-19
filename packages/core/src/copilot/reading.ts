@@ -303,13 +303,11 @@ export async function* readLiveData(
   const run = {
     round: 0,
     card: null as ProposedCard | null,
-    // Calls to `propose_change` the drafter counted among its reads.
-    proposalCalls: 0,
+    reads: 0,
   };
 
   const read = async (name: string, args: unknown): Promise<string> => {
     if (name === PROPOSE_TOOL && proposer) {
-      run.proposalCalls += 1;
       if (run.round === 1 && run.card === null) {
         // Shown while the call is being built, and only then (A4-D5).
         queue.push({ step: "proposing" });
@@ -339,6 +337,7 @@ export async function* readLiveData(
     });
     collectSegments(result.text, segments);
     if ((COPILOT_READS as readonly string[]).includes(name)) {
+      run.reads += 1;
       const label = result.subject?.label;
       queue.push({
         step: "reading",
@@ -459,11 +458,7 @@ export async function* readLiveData(
     return null;
   }
   const loop = chosen.ok ? chosen.value : null;
-  // A `propose_change` call is one of the loop's calls (A4-D8) but opens no
-  // record, so it is not a read: the answer's sources and the "made n reads"
-  // line count reads only.
-  const reads =
-    Math.max(0, (loop?.reads ?? 0) - run.proposalCalls) + subjectReads;
+  const reads = run.reads + subjectReads;
   const limited = loop?.limited ?? false;
   const costUsd = loop?.costUsd ?? 0;
   const tokensIn = loop?.tokensIn ?? 0;

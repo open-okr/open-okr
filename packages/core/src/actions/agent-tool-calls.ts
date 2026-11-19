@@ -27,8 +27,9 @@ import { defineReadAction } from "./define.ts";
 
 const DAY = 86_400_000;
 
-/** How many of the copilot's latest reads the administrator's list shows. */
-const COPILOT_RECENT_READS = 20;
+/** How many of the copilot's latest calls the administrator's list shows. */
+const COPILOT_RECENT_CALLS = 20;
+const copilotCallKind = z.enum(["read", "proposal", "unknown"]);
 
 const callRow = z.object({
   tool: z.string().nullable(),
@@ -131,7 +132,7 @@ export const readToolCallSummary = defineReadAction({
   name: "ai.readToolCallSummary",
   agentSurface: false,
   summary:
-    "How much external agents were used in this workspace over 30 days, and how often refused, with no member named, and the copilot's reads over the same days with the member each was made for.",
+    "External agent calls, copilot read totals and recent copilot activity over 30 days. Only the copilot activity names members.",
   input: z.object({}),
   output: z.object({
     calls: z.number().int(),
@@ -139,15 +140,16 @@ export const readToolCallSummary = defineReadAction({
     busiestTools: z.array(
       z.object({ tool: z.string(), calls: z.number().int() }),
     ),
-    /** The copilot's reads, counted apart from external agents' calls. */
+    /** Copilot read totals and the latest activity, including proposals. */
     copilot: z.object({
       calls: z.number().int(),
       refused: z.number().int(),
-      /** The latest reads, newest first. */
+      /** The latest calls, newest first. */
       recent: z.array(
         z.object({
           member: z.string(),
           tool: z.string().nullable(),
+          kind: copilotCallKind,
           outcome: z.string(),
           calledAt: z.string(),
         }),
@@ -200,11 +202,12 @@ export const readToolCallSummary = defineReadAction({
           refused: sql<number>`count(*) filter (where ${aiToolCalls.outcome} <> 'ok')::int`,
         })
         .from(aiToolCalls)
-        .where(copilotOnly);
+        .where(and(copilotOnly, eq(aiToolCalls.scope, "read")));
       const copilotRecent = await tx
         .select({
           member: workspaceMembers.name,
           tool: aiToolCalls.tool,
+          scope: aiToolCalls.scope,
           outcome: aiToolCalls.outcome,
           calledAt: aiToolCalls.calledAt,
         })
@@ -215,7 +218,7 @@ export const readToolCallSummary = defineReadAction({
         )
         .where(copilotOnly)
         .orderBy(desc(aiToolCalls.calledAt), desc(aiToolCalls.id))
-        .limit(COPILOT_RECENT_READS);
+        .limit(COPILOT_RECENT_CALLS);
       return {
         calls: totals?.calls ?? 0,
         refused: totals?.refused ?? 0,
@@ -226,12 +229,22 @@ export const readToolCallSummary = defineReadAction({
         copilot: {
           calls: copilotTotals?.calls ?? 0,
           refused: copilotTotals?.refused ?? 0,
-          recent: copilotRecent.map((row) => ({
-            member: row.member,
-            tool: row.tool,
-            outcome: row.outcome,
-            calledAt: row.calledAt.toISOString(),
-          })),
+          recent: copilotRecent.map((row) => {
+            // The recorder reserves the write scope for proposal attempts.
+            const kind: z.infer<typeof copilotCallKind> =
+              row.scope === "write"
+                ? "proposal"
+                : row.scope === "read"
+                  ? "read"
+                  : "unknown";
+            return {
+              member: row.member,
+              tool: row.tool,
+              kind,
+              outcome: row.outcome,
+              calledAt: row.calledAt.toISOString(),
+            };
+          }),
         },
       };
     });

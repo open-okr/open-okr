@@ -32,16 +32,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import {
-  and,
-  desc,
-  eq,
-  gte,
-  inArray,
-  isNotNull,
-  isNull,
-  sql,
-} from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -491,7 +482,8 @@ export const completeRun = defineWriteAction({
           tokensIn: input.tokensIn ?? null,
           tokensOut: input.tokensOut ?? null,
           cost: input.cost === undefined ? null : String(input.cost),
-          runCompletedAt: new Date(),
+          // The read records use the database clock for their call times.
+          runCompletedAt: sql`now()`,
           runHaltedReason: input.haltedReason ?? null,
           updatedAt: new Date(),
         })
@@ -605,7 +597,7 @@ export const stopRun = defineWriteAction({
       if (running) {
         await tx
           .update(aiMessages)
-          .set({ stoppedAt: new Date(), updatedAt: new Date() })
+          .set({ stoppedAt: sql`now()`, updatedAt: new Date() })
           .where(
             activeOnly(
               aiMessages,
@@ -1251,7 +1243,7 @@ export async function answerContextsInTx(
             eq(aiToolCalls.workspaceId, workspaceId),
             eq(aiToolCalls.memberId, memberId),
             eq(aiToolCalls.source, "copilot"),
-            isNotNull(aiToolCalls.tool),
+            eq(aiToolCalls.scope, "read"),
             gte(aiToolCalls.calledAt, first),
           ),
         )
@@ -1389,9 +1381,7 @@ export const readThread = defineReadAction({
                   eq(aiToolCalls.workspaceId, context.workspaceId),
                   eq(aiToolCalls.memberId, memberId),
                   eq(aiToolCalls.source, "copilot"),
-                  // Only the copilot's own tools, as the live line labels
-                  // only those: an unknown tool's row has a null tool.
-                  isNotNull(aiToolCalls.tool),
+                  eq(aiToolCalls.scope, "read"),
                   gte(aiToolCalls.calledAt, first),
                 ),
               )
