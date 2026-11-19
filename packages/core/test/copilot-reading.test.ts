@@ -556,7 +556,9 @@ describe("a reading step off the wire", () => {
     expect(
       copilotStepFrom({ step: "reading", tool: "goals.read", subject: "Grow" }),
     ).toEqual({ step: "reading", tool: "goals.read", subject: "Grow" });
-    expect(copilotStepFrom({ step: "reading", tool: "goals.list" })).toEqual({
+    expect(
+      copilotStepFrom({ step: "reading", tool: "goals.list", subject: "Grow" }),
+    ).toEqual({
       step: "reading",
       tool: "goals.list",
     });

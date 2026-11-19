@@ -83,14 +83,6 @@ const SOURCE_CHARS = 1600;
 /** Characters of all records together. Later ones keep a label only. */
 const SOURCES_BUDGET_CHARS = 24_000;
 
-/** Tools that read one named record, so the step may say which. */
-const SINGLE_RECORD_TOOLS: ReadonlySet<string> = new Set([
-  "goals.read",
-  "kpis.detail",
-  "initiatives.read",
-  "tasks.read",
-]);
-
 const SEGMENT_START = /^\s*\[(\d+)\] /;
 const NOT_SHOWN_FOOTER = /^\(.* not shown\)$/;
 
@@ -347,9 +339,7 @@ export async function* readLiveData(
     });
     collectSegments(result.text, segments);
     if ((COPILOT_READS as readonly string[]).includes(name)) {
-      const label = SINGLE_RECORD_TOOLS.has(name)
-        ? result.entities[0]?.label
-        : undefined;
+      const label = result.subject?.label;
       queue.push({
         step: "reading",
         tool: name,
@@ -394,9 +384,7 @@ export async function* readLiveData(
       memberId,
       result,
     });
-    const opened = result.entities.find(
-      (entity) => entity.entityId === anchor.id,
-    );
+    const opened = result.subject;
     const ref = refs.refOf(anchor.id);
     if (result.outcome === "ok" && opened && ref !== undefined) {
       subjectReads = 1;

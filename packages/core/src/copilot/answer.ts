@@ -47,7 +47,7 @@ import {
   proposalRequestText,
   proposeBeforeAnswering,
 } from "./proposals.ts";
-import { COPILOT_READS } from "./read-tools.ts";
+import { COPILOT_READS, singleRecordTool } from "./read-tools.ts";
 import { drainReading, readLiveData, withReadingCost } from "./reading.ts";
 import {
   aiOffReason,
@@ -442,8 +442,10 @@ export function copilotStepFrom(
         return null;
       }
       const subject =
-        typeof data.subject === "string" && data.subject.trim() !== ""
-          ? data.subject.slice(0, 120)
+        singleRecordTool(data.tool) &&
+        typeof data.subject === "string" &&
+        data.subject.trim() !== ""
+          ? data.subject.trim().slice(0, 120)
           : undefined;
       return {
         step: "reading",

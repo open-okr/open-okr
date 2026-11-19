@@ -500,6 +500,7 @@ test("the panel says what it is reading, then answers from the stored values wit
   await expect(
     panel.getByText(/^(Looking through objectives|Reading .+|Writing the answer)…$/),
   ).toBeVisible({ timeout: 15_000 });
+  await expect(panel.getByText(`Reading ${GOAL_TITLE}…`, { exact: true })).toBeVisible();
   // The polite status line is the panel's own region for it.
   await expect(panel.getByRole("status").first()).toBeAttached();
 
@@ -579,6 +580,8 @@ test("an objective the member cannot read is not named, in a tool result or in t
     timeout: 30_000,
   });
   await expect(panel.getByText(SECRET_TITLE)).toHaveCount(0);
+  await panel.getByText("Searched your workspace, made 2 reads", { exact: true }).click();
+  await expect(panel.getByText("Reading an objective", { exact: true })).toBeVisible();
   await expect(page.getByText(SECRET_TITLE)).toHaveCount(0);
 
   // Nothing the model was sent, in a tool result or in the passages, held it.

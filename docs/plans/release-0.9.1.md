@@ -88,5 +88,6 @@ Statuses: **to do**, **design written**, **in verification**, **done**, **merged
 | C2 | in verification | Task proposals can use the named or sole eligible space. Initiative and task links resolve against scoped choices and decline ambiguous matches. |
 | C3 | in verification | A named key result resolves to its editable parent objective. A check-in needs the member's overall confidence, and a short confidence reply can complete the previous request before the card is offered. |
 | C4 | in verification | The interface and copilot share the English or Malay preference. Grounded reads use the existing health labels, and adjacent citations have a separator. The [13 wording items](../report/malay-review-0.9.0.md#doubtful-items-left-for-the-native-speaker) remain tracked for gradual correction. |
-| C5, C6 | to do | Findings carried forward on 19 November 2026. |
+| C5 | in verification | The reading step takes its title from the exact record returned by a successful single-record read. List and refused reads keep generic status. The browser spec checks the displayed title and the refused fallback. |
+| C6 | to do | Finding carried forward on 19 November 2026. |
 | Section 6 | decided | Akmal approved the directions on 19 November 2026 and chose machine translation for the initial copy. |

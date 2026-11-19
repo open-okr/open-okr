@@ -394,6 +394,8 @@ export interface ReadResult {
     readonly entityId: string;
     readonly label: string;
   }[];
+  /** The primary record of a successful single-record read. */
+  readonly subject?: ReadResult["entities"][number];
   /** The agent surface's own vocabulary, so a recorded call needs no translation. */
   readonly outcome: ToolCallOutcome;
   readonly refusalCode?: "forbidden" | "not_found" | "conflict";
@@ -1181,7 +1183,7 @@ export async function runRead(
   const started = performance.now();
   const done = (
     partial: Pick<ReadResult, "text" | "outcome"> &
-      Partial<Pick<ReadResult, "refusalCode" | "entities">>,
+      Partial<Pick<ReadResult, "refusalCode" | "entities" | "subject">>,
   ): ReadResult => ({
     entities: [],
     ...partial,
@@ -1316,7 +1318,20 @@ export async function runRead(
       return done({ text: NOTHING_FOUND, outcome: "ok" });
     }
     const { text, entities } = assemble(groups, refs);
-    return done({ text, entities, outcome: "ok" });
+    const descriptor = singleRecordTool(name);
+    const subject =
+      descriptor &&
+      findReadSubject(
+        entities,
+        descriptor[0],
+        prepared.input[descriptor[1].field],
+      );
+    return done({
+      text,
+      entities,
+      outcome: "ok",
+      ...(subject ? { subject } : {}),
+    });
   } catch (error) {
     return done(failureOf(error));
   }
@@ -1370,6 +1385,20 @@ export const SUBJECT_READS: Readonly<
   task: { tool: "tasks.read", field: "id" },
 };
 
+export function singleRecordTool(name: string) {
+  return Object.entries(SUBJECT_READS).find(([, read]) => read.tool === name);
+}
+
+function findReadSubject(
+  entities: ReadResult["entities"],
+  kind: string,
+  id: unknown,
+): ReadResult["subject"] {
+  return entities.find(
+    (entity) => entity.entityType === kind && entity.entityId === id,
+  );
+}
+
 /**
  * Reads the record a conversation is anchored to, by its real id.
  *
@@ -1392,7 +1421,7 @@ export async function readSubject(
   const tool = SUBJECT_READS[kind];
   const done = (
     partial: Pick<ReadResult, "text" | "outcome"> &
-      Partial<Pick<ReadResult, "refusalCode" | "entities">>,
+      Partial<Pick<ReadResult, "refusalCode" | "entities" | "subject">>,
   ): ReadResult => ({
     entities: [],
     ...partial,
@@ -1424,7 +1453,13 @@ export async function readSubject(
       return done({ text: NOTHING_FOUND, outcome: "ok" });
     }
     const { text, entities } = assemble(groups, refs);
-    return done({ text, entities, outcome: "ok" });
+    const subject = findReadSubject(entities, kind, id);
+    return done({
+      text,
+      entities,
+      outcome: "ok",
+      ...(subject ? { subject } : {}),
+    });
   } catch (error) {
     refs.truncate(mark);
     return done(failureOf(error));
