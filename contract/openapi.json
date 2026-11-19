@@ -36276,6 +36276,9 @@
                                         "total"
                                       ],
                                       "additionalProperties": false
+                                    },
+                                    "canMove": {
+                                      "type": "boolean"
                                     }
                                   },
                                   "required": [
@@ -36289,7 +36292,8 @@
                                     "dueOn",
                                     "position",
                                     "assignees",
-                                    "checklist"
+                                    "checklist",
+                                    "canMove"
                                   ],
                                   "additionalProperties": false
                                 }

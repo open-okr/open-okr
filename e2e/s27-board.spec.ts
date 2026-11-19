@@ -392,6 +392,75 @@ test("an initiative's board is one click from the initiative, and work added the
   expect(made.rows[0]?.initiative_id).toBe(initiative.id);
 });
 
+test("a viewer with one assigned card sees move affordances only on the editable card", async () => {
+  const { rows: memberRows } = await pool.query<{
+    id: string;
+    role_id: string;
+  }>(
+    `select m.id, m.role_id from workspace_members m
+       join users u on u.id = m.user_id
+      where u.email = $1 limit 1`,
+    [INSTANCE_ACCOUNT.email],
+  );
+  const memberId = memberRows[0]?.id;
+  const originalRoleId = memberRows[0]?.role_id;
+  if (!memberId || !originalRoleId) {
+    throw new Error("Signed in member not found");
+  }
+
+  const { rows: viewerRows } = await pool.query<{ id: string }>(
+    `select id from workspace_roles
+      where workspace_id = $1 and builtin_key = 'viewer' and deleted_at is null
+      limit 1`,
+    [workspaceId],
+  );
+  const viewerRoleId = viewerRows[0]?.id;
+  if (!viewerRoleId) {
+    throw new Error("Viewer role not found");
+  }
+
+  try {
+    // Switch member to Viewer role
+    await pool.query(
+      "update workspace_members set role_id = $1 where id = $2",
+      [viewerRoleId, memberId],
+    );
+
+    await goTo(page, "/board");
+
+    const editableCard = page
+      .getByTestId("board-card")
+      .filter({ hasText: TASK });
+    const viewOnlyCard = page
+      .getByTestId("board-card")
+      .filter({ hasText: SECOND });
+
+    await expect(editableCard).toBeVisible({ timeout: 15_000 });
+    await expect(viewOnlyCard).toBeVisible({ timeout: 15_000 });
+
+    // Editable card has move handle and shift buttons
+    await expect(
+      editableCard.getByRole("button", { name: `Reorder ${TASK}` }),
+    ).toBeVisible();
+    await expect(
+      editableCard.getByRole("button", { name: `Move ${TASK} on a column` }),
+    ).toBeVisible();
+
+    // View-only card has neither
+    await expect(
+      viewOnlyCard.getByRole("button", { name: `Reorder ${SECOND}` }),
+    ).toHaveCount(0);
+    await expect(
+      viewOnlyCard.getByRole("button", { name: `Move ${SECOND} on a column` }),
+    ).toHaveCount(0);
+  } finally {
+    await pool.query(
+      "update workspace_members set role_id = $1 where id = $2",
+      [originalRoleId, memberId],
+    );
+  }
+});
+
 /** The task this file works on, by its title. */
 async function taskId(): Promise<string> {
   const { rows } = await pool.query<{ id: string }>(

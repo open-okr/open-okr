@@ -907,6 +907,70 @@ describe("the board, which is a view over one set of rows", () => {
     // it.
     await expect(call("tasks.board", {})).rejects.toThrow();
   });
+
+  it("returns canMove for each card, matching effective task access", async () => {
+    const taskA = await createTask("View-only for Bo", { status: "todo" });
+    const taskB = await createTask("Editable for Bo", { status: "todo" });
+
+    // Assign Bo to taskB, granting an explicit edit binding
+    await call("tasks.assign", { id: taskB.id, memberId: otherMemberId });
+
+    // Set Bo's role to Viewer
+    const wb = await workerDb();
+    const { rows: roleRows } = await wb.admin.query<{ id: string }>(
+      `select id from workspace_roles where workspace_id = $1 and builtin_key = 'viewer' and deleted_at is null`,
+      [workspaceId],
+    );
+    const viewerRoleId = roleRows[0]?.id;
+    if (!viewerRoleId) {
+      throw new Error("Viewer role not found");
+    }
+    await wb.admin.query(
+      `update workspace_members set role_id = $1 where id = $2`,
+      [viewerRoleId, otherMemberId],
+    );
+
+    // For OWNER, both cards have canMove: true
+    const ownerBoard = (await call("tasks.board", { spaceId }, OWNER)) as {
+      columns: {
+        status: string;
+        cards: { id: string; canMove: boolean }[];
+      }[];
+    };
+    const ownerTodoCards =
+      ownerBoard.columns.find((c) => c.status === "todo")?.cards ?? [];
+    const ownerCardA = ownerTodoCards.find((c) => c.id === taskA.id);
+    const ownerCardB = ownerTodoCards.find((c) => c.id === taskB.id);
+    expect(ownerCardA?.canMove).toBe(true);
+    expect(ownerCardB?.canMove).toBe(true);
+
+    // For Bo (OTHER), taskA has canMove: false, taskB has canMove: true
+    const boBoard = (await call("tasks.board", { spaceId }, OTHER)) as {
+      columns: {
+        status: string;
+        cards: { id: string; canMove: boolean }[];
+      }[];
+    };
+    const boTodoCards =
+      boBoard.columns.find((c) => c.status === "todo")?.cards ?? [];
+    const boCardA = boTodoCards.find((c) => c.id === taskA.id);
+    const boCardB = boTodoCards.find((c) => c.id === taskB.id);
+    expect(boCardA?.canMove).toBe(false);
+    expect(boCardB?.canMove).toBe(true);
+
+    // Bo cannot move the view-only task
+    await expect(
+      call("tasks.move", { id: taskA.id, status: "in_progress" }, OTHER),
+    ).rejects.toThrow();
+
+    // Bo can move the editable task after the view-only task
+    const moveResult = (await call(
+      "tasks.move",
+      { id: taskB.id, status: "todo", afterTaskId: taskA.id },
+      OTHER,
+    )) as { id: string };
+    expect(moveResult.id).toBe(taskB.id);
+  });
 });
 
 describe("a task's due date (guided-inputs §4.9)", () => {
