@@ -337,7 +337,7 @@ export async function* readLiveData(
       }
       return result.text;
     }
-    const result = await runRead(context, refs, name, args);
+    const result = await runRead(context, refs, name, args, ask.locale);
     // Every read, including a refused or unknown one, is written down as the
     // member's (design 3.6). Never in the way of the answer.
     await recordCopilotRead(context.pool, {
@@ -382,7 +382,13 @@ export async function* readLiveData(
   // would tell them. The read is recorded either way, like any loop read.
   let subjectReads = 0;
   if (anchor) {
-    const result = await readSubject(context, refs, anchor.kind, anchor.id);
+    const result = await readSubject(
+      context,
+      refs,
+      anchor.kind,
+      anchor.id,
+      ask.locale,
+    );
     await recordCopilotRead(context.pool, {
       workspaceId: context.workspaceId,
       memberId,

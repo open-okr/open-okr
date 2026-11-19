@@ -364,8 +364,13 @@ const subjectBlock = (subject: ReadingContext["subject"]) =>
 const copilotMessages = (context: GroundedQuestionContext) => {
   const note = proposalNoteFor(context.proposal);
   const readingNote = readingNoteFor(context.reading);
+  const language =
+    context.locale === "ms" ? "Malay (Bahasa Melayu)" : "English";
   return [
-    { role: "system" as const, content: COPILOT_SYSTEM },
+    {
+      role: "system" as const,
+      content: `${COPILOT_SYSTEM} Write the answer in ${language}. Use human-readable health names, preserve record names and the SOURCES line.`,
+    },
     ...askerNote(context.asker),
     ...context.history.map((turn) => ({
       role: turn.role === "member" ? ("user" as const) : ("assistant" as const),

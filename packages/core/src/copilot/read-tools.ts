@@ -23,6 +23,7 @@
  */
 import {
   activeOnly,
+  type GoalHealth,
   type ToolCallOutcome,
   withWorkspace,
   workspaceMembers,
@@ -39,6 +40,7 @@ import { EmbeddingService } from "../embeddings/service.ts";
 import { OperationError } from "../operations/errors.ts";
 import { plainTextOfDocument } from "../rich-text/moving.ts";
 import type { RichTextDocument } from "../rich-text/schema.ts";
+import type { MemberLanguage } from "../settings/member-language.ts";
 import { citationLabel } from "./citations.ts";
 
 // ── What is offered ──────────────────────────────────────────────────────
@@ -620,13 +622,43 @@ interface Group {
   readonly mark: number;
 }
 
+// Reuse the default interface wording for data that goes to the model.
+const HEALTH_WORDS: Readonly<
+  Record<GoalHealth, Record<MemberLanguage, string>>
+> = {
+  pending: { en: "No check-in yet", ms: "Belum dilapor" },
+  on_track: { en: "On track", ms: "Di landasan" },
+  caution: { en: "At risk", ms: "Berisiko" },
+  off_track: { en: "Off track", ms: "Tersasar" },
+  outdated: { en: "Outdated", ms: "Lapuk" },
+  achieved: { en: "Achieved", ms: "Tercapai" },
+  missed: { en: "Missed", ms: "Terlepas" },
+  abandoned: { en: "Abandoned", ms: "Ditinggalkan" },
+};
+
+function healthLabel(key: string, value: string, locale: MemberLanguage) {
+  const isCheckInStatus =
+    value === "on_track" || value === "caution" || value === "off_track";
+  if (
+    key === "health" ||
+    (isCheckInStatus && (key === "status" || key === "reportedStatus"))
+  ) {
+    return Object.hasOwn(HEALTH_WORDS, value)
+      ? HEALTH_WORDS[value as GoalHealth][locale]
+      : null;
+  }
+  return null;
+}
+
 class Renderer {
   private readonly refs: RefTable;
   private readonly names: Names;
+  private readonly locale: MemberLanguage;
 
-  constructor(refs: RefTable, names: Names) {
+  constructor(refs: RefTable, names: Names, locale: MemberLanguage) {
     this.refs = refs;
     this.names = names;
+    this.locale = locale;
   }
 
   /** A group for one entity and everything nested under it. */
@@ -801,7 +833,10 @@ class Renderer {
       if (UUID_EXACT.test(value)) {
         return this.idText(value);
       }
-      return value.trim() ? clip(value) : null;
+      return (
+        healthLabel(key, value, this.locale) ??
+        (value.trim() ? clip(value) : null)
+      );
     }
     if (Array.isArray(value)) {
       const parts = value
@@ -1141,6 +1176,7 @@ export async function runRead(
   refs: RefTable,
   name: string,
   args: unknown,
+  locale: MemberLanguage = "en",
 ): Promise<ReadResult> {
   const started = performance.now();
   const done = (
@@ -1244,7 +1280,7 @@ export async function runRead(
         context,
         boards.map((board) => board.output),
       );
-      const renderer = new Renderer(refs, names);
+      const renderer = new Renderer(refs, names, locale);
       groups = [];
       for (const board of boards) {
         const found = groupsOf(name, board.output, renderer);
@@ -1272,7 +1308,7 @@ export async function runRead(
         prepared.input as never,
       );
       names = await lookupNames(context, output);
-      groups = groupsOf(name, output, new Renderer(refs, names));
+      groups = groupsOf(name, output, new Renderer(refs, names, locale));
     }
 
     if (groups.length === 0) {
@@ -1350,6 +1386,7 @@ export async function readSubject(
   refs: RefTable,
   kind: string,
   id: string,
+  locale: MemberLanguage = "en",
 ): Promise<ReadResult> {
   const started = performance.now();
   const tool = SUBJECT_READS[kind];
@@ -1377,7 +1414,11 @@ export async function readSubject(
       { [tool.field]: id } as never,
     );
     const names = await lookupNames(context, output);
-    const groups = groupsOf(tool.tool, output, new Renderer(refs, names));
+    const groups = groupsOf(
+      tool.tool,
+      output,
+      new Renderer(refs, names, locale),
+    );
     if (groups.length === 0) {
       refs.truncate(mark);
       return done({ text: NOTHING_FOUND, outcome: "ok" });

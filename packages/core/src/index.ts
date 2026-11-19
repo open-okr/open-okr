@@ -1334,6 +1334,7 @@ export {
   type StatusHue,
   statusHueOf,
 } from "./settings/brand-colour.ts";
+export { resolveMemberLanguage } from "./settings/member-language.ts";
 export {
   AI_CONTEXT_EGRESS_LEVELS,
   type AIContextEgressLevel,

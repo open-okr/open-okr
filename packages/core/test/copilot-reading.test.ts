@@ -265,6 +265,34 @@ afterAll(async () => {
 });
 
 describe("a whole answer (the chat Ask path)", () => {
+  it("uses the member's interface locale and renders health in words", async () => {
+    await call("people.updateOwnProfile", { language: "ms" });
+    await call("goals.publishDraftedCheckIn", {
+      goalId,
+      status: "on_track",
+      confidence: 0.8,
+      narrative: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "The trial is progressing." }],
+          },
+        ],
+      },
+      values: [],
+    });
+    const drafter = new ReadingDrafter(readTheGoal);
+    await answerQuestion(await contextFor(drafter), {
+      workspaceId,
+      question: QUESTION,
+    });
+    expect(drafter.seen[0]?.locale).toBe("ms");
+    const records = drafter.results.join("\n");
+    expect(records).toContain("Di landasan");
+    expect(records).not.toContain("on_track");
+  });
+
   it("answers from the records it read and cites them", async () => {
     const drafter = new ReadingDrafter(readTheGoal);
     const result = await answerQuestion(await contextFor(drafter), {

@@ -297,21 +297,24 @@ function CitationChip({
     "mx-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-raised px-1 align-baseline text-[10px] leading-4 text-ink-2 tabular-nums";
   const name = t("copilot.copilotPanel.sourceLabel", { n, label });
   return (
-    <Tooltip label={label}>
-      {citation.href ? (
-        <Link
-          href={citation.href}
-          aria-label={name}
-          className={`${className} hover:bg-line`}
-        >
-          {n}
-        </Link>
-      ) : (
-        <span aria-label={name} role="note" className={className}>
-          {n}
-        </span>
-      )}
-    </Tooltip>
+    <>
+      {" "}
+      <Tooltip label={label}>
+        {citation.href ? (
+          <Link
+            href={citation.href}
+            aria-label={name}
+            className={`${className} hover:bg-line`}
+          >
+            {n}
+          </Link>
+        ) : (
+          <span aria-label={name} role="note" className={className}>
+            {n}
+          </span>
+        )}
+      </Tooltip>
+    </>
   );
 }
 

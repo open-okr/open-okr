@@ -56,6 +56,7 @@ const KR_TITLE = "Activated accounts in the first 14 days";
 const SECRET_TITLE = "Quietly merge the Lisbon office";
 const ACTIVATION_QUESTION = "How is my activation key result doing?";
 const SECRET_QUESTION = "How is my secret restructuring objective doing?";
+const LOCALE_QUESTION = "What is the current health of my activation objective?";
 const TASK_TITLE = "Draft the activation handover";
 const CHECK_IN_REQUEST = `Check in on "${KR_TITLE}". We're on track after the new flow shipped.`;
 
@@ -212,11 +213,18 @@ async function streamAnswer(
   const keyResult = prompt.includes("secret restructuring")
     ? undefined
     : passages.find((one) => one.label === KR_TITLE);
-  const text = prompt.includes(`Question: ${CHECK_IN_REQUEST}`) && prompt.includes("ask for that confidence")
+  const goal = passages.find((one) => one.label === GOAL_TITLE);
+  const malay = messages.some(
+    (message) => message.role === "system" && textOf(message.content).includes("Write the answer in Malay (Bahasa Melayu)"),
+  );
+  const healthAnswer = prompt.includes(LOCALE_QUESTION) && malay && keyResult && goal?.content.includes("Di landasan")
+    ? `Objektif berada di landasan.[${goal.index}][${keyResult.index}]\nSOURCES: ${goal.index}, ${keyResult.index}`
+    : null;
+  const text = healthAnswer ?? (prompt.includes(`Question: ${CHECK_IN_REQUEST}`) && prompt.includes("ask for that confidence")
     ? "What is your overall confidence for this check-in?\nSOURCES: none"
     : keyResult
     ? `${keyResult.content} [${keyResult.index}]\nSOURCES: ${keyResult.index}`
-    : "I could not find that objective, so I cannot say how it is doing.\nSOURCES: none";
+    : "I could not find that objective, so I cannot say how it is doing.\nSOURCES: none");
 
   res.writeHead(200, {
     "content-type": "text/event-stream",
@@ -597,6 +605,30 @@ test("a named key result gets an objective check-in card after a confidence repl
   const turn = panel.locator("article").last();
   await expect(turn.getByRole("button", { name: "Apply", exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(turn.getByText(GOAL_TITLE, { exact: true })).toBeVisible();
+});
+
+test("the provider gets the member's Malay locale and health labels, and adjacent citations stay apart", async () => {
+  const panel = await openFreshPanel();
+  const post = async (path: string, data: object) => {
+    const response = await api.post(`/api/v1/${path}`, { headers: authed(), data });
+    expect(response.ok(), `${path}: ${await response.text()}`).toBe(true);
+  };
+  await post("goals/publishDraftedCheckIn", {
+    goalId,
+    status: "on_track",
+    confidence: 0.8,
+    narrative: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Activation is progressing." }] }] },
+    values: [],
+  });
+  await post("people/updateOwnProfile", { language: "ms" });
+  try {
+    await ask(panel, LOCALE_QUESTION);
+    const turn = panel.locator("article").last();
+    await expect(turn).toContainText(/Objektif berada di landasan\. \d+ \d+/, { timeout: 30_000 });
+    await expect(turn).not.toContainText("on_track");
+  } finally {
+    await post("people/updateOwnProfile", { language: "en" });
+  }
 });
 
 test("with the provider off, the same question returns matching passages and the reason, and no model is called", async () => {

@@ -39,6 +39,7 @@ import type {
 } from "../agents/drafter.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { EmbeddingService, type RetrievalHit } from "../embeddings/service.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import { citationLabel } from "./citations.ts";
 import {
@@ -273,6 +274,7 @@ export async function groundQuestion(
     sources,
     ask: {
       question: input.question,
+      locale: await resolveMemberLanguage(context, memberId),
       history: await recentTurns(
         context,
         asked.threadId,

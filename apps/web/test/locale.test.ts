@@ -39,15 +39,8 @@ vi.mock("next/headers", () => ({
   },
 }));
 vi.mock("@openokr/core", () => ({
-  callAction: async (_context: unknown, name: string) => {
-    if (name === "people.readMember") {
-      return { language: state.memberLanguage };
-    }
-    if (name === "settings.readWorkspaceSettings") {
-      return { settings: { language: state.workspaceLanguage } };
-    }
-    throw new Error(`Unexpected action ${name}`);
-  },
+  resolveMemberLanguage: async () =>
+    state.memberLanguage ?? state.workspaceLanguage ?? "en",
   resolveInstanceDefaultLanguage: async () => {
     if (state.instanceLanguage instanceof Error) {
       throw state.instanceLanguage;

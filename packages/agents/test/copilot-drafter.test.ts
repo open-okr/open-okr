@@ -207,6 +207,25 @@ describe("what the answer is told about the card (plan 0.8.1 A2)", () => {
   });
 });
 
+it.each([
+  ["en", "English"],
+  ["ms", "Malay (Bahasa Melayu)"],
+] as const)(
+  "instructs both answer paths to write in the %s locale",
+  async (locale, language) => {
+    const { drafter, provider } = drafterOver(["The answer.\nSOURCES: none"]);
+    const localQuestion = { ...question, locale };
+    await drafter.answerGrounded?.(localQuestion);
+    await collect(streamOf(drafter, localQuestion));
+    expect(provider.requests).toHaveLength(2);
+    for (const request of provider.requests) {
+      expect(request.messages[0]?.content).toContain(
+        `Write the answer in ${language}`,
+      );
+    }
+  },
+);
+
 describe("who the answer is told is asking (plan 0.9.0 L7b)", () => {
   const systemNotes = (provider: ScriptedProvider) =>
     (provider.requests[0]?.messages ?? [])
