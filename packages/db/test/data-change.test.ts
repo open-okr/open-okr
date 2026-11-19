@@ -58,6 +58,7 @@ import { revalidationNoteDocuments } from "../src/data-changes/0032_revalidation
 import { attachmentRowsFromText } from "../src/data-changes/0033_attachment_rows_from_text.ts";
 import { shortIds } from "../src/data-changes/0034_short_ids.ts";
 import { indexContentNeverQueued } from "../src/data-changes/0035_index_content_never_queued.ts";
+import { kpiAccessContexts } from "../src/data-changes/0037_kpi_access_contexts.ts";
 import { plainTextDocument } from "../src/data-changes/plain-text-document.ts";
 import { registeredDataChanges } from "../src/data-changes/registry.ts";
 import { runMigrations } from "../src/migrate.ts";
@@ -3262,5 +3263,231 @@ describe("0035: queues the check-ins, key results, blockers and objectives neith
       await owner.end();
       await wb.admin.query(`drop database if exists ${ownerDb} with (force)`);
     }
+  });
+});
+
+describe("0037: kpi access contexts and owner bindings (AC-26, AC-27)", () => {
+  it("AC-27: gives space and spaceless KPIs contexts, standard and owner bindings, re-points search and activities, without new agent bindings", async () => {
+    await runMigrations(client, { dirs: [MIGRATIONS] });
+
+    // Workspace before 0037:
+    // - Human member Ana (owner of both KPIs)
+    // - Two agent members (Champion & Coach)
+    // - workspace_standard group
+    // - Space 'Product'
+    // - Spaceless KPI with an existing context from 0009 and agent bindings on it
+    // - Space KPI with NO context
+    // - Search rows and activity rows for both KPIs pointing to workspace context or null
+    const { rows } = await client.query<{
+      workspace_id: string;
+      ana_id: string;
+      spaceless_kpi_id: string;
+      spaceless_ctx_id: string;
+      space_kpi_id: string;
+    }>(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme 37', 'acme-37') returning id
+       ), ws_ctx as (
+         insert into access_contexts (id, workspace_id, resource_type, resource_id)
+         select gen_random_uuid(), w.id, 'workspace', w.id from w returning id, workspace_id
+       ), ws_grp as (
+         insert into access_groups (id, workspace_id, kind)
+         select gen_random_uuid(), w.id, 'workspace_standard' from w returning id
+       ), s as (
+         insert into spaces (id, workspace_id, name)
+         select gen_random_uuid(), w.id, 'Product' from w returning id, workspace_id
+       ), ana as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Ana', 'human', 'active' from w
+         returning id, workspace_id
+       ), champion as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'OKR Champion', 'agent', 'active' from w
+         returning id, workspace_id
+       ), coach as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'OKR Coach', 'agent', 'active' from w
+         returning id, workspace_id
+       ), agents_in as (
+         insert into agents (id, workspace_id, member_id, name, kind)
+         select gen_random_uuid(), champion.workspace_id, champion.id, 'OKR Champion', 'champion' from champion
+         union all
+         select gen_random_uuid(), coach.workspace_id, coach.id, 'OKR Coach', 'coach' from coach
+         returning id
+       ), champion_grp as (
+         insert into access_groups (id, workspace_id, kind, member_id)
+         select gen_random_uuid(), champion.workspace_id, 'member', champion.id from champion
+         returning id, workspace_id
+       ), coach_grp as (
+         insert into access_groups (id, workspace_id, kind, member_id)
+         select gen_random_uuid(), coach.workspace_id, 'member', coach.id from coach
+         returning id, workspace_id
+       ), spaceless_k as (
+         insert into kpis (id, workspace_id, short_id, title, frequency, direction, target_type, indicator_type, aggregate, owner_kind, owner_member_id)
+         select gen_random_uuid(), w.id, 'K-37-1', 'Spaceless KPI', 'monthly', 'higher_better', 'at_least', 'lagging', 'sum', 'workspace', ana.id from w, ana
+         returning id, workspace_id
+       ), spaceless_ctx as (
+         insert into access_contexts (id, workspace_id, resource_type, resource_id)
+         select gen_random_uuid(), spaceless_k.workspace_id, 'kpi', spaceless_k.id from spaceless_k
+         returning id, workspace_id
+       ), spaceless_agent_b1 as (
+         insert into access_bindings (id, workspace_id, group_id, context_id, level)
+         select gen_random_uuid(), champion_grp.workspace_id, champion_grp.id, spaceless_ctx.id, 10 from champion_grp, spaceless_ctx
+         returning id
+       ), spaceless_agent_b2 as (
+         insert into access_bindings (id, workspace_id, group_id, context_id, level)
+         select gen_random_uuid(), coach_grp.workspace_id, coach_grp.id, spaceless_ctx.id, 10 from coach_grp, spaceless_ctx
+         returning id
+       ), space_k as (
+         insert into kpis (id, workspace_id, short_id, title, frequency, direction, target_type, indicator_type, aggregate, owner_kind, space_id, owner_member_id)
+         select gen_random_uuid(), s.workspace_id, 'K-37-2', 'Space KPI', 'monthly', 'higher_better', 'at_least', 'lagging', 'sum', 'space', s.id, ana.id from s, ana
+         returning id, workspace_id
+       ), search_in as (
+         insert into search_documents (id, workspace_id, entity_type, entity_id, context_id, title, body)
+         select gen_random_uuid(), spaceless_k.workspace_id, 'kpi', spaceless_k.id, ws_ctx.id, 'Spaceless KPI', 'Body' from spaceless_k, ws_ctx
+         union all
+         select gen_random_uuid(), space_k.workspace_id, 'kpi', space_k.id, ws_ctx.id, 'Space KPI', 'Body' from space_k, ws_ctx
+         returning id
+       ), act_in as (
+         insert into activities (id, workspace_id, kind, actor_kind, subject_type, subject_id, context_id, payload)
+         select gen_random_uuid(), spaceless_k.workspace_id, 'kpi.updated', 'human', 'kpi', spaceless_k.id, null::uuid, '{}'::jsonb from spaceless_k
+         union all
+         select gen_random_uuid(), space_k.workspace_id, 'kpi.updated', 'human', 'kpi', space_k.id, null::uuid, '{}'::jsonb from space_k
+         returning id
+       )
+       select w.id as workspace_id, ana.id as ana_id,
+              spaceless_k.id as spaceless_kpi_id, spaceless_ctx.id as spaceless_ctx_id,
+              space_k.id as space_kpi_id
+         from w, ana, spaceless_k, spaceless_ctx, space_k, ws_grp, ws_ctx,
+              (select count(*) from search_in) si,
+              (select count(*) from act_in) ai,
+              (select count(*) from spaceless_agent_b1) b1,
+              (select count(*) from spaceless_agent_b2) b2`,
+    );
+
+    const seeded = rows[0];
+    if (!seeded) {
+      throw new Error("Seeding failed for 0037 test");
+    }
+
+    // Run 0037
+    const outcomes = await runDataChanges(client, {
+      scripts: [kpiAccessContexts],
+    });
+    expect(outcomes[0]?.rowsChanged).toBeGreaterThan(0);
+
+    // 1. Both KPIs have access contexts
+    const spaceCtxRes = await client.query<{ id: string }>(
+      "select id from access_contexts where workspace_id = $1 and resource_type = 'kpi' and resource_id = $2 and deleted_at is null",
+      [seeded.workspace_id, seeded.space_kpi_id],
+    );
+    expect(spaceCtxRes.rows).toHaveLength(1);
+    const spaceCtxId = spaceCtxRes.rows[0]?.id as string;
+
+    const spacelessCtxRes = await client.query<{ id: string }>(
+      "select id from access_contexts where workspace_id = $1 and resource_type = 'kpi' and resource_id = $2 and deleted_at is null",
+      [seeded.workspace_id, seeded.spaceless_kpi_id],
+    );
+    expect(spacelessCtxRes.rows).toHaveLength(1);
+    expect(spacelessCtxRes.rows[0]?.id).toBe(seeded.spaceless_ctx_id);
+
+    // 2. Both have workspace_standard bindings at 10, tag null
+    const stdBindings = await client.query<{ context_id: string }>(
+      `select b.context_id from access_bindings b
+         join access_groups g on g.id = b.group_id
+        where b.workspace_id = $1
+          and g.kind = 'workspace_standard'
+          and b.level = 10
+          and b.tag is null
+          and b.deleted_at is null`,
+      [seeded.workspace_id],
+    );
+    const stdContexts = new Set(stdBindings.rows.map((r) => r.context_id));
+    expect(stdContexts.has(seeded.spaceless_ctx_id)).toBe(true);
+    expect(stdContexts.has(spaceCtxId)).toBe(true);
+
+    // 3. Both have owner bindings at 100, tag 'owner'
+    const ownerBindings = await client.query<{
+      context_id: string;
+      member_id: string;
+    }>(
+      `select b.context_id, g.member_id from access_bindings b
+         join access_groups g on g.id = b.group_id
+        where b.workspace_id = $1
+          and g.kind = 'member'
+          and b.level = 100
+          and b.tag = 'owner'
+          and b.deleted_at is null`,
+      [seeded.workspace_id],
+    );
+    expect(ownerBindings.rows).toEqual(
+      expect.arrayContaining([
+        { context_id: seeded.spaceless_ctx_id, member_id: seeded.ana_id },
+        { context_id: spaceCtxId, member_id: seeded.ana_id },
+      ]),
+    );
+
+    // 4. Agent bindings: spaceless KPI has 2 (from 0009), space KPI has 0
+    const agentBindings = await client.query<{ context_id: string }>(
+      `select b.context_id from access_bindings b
+         join access_groups g on g.id = b.group_id
+         join workspace_members m on m.id = g.member_id
+        where b.workspace_id = $1
+          and m.kind = 'agent'
+          and b.deleted_at is null`,
+      [seeded.workspace_id],
+    );
+    const spacelessAgentCount = agentBindings.rows.filter(
+      (r) => r.context_id === seeded.spaceless_ctx_id,
+    ).length;
+    const spaceAgentCount = agentBindings.rows.filter(
+      (r) => r.context_id === spaceCtxId,
+    ).length;
+    expect(spacelessAgentCount).toBe(2);
+    expect(spaceAgentCount).toBe(0);
+
+    // 5. Search documents carry their own context ids
+    const searchDocs = await client.query<{
+      entity_id: string;
+      context_id: string;
+    }>(
+      "select entity_id, context_id from search_documents where workspace_id = $1 and entity_type = 'kpi'",
+      [seeded.workspace_id],
+    );
+    expect(searchDocs.rows).toEqual(
+      expect.arrayContaining([
+        {
+          entity_id: seeded.spaceless_kpi_id,
+          context_id: seeded.spaceless_ctx_id,
+        },
+        { entity_id: seeded.space_kpi_id, context_id: spaceCtxId },
+      ]),
+    );
+
+    // 6. Activities carry their own context ids
+    const activities = await client.query<{
+      subject_id: string;
+      context_id: string;
+    }>(
+      "select subject_id, context_id from activities where workspace_id = $1 and subject_type = 'kpi'",
+      [seeded.workspace_id],
+    );
+    expect(activities.rows).toEqual(
+      expect.arrayContaining([
+        {
+          subject_id: seeded.spaceless_kpi_id,
+          context_id: seeded.spaceless_ctx_id,
+        },
+        { subject_id: seeded.space_kpi_id, context_id: spaceCtxId },
+      ]),
+    );
+
+    // AC-26: running it a second time changes 0 rows
+    await client.query("delete from _data_changes");
+    const secondOutcomes = await runDataChanges(client, {
+      scripts: [kpiAccessContexts],
+    });
+    expect(secondOutcomes[0]?.rowsChanged).toBe(0);
   });
 });
