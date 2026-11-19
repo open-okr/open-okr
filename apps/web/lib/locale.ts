@@ -2,7 +2,8 @@ import {
   resolveInstanceDefaultLanguage,
   resolveMemberLanguage,
 } from "@openokr/core";
-import { CATALOGUES, type Locale } from "@openokr/ui";
+import { isShippedLocale, SHIPPED_LOCALES } from "@openokr/formats";
+import type { Locale } from "@openokr/ui";
 import { headers } from "next/headers";
 import { browserLocale } from "./accept-language.ts";
 import { getPool } from "./pool";
@@ -43,7 +44,7 @@ export async function resolveLocale(): Promise<Locale> {
 
   const { session, workspace } = signedIn;
   try {
-    return await resolveMemberLanguage(
+    const lang = await resolveMemberLanguage(
       {
         pool: getPool(),
         workspaceId: workspace.workspaceId,
@@ -51,16 +52,13 @@ export async function resolveLocale(): Promise<Locale> {
       },
       workspace.memberId,
     );
+    if (isShippedLocale(lang)) {
+      return lang;
+    }
   } catch {
     return "en";
   }
-}
-
-/** The languages the product has a catalogue for: today `en` and `ms`. */
-const SHIPPED = Object.keys(CATALOGUES) as Locale[];
-
-function isShipped(language: unknown): language is Locale {
-  return SHIPPED.includes(language as Locale);
+  return "en";
 }
 
 /**
@@ -71,9 +69,9 @@ async function visitorLocale(): Promise<Locale> {
   try {
     const browser = browserLocale(
       (await headers()).get("accept-language"),
-      SHIPPED,
+      SHIPPED_LOCALES,
     );
-    if (browser) {
+    if (browser && isShippedLocale(browser)) {
       return browser;
     }
   } catch {
@@ -81,7 +79,7 @@ async function visitorLocale(): Promise<Locale> {
   }
   try {
     const instance = await resolveInstanceDefaultLanguage(getPool());
-    if (isShipped(instance)) {
+    if (isShippedLocale(instance)) {
       return instance;
     }
   } catch {

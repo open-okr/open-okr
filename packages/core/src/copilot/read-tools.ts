@@ -626,7 +626,7 @@ interface Group {
 
 // Reuse the default interface wording for data that goes to the model.
 const HEALTH_WORDS: Readonly<
-  Record<GoalHealth, Record<MemberLanguage, string>>
+  Record<GoalHealth, Partial<Record<MemberLanguage, string>> & { en: string }>
 > = {
   pending: { en: "No check-in yet", ms: "Belum dilapor" },
   on_track: { en: "On track", ms: "Di landasan" },
@@ -645,9 +645,11 @@ function healthLabel(key: string, value: string, locale: MemberLanguage) {
     key === "health" ||
     (isCheckInStatus && (key === "status" || key === "reportedStatus"))
   ) {
-    return Object.hasOwn(HEALTH_WORDS, value)
-      ? HEALTH_WORDS[value as GoalHealth][locale]
-      : null;
+    if (Object.hasOwn(HEALTH_WORDS, value)) {
+      const words = HEALTH_WORDS[value as GoalHealth];
+      return words[locale] ?? words.en;
+    }
+    return null;
   }
   return null;
 }

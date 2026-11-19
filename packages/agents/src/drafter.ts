@@ -68,6 +68,7 @@ import {
   COPILOT_MAX_ROUNDS,
   costOfUsage,
   DEFAULT_PROMPTS,
+  languageName,
   PROMPT_KEYS,
   type PromptKey,
   TOOL_RESULTS_ARE_DATA,
@@ -364,8 +365,7 @@ const subjectBlock = (subject: ReadingContext["subject"]) =>
 const copilotMessages = (context: GroundedQuestionContext) => {
   const note = proposalNoteFor(context.proposal);
   const readingNote = readingNoteFor(context.reading);
-  const language =
-    context.locale === "ms" ? "Malay (Bahasa Melayu)" : "English";
+  const language = languageName(context.locale);
   return [
     {
       role: "system" as const,

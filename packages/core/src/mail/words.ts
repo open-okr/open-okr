@@ -11,6 +11,8 @@
  * A hole is `{name}`, filled by `mailWords(locale)(key, values)`.
  */
 
+import { isShippedLocale } from "@openokr/formats";
+
 export type MailLocale = "en" | "ms";
 
 const en = {
@@ -575,7 +577,10 @@ const WORDS: Readonly<
 
 /** The locale a stored language reads as: Malay where it says so, English otherwise. */
 export function mailLocale(language: string | null | undefined): MailLocale {
-  return language === "ms" ? "ms" : "en";
+  if (language && isShippedLocale(language)) {
+    return language as MailLocale;
+  }
+  return "en";
 }
 
 export type MailWords = (

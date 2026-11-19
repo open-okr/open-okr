@@ -77,10 +77,55 @@ export function browserLocale<L extends string>(
     if (range === "*") {
       continue;
     }
-    const primary = range.split("-")[0];
-    const match = shipped.find((locale) => locale === primary);
-    if (match) {
-      return match;
+
+    // 1. Exact match with a shipped code, compared case-insensitively
+    const exact = shipped.find((code) => code.toLowerCase() === range);
+    if (exact) {
+      return exact;
+    }
+
+    // 2. Traditional Chinese: zh-tw, zh-hk, zh-mo, zh-hant, zh-hant-*
+    // Explicitly no match; try next range (§8.2)
+    if (
+      range === "zh-tw" ||
+      range === "zh-hk" ||
+      range === "zh-mo" ||
+      range === "zh-hant" ||
+      range.startsWith("zh-hant-")
+    ) {
+      continue;
+    }
+
+    // 3. Simplified / generic Chinese: zh, zh-cn, zh-sg, zh-my, zh-hans, zh-hans-*
+    if (
+      range === "zh" ||
+      range === "zh-cn" ||
+      range === "zh-sg" ||
+      range === "zh-my" ||
+      range === "zh-hans" ||
+      range.startsWith("zh-hans-")
+    ) {
+      const zhHans = shipped.find((code) => code.toLowerCase() === "zh-hans");
+      if (zhHans) {
+        return zhHans;
+      }
+      continue;
+    }
+
+    // 4. in (the old code for Indonesian)
+    if (range === "in" || range.startsWith("in-")) {
+      const idMatch = shipped.find((code) => code.toLowerCase() === "id");
+      if (idMatch) {
+        return idMatch;
+      }
+      continue;
+    }
+
+    // 5. Any other range: its primary subtag if that is a shipped code
+    const primary = range.split("-")[0]?.toLowerCase();
+    const primaryMatch = shipped.find((code) => code.toLowerCase() === primary);
+    if (primaryMatch) {
+      return primaryMatch;
     }
   }
   return null;

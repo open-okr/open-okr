@@ -39,8 +39,25 @@ vi.mock("next/headers", () => ({
   },
 }));
 vi.mock("@openokr/core", () => ({
-  resolveMemberLanguage: async () =>
-    state.memberLanguage ?? state.workspaceLanguage ?? "en",
+  resolveMemberLanguage: async () => {
+    // Member -> Workspace -> Instance -> English
+    const isShipped = (lang: string | null | undefined) =>
+      lang === "en" || lang === "ms";
+
+    if (state.memberLanguage && isShipped(state.memberLanguage)) {
+      return state.memberLanguage;
+    }
+    if (state.workspaceLanguage && isShipped(state.workspaceLanguage)) {
+      return state.workspaceLanguage;
+    }
+    if (
+      typeof state.instanceLanguage === "string" &&
+      isShipped(state.instanceLanguage)
+    ) {
+      return state.instanceLanguage;
+    }
+    return "en";
+  },
   resolveInstanceDefaultLanguage: async () => {
     if (state.instanceLanguage instanceof Error) {
       throw state.instanceLanguage;
@@ -111,10 +128,41 @@ describe("a signed-in page, unchanged", () => {
     expect(await resolveLocale()).toBe("ms");
   });
 
-  test("then English, whatever the browser says", async () => {
+  test("then the instance default before English", async () => {
+    state.signedIn = true;
+    state.acceptLanguage = "en";
+    state.instanceLanguage = "ms";
+    expect(await resolveLocale()).toBe("ms");
+  });
+
+  test("then English when instance setting is absent or unshipped", async () => {
     state.signedIn = true;
     state.acceptLanguage = "ms";
-    state.instanceLanguage = "ms";
+    state.instanceLanguage = "unknown";
     expect(await resolveLocale()).toBe("en");
+  });
+
+  test("AC-2: instance ms, workspace en, member fr skips fr and sees en; clearing workspace falls to ms", async () => {
+    state.signedIn = true;
+    state.instanceLanguage = "ms";
+    state.workspaceLanguage = "en";
+    state.memberLanguage = "fr"; // fr is not shipped, skipped
+    expect(await resolveLocale()).toBe("en");
+
+    // Member chooses "Follow workspace" (memberLanguage becomes null)
+    state.memberLanguage = null;
+    expect(await resolveLocale()).toBe("en");
+
+    // Administrator clears workspace language (workspaceLanguage becomes null)
+    state.workspaceLanguage = null;
+    expect(await resolveLocale()).toBe("ms");
+  });
+
+  test("unknown stored value is skipped at every step", async () => {
+    state.signedIn = true;
+    state.memberLanguage = "xyz-unknown";
+    state.workspaceLanguage = "bad-locale";
+    state.instanceLanguage = "ms";
+    expect(await resolveLocale()).toBe("ms");
   });
 });
