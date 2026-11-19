@@ -17,6 +17,7 @@ import {
   accessBindings,
   accessGroups,
   activeOnly,
+  auditEvents,
   goals,
   KPI_AGGREGATES,
   KPI_DIRECTION_VALUES,
@@ -48,7 +49,17 @@ import {
   targetTypeOfDirection,
   thresholdsProblem,
 } from "@openokr/method";
-import { and, asc, eq, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -3205,4 +3216,193 @@ export const readKpiShares = defineReadAction({
       },
     );
   },
+});
+
+export const importKpiShare = defineWriteAction({
+  name: "kpis.importShare",
+  domain: "kpi",
+  agentSurface: false,
+  summary: "Imports a KPI share from a legacy system idempotently.",
+  input: z.object({
+    kpiId: z.uuid(),
+    memberId: z.uuid(),
+    level: z.enum(["view", "edit"]),
+    legacy: legacyKey,
+  }),
+  output: z.object({
+    outcome: z.enum(["written", "raised", "unchanged", "revoked"]),
+    coveredByRole: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const contextId = await ensureKpiContextInTx(tx, {
+        workspaceId,
+        kpiId: input.kpiId,
+      });
+
+      const [target] = await tx
+        .select({
+          id: workspaceMembers.id,
+          kind: workspaceMembers.kind,
+          status: workspaceMembers.status,
+        })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.memberId),
+          ),
+        )
+        .limit(1);
+
+      if (!target || target.status !== "active") {
+        throw new OperationError("not_found", "No such member.");
+      }
+      if (target.kind === "agent") {
+        throw new OperationError(
+          "forbidden",
+          "Agents cannot be granted individual KPI shares.",
+        );
+      }
+
+      const [kpi] = await tx
+        .select({ id: kpis.id, ownerMemberId: kpis.ownerMemberId })
+        .from(kpis)
+        .where(
+          activeOnly(
+            kpis,
+            eq(kpis.workspaceId, workspaceId),
+            eq(kpis.id, input.kpiId),
+          ),
+        )
+        .limit(1);
+
+      if (!kpi) {
+        throw new OperationError("not_found", "No such KPI.");
+      }
+
+      const roleLevel = await resolveMemberRoleLevel(tx, {
+        workspaceId,
+        memberId: input.memberId,
+        domain: "kpi",
+      });
+      const shareLevel =
+        input.level === "edit" ? ACCESS_LEVELS.edit : ACCESS_LEVELS.view;
+      const coveredByRole = roleLevel !== null && roleLevel >= shareLevel;
+
+      if (kpi.ownerMemberId === input.memberId) {
+        return {
+          result: { outcome: "unchanged" as const, coveredByRole },
+          audit: {
+            action: "kpis.importShare",
+            targetType: "kpi",
+            targetId: input.kpiId,
+            payload: {
+              memberId: input.memberId,
+              level: input.level,
+              legacyType: input.legacy.type,
+              legacyId: input.legacy.id,
+              outcome: "unchanged",
+              coveredByRole,
+            },
+          },
+        };
+      }
+
+      const [priorAudit] = await tx
+        .select({ id: auditEvents.id })
+        .from(auditEvents)
+        .where(
+          and(
+            eq(auditEvents.workspaceId, workspaceId),
+            eq(auditEvents.targetType, "kpi"),
+            eq(auditEvents.targetId, input.kpiId),
+            eq(auditEvents.action, "kpis.importShare"),
+            sql`${auditEvents.payload}->>'legacyId' = ${String(input.legacy.id)}`,
+          ),
+        )
+        .limit(1);
+
+      const [existingBinding] = await tx
+        .select({
+          id: accessBindings.id,
+          level: accessBindings.level,
+        })
+        .from(accessBindings)
+        .innerJoin(accessGroups, eq(accessGroups.id, accessBindings.groupId))
+        .where(
+          activeOnly(
+            accessBindings,
+            eq(accessBindings.workspaceId, workspaceId),
+            eq(accessBindings.contextId, contextId),
+            eq(accessBindings.tag, "share"),
+            eq(accessGroups.memberId, input.memberId),
+          ),
+        )
+        .limit(1);
+
+      let outcome: "written" | "raised" | "unchanged" | "revoked";
+
+      if (!priorAudit) {
+        if (!existingBinding) {
+          outcome = "written";
+          await setKpiShareInTx(tx, {
+            workspaceId,
+            contextId,
+            memberId: input.memberId,
+            level: shareLevel,
+          });
+        } else if (existingBinding.level < shareLevel) {
+          outcome = "raised";
+          await setKpiShareInTx(tx, {
+            workspaceId,
+            contextId,
+            memberId: input.memberId,
+            level: shareLevel,
+          });
+        } else {
+          outcome = "unchanged";
+        }
+      } else {
+        if (existingBinding) {
+          outcome = "unchanged";
+        } else {
+          outcome = "revoked";
+        }
+      }
+
+      return {
+        result: { outcome, coveredByRole },
+        ...(outcome === "written" || outcome === "raised"
+          ? {
+              activity: {
+                kind: "kpi.shared" as const,
+                subjectType: "kpi" as const,
+                subjectId: input.kpiId,
+                payload: {
+                  memberId: input.memberId,
+                  level: input.level,
+                  imported: true,
+                },
+              },
+            }
+          : {}),
+        audit: {
+          action: "kpis.importShare",
+          targetType: "kpi",
+          targetId: input.kpiId,
+          payload: {
+            memberId: input.memberId,
+            level: input.level,
+            legacyType: input.legacy.type,
+            legacyId: input.legacy.id,
+            outcome,
+            coveredByRole,
+          },
+        },
+      };
+    },
+  }),
 });

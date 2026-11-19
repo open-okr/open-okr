@@ -136,7 +136,7 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   {
     name: "indicator_accesses",
     columns:
-      "id bigint primary key, company_id int, indicator_id bigint, user_id int, permissions varchar(16), view_options varchar(16)",
+      "id bigint primary key, company_id int, indicator_id bigint, user_id int, department_id int, permissions varchar(16), view_options varchar(16), occurance varchar(16), deleted_at timestamp null",
     optional: true,
   },
   {
@@ -331,10 +331,6 @@ const UNREAD_ROWS: readonly { table: string; sql: string }[] = [
   {
     table: "key_result_files",
     sql: "insert into key_result_files (id, company_id, user_id, key_result_checkin_id, filename) values (1, 7, 1, 1, 'evidence.pdf')",
-  },
-  {
-    table: "indicator_accesses",
-    sql: "insert into indicator_accesses (id, company_id, indicator_id, user_id, permissions, view_options) values (1, 7, 1, 2, 'read', 'team')",
   },
   {
     table: "indicator_calculates",

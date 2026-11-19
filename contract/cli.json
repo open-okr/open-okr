@@ -9982,6 +9982,45 @@
       "pages": false
     },
     {
+      "name": "kpis importShare",
+      "action": "kpis.importShare",
+      "method": "POST",
+      "path": "/kpis/importShare",
+      "scope": "write",
+      "summary": "Imports a KPI share from a legacy system idempotently.",
+      "flags": [
+        {
+          "name": "kpi-id",
+          "field": "kpiId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "level",
+          "field": "level",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "view",
+            "edit"
+          ]
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "kpis update",
       "action": "kpis.update",
       "method": "POST",

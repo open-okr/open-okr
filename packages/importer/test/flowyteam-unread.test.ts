@@ -41,7 +41,6 @@ const COMPANY_SEVEN = [
   ["keyresult_indicator", 2],
   ["checkins", 2],
   ["key_result_files", 1],
-  ["indicator_accesses", 1],
   ["indicator_calculates", 2],
   ["task_boards", 1],
   ["task_category", 2],
