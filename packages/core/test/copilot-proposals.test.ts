@@ -156,15 +156,17 @@ describe("with no provider", () => {
 });
 
 describe("what the model is shown", () => {
-  it("is one action, with the spaces as labels and no identifiers", async () => {
+  it("offers objective and task creation with space labels and no identifiers", async () => {
     const drafter = new ProposingDrafter(objective());
     await propose(drafter);
 
     const shown = drafter.seen[0];
     expect(shown?.options.map((option) => option.action)).toEqual([
       "goals.create",
+      "tasks.create",
     ]);
     expect(shown?.options[0]?.choices.spaces).toEqual([spaceName]);
+    expect(shown?.options[1]?.choices).toEqual({ spaces: [spaceName] });
     // The whole reason choices are labels: there is no id here to copy or alter.
     expect(JSON.stringify(shown?.options)).not.toContain(workspaceId);
   });
@@ -886,6 +888,73 @@ describe("the rest of the catalogue", () => {
     expect(audit.rows.map((row) => row.action)).toEqual(
       expect.arrayContaining(["initiatives.create", "initiatives.delete"]),
     );
+  });
+
+  it("proposes a standalone task in a space the member can use", async () => {
+    const drafter = new ProposingDrafter(task({ keyResultNumber: undefined }));
+    const proposed = await propose(
+      drafter,
+      "Create a task to draft the handover note",
+    );
+    expect(proposed?.preview).toContainEqual({
+      label: "Space",
+      value: spaceName,
+    });
+    expect(proposed?.preview.some((line) => line.label === "Key result")).toBe(
+      false,
+    );
+    const applied = await callAction(
+      await contextFor(),
+      "copilot.applyProposal",
+      {
+        id: proposed?.id ?? "",
+      },
+    );
+    const created = await callAction(await contextFor(), "tasks.read", {
+      id: String(applied.result?.id),
+    });
+    expect(created).toMatchObject({
+      spaceId,
+      title: "Draft the handover note",
+      keyResultId: null,
+    });
+  });
+
+  it("resolves an exact key result and refuses an ambiguous name", async () => {
+    const similar = `${KEY_RESULT_TITLE} for enterprise accounts`;
+    const second = (await call("goals.addKeyResult", {
+      goalId,
+      title: similar,
+      direction: "increase",
+      indicatorType: "lagging",
+      baselineValue: 18,
+      targetValue: 30,
+      weight: 1,
+    })) as { id: string };
+    const ambiguous = await propose(
+      new ProposingDrafter(
+        initiative({ keyResultName: "trial to paid conversion" }),
+      ),
+      "Start a handover initiative for the trial to paid conversion key result",
+    );
+    expect(ambiguous).toBeNull();
+    expect(await storedProposals()).toEqual([]);
+
+    const exact = await propose(
+      new ProposingDrafter(initiative({ keyResultName: similar })),
+      `Start a handover initiative for "${similar}"`,
+    );
+    const applied = await callAction(
+      await contextFor(),
+      "copilot.applyProposal",
+      {
+        id: exact?.id ?? "",
+      },
+    );
+    const linked = await callAction(await contextFor(), "initiatives.list", {
+      keyResultId: second.id,
+    });
+    expect(linked.map((row) => row.id)).toContain(applied.result?.id);
   });
 
   it("adds a task behind the key result, for the asking member", async () => {

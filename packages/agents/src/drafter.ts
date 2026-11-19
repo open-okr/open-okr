@@ -243,8 +243,9 @@ function proposalNoteFor(
   }
   return (
     "From the product, not the person: no change card was made for this " +
-    "message. If it asks you to create or change something, say plainly that " +
-    "you cannot make that change from here yet, and say where the person " +
+    "message. For a supported task or initiative request with missing or " +
+    "ambiguous details, ask one focused question for the task title, space " +
+    "or exact key result you need. If the action is unavailable, say where the person " +
     `makes it: ${WHERE_CHANGES_ARE_MADE}. Never describe or promise a card.`
   );
 }
@@ -546,7 +547,10 @@ const PROPOSAL_SYSTEM =
   // "my activation key result" when no activation key result was on the
   // list, it chose the nearest one, a different measure.
   "When the request names an item that is not on the list, propose nothing " +
-  "rather than choosing the nearest one. Fill in the fields the action you " +
+  "rather than choosing the nearest one. When several key results could match, " +
+  "propose nothing so the answer can ask which one. For a standalone task, " +
+  "write the title the person asked for and leave its key result empty. " +
+  "Use the named space or the only one offered. Fill in the fields the action you " +
   "chose takes, and set every other field to null. " +
   // Tuned to GPT-6 Luna, 12 November 2026: one sentence asked to leave a
   // reason out and another to give one, so Luna left the top-level why empty

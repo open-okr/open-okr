@@ -56,6 +56,7 @@ const KR_TITLE = "Activated accounts in the first 14 days";
 const SECRET_TITLE = "Quietly merge the Lisbon office";
 const ACTIVATION_QUESTION = "How is my activation key result doing?";
 const SECRET_QUESTION = "How is my secret restructuring objective doing?";
+const TASK_TITLE = "Draft the activation handover";
 
 /** One request the scripted model received. */
 interface Received {
@@ -133,6 +134,17 @@ function chooseRound(
   const round = messages.filter(
     (m) => m.role === "assistant" && (m.tool_calls?.length ?? 0) > 0,
   ).length;
+  if (question.includes(TASK_TITLE)) {
+    toolReply(res, round === 0 ? {
+      name: "propose_change",
+      args: {
+        action: "tasks.create",
+        fields: { title: TASK_TITLE },
+        why: "The member asked for this task.",
+      },
+    } : null);
+    return;
+  }
   if (round === 0) {
     toolReply(res, { name: "goals.list", args: { mine: true, limit: 50 } });
     return;
@@ -301,6 +313,7 @@ let providerId = "";
 let goalId = "";
 let secretGoalId = "";
 let keyResultId = "";
+let taskSpaceName = "";
 let startedAt = new Date();
 
 const authed = () => ({ authorization: `Bearer ${token}` });
@@ -397,8 +410,9 @@ test("set up: the objectives are real, and the workspace's provider is the scrip
   };
 
   const spaces = await api.get("/api/v1/spaces/list", { headers: authed() });
-  const spaceId = ((await spaces.json()).data as { id: string }[])[0]
-    ?.id as string;
+  const availableSpaces = (await spaces.json()).data as { id: string; name: string }[];
+  const spaceId = availableSpaces[0]?.id as string;
+  taskSpaceName = availableSpaces[0]?.name ?? "";
   const cycles = await api.get("/api/v1/cycles/current?mode=quarterly", {
     headers: authed(),
   });
@@ -544,6 +558,15 @@ test("an objective the member cannot read is not named, in a tool result or in t
   const sent = JSON.stringify(received.slice(before).map((one) => one.body));
   expect(sent).not.toContain(SECRET_TITLE);
   expect(sent).toContain("That is not something you were shown.");
+});
+
+test("the copilot offers a standalone task without choosing a key result", async () => {
+  const panel = await openFreshPanel();
+  await ask(panel, `Create a task called "${TASK_TITLE}" in "${taskSpaceName}".`);
+  const turn = panel.locator("article").last();
+  await expect(turn.getByText(TASK_TITLE, { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(turn.getByText(taskSpaceName, { exact: true })).toBeVisible();
+  await expect(turn.getByRole("button", { name: "Apply", exact: true })).toBeVisible();
 });
 
 test("with the provider off, the same question returns matching passages and the reason, and no model is called", async () => {

@@ -162,7 +162,7 @@ While reads run, the answer area shows what is being read in words ("Reading New
 | Create an objective | `goals.create` | Today's | `goals.delete` |
 | Add a key result | `goals.addKeyResult` | Today's | None, as today |
 | Start an initiative | `initiatives.create` | Today's | `initiatives.delete` |
-| Add a task | `tasks.create` | Today's | `tasks.delete` |
+| Add a task | `tasks.create` | Title, with a named or sole eligible space for a standalone task, or the named key result for a linked task | `tasks.delete` |
 | **Rename or redescribe an objective** | `goals.update` | Title, description | `goals.update` with the values before |
 | **Check in** | `goals.publishDraftedCheckIn` | Status, confidence, narrative, and per key result a value and confidence | `goals.deleteCheckIn` while it is the latest |
 | **Record a KPI value** | `kpis.record` | Period, actual value, remark | `kpis.record` with the record before, or none for a new period |

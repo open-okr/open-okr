@@ -299,6 +299,7 @@ export async function* readLiveData(
       ? createProposer(context, {
           threadId: prepared.threadId,
           offers: hooks.proposal.offers,
+          request: ask.question,
         })
       : null;
   // One object rather than three `let`s: they are changed inside callbacks,
