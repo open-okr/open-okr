@@ -99,6 +99,8 @@ capacity gauge.
 | `openokr_agent_run_duration_seconds` | trigger |
 | `openokr_ai_tokens_total` | provider, model, direction |
 | `openokr_ai_cost_total` | provider, model |
+| `openokr_copilot_stage_duration_seconds` | stage (preparation, checks, round, tool, first_token) |
+| `openokr_copilot_turns_total` | path (fast_path, loop, passages) |
 
 **Capacity**
 

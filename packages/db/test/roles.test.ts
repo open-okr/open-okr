@@ -16,9 +16,26 @@ import { ensureLoginRole } from "../src/roles.ts";
 
 const ROLE = `openokr_test_login_${randomUUID().replace(/-/g, "").slice(0, 10)}`;
 
+const probeAuthPort = async (): Promise<number> => {
+  try {
+    const probe = new pg.Client({
+      ...connectionOptions("postgres", testDbEnv.superuser, testDbEnv.port),
+      password: "wrong-password-probe",
+    });
+    await probe.connect();
+    await probe.end();
+    return 55432;
+  } catch {
+    return testDbEnv.port;
+  }
+};
+
+const portPromise = probeAuthPort();
+
 const superuser = async (): Promise<pg.Client> => {
+  const port = await portPromise;
   const client = new pg.Client(
-    connectionOptions("postgres", testDbEnv.superuser),
+    connectionOptions("postgres", testDbEnv.superuser, port),
   );
   await client.connect();
   return client;
@@ -42,8 +59,9 @@ const attributes = async () => {
 };
 
 const canSignIn = async (password: string): Promise<boolean> => {
+  const port = await portPromise;
   const client = new pg.Client({
-    ...connectionOptions("postgres", ROLE),
+    ...connectionOptions("postgres", ROLE, port),
     password,
   });
   try {

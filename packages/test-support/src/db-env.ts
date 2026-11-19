@@ -15,9 +15,13 @@ const env = (name: string, fallback: string): string => {
 export const testDbEnv = {
   host: env("TEST_DB_HOST", "localhost"),
   /** Postgres, direct. */
-  port: Number(env("TEST_DB_PORT", "55432")),
+  get port(): number {
+    return Number(env("TEST_DB_PORT", "55432"));
+  },
   /** PgBouncer in transaction pooling mode, in front of the same Postgres. */
-  pgbouncerPort: Number(env("TEST_PGBOUNCER_PORT", "56432")),
+  get pgbouncerPort(): number {
+    return Number(env("TEST_PGBOUNCER_PORT", "56432"));
+  },
   superuser: env("TEST_DB_SUPERUSER", "postgres"),
   /** One throwaway password for every test role; see docker/userlist.txt. */
   password: env("TEST_DB_PASSWORD", "postgres"),

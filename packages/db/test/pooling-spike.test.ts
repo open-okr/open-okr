@@ -3,6 +3,10 @@ import {
   testDbEnv,
   workerDb,
 } from "@openokr/test-support/db";
+
+// PgBouncer on testDbEnv.pgbouncerPort (56432) routes to the docker Postgres instance on 55432
+process.env.TEST_DB_PORT = "55432";
+
 import { tenantProbes } from "@openokr/test-support/db-fixtures";
 import { sql } from "drizzle-orm";
 import pg from "pg";
