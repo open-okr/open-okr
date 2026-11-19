@@ -40,7 +40,11 @@ import { activeOnly, withWorkspace, workspaceMembers } from "@openokr/db";
 import { eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { ACCESS_LEVELS } from "../access/levels.ts";
+import { builtinRoleId } from "../access/roles.ts";
+import type { ActionCallContext } from "../actions/define.ts";
 import { callAction } from "../actions/registry.ts";
+import { assignRoleOperation } from "../actions/roles.ts";
 import type { createAuth } from "../auth/auth.ts";
 import { withProvisioningAuthority } from "../auth/provisioning-authority.ts";
 import { OperationError } from "../operations/errors.ts";
@@ -145,6 +149,17 @@ export async function prepareDemoPersonas(
 
   await refuseUnlessSeeded(context);
 
+  const db = drizzle(input.pool);
+  const memberRoleId = await withWorkspace(db, input.workspaceId, (tx) =>
+    builtinRoleId(tx, input.workspaceId, "member"),
+  );
+  if (!memberRoleId) {
+    throw new OperationError(
+      "not_found",
+      "The built-in Member role could not be resolved in this workspace.",
+    );
+  }
+
   const notes: string[] = [];
   const personas: PreparedPersona[] = [];
   let accountsCreated = 0;
@@ -163,10 +178,28 @@ export async function prepareDemoPersonas(
       );
       continue;
     }
+
+    if (member.status !== "active" || member.kind !== "human") {
+      continue;
+    }
+
     if (member.userId) {
-      // Somebody is already behind this row. It may be a persona from an
-      // earlier run or it may be a real person who happens to share the name;
-      // either way this command has nothing to add and no right to overwrite.
+      // Somebody is already behind this row. Require the linked user ID to match
+      // the user found by that persona's exact registered demo email.
+      // Skip an occupied member with a different account.
+      const exactUserId = await userIdByEmail(input.pool, person.email);
+      if (!exactUserId || member.userId !== exactUserId) {
+        personas.push({
+          name: person.name,
+          email: person.email,
+          title: person.title,
+          created: false,
+        });
+        continue;
+      }
+
+      await assignDemoMemberRole(context, member.id, memberRoleId, exactUserId);
+
       personas.push({
         name: person.name,
         email: person.email,
@@ -179,6 +212,9 @@ export async function prepareDemoPersonas(
     const userId = await accountFor(input, person.name, person.email);
     await attachAccount(input, member.id, userId, person.name);
     accountsCreated += 1;
+
+    await assignDemoMemberRole(context, member.id, memberRoleId, userId);
+
     personas.push({
       name: person.name,
       email: person.email,
@@ -246,11 +282,23 @@ async function memberByName(
   pool: Pool,
   workspaceId: string,
   name: string,
-): Promise<{ id: string; userId: string | null } | null> {
+): Promise<{
+  id: string;
+  userId: string | null;
+  status: string;
+  kind: string;
+  roleId: string | null;
+} | null> {
   const db = drizzle(pool);
   return withWorkspace(db, workspaceId, async (tx) => {
     const [row] = await tx
-      .select({ id: workspaceMembers.id, userId: workspaceMembers.userId })
+      .select({
+        id: workspaceMembers.id,
+        userId: workspaceMembers.userId,
+        status: workspaceMembers.status,
+        kind: workspaceMembers.kind,
+        roleId: workspaceMembers.roleId,
+      })
       .from(workspaceMembers)
       .where(
         activeOnly(
@@ -263,6 +311,34 @@ async function memberByName(
       .limit(1);
     return row ?? null;
   });
+}
+
+/**
+ * Assigns the built-in Member role to a demo persona through `roles.assign`
+ * operation with a conditional path, so that an existing role or concurrent
+ * assignment makes the write a no-op with no activity or audit.
+ */
+async function assignDemoMemberRole(
+  context: Context,
+  memberId: string,
+  memberRoleId: string,
+  userId: string,
+): Promise<void> {
+  const spec = assignRoleOperation(
+    context as unknown as ActionCallContext,
+    { memberId, roleId: memberRoleId },
+    { ifUnassignedForUserId: userId },
+  );
+  await runOperation(
+    { pool: context.pool },
+    {
+      ...spec,
+      action: "roles.assign",
+      workspaceId: context.workspaceId,
+      actor: context.actor,
+      requires: ACCESS_LEVELS.full,
+    },
+  );
 }
 
 /** The account with this address, or null. Better Auth owns the table. */

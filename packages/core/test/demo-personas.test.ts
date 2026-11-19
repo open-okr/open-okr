@@ -124,13 +124,13 @@ describe("a seeded demo workspace", () => {
     );
   });
 
-  it("attaches the account to the member the builder already wrote", async () => {
+  it("attaches the account to the member the builder already wrote and assigns Member role", async () => {
     const wb = await workerDb();
     // One row, not two. A second Priya in the directory is the failure this
     // guards: the sign-up hook joins a workspace, and a persona has to be
     // attached instead.
     const { rows } = await wb.admin.query(
-      `select m.id, m.user_id, u.email
+      `select m.id, m.user_id, m.role_id, u.email
          from workspace_members m
          join users u on u.id = m.user_id
         where m.workspace_id = $1 and m.name = 'Priya Raman'
@@ -139,6 +139,26 @@ describe("a seeded demo workspace", () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.email).toBe("priya@northwind.example");
+    const { rows: roleRows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_roles where workspace_id = $1 and builtin_key = 'member'",
+      [workspaceId],
+    );
+    expect(rows[0]?.role_id).toBe(roleRows[0]?.id);
+  });
+
+  it("audited the role assignment and recorded activity for each persona", async () => {
+    const wb = await workerDb();
+    const { rows: auditRows } = await wb.admin.query(
+      "select count(*)::int as n from audit_events where workspace_id = $1 and action = 'roles.assign'",
+      [workspaceId],
+    );
+    expect(auditRows[0]?.n).toBe(INVENTED_CAST.length);
+
+    const { rows: actRows } = await wb.admin.query(
+      "select count(*)::int as n from activities where workspace_id = $1 and kind = 'role.assigned'",
+      [workspaceId],
+    );
+    expect(actRows[0]?.n).toBe(INVENTED_CAST.length);
   });
 
   it("does not give a persona a private workspace of their own", async () => {
@@ -199,14 +219,148 @@ describe("a seeded demo workspace", () => {
   });
 
   it("changes nothing when it runs again", async () => {
+    const wb = await workerDb();
+    const { rows: beforeAudit } = await wb.admin.query(
+      "select count(*)::int as n from audit_events where workspace_id = $1 and action = 'roles.assign'",
+      [workspaceId],
+    );
+    const { rows: beforeAct } = await wb.admin.query(
+      "select count(*)::int as n from activities where workspace_id = $1 and kind = 'role.assigned'",
+      [workspaceId],
+    );
+
     const again = await prepare();
     expect(again.accountsCreated).toBe(0);
     expect(again.personas).toHaveLength(INVENTED_CAST.length);
 
-    const wb = await workerDb();
     const { rows } = await wb.admin.query(
       "select count(*)::int as n from users where email like '%@northwind.example'",
     );
     expect(rows[0]?.n).toBe(INVENTED_CAST.length);
+
+    const { rows: afterAudit } = await wb.admin.query(
+      "select count(*)::int as n from audit_events where workspace_id = $1 and action = 'roles.assign'",
+      [workspaceId],
+    );
+    const { rows: afterAct } = await wb.admin.query(
+      "select count(*)::int as n from activities where workspace_id = $1 and kind = 'role.assigned'",
+      [workspaceId],
+    );
+    expect(afterAudit[0]?.n).toBe(beforeAudit[0]?.n);
+    expect(afterAct[0]?.n).toBe(beforeAct[0]?.n);
+  });
+});
+
+describe("convergence and role preservation on rerun", () => {
+  let customWorkspaceId: string;
+  const CUSTOM_OWNER = "custom-owner";
+
+  beforeAll(async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, $2, $3)",
+      [CUSTOM_OWNER, "Custom Owner", "custom-owner@example.com"],
+    );
+    customWorkspaceId = (
+      await provisionWorkspaceForUser(wb.appPool, {
+        id: CUSTOM_OWNER,
+        name: "Northwind Custom Defaults",
+      })
+    ).workspaceId;
+
+    await buildDemoWorkspace({
+      pool: wb.appPool,
+      workspaceId: customWorkspaceId,
+      adminUserId: CUSTOM_OWNER,
+    });
+  });
+
+  it("assigns built-in Member even when workspace has a custom default role", async () => {
+    const wb = await workerDb();
+    const customContext = {
+      pool: wb.appPool,
+      workspaceId: customWorkspaceId,
+      actor: { kind: "human" as const, userId: CUSTOM_OWNER },
+    };
+
+    // Create a custom role and set it as default
+    const customRole = (await callAction(customContext, "roles.create", {
+      name: "Custom Base Role",
+    } as never)) as { id: string };
+    await wb.admin.query(
+      "update workspace_roles set is_default = false where workspace_id = $1",
+      [customWorkspaceId],
+    );
+    await wb.admin.query(
+      "update workspace_roles set is_default = true where id = $1",
+      [customRole.id],
+    );
+
+    // Prepare demo personas in this workspace
+    const outcome = await prepareDemoPersonas({
+      pool: wb.appPool,
+      workspaceId: customWorkspaceId,
+      adminUserId: CUSTOM_OWNER,
+      auth,
+    });
+    expect(outcome.accountsCreated).toBe(INVENTED_CAST.length);
+
+    // Verify personas got built-in Member, NOT customRole
+    const { rows: memberRoleRows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_roles where workspace_id = $1 and builtin_key = 'member'",
+      [customWorkspaceId],
+    );
+    const memberRoleId = memberRoleRows[0]?.id;
+    const { rows } = await wb.admin.query(
+      `select m.name, m.role_id
+         from workspace_members m
+        where m.workspace_id = $1 and m.name = 'Priya Raman'`,
+      [customWorkspaceId],
+    );
+    expect(rows[0]?.role_id).toBe(memberRoleId);
+    expect(rows[0]?.role_id).not.toBe(customRole.id);
+  });
+
+  it("preserves an existing role on rerun and skips an account with mismatched user ID", async () => {
+    const wb = await workerDb();
+    const customContext = {
+      pool: wb.appPool,
+      workspaceId: customWorkspaceId,
+      actor: { kind: "human" as const, userId: CUSTOM_OWNER },
+    };
+
+    // Give Priya a custom role explicitly
+    const customRole = (await callAction(customContext, "roles.create", {
+      name: "Priya Special Role",
+    } as never)) as { id: string };
+
+    const { rows: priyaRows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and name = 'Priya Raman'",
+      [customWorkspaceId],
+    );
+    const priyaMemberId = priyaRows[0]?.id;
+    if (!priyaMemberId) {
+      throw new Error("Priya not found in custom workspace");
+    }
+
+    await callAction(customContext, "roles.assign", {
+      memberId: priyaMemberId,
+      roleId: customRole.id,
+    });
+
+    // Rerun preparation
+    await prepareDemoPersonas({
+      pool: wb.appPool,
+      workspaceId: customWorkspaceId,
+      adminUserId: CUSTOM_OWNER,
+      auth,
+    });
+
+    // Priya still has customRole!
+    const { rows: checkPriya } = await wb.admin.query(
+      "select role_id from workspace_members where id = $1",
+      [priyaMemberId],
+    );
+    expect(checkPriya[0]?.role_id).toBe(customRole.id);
   });
 });

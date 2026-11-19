@@ -154,13 +154,14 @@ export interface AuditInput {
 }
 
 /**
- * What an operation must hand back. Activity and audit are required, which is
- * the whole point.
+ * What an operation must hand back. Activity and audit are recorded when the
+ * write lands. Scoped conditional paths (such as demo preparation) may omit
+ * them when the write is a no-op.
  */
 export interface OperationOutcome<TResult> {
   readonly result: TResult;
-  readonly activity: ActivityInput;
-  readonly audit: AuditInput;
+  readonly activity?: ActivityInput;
+  readonly audit?: AuditInput;
   readonly outbox?: readonly OutboxMessage[];
 }
 
@@ -775,130 +776,137 @@ export async function runOperation<TResult, TLoaded = undefined>(
         //    persisting — this is what makes "an event kind outside the
         //    catalogue cannot be persisted" true of every write path at once
         //    instead of every call site having to remember its own check.
-        const activityPayload = outcome.activity.payload ?? {};
-        validateActivityPayload(outcome.activity.kind, activityPayload);
-        const contextId =
-          outcome.activity.contextId ??
-          (await resolveActivityContext(
-            tx,
-            spec.workspaceId,
-            outcome.activity.subjectType,
-            outcome.activity.subjectId,
-          ));
-        const activityAt = new Date();
-        const [insertedActivity] = await tx
-          .insert(activities)
-          .values({
-            workspaceId: spec.workspaceId,
-            kind: outcome.activity.kind,
-            payload: activityPayload,
-            actorMemberId: actor.memberId,
-            actorKind: actor.kind,
-            subjectType: outcome.activity.subjectType,
-            subjectId: outcome.activity.subjectId,
-            spaceId: outcome.activity.spaceId ?? null,
-            contextId: contextId ?? null,
-            at: activityAt,
-          })
-          .returning({ id: activities.id });
-
-        // **A notification this write made in its own words points at the
-        // event too** (UAT M10-04). A comment notifies its subject's
-        // followers inside the action, before this row exists, so the inbox
-        // had no activity to render and said "Something new here". Every row
-        // this transaction wrote with no activity and no nudge behind it is
-        // about this write, so it is linked here, once, for every action.
-        // openokr:allow-mutation: the Operation's own transaction.
-        await tx
-          .update(notifications)
-          .set({ activityId: (insertedActivity as { id: string }).id })
-          .where(
-            activeOnly(
-              notifications,
-              eq(notifications.workspaceId, spec.workspaceId),
-              isNull(notifications.activityId),
-              isNull(notifications.nudgeId),
-              sql`${notifications.createdAt} = now()`,
-            ),
-          );
-
-        /**
-         * The feed's own live insert (P6-G11c).
-         *
-         * Here rather than in each action, for the reason the embedding job
-         * two blocks down gives: an enqueue every write has to remember is an
-         * enqueue the next write will forget. Every activity is a feed row, so
-         * every activity announces itself.
-         *
-         * Unconditional on `notify`. That flag decides whether anybody is
-         * *messaged*, and a feed is not a message: an activity nobody is
-         * subscribed to still belongs on the space's and the workspace's feed.
-         * `suppressNotifications` is not consulted for the same reason, with
-         * one exception below.
-         *
-         * **An import is the exception.** `suppressDispatch` exists because a
-         * run writes thousands of rows, and a thousand pings would make every
-         * open feed in the workspace re-render a thousand times while saying
-         * nothing a single refresh at the end would not. An import's rows are
-         * on the feed either way, from the first navigation after it.
-         */
-        if (!spec.suppressNotifications) {
-          await enqueueOutbox(
-            tx,
-            feedAddedEvent({
+        let insertedActivityId: string | undefined;
+        let activityAt = new Date();
+        if (outcome.activity) {
+          const activityPayload = outcome.activity.payload ?? {};
+          validateActivityPayload(outcome.activity.kind, activityPayload);
+          const contextId =
+            outcome.activity.contextId ??
+            (await resolveActivityContext(
+              tx,
+              spec.workspaceId,
+              outcome.activity.subjectType,
+              outcome.activity.subjectId,
+            ));
+          activityAt = new Date();
+          const [insertedActivity] = await tx
+            .insert(activities)
+            .values({
               workspaceId: spec.workspaceId,
-              activityId: (insertedActivity as { id: string }).id,
+              kind: outcome.activity.kind,
+              payload: activityPayload,
               actorMemberId: actor.memberId,
-            }),
-          );
-        }
+              actorKind: actor.kind,
+              subjectType: outcome.activity.subjectType,
+              subjectId: outcome.activity.subjectId,
+              spaceId: outcome.activity.spaceId ?? null,
+              contextId: contextId ?? null,
+              at: activityAt,
+            })
+            .returning({ id: activities.id });
+          insertedActivityId = (insertedActivity as { id: string }).id;
 
-        /**
-         * The webhooks waiting for this event (docs/design/outbound-webhooks.md
-         * W8), one outbox row each, here for the reason the feed's event above
-         * is: an enqueue every write has to remember is one the next write
-         * forgets. An unmapped kind costs nothing and a workspace with no hooks
-         * costs one indexed lookup.
-         *
-         * **Not for an import**, for the reason the feed event is not: a run
-         * writes thousands of rows about work that already happened, and a
-         * receiver flooded with a quarter of somebody else's history would
-         * read it as this quarter's news.
-         */
-        if (!spec.suppressNotifications) {
-          await enqueueWebhookDeliveries(tx, {
-            workspaceId: spec.workspaceId,
-            kind: outcome.activity.kind,
-            subjectId: outcome.activity.subjectId,
-            payload: activityPayload,
-            at: activityAt,
-          });
-        }
+          // **A notification this write made in its own words points at the
+          // event too** (UAT M10-04). A comment notifies its subject's
+          // followers inside the action, before this row exists, so the inbox
+          // had no activity to render and said "Something new here". Every row
+          // this transaction wrote with no activity and no nudge behind it is
+          // about this write, so it is linked here, once, for every action.
+          // openokr:allow-mutation: the Operation's own transaction.
+          await tx
+            .update(notifications)
+            .set({ activityId: insertedActivityId })
+            .where(
+              activeOnly(
+                notifications,
+                eq(notifications.workspaceId, spec.workspaceId),
+                isNull(notifications.activityId),
+                isNull(notifications.nudgeId),
+                sql`${notifications.createdAt} = now()`,
+              ),
+            );
 
-        if (outcome.activity.notify && !spec.suppressNotifications) {
-          await fanOutActivity(tx, {
-            workspaceId: spec.workspaceId,
-            activityId: (insertedActivity as { id: string }).id,
-            subjectType: outcome.activity.subjectType,
-            subjectId: outcome.activity.subjectId,
-            actorMemberId: actor.memberId,
-          });
+          /**
+           * The feed's own live insert (P6-G11c).
+           *
+           * Here rather than in each action, for the reason the embedding job
+           * two blocks down gives: an enqueue every write has to remember is an
+           * enqueue the next write will forget. Every activity is a feed row, so
+           * every activity announces itself.
+           *
+           * Unconditional on `notify`. That flag decides whether anybody is
+           * *messaged*, and a feed is not a message: an activity nobody is
+           * subscribed to still belongs on the space's and the workspace's feed.
+           * `suppressNotifications` is not consulted for the same reason, with
+           * one exception below.
+           *
+           * **An import is the exception.** `suppressDispatch` exists because a
+           * run writes thousands of rows, and a thousand pings would make every
+           * open feed in the workspace re-render a thousand times while saying
+           * nothing a single refresh at the end would not. An import's rows are
+           * on the feed either way, from the first navigation after it.
+           */
+          if (!spec.suppressNotifications) {
+            await enqueueOutbox(
+              tx,
+              feedAddedEvent({
+                workspaceId: spec.workspaceId,
+                activityId: insertedActivityId,
+                actorMemberId: actor.memberId,
+              }),
+            );
+          }
+
+          /**
+           * The webhooks waiting for this event (docs/design/outbound-webhooks.md
+           * W8), one outbox row each, here for the reason the feed's event above
+           * is: an enqueue every write has to remember is one the next write
+           * forgets. An unmapped kind costs nothing and a workspace with no hooks
+           * costs one indexed lookup.
+           *
+           * **Not for an import**, for the reason the feed event is not: a run
+           * writes thousands of rows about work that already happened, and a
+           * receiver flooded with a quarter of somebody else's history would
+           * read it as this quarter's news.
+           */
+          if (!spec.suppressNotifications) {
+            await enqueueWebhookDeliveries(tx, {
+              workspaceId: spec.workspaceId,
+              kind: outcome.activity.kind,
+              subjectId: outcome.activity.subjectId,
+              payload: activityPayload,
+              at: activityAt,
+            });
+          }
+
+          if (outcome.activity.notify && !spec.suppressNotifications) {
+            await fanOutActivity(tx, {
+              workspaceId: spec.workspaceId,
+              activityId: insertedActivityId,
+              subjectType: outcome.activity.subjectType,
+              subjectId: outcome.activity.subjectId,
+              actorMemberId: actor.memberId,
+            });
+          }
         }
 
         // 6. The audit row, chained. The channel is merged in here, once, so
         //    "she checked in from Slack" is answerable for every action rather
         //    than only for the ones whose author remembered (P5-T06a).
-        await appendAudit(tx, spec.workspaceId, actor, {
-          ...outcome.audit,
-          ...(spec.channel
-            ? {
-                payload: {
-                  ...(outcome.audit.payload ?? {}),
-                  channel: spec.channel,
-                },
-              }
-            : {}),
-        });
+        if (outcome.audit) {
+          await appendAudit(tx, spec.workspaceId, actor, {
+            ...outcome.audit,
+            ...(spec.channel
+              ? {
+                  payload: {
+                    ...(outcome.audit.payload ?? {}),
+                    channel: spec.channel,
+                  },
+                }
+              : {}),
+          });
+        }
 
         // 7. Side effects, as outbox rows. The relay delivers them after this
         //    transaction commits, so nothing fires for a change that rolls back.
@@ -921,14 +929,15 @@ export async function runOperation<TResult, TLoaded = undefined>(
          * legitimate domain write. Duplicate rows are the cheaper mistake, because
          * the worker's hash check makes the second one a no-op.
          */
-        const embedTarget =
-          outcome.activity.embed ??
-          (isEmbeddableSubject(outcome.activity.subjectType)
-            ? {
-                entityType: outcome.activity.subjectType,
-                entityId: outcome.activity.subjectId,
-              }
-            : null);
+        const embedTarget = outcome.activity
+          ? (outcome.activity.embed ??
+            (isEmbeddableSubject(outcome.activity.subjectType)
+              ? {
+                  entityType: outcome.activity.subjectType,
+                  entityId: outcome.activity.subjectId,
+                }
+              : null))
+          : null;
         if (embedTarget) {
           await enqueueOutbox(tx, {
             topic: EMBED_TOPIC,
@@ -950,14 +959,15 @@ export async function runOperation<TResult, TLoaded = undefined>(
          * an initiative, a task and a session are searchable and hold no prose
          * worth embedding.
          */
-        const indexTarget =
-          outcome.activity.embed ??
-          (isIndexableSubject(outcome.activity.subjectType)
-            ? {
-                entityType: outcome.activity.subjectType,
-                entityId: outcome.activity.subjectId,
-              }
-            : null);
+        const indexTarget = outcome.activity
+          ? (outcome.activity.embed ??
+            (isIndexableSubject(outcome.activity.subjectType)
+              ? {
+                  entityType: outcome.activity.subjectType,
+                  entityId: outcome.activity.subjectId,
+                }
+              : null))
+          : null;
         if (indexTarget) {
           await enqueueOutbox(tx, {
             topic: INDEX_TOPIC,
