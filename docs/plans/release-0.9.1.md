@@ -83,7 +83,7 @@ Statuses: **to do**, **design written**, **in verification**, **done**, **merged
 | A2 | in verification | Approved on 19 November 2026. The proxy uses the configured public origin on pages and sign-in redirects. Regression tests cover both schemes, the default and conflicting request headers. Browser checks are grouped at the end of the patch. |
 | A3 | design written, waiting for design approved | [Demo persona roles](../design/demo-persona-roles.md) gives verified roleless demo accounts built-in Member through the existing assignment path. |
 | W2 | design written, waiting for design approved | [Board card moves](../design/board-card-moves.md) adds an effective task Edit flag and clears an active move when a refresh revokes access. |
-| C1 | to do | Design and explicit approval before code. |
+| C1 | design written, waiting for design approved | [Copilot first word](../design/copilot-first-word.md) times each stage and tests a one-call answer for simple questions grounded in an already read anchor. |
 | W1 | in verification | The Goals list passes each card its own pending and refused state. In the same 1,000-objective jsdom fixture, one title save took about 903 ms to start and 1,196 ms to settle before the change, and 16 ms and 6 ms after. The browser spec checks the busy state and the settled value. |
 | C2, C3, C4, C5, C6 | to do | Findings carried forward on 19 November 2026. |
 | Section 6 | decided | Akmal approved the directions on 19 November 2026 and chose machine translation for the initial copy. |
