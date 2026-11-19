@@ -92,6 +92,8 @@ Akmal accepted the recommended directions on 19 November 2026 and chose machine 
 | L-Q6 | Approval of runtime dependency for ICU MessageFormat: may we add `intl-messageformat`? | **Approve.** Permissive BSD-3-Clause licence, ~14 kB min+gzip, pure JS, zero dependencies, uses native `Intl.PluralRules` to support all 10 locales including Arabic's 6 plural categories. | Reject / write custom plural logic. | Explicit approval required before adding to `package.json`. |
 | L-Q8 | Approval of METHOD.md §4 amendment: is the proposed wording to skip English word lists on non-English text approved? | **Approve.** Word-list checks are skipped with a translated advisory notice on non-English text and excluded from the strength score denominator; structural checks remain active. | Propose different wording or per-language word lists. | Needs Akmal's approval before modifying METHOD.md. |
 
+**Design approvals, Agung, 19 November 2026.** Both designs were rewritten by Claude after the reviews in `docs/audits/design-review-kpi-access-2026-11-19.md` and `docs/audits/design-review-languages-2026-11-19.md`, and Agung approved them with every open question answered as recommended: [kpi-access](../design/kpi-access.md) Q1 to Q8 and [languages](../design/languages.md) A-1 to A-13. Several of those questions were addressed to Akmal (access in Q1 to Q6, rollout in A-1, the method in A-4 to A-7 and A-13). Agung answered them for this release; Akmal should be told, and the METHOD.md change in languages §14.4 lands only in its own slice (S18). The language design's A-2 (plural keys, no new dependency) replaces the `intl-messageformat` recommendation in L-Q6 above. Implementation follows the task cards in [release-0.10.0-cards.md](release-0.10.0-cards.md).
+
 ## 8. Suggested order
 
 1. Apply section 7 to the designs and seek explicit approval. Start G4's access work and **L1** independently once approved. Finish the KPI access checks before importing shares.
@@ -105,6 +107,6 @@ Statuses: **to do**, **design written**, **design ready, waiting for design appr
 
 | Row | Status | Note |
 |---|---|---|
-| G4 | design ready, waiting for design approved | [KPI access design](../design/kpi-access.md) updated with grant authority, per-KPI access, schema/data migration, importer mapping, getter/can() changes, contract actions, screens, audit rows, and acceptance criteria. Awaiting explicit "design approved" before code. |
-| L1 to L14 | design ready, waiting for design approved | [Language design](../design/languages.md) updated with RTL, offline fonts, ICU dependency proposal, METHOD.md draft wording, and rollout plan. Awaiting explicit "design approved" before code. |
+| G4 | design approved, to do | [KPI access design](../design/kpi-access.md) updated with grant authority, per-KPI access, schema/data migration, importer mapping, getter/can() changes, contract actions, screens, audit rows, and acceptance criteria. Awaiting explicit "design approved" before code. |
+| L1 to L14 | design approved, to do | [Language design](../design/languages.md) updated with RTL, offline fonts, ICU dependency proposal, METHOD.md draft wording, and rollout plan. Awaiting explicit "design approved" before code. |
 | Section 7 | decided | Akmal approved the directions and chose machine translation for the initial release. Open questions G4-Q3, L-Q6, and L-Q8 recorded above. |

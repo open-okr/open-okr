@@ -1,6 +1,6 @@
 # Adding languages to OpenOKR
 
-Status: awaiting design approved (rewritten 19 November 2026 after docs/audits/design-review-languages-2026-11-19.md).
+Status: **design approved by Agung on 19 November 2026**, every open question (A-1 to A-13) answered as recommended in this document. Rewritten the same day after the review in docs/audits.
 
 Owner: Akmal. Plan: [release 0.10.0](../plans/release-0.10.0.md), rows L1 to L14, decisions L-Q1 to L-Q10.
 

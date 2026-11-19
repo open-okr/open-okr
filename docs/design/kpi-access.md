@@ -1,6 +1,6 @@
 # Access to one KPI, and FlowyTeam's KPI shares
 
-Status: awaiting design approved (rewritten 19 November 2026 after docs/audits/design-review-kpi-access-2026-11-19.md).
+Status: **design approved by Agung on 19 November 2026**, every open question (Q1 to Q8) answered as recommended in this document. Rewritten the same day after the review in docs/audits.
 
 Release: 0.10.0, row G4 of the [release plan](../plans/release-0.10.0.md). Akmal approved the direction on 19 November 2026 (G4-Q1, G4-Q2 in §7 of that plan). This document is the design those answers asked for. It needs an explicit "design approved" before code, because it carries a migration and a change to access (CLAUDE.md, "Three kinds of change start with the design").
 
