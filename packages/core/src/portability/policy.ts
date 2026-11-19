@@ -761,7 +761,7 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
   {
     table: "kpi_shares",
     decision: "export",
-    reason: "Who a KPI is shared with beyond its owning space.",
+    reason: "Retired in 0.10.0, never written. Shares live in access_bindings.",
   },
   {
     table: "performance_snapshots",

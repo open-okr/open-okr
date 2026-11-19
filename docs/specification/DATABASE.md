@@ -157,7 +157,7 @@ Unique on `(workspace_id, user_id)` for live rows, so one person has at most one
 `group_id` to access_groups, `member_id` to workspace_members. Enumerates who belongs to a group whose membership is real data rather than structural — `space_standard`, once spaces exist. Deliberately unused for `workspace_standard`: every active member of the workspace already belongs to it by definition, so a row per person would be state kept only to agree with `workspace_members`.
 
 ### access_bindings
-`group_id` to access_groups, `context_id` to access_contexts, `level` (10 view, 40 comment, 70 edit, 100 full), `tag?` (`champion` / `reviewer` / `sponsor` / `facilitator` / `coordinator`). A group may hold at most one live untagged binding and one live binding per tag on a given context. Written through `bindGroup`, alongside `ensureContext` in the same file. `can()` and the access-aware getter that read these four tables back (`packages/core/src/access/reads.ts`) are P2-T02: `resolveMemberAccessLevel` walks the three reachable tiers and takes the maximum, and `resolveActor` in the Operation pipeline uses it in place of the placeholder `full` it returned before that task.
+`group_id` to access_groups, `context_id` to access_contexts, `level` (10 view, 40 comment, 70 edit, 100 full), `tag?` (`champion` / `reviewer` / `sponsor` / `facilitator` / `coordinator` / `owner` / `share`). A group may hold at most one live untagged binding and one live binding per tag on a given context. Written through `bindGroup`, alongside `ensureContext` in the same file. `can()` and the access-aware getter that read these four tables back (`packages/core/src/access/reads.ts`) are P2-T02: `resolveMemberAccessLevel` walks the three reachable tiers and takes the maximum, and `resolveActor` in the Operation pipeline uses it in place of the placeholder `full` it returned before that task.
 
 Workspace provisioning (P1-T06, wired for the access model in P2-T01) gives every new workspace its own context and `workspace_standard` group, and gives the first member a `member` group with a `full` binding on that context.
 
@@ -399,7 +399,7 @@ The latest score per scope per cycle, unique on `(workspace_id, cycle_id, scope,
 `dependent_kpi_id` (the calculated KPI whose formula holds the reference) and `depends_on_kpi_id` to kpis. Formula edges, cycle-checked.
 
 ### kpi_shares
-`kpi_id` to kpis, `member_id` to workspace_members, `access` (`read` / `update`).
+Retired in 0.10.0, never written; replaced by `access_bindings` tagged `share` (KA-D8). Columns: `kpi_id` to kpis, `member_id` to workspace_members, `access` (`read` / `update`).
 
 ### performance_snapshots
 `cycle_id` to cycles, `owner_kind` (`workspace` / `space` / `member`), `space_id?` to spaces, `member_id?` to workspace_members, `result_value numeric(3,2)?`, the four §3.3 band counts as integers (`fully_achieved_count`, `strong_count`, `partial_count`, `little_count`), `verdict` (`too_safe` / `healthy` / `partial` / `outran_capacity`)?. `result_value` is the cycle score over every scored key result (METHOD.md §8.6); since P9-T11b-b the `verdict` is §3.4's over the **aspirational** key results alone, and null where none was scored, because committed key results are judged by the share met. Unique on the cycle, the owner kind and the coalesced owner columns, so archiving twice updates rather than doubling the trend. The owner has to agree with its kind, as a check constraint. Derived: written by the archive and never imported (P3-T15).

@@ -107,6 +107,6 @@ Statuses: **to do**, **design written**, **design ready, waiting for design appr
 
 | Row | Status | Note |
 |---|---|---|
-| G4 | design approved, to do | [KPI access design](../design/kpi-access.md) updated with grant authority, per-KPI access, schema/data migration, importer mapping, getter/can() changes, contract actions, screens, audit rows, and acceptance criteria. Awaiting explicit "design approved" before code. |
+| G4 | design approved, to do | [KPI access design](../design/kpi-access.md) updated with grant authority, per-KPI access, schema/data migration, importer mapping, getter/can() changes, contract actions, screens, audit rows, and acceptance criteria. Awaiting explicit "design approved" before code. K1 done |
 | L1 to L14 | design approved, to do | [Language design](../design/languages.md) updated with RTL, offline fonts, ICU dependency proposal, METHOD.md draft wording, and rollout plan. Awaiting explicit "design approved" before code. |
 | Section 7 | decided | Akmal approved the directions and chose machine translation for the initial release. Open questions G4-Q3, L-Q6, and L-Q8 recorded above. |
