@@ -64,6 +64,7 @@
     "check:docs": "node --experimental-strip-types --no-warnings scripts/check-docs.ts",
     "i18n:check": "node --experimental-strip-types --no-warnings scripts/i18n-check.ts",
     "i18n:sync": "node --experimental-strip-types --no-warnings scripts/i18n-sync.ts",
+    "i18n:translate": "pnpm --filter @openokr/agents i18n:translate",
     "gen:docs": "node --experimental-strip-types --no-warnings scripts/gen-api-reference.ts"
   },
   "devDependencies": {
