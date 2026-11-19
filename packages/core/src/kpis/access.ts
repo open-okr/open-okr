@@ -14,14 +14,20 @@ import {
   kpis,
   type WorkspaceTx,
 } from "@openokr/db";
-import { eq, isNull } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import {
   bindGroup,
   ensureMemberGroup,
   ensureWorkspaceStandardGroup,
   unbindGroup,
 } from "../access/contexts.ts";
-import { ACCESS_LEVELS } from "../access/levels.ts";
+import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
+import {
+  accessFilterMember,
+  resolveMemberAccessLevel,
+  resolveMemberRoleLevel,
+  visibleResourceIds,
+} from "../access/reads.ts";
 import { OperationError } from "../operations/errors.ts";
 
 export interface EnsureKpiContextInput {
@@ -159,4 +165,204 @@ export async function rebindKpiOwnerInTx<
       tag: "owner",
     });
   }
+}
+
+export interface RequireKpiAccessInput {
+  readonly workspaceId: string;
+  readonly memberId: string;
+  readonly kpiId: string;
+  readonly requires?: AccessLevel;
+}
+
+/**
+ * Throws not_found for a missing or deleted KPI and for a level below requires.
+ * With a context: level on own context via resolveMemberAccessLevel.
+ * Straggler: §4 rule using resolveMemberRoleLevel and accessFilterMember.
+ */
+export async function requireKpiAccess<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: WorkspaceTx<TSchema>,
+  input: RequireKpiAccessInput,
+): Promise<{ contextId: string | null; level: number }> {
+  const [kpi] = await tx
+    .select({ id: kpis.id })
+    .from(kpis)
+    .where(
+      activeOnly(
+        kpis,
+        eq(kpis.workspaceId, input.workspaceId),
+        eq(kpis.id, input.kpiId),
+      ),
+    )
+    .limit(1);
+
+  if (!kpi) {
+    throw new OperationError(
+      "not_found",
+      "No such KPI, or you do not have access to it.",
+    );
+  }
+
+  const requires = input.requires ?? ACCESS_LEVELS.view;
+
+  const [context] = await tx
+    .select({ id: accessContexts.id })
+    .from(accessContexts)
+    .where(
+      activeOnly(
+        accessContexts,
+        eq(accessContexts.workspaceId, input.workspaceId),
+        eq(accessContexts.resourceType, "kpi"),
+        eq(accessContexts.resourceId, input.kpiId),
+      ),
+    )
+    .limit(1);
+
+  if (context) {
+    const level = await resolveMemberAccessLevel(tx, {
+      workspaceId: input.workspaceId,
+      memberId: input.memberId,
+      contextId: context.id,
+    });
+    if (level < requires) {
+      throw new OperationError(
+        "not_found",
+        "No such KPI, or you do not have access to it.",
+      );
+    }
+    return { contextId: context.id, level };
+  }
+
+  // Straggler: §4 rule using resolveMemberRoleLevel and accessFilterMember
+  const member = await accessFilterMember(tx, {
+    workspaceId: input.workspaceId,
+    memberId: input.memberId,
+  });
+  if (!member.active || !member.human) {
+    throw new OperationError(
+      "not_found",
+      "No such KPI, or you do not have access to it.",
+    );
+  }
+
+  const roleLevel = await resolveMemberRoleLevel(tx, {
+    workspaceId: input.workspaceId,
+    memberId: input.memberId,
+    domain: "kpi",
+  });
+
+  let effectiveLevel = Math.max(roleLevel ?? 0, ACCESS_LEVELS.view);
+  if (member.supportLevel !== undefined) {
+    effectiveLevel = Math.min(effectiveLevel, member.supportLevel);
+  }
+
+  if (effectiveLevel < requires) {
+    throw new OperationError(
+      "not_found",
+      "No such KPI, or you do not have access to it.",
+    );
+  }
+
+  return { contextId: null, level: effectiveLevel };
+}
+
+export interface VisibleKpiIdsInput {
+  readonly workspaceId: string;
+  readonly memberId: string;
+  readonly ids: readonly string[];
+  readonly requires?: AccessLevel;
+}
+
+/**
+ * The subset of KPI ids the member may see, in at most two statements (0.10.0 K4, §5).
+ * Statement 1: visibleResourceIds for KPIs with context.
+ * Statement 2: stragglers among ids that pass the §4 rule.
+ */
+export async function visibleKpiIds<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: WorkspaceTx<TSchema>, input: VisibleKpiIdsInput): Promise<Set<string>> {
+  if (input.ids.length === 0) {
+    return new Set();
+  }
+
+  const requires = input.requires ?? ACCESS_LEVELS.view;
+
+  // Statement 1: visible contextual KPIs
+  const visible = await visibleResourceIds(tx, {
+    workspaceId: input.workspaceId,
+    memberId: input.memberId,
+    resourceType: "kpi",
+    ids: input.ids,
+    requires,
+  });
+
+  // Statement 2: stragglers among input.ids that pass the §4 rule
+  const stragglers = await tx.execute<{ id: string }>(sql`
+    with actor as (
+      select kind, role_id,
+             (select s.level from operator_sessions s
+               where s.member_id = workspace_members.id
+                 and s.granted_at is not null
+                 and s.ended_at is null
+                 and s.expires_at > now()
+                 and s.deleted_at is null
+               limit 1) as support_level
+        from workspace_members
+       where id = ${input.memberId}
+         and workspace_id = ${input.workspaceId}
+         and status = 'active'
+         and deleted_at is null
+         and not exists (
+           select 1 from operator_sessions s
+            where s.member_id = workspace_members.id
+              and s.ended_at is null
+              and s.deleted_at is null
+              and s.expires_at is not null
+              and s.expires_at <= now()
+         )
+    ),
+    role_level as (
+      select coalesce(max(rp.level), 0)::int as level
+        from role_permissions rp
+       where rp.workspace_id = ${input.workspaceId}
+         and rp.deleted_at is null
+         and rp.domain = 'kpi'
+         and exists (
+           select 1 from actor
+            where (actor.kind = 'human' or actor.support_level is not null)
+              and actor.role_id is not null
+              and actor.role_id = rp.role_id
+         )
+    )
+    select k.id
+      from kpis k
+     where k.workspace_id = ${input.workspaceId}
+       and k.deleted_at is null
+       and k.id = any(${sql.param([...input.ids])}::uuid[])
+       and not exists (
+         select 1 from access_contexts c
+          where c.workspace_id = ${input.workspaceId}
+            and c.resource_type = 'kpi'
+            and c.resource_id = k.id
+            and c.deleted_at is null
+       )
+       and exists (
+         select 1 from actor
+          where (actor.kind = 'human' or actor.support_level is not null)
+            and least(
+              greatest(
+                (select level from role_level),
+                ${ACCESS_LEVELS.view}
+              ),
+              coalesce(actor.support_level, ${ACCESS_LEVELS.full})
+            ) >= ${requires}
+       )
+  `);
+
+  for (const row of stragglers.rows) {
+    visible.add(row.id);
+  }
+
+  return visible;
 }

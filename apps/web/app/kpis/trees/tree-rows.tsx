@@ -61,6 +61,8 @@ export interface KpiTreeNode {
   readonly recoveryProgressPct: number | null;
   /** How it drives its parent (§6.3): part of its formula, or believed to move it. */
   readonly link: "formula" | "influence" | null;
+  /** True when the parent KPI is hidden by access (0.10.0 K4). */
+  readonly parentHidden?: boolean;
 }
 
 /** Parents before children, with the depth as a number: the same flattening the
@@ -160,6 +162,14 @@ export async function KpiTreeRows({
                     </span>
                   ) : null}
                 </span>
+                {node.parentHidden ? (
+                  <span
+                    data-testid="kpi-parent-hidden"
+                    className="text-[11px] text-ink-4"
+                  >
+                    {t("kpis.trees.parentNotVisible")}
+                  </span>
+                ) : null}
                 {node.link ? (
                   <span
                     data-testid="kpi-link"

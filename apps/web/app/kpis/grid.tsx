@@ -323,7 +323,9 @@ export function KpiGrid({
   if (kpis.length === 0) {
     return (
       <p className="rounded-xl border border-line bg-surface p-4 text-sm text-ink-3">
-        {t("kpis.grid.noKpisYetA")}
+        {canEdit
+          ? t("kpis.grid.noKpisYetA")
+          : t("kpis.grid.noKpisSharedWithYou")}
       </p>
     );
   }

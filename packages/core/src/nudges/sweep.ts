@@ -54,6 +54,7 @@ import {
 } from "../agents/scope.ts";
 import { blockerClockOf, frequencyOf } from "../cadence/blockers.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { visibleKpiIds } from "../kpis/access.ts";
 import {
   KPI_RULE_COLUMNS,
   type KpiRule,
@@ -264,7 +265,21 @@ export async function dueKpiCorridorNudges(
   const due: DueNudge[] = [];
 
   for (const kpi of rows) {
-    const owners = await kpiOwners(tx, input.workspaceId, kpi);
+    const candidateOwners = await kpiOwners(tx, input.workspaceId, kpi);
+    if (candidateOwners.length === 0) {
+      continue;
+    }
+    const owners: string[] = [];
+    for (const candidate of candidateOwners) {
+      const visible = await visibleKpiIds(tx, {
+        workspaceId: input.workspaceId,
+        memberId: candidate,
+        ids: [kpi.id],
+      });
+      if (visible.has(kpi.id)) {
+        owners.push(candidate);
+      }
+    }
     if (owners.length === 0) {
       continue;
     }

@@ -50,7 +50,11 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { getAccessScoped } from "../access/reads.ts";
+import {
+  getAccessScoped,
+  resolveMemberRoleLevel,
+  visibleResourceIds,
+} from "../access/reads.ts";
 import { bindAgentsToContextInTx } from "../agents/bindings.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
@@ -61,7 +65,12 @@ import {
   legacyColumns,
   legacyKey,
 } from "../imports/legacy.ts";
-import { ensureKpiContextInTx, rebindKpiOwnerInTx } from "../kpis/access.ts";
+import {
+  ensureKpiContextInTx,
+  rebindKpiOwnerInTx,
+  requireKpiAccess,
+  visibleKpiIds,
+} from "../kpis/access.ts";
 import {
   cascadeFromKpi,
   evaluateKpiForPeriod,
@@ -859,8 +868,42 @@ export const readKpiGrid = defineReadAction({
           .orderBy(asc(kpis.position), asc(kpis.title));
 
         const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx, context.workspaceId, userId));
+
+        const visible = await visibleKpiIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          ids: kpiRows.map((k) => k.id),
+        });
+
+        const filteredKpis = kpiRows.filter((k) => visible.has(k.id));
+
+        const roleLevel = await resolveMemberRoleLevel(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          domain: "kpi",
+        });
+
+        const canEditKpi = (roleLevel ?? 0) >= ACCESS_LEVELS.edit;
+        const visibleCategoryIds = new Set(
+          filteredKpis
+            .map((k) => k.categoryId)
+            .filter((id): id is string => id !== null),
+        );
+
+        const filteredCategories = canEditKpi
+          ? categoryRows
+          : categoryRows.filter((c) => visibleCategoryIds.has(c.id));
+
+        const hasUncategorised = filteredKpis.some(
+          (k) => k.categoryId === null,
+        );
+        const includeUncategorised = canEditKpi || hasUncategorised;
+
         const out = [];
-        for (const kpi of kpiRows) {
+        for (const kpi of filteredKpis) {
           const corridor = corridorOf(kpi, workspace);
           const records = await loadKpiRecords(
             tx,
@@ -921,10 +964,12 @@ export const readKpiGrid = defineReadAction({
         }
 
         return {
-          // A null id is the "uncategorised" group, which the grid renders last.
-          // Every KPI belongs to exactly one group, and a category nobody chose
-          // is still a group rather than a gap.
-          categories: [...categoryRows, { id: null, name: "Uncategorised" }],
+          categories: [
+            ...filteredCategories,
+            ...(includeUncategorised
+              ? [{ id: null, name: "Uncategorised" }]
+              : []),
+          ],
           kpis: out,
         };
       },
@@ -989,8 +1034,19 @@ export const listKpis = defineReadAction({
           .from(kpis)
           .where(activeOnly(kpis, eq(kpis.workspaceId, context.workspaceId)))
           .orderBy(asc(kpis.title), asc(kpis.id));
+
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx, context.workspaceId, userId));
+        const visible = await visibleKpiIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          ids: rows.map((r) => r.id),
+        });
+        const visibleRows = rows.filter((r) => visible.has(r.id));
+
         return {
-          kpis: rows.map((row) => ({
+          kpis: visibleRows.map((row) => ({
             ...row,
             achievementPct:
               row.achievementPct === null ? null : Number(row.achievementPct),
@@ -1837,20 +1893,24 @@ export const readRecoveryBoard = defineReadAction({
           )
           .orderBy(asc(kpis.title));
 
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx as OperationTx, context.workspaceId, userId));
+        const visible = await visibleKpiIds(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          ids: rows.map((r) => r.id),
+        });
+        const visibleRows = rows.filter((r) => visible.has(r.id));
+
         const responses = await kpiResponsesInTx(
           tx as OperationTx,
           context.workspaceId,
-          rows,
-          {
-            memberId: await actingMember(
-              tx as OperationTx,
-              context.workspaceId,
-              userId,
-            ),
-          },
+          visibleRows,
+          { memberId },
         );
         const counts = new Map<string, number>();
-        const goalIds = rows
+        const goalIds = visibleRows
           .map((row) => row.recoveryGoalId)
           .filter((id): id is string => id !== null);
         if (goalIds.length > 0) {
@@ -1871,7 +1931,7 @@ export const readRecoveryBoard = defineReadAction({
 
         const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         return {
-          cards: rows.map((row) => ({
+          cards: visibleRows.map((row) => ({
             kpiId: row.id,
             shortId: row.shortId,
             title: row.title,
@@ -1914,6 +1974,7 @@ export const readRecoveryBoard = defineReadAction({
 const kpiTreeNode = z.object({
   id: z.uuid(),
   parentKpiId: z.uuid().nullable(),
+  parentHidden: z.boolean().default(false),
   title: z.string(),
   unit: z.string().nullable(),
   indicatorType: z.string(),
@@ -2023,10 +2084,12 @@ function toTreeNode(
     readonly recoveryGoalClosedAt: Date | null;
     readonly recoveryProgress: string | null;
   },
+  parentHidden = false,
 ): TreeNode {
   return {
     id: row.id,
-    parentKpiId: row.parentKpiId,
+    parentKpiId: parentHidden ? null : row.parentKpiId,
+    parentHidden,
     title: row.title,
     unit: row.unit,
     indicatorType: row.indicatorType,
@@ -2041,7 +2104,7 @@ function toTreeNode(
     recoveryGoalId: row.recoveryGoalId,
     recoveryProgressPct: numberOrNull(row.recoveryProgress),
     link:
-      row.parentKpiId === null
+      parentHidden || row.parentKpiId === null
         ? null
         : formulaLinks.has(`${row.parentKpiId} ${row.id}`)
           ? "formula"
@@ -2101,16 +2164,42 @@ export const readKpiTree = defineReadAction({
           )
           .orderBy(asc(kpis.position), asc(kpis.title));
 
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx as OperationTx, context.workspaceId, userId));
+
+        const candidateIds = new Set<string>();
+        for (const row of rows) {
+          candidateIds.add(row.id);
+          if (row.parentKpiId) {
+            candidateIds.add(row.parentKpiId);
+          }
+        }
+
+        const visible = await visibleKpiIds(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          ids: [...candidateIds],
+        });
+
+        const visibleRows = rows.filter((row) => visible.has(row.id));
+
         const links = await formulaLinksInTx(
-          tx,
+          tx as OperationTx,
           context.workspaceId,
-          rows.flatMap((row) => (row.parentKpiId ? [row.parentKpiId] : [])),
+          visibleRows.flatMap((row) =>
+            row.parentKpiId ? [row.parentKpiId] : [],
+          ),
         );
         const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         return {
           trees,
           treeId,
-          nodes: rows.map((row) => toTreeNode(links, workspace, row)),
+          nodes: visibleRows.map((row) => {
+            const parentHidden =
+              row.parentKpiId !== null && !visible.has(row.parentKpiId);
+            return toTreeNode(links, workspace, row, parentHidden);
+          }),
         };
       },
     );
@@ -2204,10 +2293,26 @@ export const readSpaceKpiTrees = defineReadAction({
             asc(kpis.title),
           );
 
+        const candidateIds = new Set<string>();
+        for (const row of rows) {
+          candidateIds.add(row.id);
+          if (row.parentKpiId) {
+            candidateIds.add(row.parentKpiId);
+          }
+        }
+        const visible = await visibleKpiIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          ids: [...candidateIds],
+        });
+        const visibleRows = rows.filter((row) => visible.has(row.id));
+
         const links = await formulaLinksInTx(
           tx,
           context.workspaceId,
-          rows.flatMap((row) => (row.parentKpiId ? [row.parentKpiId] : [])),
+          visibleRows.flatMap((row) =>
+            row.parentKpiId ? [row.parentKpiId] : [],
+          ),
         );
         const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         // A tree that was deleted leaves its KPIs pointing at nothing live, so
@@ -2217,14 +2322,16 @@ export const readSpaceKpiTrees = defineReadAction({
           string | null,
           { id: string | null; name: string | null; nodes: TreeNode[] }
         >();
-        for (const row of rows) {
+        for (const row of visibleRows) {
           const key = row.treeName === null ? null : row.treeId;
           const group = groups.get(key) ?? {
             id: key,
             name: key === null ? null : row.treeName,
             nodes: [],
           };
-          group.nodes.push(toTreeNode(links, workspace, row));
+          const parentHidden =
+            row.parentKpiId !== null && !visible.has(row.parentKpiId);
+          group.nodes.push(toTreeNode(links, workspace, row, parentHidden));
           groups.set(key, group);
         }
         const unfiled = groups.get(null);
@@ -2318,6 +2425,16 @@ export const readKpiDetail = defineReadAction({
       drizzle(context.pool),
       { workspaceId: context.workspaceId, userId },
       async (tx) => {
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx as OperationTx, context.workspaceId, userId));
+        await requireKpiAccess(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          kpiId: input.kpiId,
+          requires: ACCESS_LEVELS.view,
+        });
+
         const [kpi] = await tx
           .select({
             id: kpis.id,
@@ -2437,6 +2554,43 @@ export const readKpiDetail = defineReadAction({
             ),
           );
 
+        // Filter relatives with visibleKpiIds
+        const relativeIds: string[] = [];
+        if (parent?.id) {
+          relativeIds.push(parent.id);
+        }
+        for (const child of children) {
+          relativeIds.push(child.id);
+        }
+        for (const cand of candidates) {
+          relativeIds.push(cand.id);
+        }
+        const visibleRelatives = await visibleKpiIds(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          ids: relativeIds,
+        });
+
+        const filteredParent =
+          parent && visibleRelatives.has(parent.id) ? parent : null;
+        const filteredChildren = children.filter((c) =>
+          visibleRelatives.has(c.id),
+        );
+        const filteredCandidates = candidates.filter((c) =>
+          visibleRelatives.has(c.id),
+        );
+
+        // Filter linked key results with visibleResourceIds on goal
+        const goalIds = linked.map((l) => l.goalId);
+        const visibleGoals = await visibleResourceIds(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "goal",
+          ids: goalIds,
+          requires: ACCESS_LEVELS.view,
+        });
+        const filteredLinked = linked.filter((l) => visibleGoals.has(l.goalId));
+
         const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         return {
           kpi: {
@@ -2478,8 +2632,8 @@ export const readKpiDetail = defineReadAction({
                 ? null
                 : Number(kpi.recoveryStartedPct),
           },
-          parent: parent ?? null,
-          children: children.map((child) => ({
+          parent: filteredParent ?? null,
+          children: filteredChildren.map((child) => ({
             ...child,
             achievementPct:
               child.achievementPct === null
@@ -2494,8 +2648,8 @@ export const readKpiDetail = defineReadAction({
               record.targetValue === null ? null : Number(record.targetValue),
             remark: record.remark,
           })),
-          candidates,
-          linkedKeyResults: linked,
+          candidates: filteredCandidates,
+          linkedKeyResults: filteredLinked,
         };
       },
     );
@@ -2537,6 +2691,16 @@ export const readRecoveryDraft = defineReadAction({
       drizzle(context.pool),
       { workspaceId: context.workspaceId, userId },
       async (tx) => {
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx as OperationTx, context.workspaceId, userId));
+        await requireKpiAccess(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          kpiId: input.kpiId,
+          requires: ACCESS_LEVELS.view,
+        });
+
         const rhythm = resolveRhythm(
           await readRhythmRow(tx, context.workspaceId),
         );

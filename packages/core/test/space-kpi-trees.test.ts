@@ -169,7 +169,7 @@ describe("a space's KPI trees", () => {
       }),
     ).rejects.toThrow(/No such space/);
 
-    // Put in the one space, they see that space's measures and only those.
+    // Put in the one space, they still see no KPIs without an explicit share (0.10.0 K4).
     await callAction(await as(OWNER), "spaces.addMember", {
       spaceId: growthId,
       memberId,
@@ -180,7 +180,7 @@ describe("a space's KPI trees", () => {
       "kpis.spaceTrees",
       { spaceId: growthId },
     );
-    expect(read.trees[0]?.nodes.map((node) => node.title)).toEqual(["Revenue"]);
+    expect(read.trees).toEqual([]);
     await expect(
       callAction(await as("space-kpi-guest"), "kpis.spaceTrees", {
         spaceId: financeId,

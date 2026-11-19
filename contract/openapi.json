@@ -56806,6 +56806,10 @@
                                   }
                                 ]
                               },
+                              "parentHidden": {
+                                "default": false,
+                                "type": "boolean"
+                              },
                               "title": {
                                 "type": "string"
                               },
@@ -56893,6 +56897,7 @@
                             "required": [
                               "id",
                               "parentKpiId",
+                              "parentHidden",
                               "title",
                               "unit",
                               "indicatorType",
@@ -57042,6 +57047,10 @@
                                         }
                                       ]
                                     },
+                                    "parentHidden": {
+                                      "default": false,
+                                      "type": "boolean"
+                                    },
                                     "title": {
                                       "type": "string"
                                     },
@@ -57129,6 +57138,7 @@
                                   "required": [
                                     "id",
                                     "parentKpiId",
+                                    "parentHidden",
                                     "title",
                                     "unit",
                                     "indicatorType",

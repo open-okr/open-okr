@@ -162,7 +162,9 @@ export default async function KpiTreesPage({
           </h2>
           {tree.nodes.length === 0 ? (
             <p className="p-4 text-sm text-ink-3">
-              {t("kpis.trees.nothingInThisTree")}
+              {canEdit
+                ? t("kpis.trees.nothingInThisTree")
+                : t("kpis.trees.noKpisYouCanSee")}
             </p>
           ) : (
             <KpiTreeRows

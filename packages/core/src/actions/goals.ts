@@ -2345,7 +2345,7 @@ export const createKeyResult = defineWriteAction({
       // KPI's reading wins over a typed current value; with nothing recorded
       // yet, the key result starts at its own baseline like any other.
       const kpi = input.kpiId
-        ? await readLinkableKpi(tx, workspaceId, input.kpiId)
+        ? await readLinkableKpi(tx, workspaceId, input.kpiId, memberId)
         : null;
       const currentValue = kpi?.reading ?? input.currentValue;
 
@@ -2932,7 +2932,7 @@ export const linkKeyResultKpi = defineWriteAction({
           "This goal is closed, so its key results take no new values. Reopen it first to link a KPI.",
         );
       }
-      const kpi = await readLinkableKpi(tx, workspaceId, input.kpiId);
+      const kpi = await readLinkableKpi(tx, workspaceId, input.kpiId, memberId);
 
       await linkKpiInTx(tx, {
         workspaceId,
