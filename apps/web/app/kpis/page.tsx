@@ -1,4 +1,8 @@
-import { ACCESS_LEVELS, callAction, RHYTHM_ASSIST_KEYS } from "@openokr/core";
+import {
+  callAction,
+  RHYTHM_ASSIST_KEYS,
+  resolveKpiGridAccess,
+} from "@openokr/core";
 import {
   buttonVariants,
   EntityPicker,
@@ -85,11 +89,15 @@ export default async function KpisPage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
 
-  const level = await workspaceReaderLevel(
+  const pool = getPool();
+  await workspaceReaderLevel(workspace.workspaceId, workspace.memberId);
+  const grid = await callAction(context, "kpis.grid", { periods: 12 });
+  const { canEdit, editableKpiIds } = await resolveKpiGridAccess(
+    pool,
     workspace.workspaceId,
     workspace.memberId,
+    grid.kpis.map((k) => k.id),
   );
-  const canEdit = level >= ACCESS_LEVELS.edit;
   // §2.2's suggestion beside the add form (M-09), for somebody who may add a
   // KPI and only where a provider may write one. The form is the same either
   // way.
@@ -102,7 +110,6 @@ export default async function KpisPage({
       session.user.id,
     ));
 
-  const grid = await callAction(context, "kpis.grid", { periods: 12 });
   // Who may own a KPI: a person who is here (§6.2, P9-T17b-b). Read only for
   // somebody who may add one.
   const people = canEdit
@@ -421,6 +428,7 @@ export default async function KpisPage({
           categories={grid.categories}
           kpis={shown}
           canEdit={canEdit}
+          editableKpiIds={editableKpiIds}
           today={today}
           addHref={opening("kpi")}
         />

@@ -14,8 +14,11 @@ import {
   activeOnly,
   kpis,
   type WorkspaceTx,
+  withWorkspace,
 } from "@openokr/db";
 import { eq, isNull, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import type { Pool } from "pg";
 import {
   bindGroup,
   ensureMemberGroup,
@@ -501,4 +504,39 @@ export async function removeKpiShareInTx<
   }
 
   return { previous: null, removed: false };
+}
+
+/**
+ * Resolves the role-level for the 'kpi' domain and editable KPI ids for a member,
+ * under the tenant floor (withWorkspace).
+ */
+export async function resolveKpiGridAccess(
+  pool: Pool,
+  workspaceId: string,
+  memberId: string,
+  kpiIds: readonly string[],
+): Promise<{
+  readonly canEdit: boolean;
+  readonly editableKpiIds?: ReadonlySet<string>;
+}> {
+  const db = drizzle(pool);
+  return withWorkspace(db, workspaceId, async (tx) => {
+    const roleLevel = await resolveMemberRoleLevel(tx, {
+      workspaceId,
+      memberId,
+      domain: "kpi",
+    });
+    // If no role assigned, fall back to true (member edit)
+    const canEdit = (roleLevel ?? ACCESS_LEVELS.edit) >= ACCESS_LEVELS.edit;
+    if (canEdit || kpiIds.length === 0) {
+      return { canEdit };
+    }
+    const editable = await visibleKpiIds(tx, {
+      workspaceId,
+      memberId,
+      ids: kpiIds,
+      requires: ACCESS_LEVELS.edit,
+    });
+    return { canEdit: false, editableKpiIds: editable };
+  });
 }

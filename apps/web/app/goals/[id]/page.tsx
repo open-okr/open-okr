@@ -63,6 +63,7 @@ import {
   readSubjectDocuments,
   SubjectDocuments,
 } from "../../documents/subject-documents.tsx";
+import { LinkedKpiChip } from "../linked-kpi-chip.tsx";
 import { closeGoal, editGoal, reassignRole, reopenGoal } from "./actions.ts";
 import { CoachStrip } from "./coach-strip";
 import { DecomposeKeyResult } from "./decompose.tsx";
@@ -272,6 +273,16 @@ export default async function GoalPage({
       : [];
   const kpiOptions =
     unlinkedKeyResults.length > 0 ? await readKpiOptions(context) : [];
+
+  const hasLinkedKpis = goal.keyResults.some(
+    (keyResult) => keyResult.kpiId !== null,
+  );
+  const visibleKpis = hasLinkedKpis
+    ? kpiOptions && kpiOptions.length > 0
+      ? kpiOptions
+      : await readKpiOptions(context)
+    : [];
+  const visibleKpiMap = new Map((visibleKpis ?? []).map((k) => [k.id, k]));
 
   const retrospectiveHtml = goal.retrospective
     ? richTextHtml(goal.retrospective.body)
@@ -631,7 +642,10 @@ export default async function GoalPage({
                           thresholds={pageThresholds}
                         />
                       ) : keyResult.kpiId ? (
-                        <Chip tone="info">{t("common.fromAKpi")}</Chip>
+                        <LinkedKpiChip
+                          kpiId={keyResult.kpiId}
+                          kpi={visibleKpiMap.get(keyResult.kpiId)}
+                        />
                       ) : null}
                     </span>
                   </li>

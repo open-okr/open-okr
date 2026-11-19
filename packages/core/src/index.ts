@@ -1055,6 +1055,7 @@ export {
   type TrustedDomainOffer,
   trustedDomainOffers,
 } from "./invitations/trusted-domain.ts";
+export { resolveKpiGridAccess } from "./kpis/access.ts";
 export {
   type EmailBlock,
   type EmailFrame,

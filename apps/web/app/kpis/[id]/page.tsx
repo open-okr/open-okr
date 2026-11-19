@@ -30,6 +30,7 @@ import { ActionForm } from "../../cycle/action-form.tsx";
 import { updateKpiRule } from "../actions.ts";
 import { JudgedBy } from "../judged-by.tsx";
 import { FormulaBuilder } from "./formula-builder.tsx";
+import { SharedWithCard } from "./shared-with-card.tsx";
 import { TrendNarration } from "./trend-narration.tsx";
 
 /** The tab reads this item's own name (lib/page-title.ts). */
@@ -147,13 +148,27 @@ export default async function KpiDetailPage({
   }).format(new Date());
 
   const { kpi } = detail;
+  const canFull =
+    level >= ACCESS_LEVELS.full ||
+    (kpi.namedOwnerId !== null && kpi.namedOwnerId === workspace.memberId);
+
+  let sharesData: Awaited<ReturnType<typeof callAction<"kpis.shares">>> | null =
+    null;
+  let sharesError: string | null = null;
+  try {
+    sharesData = await callAction(context, "kpis.shares", { kpiId: id });
+  } catch {
+    sharesError = t("kpis.shares.loadFailed");
+  }
+
   // Who may own it: a person who is here (§6.2, P9-T17b-b). Read only for
   // somebody who may change it.
-  const people = canEdit
-    ? (await callAction(context, "people.directory", {})).filter(
-        (member) => member.kind === "human" && member.status === "active",
-      )
-    : [];
+  const people =
+    canEdit || canFull
+      ? (await callAction(context, "people.directory", {})).filter(
+          (member) => member.kind === "human" && member.status === "active",
+        )
+      : [];
   // Oldest first for the chart; the read returns newest first for the table.
   const series = [...detail.records].reverse();
   const target = kpi.targetDefault ?? 0;
@@ -320,19 +335,27 @@ export default async function KpiDetailPage({
                 }}
               />
               <div className="flex flex-wrap items-center gap-2.5">
-                <EntityPicker
-                  id="edit-ownerMemberId"
-                  label={t("kpis.rule.owner")}
-                  name="ownerMemberId"
-                  defaultValue={kpi.namedOwnerId}
-                  options={people.map((person) =>
-                    memberOption(person, t("common.agent")),
-                  )}
-                  noneLabel={t("kpis.rule.nobodyNamedOption")}
-                  search={searchHumans}
-                  className="w-56"
-                  inputClassName="text-xs"
-                />
+                <div className="flex flex-col gap-1">
+                  <EntityPicker
+                    id="edit-ownerMemberId"
+                    label={t("kpis.rule.owner")}
+                    name="ownerMemberId"
+                    defaultValue={kpi.namedOwnerId}
+                    options={people.map((person) =>
+                      memberOption(person, t("common.agent")),
+                    )}
+                    noneLabel={t("kpis.rule.nobodyNamedOption")}
+                    search={searchHumans}
+                    disabled={!canFull}
+                    className="w-56"
+                    inputClassName="text-xs"
+                  />
+                  {!canFull ? (
+                    <p className="text-[11px] text-ink-3">
+                      {t("kpis.rule.ownerNeedsFull")}
+                    </p>
+                  ) : null}
+                </div>
                 <SelectInput
                   id="edit-tier"
                   label={t("kpis.rule.tier")}
@@ -358,6 +381,21 @@ export default async function KpiDetailPage({
           </CardBody>
         ) : null}
       </Card>
+
+      {/* S-21 KPI detail "Shared with" card under "How it is judged" */}
+      <SharedWithCard
+        kpiId={kpi.id}
+        canFull={canFull}
+        owner={
+          sharesData?.owner ??
+          (kpi.namedOwnerId
+            ? { memberId: kpi.namedOwnerId, name: kpi.namedOwnerName ?? "" }
+            : null)
+        }
+        shares={sharesData?.shares ?? []}
+        error={sharesError}
+        availableMembers={people}
+      />
 
       <Card>
         <CardHeader>

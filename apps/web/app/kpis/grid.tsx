@@ -221,12 +221,14 @@ export function KpiGrid({
   categories,
   kpis,
   canEdit,
+  editableKpiIds,
   today,
   addHref,
 }: {
   readonly categories: readonly GridCategory[];
   readonly kpis: readonly GridKpi[];
   readonly canEdit: boolean;
+  readonly editableKpiIds?: ReadonlySet<string>;
   /**
    * Today in the workspace calendar, from the server. Never `new Date()` here:
    * the browser's clock is the reader's, and a value typed at 23:00 in Jakarta
@@ -541,7 +543,8 @@ export function KpiGrid({
                                 target: figure(target, language),
                               })}
                             >
-                              {canEdit && !kpi.isCalculated ? (
+                              {!kpi.isCalculated &&
+                              (canEdit || editableKpiIds?.has(kpi.id)) ? (
                                 <GridCell
                                   id={`cell-${kpi.id}-${column}`}
                                   label={t("kpis.grid.periodBeginning", {
