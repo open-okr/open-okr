@@ -41,7 +41,11 @@ import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { EmbeddingService, type RetrievalHit } from "../embeddings/service.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import { citationLabel } from "./citations.ts";
-import { offersToPropose, proposeBeforeAnswering } from "./proposals.ts";
+import {
+  offersToPropose,
+  proposalRequestText,
+  proposeBeforeAnswering,
+} from "./proposals.ts";
 import { COPILOT_READS } from "./read-tools.ts";
 import { drainReading, readLiveData, withReadingCost } from "./reading.ts";
 import {
@@ -588,7 +592,10 @@ export async function* streamAnswer(
     }
     proposal = await proposeBeforeAnswering(
       context,
-      { threadId: prepared.threadId, request: input.question },
+      {
+        threadId: prepared.threadId,
+        request: proposalRequestText(prepared.ask),
+      },
       offers,
     );
     if (proposal.proposalId !== null) {

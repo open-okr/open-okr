@@ -57,6 +57,7 @@ const SECRET_TITLE = "Quietly merge the Lisbon office";
 const ACTIVATION_QUESTION = "How is my activation key result doing?";
 const SECRET_QUESTION = "How is my secret restructuring objective doing?";
 const TASK_TITLE = "Draft the activation handover";
+const CHECK_IN_REQUEST = `Check in on "${KR_TITLE}". We're on track after the new flow shipped.`;
 
 /** One request the scripted model received. */
 interface Received {
@@ -145,6 +146,22 @@ function chooseRound(
     } : null);
     return;
   }
+  if (question === CHECK_IN_REQUEST || question === "80%") {
+    toolReply(res, round === 0 ? {
+      name: "propose_change",
+      args: {
+        action: "goals.publishDraftedCheckIn",
+        fields: {
+          keyResultName: KR_TITLE,
+          checkInStatus: "on_track",
+          narrative: "The new flow shipped.",
+          confidence: question === "80%" ? 0.8 : null,
+        },
+        why: "The member requested a check-in.",
+      },
+    } : null);
+    return;
+  }
   if (round === 0) {
     toolReply(res, { name: "goals.list", args: { mine: true, limit: 50 } });
     return;
@@ -195,7 +212,9 @@ async function streamAnswer(
   const keyResult = prompt.includes("secret restructuring")
     ? undefined
     : passages.find((one) => one.label === KR_TITLE);
-  const text = keyResult
+  const text = prompt.includes(`Question: ${CHECK_IN_REQUEST}`) && prompt.includes("ask for that confidence")
+    ? "What is your overall confidence for this check-in?\nSOURCES: none"
+    : keyResult
     ? `${keyResult.content} [${keyResult.index}]\nSOURCES: ${keyResult.index}`
     : "I could not find that objective, so I cannot say how it is doing.\nSOURCES: none";
 
@@ -567,6 +586,17 @@ test("the copilot offers a standalone task without choosing a key result", async
   await expect(turn.getByText(TASK_TITLE, { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(turn.getByText(taskSpaceName, { exact: true })).toBeVisible();
   await expect(turn.getByRole("button", { name: "Apply", exact: true })).toBeVisible();
+});
+
+test("a named key result gets an objective check-in card after a confidence reply", async () => {
+  const panel = await openFreshPanel();
+  await ask(panel, CHECK_IN_REQUEST);
+  await expect(panel.getByText("What is your overall confidence for this check-in?")).toBeVisible({ timeout: 30_000 });
+  await expect(panel.getByRole("button", { name: "Apply", exact: true })).toHaveCount(0);
+  await ask(panel, "80%");
+  const turn = panel.locator("article").last();
+  await expect(turn.getByRole("button", { name: "Apply", exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(turn.getByText(GOAL_TITLE, { exact: true })).toBeVisible();
 });
 
 test("with the provider off, the same question returns matching passages and the reason, and no model is called", async () => {

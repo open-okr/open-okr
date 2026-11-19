@@ -49,7 +49,11 @@ import {
   citationsFrom,
   groundQuestion,
 } from "./answer.ts";
-import { offersToPropose, proposeBeforeAnswering } from "./proposals.ts";
+import {
+  offersToPropose,
+  proposalRequestText,
+  proposeBeforeAnswering,
+} from "./proposals.ts";
 import { drainReading, readLiveData, withReadingCost } from "./reading.ts";
 import {
   aiOffReason,
@@ -281,7 +285,10 @@ export async function runCopilotAnswer(
     }
     proposal = await proposeBeforeAnswering(
       context,
-      { threadId: job.threadId, request: job.question },
+      {
+        threadId: job.threadId,
+        request: proposalRequestText(prepared.ask ?? groundedFirst.ask),
+      },
       offers,
     );
     if (proposal.proposalId !== null) {

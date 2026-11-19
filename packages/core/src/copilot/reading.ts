@@ -39,7 +39,11 @@ import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import type { AnswerSource, CopilotStep, Prepared } from "./answer.ts";
 import { isCitableType } from "./citations.ts";
-import { type ProposalOffer, proposalNoteFor } from "./proposals.ts";
+import {
+  type ProposalOffer,
+  proposalNoteFor,
+  proposalRequestText,
+} from "./proposals.ts";
 import {
   createProposer,
   PROPOSE_TOOL,
@@ -299,7 +303,7 @@ export async function* readLiveData(
       ? createProposer(context, {
           threadId: prepared.threadId,
           offers: hooks.proposal.offers,
-          request: ask.question,
+          request: proposalRequestText(ask),
         })
       : null;
   // One object rather than three `let`s: they are changed inside callbacks,

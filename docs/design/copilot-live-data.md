@@ -164,7 +164,7 @@ While reads run, the answer area shows what is being read in words ("Reading New
 | Start an initiative | `initiatives.create` | Today's | `initiatives.delete` |
 | Add a task | `tasks.create` | Title, with a named or sole eligible space for a standalone task, or the named key result for a linked task | `tasks.delete` |
 | **Rename or redescribe an objective** | `goals.update` | Title, description | `goals.update` with the values before |
-| **Check in** | `goals.publishDraftedCheckIn` | Status, confidence, narrative, and per key result a value and confidence | `goals.deleteCheckIn` while it is the latest |
+| **Check in** | `goals.publishDraftedCheckIn` | Status, the member's overall confidence, narrative, and any stated key result value or confidence. A named key result can point to its parent objective | `goals.deleteCheckIn` while it is the latest |
 | **Record a KPI value** | `kpis.record` | Period, actual value, remark | `kpis.record` with the record before, or none for a new period |
 | **Move a task** | `tasks.move` | Status | `tasks.move` back |
 | **Change an initiative's status** | `initiatives.update` | Status | `initiatives.update` back |
@@ -174,6 +174,10 @@ The undo for a new KPI period is `kpis.deleteRecord` (kpi-engine.md §12). **As 
 Not proposable, on purpose: any delete, anything about people, roles, access, settings, cycles or agents. A copilot that may propose `people.erase` is one a person cannot trust with the apply button.
 
 The model still picks what to change by number from a list, never by identifier. Today the lists are every space, objective and key result the member may edit. With reads, the list for an edit is what the run read and the member may edit, so "move the checklist task to done" points at the task the run just read.
+
+When a check-in request omits overall confidence, the answer asks for it.
+A short confidence reply can complete the preceding request. The resulting
+card names the objective and still needs the member to apply it.
 
 ### 4.2 Undo for an edit
 

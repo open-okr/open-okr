@@ -1511,9 +1511,53 @@ describe("a check-in and a KPI value (plan 0.9.0 L4c)", () => {
   });
 
   describe("checking in", () => {
+    const proposeCheckIn = (drafter: ProposingDrafter, confidence = "80%") =>
+      propose(
+        drafter,
+        `Check in on Raise mid-market activation. Overall confidence: ${confidence}.`,
+      );
+
+    it("does not treat a result value as the missing overall confidence", async () => {
+      const drafted = new ProposingDrafter(checkInFields({ confidence: 0.8 }));
+      expect(
+        await propose(
+          drafted,
+          "Check in on Raise mid-market activation. Conversion reached 80%. Status on track.",
+        ),
+      ).toBeNull();
+      expect(
+        await propose(
+          drafted,
+          "Check in on Raise mid-market activation. Key result confidence is 80%.",
+        ),
+      ).toBeNull();
+      expect(await storedProposals()).toEqual([]);
+    });
+
+    it("makes a review card for the parent of the named key result", async () => {
+      const drafted = new ProposingDrafter(
+        checkInFields({
+          objectiveNumber: undefined,
+          checkInKeyResultNumber: 1,
+          keyResultName: "Trial to paid conversion",
+        }),
+      );
+      const proposed = await propose(
+        drafted,
+        "Check in on Trial to paid conversion from 18% to 30%. The new value is 25, on track, with 80% confidence.",
+      );
+      expect(proposed?.preview).toContainEqual({
+        label: "Objective",
+        value: "Raise mid-market activation",
+      });
+      expect(await checkIns()).toEqual([]);
+      await apply(proposed?.id ?? "");
+      expect(await keyResultNow()).toBe(25);
+    });
+
     it("shows the key result by label with its value, and a preview of old to new", async () => {
       const drafter = new ProposingDrafter(checkInFields());
-      const proposed = await propose(drafter, "Check in on activation");
+      const proposed = await proposeCheckIn(drafter);
       expect(proposed?.action).toBe("goals.publishDraftedCheckIn");
       const offer = drafter.seen[0]?.options.find(
         (option) => option.action === "goals.publishDraftedCheckIn",
@@ -1535,7 +1579,9 @@ describe("a check-in and a KPI value (plan 0.9.0 L4c)", () => {
     });
 
     it("publishes it as the member, and undo deletes it while it is the latest", async () => {
-      const proposed = await propose(new ProposingDrafter(checkInFields()));
+      const proposed = await proposeCheckIn(
+        new ProposingDrafter(checkInFields()),
+      );
       await apply(proposed?.id as string);
       const [published] = await checkIns();
       expect(published?.state).toBe("published");
@@ -1592,7 +1638,7 @@ describe("a check-in and a KPI value (plan 0.9.0 L4c)", () => {
       const before = await snapshot();
       expect(before.value).toBe(28);
 
-      const proposed = await propose(
+      const proposed = await proposeCheckIn(
         new ProposingDrafter(
           checkInFields({
             confidence: 0.4,
@@ -1601,6 +1647,7 @@ describe("a check-in and a KPI value (plan 0.9.0 L4c)", () => {
             ],
           }),
         ),
+        "40%",
       );
       await apply(proposed?.id as string);
       expect((await snapshot()).value).toBe(29);
@@ -1610,7 +1657,9 @@ describe("a check-in and a KPI value (plan 0.9.0 L4c)", () => {
     });
 
     it("refuses to undo once a newer check-in exists", async () => {
-      const proposed = await propose(new ProposingDrafter(checkInFields()));
+      const proposed = await proposeCheckIn(
+        new ProposingDrafter(checkInFields()),
+      );
       await apply(proposed?.id as string);
       const newer = (await call("goals.publishDraftedCheckIn", {
         goalId,
@@ -1636,7 +1685,9 @@ describe("a check-in and a KPI value (plan 0.9.0 L4c)", () => {
     });
 
     it("refuses to undo a check-in a person edited after it was applied", async () => {
-      const proposed = await propose(new ProposingDrafter(checkInFields()));
+      const proposed = await proposeCheckIn(
+        new ProposingDrafter(checkInFields()),
+      );
       await apply(proposed?.id as string);
       const [published] = await checkIns();
       await call("goals.editCheckIn", {
@@ -1650,12 +1701,16 @@ describe("a check-in and a KPI value (plan 0.9.0 L4c)", () => {
 
     it("proposes nothing over the member's own open draft", async () => {
       await call("goals.startCheckIn", { goalId });
-      expect(await propose(new ProposingDrafter(checkInFields()))).toBeNull();
+      expect(
+        await proposeCheckIn(new ProposingDrafter(checkInFields())),
+      ).toBeNull();
       expect(await storedProposals()).toEqual([]);
     });
 
     it("refuses Apply when a draft appeared after the proposal, and leaves the draft alone", async () => {
-      const proposed = await propose(new ProposingDrafter(checkInFields()));
+      const proposed = await proposeCheckIn(
+        new ProposingDrafter(checkInFields()),
+      );
       const started = (await call("goals.startCheckIn", { goalId })) as {
         id: string;
       };
@@ -1703,7 +1758,7 @@ describe("a check-in and a KPI value (plan 0.9.0 L4c)", () => {
           keyResultValues: [{ keyResultNumber: 2, value: 3, confidence: null }],
         }),
       );
-      expect(await propose(drafter)).toBeNull();
+      expect(await proposeCheckIn(drafter)).toBeNull();
       expect(await storedProposals()).toEqual([]);
     });
   });

@@ -86,5 +86,6 @@ Statuses: **to do**, **design written**, **in verification**, **done**, **merged
 | C1 | design written, waiting for design approved | [Copilot first word](../design/copilot-first-word.md) times each stage and tests a one-call answer for simple questions grounded in an already read anchor. |
 | W1 | in verification | The Goals list passes each card its own pending and refused state. In the same 1,000-objective jsdom fixture, one title save took about 903 ms to start and 1,196 ms to settle before the change, and 16 ms and 6 ms after. The browser spec checks the busy state and the settled value. |
 | C2 | in verification | Task proposals can use the named or sole eligible space. Initiative and task links resolve against scoped choices and decline ambiguous matches. |
-| C3, C4, C5, C6 | to do | Findings carried forward on 19 November 2026. |
+| C3 | in verification | A named key result resolves to its editable parent objective. A check-in needs the member's overall confidence, and a short confidence reply can complete the previous request before the card is offered. |
+| C4, C5, C6 | to do | Findings carried forward on 19 November 2026. |
 | Section 6 | decided | Akmal approved the directions on 19 November 2026 and chose machine translation for the initial copy. |
