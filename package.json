@@ -62,6 +62,8 @@
     "cloud:usage": "pnpm --filter @openokr/core cloud:usage",
     "check:air-gap": "node --experimental-strip-types --no-warnings scripts/check-air-gap.ts",
     "check:docs": "node --experimental-strip-types --no-warnings scripts/check-docs.ts",
+    "i18n:check": "node --experimental-strip-types --no-warnings scripts/i18n-check.ts",
+    "i18n:sync": "node --experimental-strip-types --no-warnings scripts/i18n-sync.ts",
     "gen:docs": "node --experimental-strip-types --no-warnings scripts/gen-api-reference.ts"
   },
   "devDependencies": {

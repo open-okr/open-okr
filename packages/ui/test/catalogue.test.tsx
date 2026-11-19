@@ -8,6 +8,7 @@ import {
   translate,
 } from "../src/i18n/catalogue.ts";
 import { CATALOGUES, missingKeys } from "../src/i18n/catalogues.ts";
+import { SAME_AS_ENGLISH } from "../src/i18n/same-as-english.ts";
 import { isTermHole } from "../src/i18n/terms.ts";
 import {
   TranslationsProvider,
@@ -33,201 +34,19 @@ describe("the message catalogue", () => {
  * uses as it is, or a line made only of holes and punctuation. Anything else
  * identical to the English is an entry nobody translated.
  */
-const SAME_IN_MALAY: ReadonlySet<string> = new Set([
-  // Product, vendor and language names.
-  // "Logo" and "Favicon" are the words Malay uses, and the file summary is
-  // two placeholders and a unit (docs/design/workspace-logo-favicon.md).
-  "admin.branding.images.faviconTitle",
-  "admin.branding.images.fileSummary",
-  "admin.branding.images.logoTitle",
-  "admin.branding.mirror.part.favicon",
-  "admin.branding.mirror.part.logo",
-  "admin.channels.groupWhatsapp",
-  // A version number and nothing else (docs/design/version-footer.md).
-  "shell.version.running",
-  // A step the copilot is on, followed by an ellipsis: the step is the
-  // translated part (plan 0.8.1 CP9).
-  "copilot.copilotPanel.step.working",
-  // "Demo" is the word Malay uses, as for logo and favicon above; the pill's
-  // full sentence is translated (plan 0.8.0 D1).
-  "shell.demo.label",
-  "method.detail.okrChampion",
-  "method.detail.okrCoach",
-  "admin.ai.providerAnthropic",
-  "admin.ai.providerGoogle",
-  "admin.ai.providerOllama",
-  "admin.ai.providerOpenai",
-  "admin.ai.providerOpenrouter",
-  // Only holes and punctuation: when, who and the outcome (plan 0.9.0 L3).
-  "admin.ai.agentCalls.copilotRead",
-  "admin.sso.oidc",
-  "admin.sso.saml2",
-  "admin.sso.ssoForm.oidcOpenIdConnect",
-  "channels.slack",
-  "channels.teams",
-  "channels.telegram",
-  "channels.whatsapp",
-  "people.detail.profileForm.slack",
-  "people.detail.profileForm.teams",
-  "people.detail.profileForm.telegram",
-  "people.detail.profileForm.whatsapp",
-  "search.exportButton.csv",
-  "search.exportButton.excel",
-  "appearance.english",
-  "appearance.bahasaMelayu",
-  "copilot.copilotPanel.copilot",
-  // The name of an API style, which the glossary keeps as it is.
-  "account.apiTokens.audienceRest",
-  // Code, commands, formats and example values a person types as shown.
-  "activity.pnpmAuditVerify",
-  "admin.ai.privacy.allowedHostsPlaceholder",
-  "admin.imports.exportCard.kb",
-  "admin.imports.exportCard.sha",
-  "admin.invitations.exampleComExampleOrg",
-  "admin.sso.ssoForm.certificatePlaceholder",
-  "admin.sso.ssoForm.discoveryUrlPlaceholder",
-  "admin.sso.ssoForm.emailDomainsPlaceholder",
-  "admin.sso.ssoForm.issuerPlaceholder",
-  "admin.sso.ssoForm.providerIdPlaceholder",
-  "admin.sso.ssoForm.scopesPlaceholder",
-  "admin.sso.ssoForm.signOnUrlPlaceholder",
-  "admin.sso.ssoForm.urlPlaceholder",
-  "common.esc",
-  "common.enter",
-  // Abbreviations the method keeps in English in every language.
-  "common.ai",
-  "dev.components.ai",
-  "term.kpi.singular",
-  "workMap.kr",
-  "okrDiagram.addKeyResult",
-  "workMap.obj",
-  // Words Bahasa Melayu uses as they are.
-  "kpis.suggestion.unit",
-  "admin.agents.levelEdit",
-  "admin.agents.proposalQueue.items.one",
-  "admin.ai.model",
-  "admin.imports.import",
-  "admin.imports.wizard.importRows",
-  "checkIn.composer.status",
-  "common.edit",
-  "cycle.drafting.unit",
-  "dev.components.neutral",
-  "kpis.detail.formula",
-  "lib.sectionTabs.grid",
-  "people.detail.bio",
-  "session.detail.quarterlyReview.actRetro",
-  "sessions.schedule.kind",
-  // Only holes and punctuation.
-  "review.checkInSays",
-  // A table and the columns an older archive carried, both named as stored.
-  "admin.imports.archiveImportCard.leftOutColumns",
-  // The label for the caution status is the "At risk" term's own hole, so a
-  // workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).
-  "common.caution",
-  "copilot.copilotPanel.preview.cycle",
-  "copilot.copilotPanel.preview.keyResult",
-  "copilot.copilotPanel.preview.objective",
-  "copilot.copilotPanel.preview.space",
-  "goals.detail.decompose.refused",
-  "board.board.movedTo",
-  "checkIn.timeline.bylineDate",
-  "checkIn.walkerLine",
-  "cycle.actions.measureRefusedBecause",
-  "documents.subjectDocuments.authorAndVersions",
-  "initiatives.metaKeyResults",
-  "initiatives.metaWindowKeyResults",
-  "workMapHeader.scopeSummary",
-  // Only a term, which each language fills with its own word or the
-  // workspace's rename (M-14), sometimes beside a hole or a bracket.
-  "cycle.drafting.space",
-  "board.scope.inSpace",
-  "board.scope.ofObjective",
-  "common.champion",
-  "common.confidence",
-  "common.count",
-  "areaTabs.goals.kpis",
-  "common.count.keyResult.one",
-  "common.count.keyResult.other",
-  "common.count.objective.one",
-  "common.count.objective.other",
-  "common.keyResult",
-  "common.kpis",
-  "kpis.countOne",
-  // Tab titles that are only the workspace term, or "Import", which Malay
-  // borrows.
-  "pageTitle.adminImports",
-  // The same three words as navigation labels (UAT 0.8.0 F-08): "Import",
-  // which Malay borrows, and the abbreviations AI and OKR.
-  "nav.item.admin-imports",
-  "nav.item.admin-ai",
-  "nav.group.okr",
-  "pageTitle.checkIn",
-  "pageTitle.cycle",
-  "pageTitle.kpi",
-  "pageTitle.kpis",
-  "pageTitle.objective",
-  "pageTitle.space",
-  "pageTitle.spaces",
-  "common.reviewer",
-  "cycle.admin.title",
-  "cycle.reviewAndLearn.keyResults",
-  "cycle.setup.facilitator",
-  "cycle.setup.sponsor",
-  "goals.detail.keyResults",
-  "inbox.subject.checkIn",
-  "inbox.subject.cycle",
-  "inbox.subject.kpi",
-  "inbox.subject.space",
-  "initiatives.space",
-  "kpis.grid.kpi",
-  "scorecard.cycle",
-  "search.checkIn",
-  "search.checkIns",
-  "search.cycle",
-  "search.objective",
-  "search.objectives",
-  "search.space",
-  "session.detail.minutes.objectives",
-  "sessions.schedule.facilitator",
-  "sessions.schedule.space",
-  "spaces.spaces",
-  // A line made only of holes: the workspace's own word for its key
-  // results and how many there are. Nothing to translate.
-  "okrList.keyResultsBand",
-  // The workspace's own word for the thing, and nothing else.
-  "newMenu.kpi",
-  "newMenu.objective",
-  "newMenu.space",
-  // "Group: value", two holes and a colon. Nothing to translate.
-  "goals.filter.chip",
-  // A line made only of holes and a slash: the workspace's own words for
-  // the two things the column holds. Nothing to translate.
-  "workMap.goalKeyResult",
-  "workMap.keyResult",
-  "workMap.objective",
-  // The coordinator role is the term's own hole, like "common.caution".
-  "spaces.role.coordinator",
-  // The Work Map's two pickers are named by the term's own hole.
-  "workMap.scope.cycle",
-  "workMap.scope.space",
-  // The owner column heading is the champion term's own hole.
-  "okrList.champion",
-  // The Outdated stat's unit is the objective term's own hole.
-  "workMapHeader.outdatedUnit.one",
-  "workMapHeader.outdatedUnit.other",
-]);
+const sameInMalay = SAME_AS_ENGLISH.ms ?? {};
 
 describe("Bahasa Melayu is translated (completeness review M-15)", () => {
   test("no entry reads the same as the English without a written reason", () => {
     const untranslated = Object.entries(CATALOGUES.en)
       .filter(([key, english]) => CATALOGUES.ms[key] === english)
       .map(([key]) => key)
-      .filter((key) => !SAME_IN_MALAY.has(key));
+      .filter((key) => !(key in sameInMalay));
     expect(untranslated).toEqual([]);
   });
 
   test("every reason on the list still applies", () => {
-    const stale = [...SAME_IN_MALAY].filter(
+    const stale = Object.keys(sameInMalay).filter(
       (key) =>
         !(key in CATALOGUES.en) || CATALOGUES.ms[key] !== CATALOGUES.en[key],
     );
