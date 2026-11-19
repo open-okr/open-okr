@@ -790,6 +790,13 @@ export default async function CyclePage({
                 draftingAllowed={workflow.drafting.allowed}
                 draftingReasons={workflow.drafting.reasons}
                 goals={draft.goals}
+                editableGoalIds={
+                  (
+                    await callAction(context, "goals.keyResultCreateAccess", {
+                      goalIds: draft.goals.map((goal) => goal.id),
+                    })
+                  ).editableGoalIds
+                }
                 members={draft.members}
                 kpis={draft.kpis}
                 canEdit={draftsGoals}

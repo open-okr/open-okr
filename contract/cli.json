@@ -4508,6 +4508,23 @@
       "pages": false
     },
     {
+      "name": "spaces creationAccess",
+      "action": "spaces.creationAccess",
+      "method": "GET",
+      "path": "/spaces/creationAccess",
+      "scope": "read",
+      "summary": "Which supplied spaces the caller can create work and sessions in.",
+      "flags": [
+        {
+          "name": "space-ids",
+          "field": "spaceIds",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "spaces read",
       "action": "spaces.read",
       "method": "GET",
@@ -5271,6 +5288,7 @@
             "kpi",
             "initiative",
             "task",
+            "session",
             "comment",
             "space",
             "workspace"
@@ -8187,6 +8205,23 @@
       "scope": "read",
       "summary": "Whether you may create an objective: your role's level on goals, measured as the write measures it.",
       "flags": [],
+      "pages": false
+    },
+    {
+      "name": "goals keyResultCreateAccess",
+      "action": "goals.keyResultCreateAccess",
+      "method": "GET",
+      "path": "/goals/keyResultCreateAccess",
+      "scope": "read",
+      "summary": "Which supplied objectives the caller can add a key result to.",
+      "flags": [
+        {
+          "name": "goal-ids",
+          "field": "goalIds",
+          "type": "array",
+          "required": true
+        }
+      ],
       "pages": false
     },
     {

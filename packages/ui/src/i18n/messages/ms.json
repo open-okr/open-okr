@@ -1243,6 +1243,7 @@
   "admin.roles.domainGoal": "Objektif",
   "admin.roles.domainInitiative": "Inisiatif",
   "admin.roles.domainKpi": "KPI",
+  "admin.roles.domainSession": "Sesi",
   "admin.roles.domainSpace": "Ruang",
   "admin.roles.domainTask": "Tugasan",
   "admin.roles.domainWorkspace": "Ruang kerja",

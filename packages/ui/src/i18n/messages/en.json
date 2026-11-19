@@ -1243,6 +1243,7 @@
   "admin.roles.domainGoal": "Objectives",
   "admin.roles.domainInitiative": "Initiatives",
   "admin.roles.domainKpi": "KPIs",
+  "admin.roles.domainSession": "Sessions",
   "admin.roles.domainSpace": "Spaces",
   "admin.roles.domainTask": "Tasks",
   "admin.roles.domainWorkspace": "Workspace",

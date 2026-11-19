@@ -230,7 +230,7 @@ export async function AppShellLayout({
   // (navigation-five-areas.md, OKRGoal UX review N3): from the spaces list the
   // reader already gets, and from whether they may set up a cycle, which plan
   // 0.8.0 R1 opened to an Admin (UAT 0.8.0, F-03).
-  const spaceRoles = await callAction(
+  const listedSpaces = await callAction(
     {
       pool: getPool(),
       workspaceId: workspace.workspaceId,
@@ -238,14 +238,12 @@ export async function AppShellLayout({
     },
     "spaces.list",
     {},
-  )
-    .then((spaces) => spaces.map((space) => space.ownRole))
-    .catch((error: unknown) => {
-      if (error instanceof OperationError) {
-        return [];
-      }
-      throw error;
-    });
+  ).catch((error: unknown) => {
+    if (error instanceof OperationError) {
+      return [];
+    }
+    throw error;
+  });
   const setsUpCycle = await callAction(
     {
       pool: getPool(),
@@ -284,7 +282,7 @@ export async function AppShellLayout({
   const runsCycle = seesCycle({
     administers: adminItems.length > 0,
     setsUpCycle,
-    spaceRoles,
+    spaceRoles: listedSpaces.map((space) => space.ownRole),
   });
   // The rows the sidebar draws: the five areas, and Cycle for those who run
   // it. The account rows live in the avatar menu, as the review asked.
@@ -293,6 +291,32 @@ export async function AppShellLayout({
   );
 
   const { t } = await getTranslations();
+  const creation = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human" as const, userId: session.user.id },
+    },
+    "spaces.creationAccess",
+    { spaceIds: listedSpaces.map((space) => space.id) },
+  ).catch((error: unknown) => {
+    if (error instanceof OperationError) {
+      return null;
+    }
+    throw error;
+  });
+  const workSpace = creation?.editableSpaceIds[0];
+  const createsTask = workSpace && creation?.canCreateTask;
+  const createsInitiative = workSpace && creation?.canCreateInitiative;
+  const schedulesSession = workSpace && creation?.canScheduleSession;
+  const createsKpi = creation?.canCreateKpi;
+  const showsNew =
+    createsGoals ||
+    createsTask ||
+    createsInitiative ||
+    schedulesSession ||
+    createsKpi ||
+    level >= ACCESS_LEVELS.full;
   const strip = runsCycle
     ? await loadCycleStrip(workspace.workspaceId, session.user.id, level, t)
     : null;
@@ -481,7 +505,7 @@ export async function AppShellLayout({
               // create, the same on every screen (lib/new-menu.tsx). Somebody
               // who cannot write is not offered it.
               newAction={
-                level >= ACCESS_LEVELS.edit ? (
+                showsNew ? (
                   <NewMenu
                     items={[
                       ...(createsGoals
@@ -495,34 +519,50 @@ export async function AppShellLayout({
                             },
                           ]
                         : []),
-                      {
-                        key: "initiative",
-                        label: t("newMenu.initiative"),
-                        icon: iconFor("initiatives"),
-                        href: "/initiatives#title",
-                        screens: ["/initiatives"],
-                      },
-                      {
-                        key: "task",
-                        label: t("newMenu.task"),
-                        icon: iconFor("board"),
-                        href: "/board#title",
-                        screens: ["/board", "/tasks"],
-                      },
-                      {
-                        key: "kpi",
-                        label: t("newMenu.kpi"),
-                        icon: iconFor("kpis"),
-                        href: "/kpis?new=kpi",
-                        screens: ["/kpis"],
-                      },
-                      {
-                        key: "session",
-                        label: t("newMenu.session"),
-                        icon: iconFor("sessions"),
-                        href: "/sessions#schedule",
-                        screens: ["/sessions", "/session"],
-                      },
+                      ...(createsInitiative
+                        ? [
+                            {
+                              key: "initiative",
+                              label: t("newMenu.initiative"),
+                              icon: iconFor("initiatives"),
+                              href: "/initiatives#title",
+                              screens: ["/initiatives"],
+                            },
+                          ]
+                        : []),
+                      ...(createsTask
+                        ? [
+                            {
+                              key: "task",
+                              label: t("newMenu.task"),
+                              icon: iconFor("board"),
+                              href: `/board?space=${workSpace}#title`,
+                              screens: ["/board", "/tasks"],
+                            },
+                          ]
+                        : []),
+                      ...(createsKpi
+                        ? [
+                            {
+                              key: "kpi",
+                              label: t("newMenu.kpi"),
+                              icon: iconFor("kpis"),
+                              href: "/kpis?new=kpi",
+                              screens: ["/kpis"],
+                            },
+                          ]
+                        : []),
+                      ...(schedulesSession
+                        ? [
+                            {
+                              key: "session",
+                              label: t("newMenu.session"),
+                              icon: iconFor("sessions"),
+                              href: "/sessions#schedule",
+                              screens: ["/sessions", "/session"],
+                            },
+                          ]
+                        : []),
                       ...(level >= ACCESS_LEVELS.full
                         ? [
                             {

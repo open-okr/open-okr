@@ -52,6 +52,7 @@ const DOMAIN_LABEL: Readonly<Record<string, string>> = {
   kpi: "admin.roles.domainKpi",
   initiative: "admin.roles.domainInitiative",
   task: "admin.roles.domainTask",
+  session: "admin.roles.domainSession",
   comment: "admin.roles.domainComment",
   space: "admin.roles.domainSpace",
   workspace: "admin.roles.domainWorkspace",
@@ -141,11 +142,11 @@ export function RoleMatrix({
           </p>
         ) : null}
 
-        {/* The table scrolls, the page never does: seven domains and five
+        {/* The table scrolls, the page never does: eight domains and five
          * choices do not fit a phone, and shrinking the cells would make the
          * words unreadable before it made the table fit. */}
         <div className="relative overflow-x-auto">
-          <table className="w-full min-w-[60rem] table-fixed border-collapse">
+          <table className="w-full min-w-[67rem] table-fixed border-collapse">
             <thead>
               <tr className="border-b border-line">
                 <th

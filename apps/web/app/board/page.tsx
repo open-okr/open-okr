@@ -110,12 +110,19 @@ export default async function BoardPage({
     throw error;
   });
   const scope = board.scope;
+  const creation = await callAction(context, "spaces.creationAccess", {
+    spaceIds: scope.spaceId ? [scope.spaceId] : spaces.map((one) => one.id),
+  });
+  const canCreate =
+    creation.canCreateTask && creation.editableSpaceIds.length > 0;
+  const editable = new Set(creation.editableSpaceIds);
+  const taskSpaces = spaces.filter((one) => editable.has(one.id));
 
   // The key results a new card can name, read only for somebody who can add
   // one: `cycles.list` is a workspace-wide read a guest may not make. Every
   // active cycle's, by the one rule every picker follows (plan 0.8.0 I1).
   const keyResults =
-    canEdit && scope.kind !== "key_result"
+    canCreate && scope.kind !== "key_result"
       ? await linkableKeyResults(context)
       : [];
 
@@ -210,7 +217,7 @@ export default async function BoardPage({
             </CardBody>
           </Card>
 
-          {canEdit ? (
+          {canCreate ? (
             <Card>
               <CardHeader>
                 <h2 className="text-sm font-bold text-ink">
@@ -259,8 +266,8 @@ export default async function BoardPage({
                         label={t("board.scope.spaceItLivesIn")}
                         name="spaceId"
                         required
-                        defaultValue={spaces[0]?.id ?? null}
-                        options={spaces.map(namedOption)}
+                        defaultValue={taskSpaces[0]?.id ?? null}
+                        options={taskSpaces.map(namedOption)}
                         className="w-56"
                       />
                     )}

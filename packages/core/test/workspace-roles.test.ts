@@ -325,7 +325,11 @@ describe("a role an administrator adds", () => {
     const auditor = roles.find((role) => role.id === created.id);
     expect(auditor?.builtinKey).toBeNull();
     expect(auditor?.editable).toBe(true);
-    expect(auditor?.permissions).toHaveLength(7);
+    expect(auditor?.permissions).toHaveLength(8);
+    expect(auditor?.permissions).toContainEqual({
+      domain: "session",
+      level: 0,
+    });
     expect(
       auditor?.permissions.find((entry) => entry.domain === "goal")?.level,
     ).toBe(40);

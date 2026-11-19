@@ -112,7 +112,6 @@ const OWN_CHECK = new Set([
   "sessions.addMinute",
   "sessions.addRetroNote",
   "sessions.advanceStage",
-  "sessions.bookCycle",
   "sessions.captureLearning",
   "sessions.castRetroVote",
   "sessions.castVote",
@@ -120,7 +119,6 @@ const OWN_CHECK = new Set([
   "sessions.closeCommitments",
   "sessions.completeAction",
   "sessions.confirmConfidence",
-  "sessions.create",
   "sessions.createBlocker",
   "sessions.decideObjective",
   "sessions.giveKudos",
@@ -158,7 +156,6 @@ const OWN_CHECK = new Set([
   "spaces.updateSettings",
   "tasks.addChecklistItem",
   "tasks.assign",
-  "tasks.create",
   "tasks.move",
   "tasks.removeChecklistItem",
   "tasks.setChecklistItem",
@@ -204,7 +201,7 @@ describe("writes below full", () => {
     expect(stale).toEqual([]);
   });
 
-  it("the comment, KPI, initiative and cycle-setup writes measure their domain", () => {
+  it("the declared writes measure their own domain", () => {
     const declared = Object.fromEntries(
       writesBelowFull
         .filter((action) => action.domain)
@@ -238,6 +235,9 @@ describe("writes below full", () => {
       "kpis.setFormula": "kpi",
       "kpis.update": "kpi",
       "reactions.add": "comment",
+      "sessions.bookCycle": "session",
+      "sessions.create": "session",
+      "tasks.create": "task",
       "workflow.publish": "workspace",
     });
   });

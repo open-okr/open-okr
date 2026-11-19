@@ -539,3 +539,73 @@ And goals.createAccess answers canCreate false, and true for a Member
 | Viewer refused and Member allowed for `goals.create`; `goals.createAccess` agrees with the write | Core, `packages/core/test/role-domain-floor.test.ts` |
 | `goals.create` is listed under the `goal` domain | `write-floor-classification.test.ts` |
 | A Viewer sees no "Start drafting" on the Work Map | End to end, `e2e/s04b-admin-sets-up-cycle.spec.ts`, which already makes members of each role |
+
+## 14. Task and session creation and key results (plan 0.9.1 A1)
+
+Status: **design approved on 19 November 2026**. Akmal accepted the directions for A1-Q1 and A1-Q2 in `docs/plans/release-0.9.1.md` §6.
+
+### What the writes check today
+
+| Surface | Current rule | Evidence |
+|---|---|---|
+| Create a task | `tasks.create` asks for `edit` in the named space. The action declares no task domain. A Viewer who belongs to a space can have `edit` there through the space membership binding. | `packages/core/src/actions/tasks.ts`, `packages/core/src/spaces/service.ts`, and §11 above |
+| Schedule sessions | `sessions.create` and `sessions.bookCycle` each ask for `edit` in the named space. Both can add sessions. Neither declares a session domain. The same form card presents both actions. | `packages/core/src/actions/sessions.ts`, `apps/web/app/sessions/schedule.tsx` |
+| Add a key result | `goals.addKeyResult` already checks `edit` on the parent objective before writing. A champion's explicit binding can supply that edit, as §8 explains. Several creation controls use a workspace-wide edit flag. | `packages/core/src/actions/goals.ts`, `apps/web/app/goals/[id]/page.tsx`, `apps/web/app/goals/okr-table.tsx`, `apps/web/app/goals/okr-diagram-cards.tsx`, `apps/web/app/cycle/drafting.tsx` |
+| Top bar | `+ New` checks the objective creation permission. Task, session, initiative and KPI links use the workspace edit flag. Initiative and KPI writes already declare their domain. | `apps/web/lib/app-shell.tsx`, `packages/core/src/actions/{initiatives,kpis}.ts` |
+
+### Write and read rules
+
+| Action or read | Proposed rule |
+|---|---|
+| `tasks.create` | Declare the `task` domain. Keep the separate `edit` check on the destination space and the existing related-record checks. A space edit grant cannot supply the task creation floor for someone with a workspace role. |
+| `sessions.create`, `sessions.bookCycle` | Declare the `session` domain on both actions. Both still require `edit` on the destination space. Read the authorised space in `load` and reuse its context for activity. Preserve the facilitator, cycle, schedule and split-review checks. |
+| Existing session reads and updates | Sessions still use their current space and facilitator checks. The new domain controls scheduling new sessions, including the booking action. It creates no session access contexts. |
+| `goals.addKeyResult` | Keep the action's parent objective check and method checks. An effective goal level of `edit` can come from the goal role or an explicit binding, including the champion's. Keep the action classified under its own objective check in `write-floor-classification.test.ts`. |
+| Actors without a role | Keep §11's existing floor and the destination checks. A guest's or agent's scoped grants still reach only the records to which they apply. This change adds no role assignments. |
+| Creation controls | Read action eligibility through the core contract, using `writeFloorFor` and the same destination check as each space-scoped write. Use the existing access-scoped space list and a bounded, set-based check for editable spaces where a picker needs them. Return capability flags or eligible IDs for the caller, without a separate role-name check in web code. |
+| Key result controls | Match the action's existing workspace floor and effective objective edit for Add key result. Use `visibleResourceIds` at `edit` for the detail view and for a page of visible goals in the list, diagram and cycle drafting views. Keep the existing phase, practice and closed-state UI checks. |
+
+### Session permission and upgrade
+
+| Built-in role | Session permission |
+|---|---|
+| Owner | `full` (100) |
+| Admin | `full` (100) |
+| Member | `edit` (70) |
+| Viewer | `view` (10) |
+
+| Step | What changes |
+|---|---|
+| New workspaces | Add `session` to `ROLE_DOMAINS` and the built-in matrix. Draw a Sessions column in the role editor with English and Malay labels. A custom role without a session setting grants zero. |
+| Existing workspaces | Add a resumable data change that inserts the new permission only for active built-in roles missing it. Use the live role and domain uniqueness rule to skip any existing value, including an explicit zero. Leave all member assignments and other permissions in place. `role_permissions.domain` already uses text in migration `0108_workspace_roles.sql`. |
+| During the rollout | Resolve an absent session permission on a built-in role to the same matrix default in both the scheduling actions' write floor and the role editor. Honour an explicit value as soon as it is saved. This covers incomplete batches and workspaces created by older pods before they leave the rollout. Test both the absent-row and filled-row paths. |
+| Operator notes | Document the new column and the custom-role default, including how an owner grants session creation. Update TECHNICAL-PLAN §4.1 to record that the session domain applies to creation while session records are still scoped through their space. |
+
+### Interface
+
+| Surface | Change |
+|---|---|
+| Board | Offer Add task for an eligible destination. When the board has no fixed space, list only eligible destination spaces. Card movement is W2 from the release plan. |
+| Sessions and space home | Gate the Schedule one and Book the cycle forms on the same session permission. Offer only eligible spaces. The existing session list and detail routes keep their read access. |
+| Top bar | Offer Task, Session, Initiative and KPI only when their corresponding creation rules pass. A Task shortcut from elsewhere opens a board with an eligible destination. Leave the menu trigger out when it would have no actions. |
+| Goal detail and editors | Offer Add key result on a goal when the same member would pass the action's objective edit check. Make the list and diagram agree on the same objective. |
+
+### Acceptance criteria
+
+| Given | When | Then |
+|---|---|---|
+| A Viewer belongs to a space that grants its members `edit` on the space | They try to create a task, schedule one session or book a cycle | The shared actions refuse. The corresponding controls are absent. There is no new task, session or write audit event. |
+| A Member has `edit` in their team's space | They create a task or schedule a session there | The action succeeds and the audit names the Member. The same actions still require the matching grant in another space. |
+| A Viewer holds a champion edit binding on one objective and view on a second | They open both objectives and add a key result | The first objective offers Add key result and the action succeeds if the practice rules allow it. The second offers no control and its action refuses. |
+| A custom role has a session level below `edit` | The owner raises it to `edit` | Its member can schedule sessions in a space they can edit. If the owner later lowers it, a fresh action refuses and a fresh page omits the control. |
+| A workspace was provisioned by the previous release | It serves requests before the new permission row is backfilled | Built-in roles have the intended session defaults and a custom role has zero. The same results hold after the backfill, and explicit edits survive it. |
+| A Viewer has no initiative or KPI creation permission | The top bar renders | `+ New` offers neither Initiative nor KPI. If no creation action is available, the trigger is absent. |
+
+### Tests and contract
+
+| Test | Coverage |
+|---|---|
+| Core action tests | Start with `packages/core/test/role-domain-floor.test.ts`, `packages/core/test/tasks.test.ts`, `packages/core/test/sessions.test.ts` and `packages/core/test/session-booking.test.ts`. Add cases for the role and binding combinations above, an unauthorised space, and UI eligibility matching the write. |
+| Role and data change tests | Verify new workspace defaults, an existing workspace before and after the data change, repeat runs, custom roles, and preservation of explicit session levels. |
+| Web and browser | Verify the top bar, board, session forms and objective controls with Viewer, Member and Viewer champion fixtures. Use the same actions through their normal client entry points. Include the set of goals in the editor to check that access reads do not add a query per row. |
+| Contract | Update the classification of task and session creation. Regenerate action projections for the new domain, the capability read and any output fields that change. Check REST and tool projections use the same registered writes. |

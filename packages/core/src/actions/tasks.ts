@@ -906,6 +906,7 @@ async function assertWhatATaskNames(
 
 export const createTask = defineWriteAction({
   name: "tasks.create",
+  domain: "task",
   summary: "Creates a task in a space, optionally behind a key result.",
   input: z.object({
     spaceId: z.uuid(),

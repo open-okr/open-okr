@@ -6,7 +6,7 @@ import {
   useKeyboardShortcut,
   useTranslations,
 } from "@openokr/ui";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Fragment,
   type ReactNode,
@@ -68,6 +68,7 @@ function focusField(id: string): boolean {
 export function NewMenu({ items }: { readonly items: readonly NewMenuItem[] }) {
   const { t } = useTranslations();
   const pathname = usePathname();
+  const search = useSearchParams().toString();
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
@@ -99,7 +100,7 @@ export function NewMenu({ items }: { readonly items: readonly NewMenuItem[] }) {
       window.setTimeout(attempt, 100);
     };
     attempt();
-  }, [pathname]);
+  }, [pathname, search]);
 
   const here = (item: NewMenuItem) =>
     item.screens.some(
@@ -109,7 +110,12 @@ export function NewMenu({ items }: { readonly items: readonly NewMenuItem[] }) {
 
   const choose = (item: NewMenuItem) => {
     const [path, id] = item.href.split("#");
-    if (id && path === pathname) {
+    const [destination, query] = (path ?? "").split("?");
+    if (
+      id &&
+      destination === pathname &&
+      (query === undefined || query === search)
+    ) {
       // After the menu has closed, which hands the focus back to its trigger.
       window.setTimeout(() => focusField(id), 50);
       return;

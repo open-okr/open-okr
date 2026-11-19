@@ -25,7 +25,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { PROTECTED_ROLE_KEY } from "../access/roles.ts";
+import { missingRolePermission, PROTECTED_ROLE_KEY } from "../access/roles.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
@@ -106,13 +106,13 @@ export const listRoles = defineReadAction({
           isDefault: role.isDefault,
           editable: role.builtinKey !== PROTECTED_ROLE_KEY,
           // Every domain, so a screen draws a full matrix without filling the
-          // gaps itself and a domain nobody has set reads as the zero it is.
+          // gaps itself. Built-in session defaults also cover rollouts.
           permissions: ROLE_DOMAINS.map((domain) => ({
             domain,
             level:
               permissions.find(
                 (entry) => entry.roleId === role.id && entry.domain === domain,
-              )?.level ?? 0,
+              )?.level ?? missingRolePermission(domain, role.builtinKey),
           })),
           memberCount: members.filter((member) => member.roleId === role.id)
             .length,
@@ -171,37 +171,25 @@ export const setRolePermission = defineWriteAction({
     async execute({ tx, workspaceId }) {
       const role = await editableRole(tx, workspaceId, input.roleId);
 
-      const [existing] = await tx
-        .select({ id: rolePermissions.id })
-        .from(rolePermissions)
-        .where(
-          activeOnly(
-            rolePermissions,
-            and(
-              eq(rolePermissions.workspaceId, workspaceId),
-              eq(rolePermissions.roleId, input.roleId),
-              eq(rolePermissions.domain, input.domain),
-            ),
-          ),
-        )
-        .limit(1);
-
-      // openokr:allow-mutation: the operation's own execute.
-      if (existing) {
-        await tx
-          .update(rolePermissions)
-          .set({ level: input.level, updatedAt: new Date() })
-          .where(
-            activeOnly(rolePermissions, eq(rolePermissions.id, existing.id)),
-          );
-      } else {
-        await tx.insert(rolePermissions).values({
+      // openokr:allow-mutation: the operation's own execute. The session
+      // default can be backfilled concurrently with an administrator's edit.
+      await tx
+        .insert(rolePermissions)
+        .values({
           workspaceId,
           roleId: input.roleId,
           domain: input.domain,
           level: input.level,
+        })
+        .onConflictDoUpdate({
+          target: [
+            rolePermissions.workspaceId,
+            rolePermissions.roleId,
+            rolePermissions.domain,
+          ],
+          targetWhere: sql`deleted_at is null`,
+          set: { level: input.level, updatedAt: new Date() },
         });
-      }
 
       return {
         result: {

@@ -307,8 +307,8 @@ export interface OperationDeps {
  * kind of check that gets forgotten exactly once.
  */
 /**
- * The level a write declaring `domain` and naming no subject would be measured
- * at for this actor (docs/design/workspace-roles.md §12, plan 0.8.0 R1).
+ * The level a write naming no subject would be measured at for this actor
+ * (docs/design/workspace-roles.md §§12 and 14).
  *
  * For a screen that draws a control only when the write behind it would pass,
  * so the screen and the write answer with one rule rather than two. Zero for
@@ -319,23 +319,63 @@ export async function writeFloorFor(
   input: {
     readonly workspaceId: string;
     readonly actor: ActorInput;
-    readonly domain: RoleDomain;
+    readonly domain?: RoleDomain;
   },
 ): Promise<number> {
+  const { levels } = await writeFloorsFor(tx, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    domains: [input.domain],
+  });
+  return levels[0] ?? 0;
+}
+
+/** Several capability checks for one actor and transaction. */
+export async function writeFloorsFor(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly actor: ActorInput;
+    readonly domains: readonly (RoleDomain | undefined)[];
+    readonly checkWorkspaceState?: boolean;
+  },
+): Promise<{ memberId: string | null; levels: number[] }> {
+  const denied = { memberId: null, levels: input.domains.map(() => 0) };
+  if (
+    input.checkWorkspaceState &&
+    (await workspaceWriteState(tx, input.workspaceId)) !== "active"
+  ) {
+    return denied;
+  }
   let actor: ResolvedActor;
   try {
     actor = await resolveActor(tx, input.workspaceId, input.actor);
   } catch (error) {
     if (error instanceof OperationError) {
-      return 0;
+      return denied;
     }
     throw error;
   }
-  return floorLevel(
-    tx,
-    { workspaceId: input.workspaceId, domain: input.domain },
-    actor,
-  );
+  const levels: number[] = [];
+  for (const domain of input.domains) {
+    levels.push(
+      await floorLevel(
+        tx,
+        { workspaceId: input.workspaceId, ...(domain ? { domain } : {}) },
+        actor,
+      ),
+    );
+  }
+  return { memberId: actor.memberId, levels };
+}
+
+async function workspaceWriteState(tx: OperationTx, workspaceId: string) {
+  const [workspace] = await tx
+    .select({ state: workspaces.state })
+    .from(workspaces)
+    .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+    .limit(1);
+  return workspace?.state;
 }
 
 /**
@@ -680,15 +720,11 @@ export async function runOperation<TResult, TLoaded = undefined>(
         // (`workspace.provision`, mid-transaction) has no state to collapse,
         // so this is silent rather than a special case keyed on `bootstrap`.
         if (!isRecoveryAction(spec.action)) {
-          const [current] = await tx
-            .select({ state: workspaces.state })
-            .from(workspaces)
-            .where(activeOnly(workspaces, eq(workspaces.id, spec.workspaceId)))
-            .limit(1);
-          if (current && current.state !== "active") {
+          const state = await workspaceWriteState(tx, spec.workspaceId);
+          if (state && state !== "active") {
             throw new OperationError(
               "forbidden",
-              current.state === "frozen"
+              state === "frozen"
                 ? "This workspace is frozen. Only member and settings management, and turning single sign-on on or off, are allowed until it is reactivated."
                 : "This workspace is read-only. Only member and settings management, and turning single sign-on on or off, are allowed until it is reactivated.",
             );

@@ -23,7 +23,7 @@ import {
 } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { dayLabel } from "../../lib/day-label.ts";
 import { focusOnMount } from "../../lib/focus-on-mount.ts";
 import {
@@ -279,6 +279,7 @@ export function OkrTable({
   level,
   canEdit,
   canCreate,
+  editableGoalIds,
   canAdminister,
   progressMax,
   members,
@@ -305,6 +306,7 @@ export function OkrTable({
    * Left out, it follows `canEdit`.
    */
   readonly canCreate?: boolean;
+  readonly editableGoalIds?: readonly string[];
   readonly canAdminister: boolean;
   readonly progressMax: number;
   /** People who may champion an objective or own a key result. */
@@ -334,6 +336,7 @@ export function OkrTable({
       level={level}
       canEdit={canEdit}
       canCreate={canCreate ?? canEdit}
+      editableGoalIds={editableGoalIds}
       canAdminister={canAdminister}
       progressMax={progressMax}
       members={members}
@@ -365,6 +368,7 @@ function LiveOkrTable({
   level,
   canEdit,
   canCreate,
+  editableGoalIds,
   canAdminister,
   progressMax,
   members,
@@ -387,6 +391,7 @@ function LiveOkrTable({
    * Left out, it follows `canEdit`.
    */
   readonly canCreate?: boolean;
+  readonly editableGoalIds?: readonly string[];
   readonly canAdminister: boolean;
   readonly progressMax: number;
   readonly members: readonly Person[];
@@ -404,6 +409,10 @@ function LiveOkrTable({
   const [collapsed, setCollapsed] = useState<readonly string[]>([]);
   // The objective just added, whose key result draft opens under it.
   const [draftUnder, setDraftUnder] = useState<string | null>(null);
+  const editableGoals = useMemo(
+    () => editableGoalIds && new Set(editableGoalIds),
+    [editableGoalIds],
+  );
   // What is being dragged, and the grip the keyboard goes back to after a
   // move, so Alt and an arrow can be pressed again without hunting for it.
   const dragged = useRef<{
@@ -739,7 +748,9 @@ function LiveOkrTable({
                         coach={coach}
                       />
                     ))}
-                    {canEdit ? (
+                    {(editableGoals
+                      ? editableGoals.has(goal.id) || draftUnder === goal.id
+                      : canEdit) && goal.closedAt === null ? (
                       <AddRow
                         label={t("goals.editor.addKeyResult")}
                         placeholder={t("goals.editor.keyResultPlaceholder")}

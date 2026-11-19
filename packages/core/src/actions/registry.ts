@@ -285,6 +285,7 @@ import {
   readCreationPolicy,
   readGoalCreateAccess,
   readGoalTree,
+  readKeyResultCreateAccess,
 } from "./goal-tree.ts";
 import {
   closeGoal,
@@ -518,6 +519,7 @@ import {
   leaveSpace,
   listSpaces,
   readSpace,
+  readSpaceCreationAccess,
   readSpaceHolidays,
   removeSpaceMember,
   setSpaceHolidays,
@@ -782,6 +784,7 @@ export const ACTION_MAP = {
   "proposals.apply": applyAgentProposal,
   "proposals.dismiss": dismissAgentProposal,
   "spaces.list": listSpaces,
+  "spaces.creationAccess": readSpaceCreationAccess,
   "spaces.read": readSpace,
   "spaces.create": createSpace,
   "spaces.update": updateSpace,
@@ -899,6 +902,7 @@ export const ACTION_MAP = {
   "goals.tree": readGoalTree,
   "goals.creationPolicy": readCreationPolicy,
   "goals.createAccess": readGoalCreateAccess,
+  "goals.keyResultCreateAccess": readKeyResultCreateAccess,
   "goals.place": placeGoal,
   "goals.placeKeyResult": placeKeyResult,
   "goals.patch": patchGoal,

@@ -64,6 +64,7 @@ import {
   OperationError,
   type OperationTx,
   writeFloorFor,
+  writeFloorsFor,
 } from "../operations/operation.ts";
 import { requireUnchanged } from "../operations/unchanged.ts";
 import {
@@ -862,6 +863,47 @@ export const readGoalCreateAccess = defineReadAction({
         }),
     );
     return { canCreate: level >= ACCESS_LEVELS.edit };
+  },
+});
+
+export const readKeyResultCreateAccess = defineReadAction({
+  name: "goals.keyResultCreateAccess",
+  summary: "Which supplied objectives the caller can add a key result to.",
+  input: z.object({ goalIds: z.array(z.uuid()) }),
+  output: z.object({ editableGoalIds: z.array(z.uuid()) }),
+  agentSurface: false,
+  async handler(context, { goalIds }) {
+    const { workspaceId, actor } = context;
+    const userId = actor.userId;
+    if (!userId || goalIds.length === 0) {
+      return { editableGoalIds: [] };
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId, userId },
+      async (tx) => {
+        const {
+          memberId,
+          levels: [level],
+        } = await writeFloorsFor(tx as OperationTx, {
+          workspaceId,
+          actor,
+          domains: [undefined],
+          checkWorkspaceState: true,
+        });
+        if (!memberId || (level ?? 0) < ACCESS_LEVELS.edit) {
+          return { editableGoalIds: [] };
+        }
+        const editable = await visibleResourceIds(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "goal",
+          ids: goalIds,
+          requires: ACCESS_LEVELS.edit,
+        });
+        return { editableGoalIds: goalIds.filter((id) => editable.has(id)) };
+      },
+    );
   },
 });
 

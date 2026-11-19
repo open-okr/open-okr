@@ -1,4 +1,4 @@
-import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import {
   Card,
   CardBody,
@@ -10,7 +10,6 @@ import {
   TextInput,
   TimeInput,
 } from "@openokr/ui";
-import { resolveAccessLevelFor } from "../../lib/access";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { searchPeople } from "../../lib/member-search.ts";
 import { getPool } from "../../lib/pool";
@@ -30,9 +29,7 @@ import { ScheduleForm } from "./schedule-form.tsx";
  * Drawn on the session list and on a space home. On a space home the space is
  * fixed, because that is the room the reader is standing in.
  *
- * Shown to members who can edit. `sessions.bookCycle` and `sessions.create`
- * both check edit on the space itself and refuse in words, so a member who
- * can edit the workspace but not this space reads why.
+ * Both forms use the session domain and the editable spaces the write uses.
  */
 
 const KINDS = [
@@ -58,31 +55,28 @@ export async function ScheduleSessions({
 }) {
   const { t } = await getTranslations();
   const { session, workspace } = await requireWorkspace();
-  const level = await resolveAccessLevelFor(
-    workspace.workspaceId,
-    workspace.memberId,
-  );
-  if (level < ACCESS_LEVELS.edit) {
-    return null;
-  }
-
   const actor = {
     pool: getPool(),
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
-  const [spaces, directory, cycle, settings] = await Promise.all([
-    callAction(actor, "spaces.list", {}),
+  const spaces = await callAction(actor, "spaces.list", {});
+  const candidates = spaceId
+    ? spaces.filter((space) => space.id === spaceId)
+    : spaces;
+  const access = await callAction(actor, "spaces.creationAccess", {
+    spaceIds: candidates.map((space) => space.id),
+  });
+  if (!access.canScheduleSession || access.editableSpaceIds.length === 0) {
+    return null;
+  }
+  const editable = new Set(access.editableSpaceIds);
+  const choices = candidates.filter((space) => editable.has(space.id));
+  const [directory, cycle, settings] = await Promise.all([
     callAction(actor, "people.directory", {}),
     callAction(actor, "cycles.current", { mode: "quarterly" }),
     callAction(actor, "settings.readForMember", {}),
   ]);
-  const choices = spaceId
-    ? spaces.filter((space) => space.id === spaceId)
-    : spaces;
-  if (choices.length === 0) {
-    return null;
-  }
   const people = directory.filter(
     (member) => member.kind === "human" || member.kind === "guest",
   );
