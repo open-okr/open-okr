@@ -24,6 +24,7 @@ import {
   keyResults,
   kpiCategories,
   kpiDependencies,
+  kpiRecords,
   kpis,
   kpiTrees,
   newId,
@@ -69,6 +70,7 @@ import {
   ensureKpiContextInTx,
   rebindKpiOwnerInTx,
   requireKpiAccess,
+  requireKpiRole,
   visibleKpiIds,
 } from "../kpis/access.ts";
 import {
@@ -542,12 +544,20 @@ export const recordKpiValue = defineWriteAction({
   }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
+    subject: { type: "kpi", id: input.kpiId },
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(
         tx,
         workspaceId,
         context.actor.userId,
       );
+
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId,
+        kpiId: input.kpiId,
+        requires: ACCESS_LEVELS.edit,
+      });
 
       const [kpi] = await tx
         .select({
@@ -675,6 +685,34 @@ export const deleteKpiRecord = defineWriteAction({
         workspaceId,
         context.actor.userId,
       );
+
+      const [record] = await tx
+        .select({ kpiId: kpiRecords.kpiId })
+        .from(kpiRecords)
+        .where(
+          activeOnly(
+            kpiRecords,
+            eq(kpiRecords.workspaceId, workspaceId),
+            eq(kpiRecords.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!record) {
+        throw new OperationError("not_found", "No such KPI value.");
+      }
+
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId,
+        kpiId: record.kpiId,
+        requires: ACCESS_LEVELS.view,
+      });
+
+      await requireKpiRole(tx, {
+        workspaceId,
+        memberId,
+        requires: ACCESS_LEVELS.edit,
+      });
 
       const removed = await softDeleteKpiRecord(tx, workspaceId, input.id);
       if (!removed) {
@@ -1079,12 +1117,20 @@ export const setKpiFormulaAction = defineWriteAction({
   }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
+    subject: { type: "kpi", id: input.kpiId },
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(
         tx,
         workspaceId,
         context.actor.userId,
       );
+
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId,
+        kpiId: input.kpiId,
+        requires: ACCESS_LEVELS.edit,
+      });
 
       const [kpi] = await tx
         .select({ id: kpis.id, frequency: kpis.frequency })
@@ -1107,6 +1153,15 @@ export const setKpiFormulaAction = defineWriteAction({
         input.kpiId,
         input.formula,
       );
+
+      for (const refId of references) {
+        await requireKpiAccess(tx, {
+          workspaceId,
+          memberId,
+          kpiId: refId,
+          requires: ACCESS_LEVELS.view,
+        });
+      }
 
       // Evaluated immediately, so the grid never shows a calculated KPI with a
       // formula and no value for the period the author was looking at.
@@ -1223,6 +1278,26 @@ export const updateKpi = defineWriteAction({
         workspaceId,
         context.actor.userId,
       );
+
+      const requiredLevel =
+        input.ownerMemberId !== undefined
+          ? ACCESS_LEVELS.full
+          : ACCESS_LEVELS.edit;
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId,
+        kpiId: input.kpiId,
+        requires: requiredLevel,
+      });
+
+      if (input.parentKpiId) {
+        await requireKpiAccess(tx, {
+          workspaceId,
+          memberId,
+          kpiId: input.parentKpiId,
+          requires: ACCESS_LEVELS.view,
+        });
+      }
 
       const [existing] = await tx
         .select({
@@ -1461,7 +1536,24 @@ export const createKpiTree = defineWriteAction({
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
-      await actingMember(tx, workspaceId, context.actor.userId);
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      await requireKpiRole(tx, {
+        workspaceId,
+        memberId,
+        requires: ACCESS_LEVELS.edit,
+      });
+      if (input.rootKpiId) {
+        await requireKpiAccess(tx, {
+          workspaceId,
+          memberId,
+          kpiId: input.rootKpiId,
+          requires: ACCESS_LEVELS.view,
+        });
+      }
       const id = newId();
       // openokr:allow-mutation: the calling Operation's own transaction.
       await tx.insert(kpiTrees).values({
@@ -1538,6 +1630,17 @@ export const launchKpiRecovery = defineWriteAction({
         workspaceId,
         context.actor.userId,
       );
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId,
+        kpiId: input.kpiId,
+        requires: ACCESS_LEVELS.view,
+      });
+      await requireKpiRole(tx, {
+        workspaceId,
+        memberId,
+        requires: ACCESS_LEVELS.edit,
+      });
       const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
       const launched = await launchRecoveryInTx(tx, {
         workspaceId,
@@ -1617,6 +1720,17 @@ export const recordKpiResponse = defineWriteAction({
         workspaceId,
         context.actor.userId,
       );
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId,
+        kpiId: input.kpiId,
+        requires: ACCESS_LEVELS.view,
+      });
+      await requireKpiRole(tx, {
+        workspaceId,
+        memberId,
+        requires: ACCESS_LEVELS.edit,
+      });
       const [kpi] = await tx
         .select({ id: kpis.id, title: kpis.title })
         .from(kpis)

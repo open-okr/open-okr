@@ -366,3 +366,30 @@ export async function visibleKpiIds<
 
   return visible;
 }
+
+export interface RequireKpiRoleInput {
+  readonly workspaceId: string;
+  readonly memberId: string;
+  readonly requires: AccessLevel;
+}
+
+/**
+ * Requires the member's workspace role on domain "kpi" to be at least `requires` (0.10.0 K5, §5).
+ * Throws `forbidden` when roleLevel < requires. For the actions of KA-D17.
+ */
+export async function requireKpiRole<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: WorkspaceTx<TSchema>, input: RequireKpiRoleInput): Promise<void> {
+  const roleLevel = await resolveMemberRoleLevel(tx, {
+    workspaceId: input.workspaceId,
+    memberId: input.memberId,
+    domain: "kpi",
+  });
+
+  if (roleLevel === null || roleLevel < input.requires) {
+    throw new OperationError(
+      "forbidden",
+      "Your role does not grant enough access on KPIs.",
+    );
+  }
+}
