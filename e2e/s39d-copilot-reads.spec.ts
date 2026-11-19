@@ -125,10 +125,10 @@ function toolReply(
 }
 
 /** The model's choice of reads: find the objective, then open it. */
-function chooseRound(
+async function chooseRound(
   res: http.ServerResponse,
   messages: NonNullable<Received["body"]["messages"]>,
-): void {
+): Promise<void> {
   const question = textOf(
     [...messages].reverse().find((m) => m.role === "user")?.content,
   );
@@ -187,6 +187,9 @@ function chooseRound(
     }
     toolReply(res, { name: "goals.read", args: { id: Number(found[1]) } });
     return;
+  }
+  if (round >= 2 && answerDelayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
   }
   toolReply(res, null);
 }
@@ -284,7 +287,7 @@ function startModel(): Promise<http.Server> {
       }
       if ((body.tools?.length ?? 0) > 0) {
         received.push({ kind: "tools", body });
-        chooseRound(res, messages);
+        void chooseRound(res, messages);
         return;
       }
       if (body.stream) {
@@ -491,6 +494,7 @@ test("set up: the objectives are real, and the workspace's provider is the scrip
 });
 
 test("the panel says what it is reading, then answers from the stored values with a link to the key result", async () => {
+  answerDelayMs = 4_000;
   startedAt = new Date();
   const panel = await openFreshPanel();
   await ask(panel, ACTIVATION_QUESTION);
@@ -500,7 +504,7 @@ test("the panel says what it is reading, then answers from the stored values wit
   await expect(
     panel.getByText(/^(Looking through objectives|Reading .+|Writing the answer)…$/),
   ).toBeVisible({ timeout: 15_000 });
-  await expect(panel.getByText(`Reading ${GOAL_TITLE}…`, { exact: true })).toBeVisible();
+  await expect(panel.getByText(`Reading ${GOAL_TITLE}…`, { exact: true })).toBeVisible({ timeout: 15_000 });
   // The polite status line is the panel's own region for it.
   await expect(panel.getByRole("status").first()).toBeAttached();
 
