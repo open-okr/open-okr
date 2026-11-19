@@ -329,8 +329,7 @@ async function governingResource(
       return row ? { resourceType: "document", resourceId: entityId } : null;
     }
 
-    // Every member reads every KPI, the rule `kpis.list` and the search index
-    // already follow, so the workspace governs it.
+    // 0.10.0 K2: A KPI owns its own context (KA-D1, R12).
     case "kpi": {
       const row = one(
         await tx
@@ -345,9 +344,7 @@ async function governingResource(
           )
           .limit(1),
       );
-      return row
-        ? { resourceType: "workspace", resourceId: workspaceId }
-        : null;
+      return row ? { resourceType: "kpi", resourceId: entityId } : null;
     }
 
     case "session": {

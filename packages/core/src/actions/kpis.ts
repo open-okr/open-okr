@@ -49,7 +49,6 @@ import { and, asc, eq, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
-import { ensureContext } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
 import { bindAgentsToContextInTx } from "../agents/bindings.ts";
@@ -62,6 +61,7 @@ import {
   legacyColumns,
   legacyKey,
 } from "../imports/legacy.ts";
+import { ensureKpiContextInTx, rebindKpiOwnerInTx } from "../kpis/access.ts";
 import {
   cascadeFromKpi,
   evaluateKpiForPeriod,
@@ -476,15 +476,13 @@ export const createKpi = defineWriteAction({
       // the column at its default and hoping they agree.
       await recomputeKpi(tx, workspaceId, id);
 
-      // A KPI that belongs to no space owns a context of its own, so the
-      // built-in agents can be bound to it by name (completeness review H-04).
-      // One in a space is in their sight through the space.
+      // Every KPI gets an access context (0.10.0 K2, KA-D1).
+      const contextId = await ensureKpiContextInTx(tx, {
+        workspaceId,
+        kpiId: id,
+      });
+      // The built-in agents are bound to spaceless KPIs only (KA-D9).
       if (!input.spaceId) {
-        const contextId = await ensureContext(tx, {
-          workspaceId,
-          resourceType: "kpi",
-          resourceId: id,
-        });
         await bindAgentsToContextInTx(tx, { workspaceId, contextId });
       }
 
@@ -494,6 +492,7 @@ export const createKpi = defineWriteAction({
           kind: "kpi.created" as const,
           subjectType: "workspace" as const,
           subjectId: workspaceId,
+          contextId,
           // The activity names the workspace, where the feed shows it. The
           // content is the KPI, so that is what retrieval embeds and search
           // indexes (plan A10); later KPI activities name the KPI themselves.
@@ -1157,6 +1156,11 @@ export const updateKpi = defineWriteAction({
   }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
+    subject: { type: "kpi", id: input.kpiId },
+    requires:
+      input.ownerMemberId !== undefined
+        ? ACCESS_LEVELS.full
+        : ACCESS_LEVELS.edit,
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(
         tx,
@@ -1167,6 +1171,7 @@ export const updateKpi = defineWriteAction({
       const [existing] = await tx
         .select({
           id: kpis.id,
+          ownerMemberId: kpis.ownerMemberId,
           ...KPI_RULE_COLUMNS,
         })
         .from(kpis)
@@ -1302,11 +1307,18 @@ export const updateKpi = defineWriteAction({
         set.tier = input.tier;
       }
       if (input.ownerMemberId !== undefined) {
-        set.ownerMemberId = await namedOwner(
-          tx,
+        const newOwner = await namedOwner(tx, workspaceId, input.ownerMemberId);
+        set.ownerMemberId = newOwner;
+        const contextId = await ensureKpiContextInTx(tx, {
           workspaceId,
-          input.ownerMemberId,
-        );
+          kpiId: input.kpiId,
+        });
+        await rebindKpiOwnerInTx(tx, {
+          workspaceId,
+          contextId,
+          from: existing.ownerMemberId,
+          to: newOwner,
+        });
       }
       if (input.targetDefault !== undefined) {
         set.targetDefault =
