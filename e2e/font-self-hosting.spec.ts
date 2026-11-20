@@ -30,6 +30,15 @@ test("no request leaves this origin, and the font is ours", async ({
   await page.goto("/sign-in");
   await page.evaluate(() => document.fonts.ready);
 
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(
+    page.locator('link[rel="stylesheet"][href="/fonts/noto-sans-arabic/fonts.css"]'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('link[rel="stylesheet"][href="/fonts/noto-sans-sc/fonts.css"]'),
+  ).toHaveCount(0);
+  expect(fonts.filter((font) => font.startsWith("/fonts/noto-"))).toEqual([]);
+
   // Not "no font CDN" — no third-party request of any kind.
   expect(external).toEqual([]);
 
@@ -38,6 +47,33 @@ test("no request leaves this origin, and the font is ours", async ({
   // and several from fonts.gstatic.com.
   expect(fonts).toHaveLength(1);
   expect(fonts[0]).toMatch(/^\/_next\/static\/media\/Geist_Variable/);
+});
+
+test("Arabic text on an English page loads the local Arabic slice", async ({
+  page,
+}) => {
+  await page.goto("/sign-in");
+  const fonts: string[] = [];
+  page.on("response", (response) => {
+    const { pathname } = new URL(response.url());
+    if (response.ok() && pathname.startsWith("/fonts/noto-sans-arabic/")) {
+      fonts.push(pathname);
+    }
+  });
+  const loaded = await page.evaluate(async () => {
+    const name = document.createElement("span");
+    name.textContent = "مرحبا";
+    document.body.append(name);
+    name.getBoundingClientRect();
+    await document.fonts.ready;
+    return [...document.fonts].find(
+      (face) => face.family.replace(/["']/g, "") === "Noto Sans Arabic",
+    )?.status;
+  });
+  expect(loaded).toBe("loaded");
+  expect(fonts).toEqual([
+    "/fonts/noto-sans-arabic/noto-sans-arabic-arabic-wght-normal.woff2",
+  ]);
 });
 
 test("the face is really in use, not merely declared", async ({ page }) => {

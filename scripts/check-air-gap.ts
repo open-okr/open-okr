@@ -15,8 +15,10 @@
  * person to add a CDN has to either fix it or delete the sentence that says
  * they did not.
  */
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { lstat, readdir, readFile } from "node:fs/promises";
+import { join, relative as relativePath } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const GUIDE = join(ROOT, "docs/runbooks/air-gap.md");
@@ -33,12 +35,7 @@ async function filesUnder(
   skip: readonly string[] = ["node_modules", ".next", ".turbo", "dist"],
 ): Promise<string[]> {
   const found: string[] = [];
-  let entries: Awaited<ReturnType<typeof readdir>>;
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch {
-    return found;
-  }
+  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     if (skip.includes(entry.name)) {
       continue;
@@ -66,6 +63,63 @@ const isComment = (line: string): boolean => {
 
 const relative = (path: string): string =>
   path.replace(ROOT, "").replace(/\\/g, "/").replace(/^\//, "");
+
+const PDF_FONTS = [
+  "apps/web/public/fonts/pdf/NotoSansSC-Regular.otf",
+  "apps/web/public/fonts/pdf/NotoSansArabic-Regular.ttf",
+] as const;
+
+/** A font declared in CSS or used by the PDF writer ships with the source. */
+export async function checkFontAssets(root: string): Promise<string[]> {
+  const tracked = new Set(
+    execFileSync("git", ["ls-files", "-z", "--cached"], {
+      cwd: root,
+      encoding: "utf8",
+    }).split("\0"),
+  );
+  const isVendored = async (asset: string): Promise<boolean> => {
+    const key = relativePath(root, asset).replace(/\\/g, "/");
+    if (!tracked.has(key)) {
+      return false;
+    }
+    return (await lstat(asset).catch(() => undefined))?.isFile() ?? false;
+  };
+  const failures: string[] = [];
+  for (const file of await filesUnder(join(root, "apps/web"), [".css"])) {
+    const css = (await readFile(file, "utf8")).replace(
+      /\/\*[\s\S]*?\*\//g,
+      (comment) => comment.replace(/[^\r\n]/g, " "),
+    );
+    for (const face of css.matchAll(/@font-face\s*\{([^}]*)\}/gi)) {
+      for (const url of (face[1] ?? "").matchAll(
+        /url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s)]*))\s*\)/gi,
+      )) {
+        const source = url[1] ?? url[2] ?? url[3] ?? "";
+        const stylesheet = relativePath(root, file).replace(/\\/g, "/");
+        if (!source || /^(?:[a-z][\w+.-]*:|\/)|\\/i.test(source)) {
+          failures.push(`${stylesheet}: @font-face URL must be relative: ${source}`);
+          continue;
+        }
+        let asset: string;
+        try {
+          asset = fileURLToPath(new URL(source, pathToFileURL(file)));
+        } catch {
+          failures.push(`${stylesheet}: invalid @font-face URL: ${source}`);
+          continue;
+        }
+        if (!(await isVendored(asset))) {
+          failures.push(`${stylesheet}: @font-face file is missing or untracked: ${source}`);
+        }
+      }
+    }
+  }
+  for (const font of PDF_FONTS) {
+    if (!(await isVendored(join(root, font)))) {
+      failures.push(`minutes PDF font is missing or untracked: ${font}`);
+    }
+  }
+  return failures;
+}
 
 /**
  * Hosts a page must never reach for, because an isolated instance cannot.
@@ -111,7 +165,7 @@ const CHECKS: readonly Check[] = [
           );
         });
       }
-      return failures;
+      return [...failures, ...(await checkFontAssets(ROOT))];
     },
   },
   {
@@ -342,43 +396,49 @@ async function checklistIds(): Promise<string[]> {
   );
 }
 
-const named = await checklistIds();
-const implemented = CHECKS.map((check) => check.id);
+async function main(): Promise<void> {
+  const named = await checklistIds();
+  const implemented = CHECKS.map((check) => check.id);
 
-const problems: string[] = [];
+  const problems: string[] = [];
 
-for (const id of named) {
-  if (!implemented.includes(id)) {
-    problems.push(
-      `docs/runbooks/air-gap.md names \`${id}\` and this script does not check it`,
+  for (const id of named) {
+    if (!implemented.includes(id)) {
+      problems.push(
+        `docs/runbooks/air-gap.md names \`${id}\` and this script does not check it`,
+      );
+    }
+  }
+  for (const id of implemented) {
+    if (!named.includes(id)) {
+      problems.push(
+        `this script checks \`${id}\` and docs/runbooks/air-gap.md does not name it`,
+      );
+    }
+  }
+
+  for (const check of CHECKS) {
+    for (const failure of await check.run()) {
+      problems.push(`${check.id}: ${failure}`);
+    }
+  }
+
+  if (problems.length > 0) {
+    process.stderr.write(
+      `Air-gap check failed. ${problems.length} problem(s):\n${problems
+        .map((problem) => `  ${problem}`)
+        .join("\n")}\n\n` +
+        "An instance on an isolated network has to work with nothing configured.\n" +
+        "See docs/runbooks/air-gap.md.\n",
     );
+    process.exit(1);
   }
-}
-for (const id of implemented) {
-  if (!named.includes(id)) {
-    problems.push(
-      `this script checks \`${id}\` and docs/runbooks/air-gap.md does not name it`,
-    );
-  }
-}
 
-for (const check of CHECKS) {
-  for (const failure of await check.run()) {
-    problems.push(`${check.id}: ${failure}`);
-  }
-}
-
-if (problems.length > 0) {
-  process.stderr.write(
-    `Air-gap check failed. ${problems.length} problem(s):\n${problems
-      .map((problem) => `  ${problem}`)
-      .join("\n")}\n\n` +
-      "An instance on an isolated network has to work with nothing configured.\n" +
-      "See docs/runbooks/air-gap.md.\n",
+  process.stdout.write(
+    `Air-gap check passed. ${CHECKS.length} check(s), and the checklist in docs/runbooks/air-gap.md names the same ${named.length}.\n`,
   );
-  process.exit(1);
 }
 
-process.stdout.write(
-  `Air-gap check passed. ${CHECKS.length} check(s), and the checklist in docs/runbooks/air-gap.md names the same ${named.length}.\n`,
-);
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  await main();
+}

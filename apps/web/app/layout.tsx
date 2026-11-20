@@ -71,10 +71,12 @@ const geistSans = localFont({
   style: "normal",
   display: "swap",
   variable: "--font-sans-face",
-  // The stack tokens.css falls back through, declared here too so the metrics
-  // Next computes for its size-adjust fallback come from the same face the
-  // browser would actually use.
+  // An automatic Arial face would sit ahead of Noto on missing Geist glyphs.
+  // Keep the locale faces first in the fallback stack used by tokens.css.
+  adjustFontFallback: false,
   fallback: [
+    "Noto Sans Arabic",
+    "Noto Sans SC",
     "-apple-system",
     "SF Pro Text",
     "Helvetica Neue",
@@ -125,6 +127,10 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <link rel="stylesheet" href="/fonts/noto-sans-arabic/fonts.css" />
+        {locale === "zh-Hans" ? (
+          <link rel="stylesheet" href="/fonts/noto-sans-sc/fonts.css" />
+        ) : null}
         <script
           nonce={nonce}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: the no-flash theme bootstrap has to run before hydration, which only a synchronous inline script can do (Next's own documented pattern for this); the string is generated, not user input
