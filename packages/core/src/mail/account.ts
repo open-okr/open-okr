@@ -1,26 +1,62 @@
 /**
- * The account mails the relay sends: the link that confirms an email address
- * (docs/design/email-verification.md D6, D18; email-templates.md §5), the
- * notice that a password changed (account-self-service.md D9), and the three
- * mails of a change of sign-in email (§4.2, plan 0.8.0 Y4).
+ * The account mail builders for password resets, email verification,
+ * password change notices, and sign-in email changes
+ * (email-templates.md §5 and account-self-service.md §4.2).
  *
- * **Built here, not in the web app,** because the relay's handlers live in
- * this package and may not import `apps/web`. The reset and the held-sign-in
- * mails are still sent from inside the request and are built there
- * (`apps/web/lib/account-mail.ts`).
- *
- * **In the instance's language, not a workspace's.** The person may belong to
- * no workspace yet, so the one language that is always theirs to receive is
- * the deployment's default. The caller resolves it; a builder that only builds
- * is one a test can call.
+ * The reset and held-sign-in notices use the visitor's request language
+ * when available. Account mail sent by the relay uses the instance language
+ * (languages §13, A-8).
  *
  * **The link is Better Auth's own**, as it was handed to the callback. Nothing
  * here invents a url.
  */
-import { intlTagFor } from "@openokr/formats";
+import { intlTagFor, isShippedLocale } from "@openokr/formats";
 import type { BuiltMail } from "./mails.ts";
 import { renderEmail } from "./render.ts";
-import { type MailLocale, mailWords } from "./words.ts";
+import { type MailLocale, mailLocale, mailWords } from "./words.ts";
+
+export function accountMailLocale(
+  instanceLanguage: string,
+  requestLocale?: string,
+): MailLocale {
+  return mailLocale(
+    isShippedLocale(requestLocale) ? requestLocale : instanceLanguage,
+  );
+}
+
+/** The link Better Auth sends when a visitor asks to reset a password. */
+export function resetPasswordMail(input: {
+  readonly instanceName: string;
+  readonly instanceLanguage: string;
+  readonly requestLocale?: string;
+  readonly to: string;
+  readonly url: string;
+}): BuiltMail {
+  const { instanceName: instance, to, url } = input;
+  const locale = accountMailLocale(input.instanceLanguage, input.requestLocale);
+  const t = mailWords(locale);
+  const host = new URL(url).host;
+  const { html, text } = renderEmail(
+    {
+      lang: locale,
+      brand: { name: instance },
+      preheader: t("reset.preheader"),
+      footer: [t("reset.footer", { instance, host })],
+      labels: { linkFallback: t("linkFallback") },
+    },
+    [
+      { kind: "eyebrow", text: t("reset.eyebrow") },
+      { kind: "heading", text: t("reset.heading") },
+      {
+        kind: "paragraph",
+        parts: [t("reset.bodyBefore"), { bold: to }, t("reset.bodyAfter")],
+      },
+      { kind: "action", label: t("reset.action"), href: url },
+      { kind: "notice", parts: [t("reset.notice")] },
+    ],
+  );
+  return { subject: t("reset.subject", { instance }), html, text };
+}
 
 export function verifyEmailMail(input: {
   readonly instanceName: string;

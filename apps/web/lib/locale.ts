@@ -67,7 +67,7 @@ export async function resolveLocale(): Promise<Locale> {
  * A visitor can override the browser's language. Unavailable values are
  * skipped at each step, including a stale cookie after a downgrade.
  */
-async function visitorLocale(): Promise<Locale> {
+export async function visitorLocaleFromRequest(): Promise<Locale | undefined> {
   try {
     const saved = (await cookies()).get(VISITOR_LANGUAGE_COOKIE)?.value;
     if (isShippedLocale(saved)) {
@@ -85,7 +85,15 @@ async function visitorLocale(): Promise<Locale> {
       return browser;
     }
   } catch {
-    // No request to read, as in a build. The instance's language is next.
+    // No request to read, as in a build.
+  }
+  return undefined;
+}
+
+async function visitorLocale(): Promise<Locale> {
+  const requestLocale = await visitorLocaleFromRequest();
+  if (requestLocale) {
+    return requestLocale;
   }
   try {
     const instance = await resolveInstanceDefaultLanguage(getPool());

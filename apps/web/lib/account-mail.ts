@@ -1,10 +1,12 @@
 import {
-  mailLocale,
+  accountMailLocale,
+  resetPasswordMail as buildResetPasswordMail,
   mailWords,
   renderEmail,
   resolveInstanceDefaultLanguage,
 } from "@openokr/core";
 import { getInstanceName } from "./instance-name";
+import { visitorLocaleFromRequest } from "./locale";
 import { getPool } from "./pool";
 
 /**
@@ -13,9 +15,8 @@ import { getPool } from "./pool";
  * email-templates.md §5). The confirmation mail is built in `packages/core`
  * and sent by the relay (email-verification.md D6).
  *
- * **In the instance's language, not a workspace's.** The person asking may
- * belong to several workspaces or to none yet, so the one language that is
- * always theirs to receive is the deployment's default, `instance.language`.
+ * Account mail uses the visitor's request locale, with the instance language
+ * as the fallback when no preference is available (languages §13, A-8).
  *
  * **The link is Better Auth's own**, built from the instance's base url and
  * pointing at its own route, which then sends the person to the page that
@@ -29,40 +30,19 @@ export interface AccountMail {
 }
 
 async function mailContext() {
-  const [instance, language] = await Promise.all([
+  const [instanceName, instanceLanguage, requestLocale] = await Promise.all([
     getInstanceName(),
     resolveInstanceDefaultLanguage(getPool()).catch(() => "en"),
+    visitorLocaleFromRequest(),
   ]);
-  const locale = mailLocale(language);
-  return { instance, locale, t: mailWords(locale) };
+  return { instanceName, instanceLanguage, requestLocale };
 }
 
 export async function resetPasswordMail(
   to: string,
   url: string,
 ): Promise<AccountMail> {
-  const { instance, locale, t } = await mailContext();
-  const host = new URL(url).host;
-  const { html, text } = renderEmail(
-    {
-      lang: locale,
-      brand: { name: instance },
-      preheader: t("reset.preheader"),
-      footer: [t("reset.footer", { instance, host })],
-      labels: { linkFallback: t("linkFallback") },
-    },
-    [
-      { kind: "eyebrow", text: t("reset.eyebrow") },
-      { kind: "heading", text: t("reset.heading") },
-      {
-        kind: "paragraph",
-        parts: [t("reset.bodyBefore"), { bold: to }, t("reset.bodyAfter")],
-      },
-      { kind: "action", label: t("reset.action"), href: url },
-      { kind: "notice", parts: [t("reset.notice")] },
-    ],
-  );
-  return { subject: t("reset.subject", { instance }), html, text };
+  return buildResetPasswordMail({ ...(await mailContext()), to, url });
 }
 
 /**
@@ -77,7 +57,13 @@ export async function signInHeldMail(
   to: string,
   resetUrl: string,
 ): Promise<AccountMail> {
-  const { instance, locale, t } = await mailContext();
+  const {
+    instanceName: instance,
+    instanceLanguage,
+    requestLocale,
+  } = await mailContext();
+  const locale = accountMailLocale(instanceLanguage, requestLocale);
+  const t = mailWords(locale);
   const host = new URL(resetUrl).host;
   const { html, text } = renderEmail(
     {

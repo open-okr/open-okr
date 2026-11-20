@@ -4,6 +4,7 @@ import {
   emailChangeNoticeMail,
   emailChangeTakenMail,
   passwordChangedMail,
+  resetPasswordMail,
   verifyEmailMail,
 } from "../src/mail/account.ts";
 import {
@@ -21,6 +22,35 @@ import type { WorkspaceMail } from "../src/mail/workspace.ts";
  */
 
 const BASE = "https://okr.example.test";
+
+describe("a password reset link", () => {
+  const input = {
+    instanceName: "Northwind OKR",
+    to: "sara@example.com",
+    url: `${BASE}/api/auth/reset-password/token?callbackURL=%2Freset-password`,
+  };
+
+  it("uses Malay when requested from the Malay sign-in page of an English instance", () => {
+    const built = resetPasswordMail({
+      ...input,
+      instanceLanguage: "en",
+      requestLocale: "ms",
+    });
+    expect(built.subject).toBe(
+      "Tetapkan semula kata laluan Northwind OKR anda",
+    );
+    expect(built.html).toContain('<html lang="ms" dir="ltr">');
+    expect(built.text).toContain(input.url);
+  });
+
+  it("uses the instance language when there is no visitor request", () => {
+    const built = resetPasswordMail({ ...input, instanceLanguage: "ms" });
+    expect(built.subject).toBe(
+      "Tetapkan semula kata laluan Northwind OKR anda",
+    );
+    expect(built.html).toContain('<html lang="ms" dir="ltr">');
+  });
+});
 
 const mail = (over: Partial<WorkspaceMail> = {}): WorkspaceMail => ({
   name: "Northwind Labs",

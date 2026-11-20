@@ -1058,6 +1058,7 @@ export {
   trustedDomainOffers,
 } from "./invitations/trusted-domain.ts";
 export { resolveKpiGridAccess } from "./kpis/access.ts";
+export { accountMailLocale, resetPasswordMail } from "./mail/account.ts";
 export {
   type EmailBlock,
   type EmailFrame,
