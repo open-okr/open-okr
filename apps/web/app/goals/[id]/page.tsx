@@ -700,7 +700,7 @@ export default async function GoalPage({
                     description={t("goals.detail.0MeansTrackedBut")}
                     inputClassName="w-24"
                   />
-                  <Button type="submit" className="ml-auto">
+                  <Button type="submit" className="ms-auto">
                     {t("common.save")}
                   </Button>
                 </div>

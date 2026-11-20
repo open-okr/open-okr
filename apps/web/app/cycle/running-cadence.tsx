@@ -314,7 +314,7 @@ export async function RunningCadence({
               >
                 <span className="min-w-0 text-ink">
                   {blocker.title}
-                  <span className="ml-1.5 text-xs text-ink-3">
+                  <span className="ms-1.5 text-xs text-ink-3">
                     {blocker.spaceName}
                     {blocker.ownerName ? ` · ${blocker.ownerName}` : ""}
                   </span>

@@ -227,7 +227,7 @@ export function OkrDrawer({
           data-testid="okr-drawer"
           aria-busy={saving || undefined}
           // Below the toasts (z-50), so an undo stays reachable over it.
-          className="fixed inset-y-0 right-0 z-40 flex w-full max-w-lg flex-col border-l border-line bg-surface shadow-lg outline-none"
+          className="fixed inset-y-0 end-0 z-40 flex w-full max-w-lg flex-col border-s border-line bg-surface shadow-lg outline-none"
         >
           <header className="flex flex-none items-center gap-2 border-b border-line px-4 py-3">
             <Dialog.Title className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
@@ -1172,7 +1172,7 @@ function Alignment({
       <button
         type="button"
         onClick={() => onOpen(id)}
-        className="text-left text-xs font-semibold text-brand-text hover:underline"
+        className="text-start text-xs font-semibold text-brand-text hover:underline"
       >
         {title}
       </button>

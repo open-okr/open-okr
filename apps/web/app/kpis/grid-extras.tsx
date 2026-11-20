@@ -155,7 +155,7 @@ export function CategorySubtotal({
       className="flex flex-wrap items-center gap-1.5 text-xs"
       data-testid={testId}
     >
-      {count ? <span className="mr-0.5 text-ink-3">{count}</span> : null}
+      {count ? <span className="me-0.5 text-ink-3">{count}</span> : null}
       {healthy > 0 ? (
         <Chip tone="ok" dot>
           {t("kpi.state.healthy", { healthy })}

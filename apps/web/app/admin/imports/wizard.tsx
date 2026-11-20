@@ -197,7 +197,7 @@ export function ImportWizard({
                 accept=".csv,.xlsx"
                 required
                 data-testid="import-file"
-                className="text-sm font-normal text-ink-2 file:mr-2 file:rounded-control file:border file:border-line-2 file:bg-surface file:px-2 file:py-1 file:text-xs file:font-semibold file:text-ink-2"
+                className="text-sm font-normal text-ink-2 file:me-2 file:rounded-control file:border file:border-line-2 file:bg-surface file:px-2 file:py-1 file:text-xs file:font-semibold file:text-ink-2"
               />
             </label>
             <p className="text-xs text-ink-3">
@@ -241,7 +241,7 @@ export function ImportWizard({
               // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
               tabIndex={0}
               aria-label={t("admin.imports.wizard.columns")}
-              className="relative max-h-[296px] divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line"
+              className="relative max-h-[296px] divide-y divide-line overflow-y-auto pe-1.5 overscroll-contain rounded-lg border border-line"
               data-testid="import-columns"
             >
               {columns.map((column, index) => (
@@ -507,7 +507,7 @@ function RowTable({ report }: { readonly report: ReportView }) {
   );
   return (
     <div className="max-h-96 overflow-y-auto rounded-md border border-line">
-      <table className="w-full text-left text-xs">
+      <table className="w-full text-start text-xs">
         <thead className="sticky top-0 bg-raised text-ink-3">
           <tr>
             <th className="px-2.5 py-1.5 font-semibold">

@@ -364,7 +364,7 @@ async function ReadOnlyFrame({ frame }: { readonly frame: Frame | null }) {
               <li key={one.id} className="text-sm text-ink-2">
                 {one.text}
                 {one.note ? (
-                  <span className="ml-1.5 text-xs text-ink-3">{one.note}</span>
+                  <span className="ms-1.5 text-xs text-ink-3">{one.note}</span>
                 ) : null}
               </li>
             ))}

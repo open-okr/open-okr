@@ -953,7 +953,7 @@ async function Filters({
           {label}
           {counts ? (
             <span
-              className={`ml-1 text-[11.5px] font-medium ${
+              className={`ms-1 text-[11.5px] font-medium ${
                 scope === key ? "text-brand-text/70" : "text-ink-4"
               }`}
             >
@@ -1126,7 +1126,7 @@ async function Filters({
             key={one.key}
             href={href({ [one.key]: null })}
             aria-label={t("goals.filter.removeOne", { filter: one.label })}
-            className="inline-flex h-6.5 items-center gap-1.5 rounded-full bg-brand-weak pr-1 pl-2.5 text-xs font-semibold text-brand-text hover:bg-brand-line"
+            className="inline-flex h-6.5 items-center gap-1.5 rounded-full bg-brand-weak pe-1 ps-2.5 text-xs font-semibold text-brand-text hover:bg-brand-line"
           >
             {one.label}
             <svg viewBox="0 0 10 10" aria-hidden="true" className="size-2.5">

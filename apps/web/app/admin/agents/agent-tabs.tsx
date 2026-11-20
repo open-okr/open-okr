@@ -67,8 +67,8 @@ export function AgentTabs({
               onKeyDown={(event) => move(event, index)}
               className={
                 on
-                  ? "flex min-w-32 flex-col items-start gap-1 rounded-lg border border-brand-line bg-brand-weak px-3 py-2 text-left"
-                  : "flex min-w-32 flex-col items-start gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-left hover:bg-raised"
+                  ? "flex min-w-32 flex-col items-start gap-1 rounded-lg border border-brand-line bg-brand-weak px-3 py-2 text-start"
+                  : "flex min-w-32 flex-col items-start gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-start hover:bg-raised"
               }
             >
               <span className="flex items-center gap-2 text-sm font-semibold text-ink">

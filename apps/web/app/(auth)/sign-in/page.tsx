@@ -501,7 +501,7 @@ export default function SignInPage() {
                 type="button"
                 data-testid={`persona-${persona.email}`}
                 onClick={() => fillForPersona(persona.email)}
-                className="flex flex-col gap-0.5 rounded-md border border-line px-2.5 py-1.5 text-left hover:border-ink-4"
+                className="flex flex-col gap-0.5 rounded-md border border-line px-2.5 py-1.5 text-start hover:border-ink-4"
               >
                 <span className="text-xs font-semibold text-ink">
                   {persona.name}

@@ -490,13 +490,13 @@ export default async function KpiDetailPage({
               </caption>
               <thead>
                 <tr className="border-line border-b text-xs text-ink-3">
-                  <th className="px-3 py-1.5 text-left font-semibold">
+                  <th className="px-3 py-1.5 text-start font-semibold">
                     {t("common.period")}
                   </th>
-                  <th className="px-3 py-1.5 text-right font-semibold">
+                  <th className="px-3 py-1.5 text-end font-semibold">
                     {t("kpis.detail.actual")}
                   </th>
-                  <th className="px-3 py-1.5 text-right font-semibold">
+                  <th className="px-3 py-1.5 text-end font-semibold">
                     {t("common.target")}
                   </th>
                 </tr>
@@ -517,10 +517,10 @@ export default async function KpiDetailPage({
                     <td className="px-3 py-1.5 text-ink-2">
                       {record.periodStart}
                     </td>
-                    <td className="px-3 py-1.5 text-right text-ink tabular-nums">
+                    <td className="px-3 py-1.5 text-end text-ink tabular-nums">
                       {record.actualValue ?? "—"}
                     </td>
-                    <td className="px-3 py-1.5 text-right text-ink-3 tabular-nums">
+                    <td className="px-3 py-1.5 text-end text-ink-3 tabular-nums">
                       {record.targetValue ?? kpi.targetDefault ?? "—"}
                     </td>
                   </tr>

@@ -407,7 +407,7 @@ export async function ReviewAndLearn({
                           space: review.spaceName,
                         })}
                       </Link>
-                      <span className="ml-2 text-xs text-ink-3">
+                      <span className="ms-2 text-xs text-ink-3">
                         {t("cycle.reviewAndLearn.close.heldOn", {
                           date: dayLabel(review.heldOn, locale),
                         })}
@@ -509,7 +509,7 @@ export async function ReviewAndLearn({
                 {waitingFor.length > 0 ? (
                   <div className="flex flex-col gap-0.5 text-xs text-ink-3">
                     <p>{t("cycle.reviewAndLearn.close.waiting")}</p>
-                    <ul className="list-disc pl-4">
+                    <ul className="list-disc ps-4">
                       {waitingFor.map((reason) => (
                         <li key={reason}>{reason}</li>
                       ))}

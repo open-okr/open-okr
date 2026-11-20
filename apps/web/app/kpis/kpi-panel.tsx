@@ -100,8 +100,8 @@ export function KpiPanel({
           data-testid={`kpi-${which}-panel`}
           className={
             panel
-              ? "fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-line bg-surface shadow-lg outline-none"
-              : "fixed top-28 left-1/2 z-40 flex w-[calc(100%-1.5rem)] max-w-sm -translate-x-1/2 flex-col rounded-xl border border-line bg-surface shadow-(--shadow-popover) outline-none"
+              ? "fixed inset-y-0 end-0 z-40 flex w-full max-w-md flex-col border-s border-line bg-surface shadow-lg outline-none"
+              : /* direction-neutral: Keep the element centered in its container. */ "fixed top-28 left-1/2 z-40 flex w-[calc(100%-1.5rem)] max-w-sm -translate-x-1/2 flex-col rounded-xl border border-line bg-surface shadow-(--shadow-popover) outline-none"
           }
         >
           <header

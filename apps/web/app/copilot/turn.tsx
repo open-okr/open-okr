@@ -231,7 +231,7 @@ function SourceList({
               key={`${item.n}:${item.entityType}:${item.entityId}`}
               className="flex items-center gap-1.5 text-xs"
             >
-              <span className="w-5 shrink-0 text-right tabular-nums text-ink-4">
+              <span className="w-5 shrink-0 text-end tabular-nums text-ink-4">
                 {item.n}.
               </span>
               <EntityIcon entityType={item.entityType} />

@@ -103,7 +103,7 @@ export default async function KpiTreesPage({
             {canEdit ? (
               <Link
                 href={`/kpis/trees?tree=${current}&new=tree`}
-                className={`${buttonVariants({ variant: "primary", size: "sm" })} ml-auto max-md:ml-0 max-md:w-full max-md:justify-center`}
+                className={`${buttonVariants({ variant: "primary", size: "sm" })} ms-auto max-md:ms-0 max-md:w-full max-md:justify-center`}
               >
                 {t("kpis.trees.newTree")}
               </Link>

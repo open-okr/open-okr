@@ -226,7 +226,7 @@ export function DecomposeKeyResult({
               />
             </div>
             {row.tasks.length > 0 ? (
-              <fieldset className="flex flex-col gap-1 pl-3">
+              <fieldset className="flex flex-col gap-1 ps-3">
                 <legend className="text-xs font-medium text-ink-3">
                   {t("goals.detail.decompose.firstTasks")}
                 </legend>

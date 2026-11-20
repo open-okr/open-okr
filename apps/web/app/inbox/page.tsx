@@ -202,7 +202,7 @@ export default async function InboxPage({
                 }
               >
                 {one.labelKey ? t(one.labelKey) : one.id}
-                <span className="ml-1 font-normal tabular-nums opacity-75">
+                <span className="ms-1 font-normal tabular-nums opacity-75">
                   {countFor(one.id)}
                 </span>
               </Link>

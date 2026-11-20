@@ -280,7 +280,7 @@ export function InlineNumber({
       onKeyDown={keys(() => setDraft(value))}
       inputClassName={cn(
         FIELD,
-        "h-auto text-right text-xs font-semibold",
+        "h-auto text-end text-xs font-semibold",
         wide ? "w-20" : "w-14",
       )}
     />
@@ -455,7 +455,7 @@ export function InlineDate({
       <span className="px-1 text-xs tabular-nums text-ink-3">
         {asText ? shown : (value ?? t("okrList.noDueDate"))}
         {asText && relative ? (
-          <span className="ml-1 text-ink-4">{relative}</span>
+          <span className="ms-1 text-ink-4">{relative}</span>
         ) : null}
       </span>
     );
@@ -733,7 +733,7 @@ export function KindControl({
           data-testid="kind-reason"
           className={cn(
             "inline-flex flex-wrap items-center gap-1.5 rounded-control bg-warn-bg px-2 py-1 text-xs",
-            floating && "absolute top-full left-0 z-10 mt-1 w-64 shadow-md",
+            floating && "absolute top-full start-0 z-10 mt-1 w-64 shadow-md",
           )}
         >
           <TextInput
@@ -1033,7 +1033,7 @@ export function ReasonField({
       data-testid="target-reason"
       className={cn(
         "flex flex-wrap items-center gap-2 bg-warn-bg py-1.5 text-xs",
-        inset ? "border-b border-line px-3.5 pl-14" : "rounded-control px-2",
+        inset ? "border-b border-line px-3.5 ps-14" : "rounded-control px-2",
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">

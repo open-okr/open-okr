@@ -185,7 +185,7 @@ export function RuleVerdict({
               </Link>
               <Button
                 variant="ghost"
-                className="ml-auto"
+                className="ms-auto"
                 onClick={() => setOpen(false)}
               >
                 {t("common.dismiss")}

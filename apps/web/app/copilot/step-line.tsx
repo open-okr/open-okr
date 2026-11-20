@@ -139,7 +139,7 @@ export function StepSummary({ steps }: { readonly steps: readonly Step[] }) {
       <summary className="w-fit cursor-pointer rounded-control hover:text-ink-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-strong">
         {summary}
       </summary>
-      <ul className="mt-1 flex flex-col gap-0.5 pl-1">
+      <ul className="mt-1 flex flex-col gap-0.5 ps-1">
         {steps.map((step, index) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: steps only grow, in order.
           <li key={index} className="flex items-center gap-1.5">

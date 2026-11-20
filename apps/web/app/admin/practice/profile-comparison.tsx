@@ -48,7 +48,10 @@ export function ProfileComparison({
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-ink/20 data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Popup
           data-testid="practice-compare"
-          className="fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-surface shadow-(--shadow-popover) outline-none"
+          className={
+            /* direction-neutral: Keep the element centered in its container. */
+            "fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-surface shadow-(--shadow-popover) outline-none"
+          }
         >
           <header className="flex flex-none items-start gap-3 border-b border-line px-4 py-3">
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -79,7 +82,7 @@ export function ProfileComparison({
                 <tr>
                   <th
                     scope="col"
-                    className="sticky top-0 left-0 z-20 w-[30%] border-b border-line bg-raised px-3 py-2 text-left align-top text-xs font-semibold text-ink-2"
+                    className="sticky top-0 start-0 z-20 w-[30%] border-b border-line bg-raised px-3 py-2 text-start align-top text-xs font-semibold text-ink-2"
                   >
                     {t("admin.practice.compare.setting")}
                   </th>
@@ -87,7 +90,7 @@ export function ProfileComparison({
                     <th
                       key={profile.key}
                       scope="col"
-                      className="sticky top-0 z-10 border-b border-line bg-raised px-3 py-2 text-left align-top text-xs font-semibold text-ink-2"
+                      className="sticky top-0 z-10 border-b border-line bg-raised px-3 py-2 text-start align-top text-xs font-semibold text-ink-2"
                     >
                       <span className="flex flex-wrap items-center gap-1.5">
                         {profile.label}
@@ -106,7 +109,7 @@ export function ProfileComparison({
                   <tr key={row.key} className="border-t border-line">
                     <th
                       scope="row"
-                      className="sticky left-0 bg-surface px-3 py-2.5 text-left align-top text-sm font-medium text-ink"
+                      className="sticky start-0 bg-surface px-3 py-2.5 text-start align-top text-sm font-medium text-ink"
                     >
                       <span className="flex items-start gap-1.5">
                         {row.name}

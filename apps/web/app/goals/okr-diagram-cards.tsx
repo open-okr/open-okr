@@ -123,7 +123,7 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
 
   return (
     <div
-      className={`relative flex h-full w-full flex-col overflow-hidden rounded-lg border bg-surface text-left shadow-sm ${linkFrom ? "border-brand ring-2 ring-brand" : "border-line"}`}
+      className={`relative flex h-full w-full flex-col overflow-hidden rounded-lg border bg-surface text-start shadow-sm ${linkFrom ? "border-brand ring-2 ring-brand" : "border-line"}`}
     >
       <Handle
         type="target"
@@ -142,12 +142,12 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
           id="move"
           isConnectable
           title={t("okrDiagram.dragToMove")}
-          className="!left-2.5 !top-2.5 !h-3.5 !w-3.5 !translate-x-0 !translate-y-0 !rounded-sm !border !border-line-2 !bg-raised hover:!border-brand hover:!bg-brand-weak"
+          className="start-2.5! end-auto! !top-2.5 !h-3.5 !w-3.5 !translate-none !rounded-sm !border !border-line-2 !bg-raised hover:!border-brand hover:!bg-brand-weak"
         />
       ) : null}
       <div className="flex flex-col gap-1 px-3 pt-2">
         <span
-          className={`flex items-center gap-1.5 pr-10 text-xs font-semibold capitalize text-ink-3 ${shared.canEdit ? "pl-4" : ""}`}
+          className={`flex items-center gap-1.5 pe-10 text-xs font-semibold capitalize text-ink-3 ${shared.canEdit ? "ps-4" : ""}`}
         >
           {goal.level}
           <span className="truncate font-normal normal-case tracking-normal">
@@ -274,7 +274,7 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
               shared.setMoving(goal.id);
             }}
             aria-label={t("okrDiagram.moveUnderOf", { title: goal.title })}
-            className="nodrag ml-auto rounded-control px-1.5 py-0.5 text-[11px] font-semibold text-ink-3 hover:bg-raised hover:text-ink"
+            className="nodrag ms-auto rounded-control px-1.5 py-0.5 text-[11px] font-semibold text-ink-3 hover:bg-raised hover:text-ink"
           >
             {t("okrDiagram.moveUnder")}
           </button>
@@ -294,7 +294,7 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
               ? t("okrDiagram.expand", { title: goal.title })
               : t("okrDiagram.collapse", { title: goal.title })
           }
-          className="nodrag absolute right-1.5 top-1.5 rounded-control px-1 text-[10px] font-semibold text-ink-3 hover:bg-raised hover:text-ink"
+          className="nodrag absolute end-1.5 top-1.5 rounded-control px-1 text-[10px] font-semibold text-ink-3 hover:bg-raised hover:text-ink"
         >
           {collapsed
             ? hiddenBelow > 0
@@ -682,7 +682,7 @@ function ContextCard({ data }: NodeProps<Node<ContextData, "context">>) {
   const { t } = useTranslations();
   const { context } = data;
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-dashed border-line bg-raised text-left">
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-dashed border-line bg-raised text-start">
       <div className="flex flex-col gap-0.5 px-3 pt-2">
         <span className="text-xs font-semibold text-ink-3">
           {context.cycleName ?? t("okrDiagram.anotherCycle")}

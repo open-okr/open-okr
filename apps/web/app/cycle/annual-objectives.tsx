@@ -69,7 +69,7 @@ async function Objective({
           className="min-w-0 text-sm text-ink hover:underline"
         >
           {objective.title}
-          <span className="ml-1.5 text-xs text-ink-3">
+          <span className="ms-1.5 text-xs text-ink-3">
             {objective.championName ??
               t("cycle.annualObjectives.noChampionNamed")}
           </span>

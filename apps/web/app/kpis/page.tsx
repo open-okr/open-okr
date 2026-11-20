@@ -324,7 +324,7 @@ export default async function KpisPage({
             key={one.key}
             href={href({ [one.key]: null })}
             aria-label={t("goals.filter.removeOne", { filter: one.label })}
-            className="inline-flex h-6.5 items-center gap-1.5 rounded-full bg-brand-weak pr-1 pl-2.5 text-xs font-semibold text-brand-text hover:bg-brand-line"
+            className="inline-flex h-6.5 items-center gap-1.5 rounded-full bg-brand-weak pe-1 ps-2.5 text-xs font-semibold text-brand-text hover:bg-brand-line"
           >
             {one.label}
             <svg viewBox="0 0 10 10" aria-hidden="true" className="size-2.5">
@@ -370,7 +370,7 @@ export default async function KpisPage({
               )}
             </div>
             {canEdit ? (
-              <div className="ml-auto flex items-center gap-2 max-md:ml-0 max-md:w-full">
+              <div className="ms-auto flex items-center gap-2 max-md:ms-0 max-md:w-full">
                 <Link
                   href={opening("category")}
                   className={buttonVariants({ size: "sm" })}

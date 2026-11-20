@@ -138,12 +138,14 @@ export async function KpiTreeRows({
           >
             <span
               className="flex min-w-0 items-center gap-2"
-              style={{ paddingLeft: `${Math.max(depth - 1, 0) * 1.25}rem` }}
+              style={{
+                paddingInlineStart: `${Math.max(depth - 1, 0) * 1.25}rem`,
+              }}
             >
               {depth > 0 ? (
                 <span
                   aria-hidden="true"
-                  className="-mt-3 ml-1.5 h-5.5 w-4.5 flex-none rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-2"
+                  className="-mt-3 ms-1.5 h-5.5 w-4.5 flex-none rounded-es-md border-b-[1.5px] border-s-[1.5px] border-line-2"
                 />
               ) : null}
               <span className="flex min-w-0 flex-col">
@@ -202,7 +204,7 @@ export async function KpiTreeRows({
                 max={KPI_ACHIEVEMENT_MAX}
                 className="flex-1"
               />
-              <span className="w-11 text-right text-xs font-semibold text-ink-2 tabular-nums">
+              <span className="w-11 text-end text-xs font-semibold text-ink-2 tabular-nums">
                 {node.achievementPct === null
                   ? t("kpis.trees.noData")
                   : `${Math.round(node.achievementPct)}%`}

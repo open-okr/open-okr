@@ -189,7 +189,7 @@ function ProfileCard({
                 <div
                   key={profile.key}
                   className={cn(
-                    "col-span-12 flex items-start gap-1 rounded-control border py-2 pr-2 pl-3 text-sm",
+                    "col-span-12 flex items-start gap-1 rounded-control border py-2 pe-2 ps-3 text-sm",
                     index < 3 ? "md:col-span-4" : "md:col-span-6",
                     chosen === profile.key
                       ? "border-brand bg-brand-weak"
@@ -225,7 +225,7 @@ function ProfileCard({
                         target="_blank"
                         rel="noopener noreferrer"
                         data-testid={`practice-profile-source-${profile.key}`}
-                        className="pl-6 text-xs font-semibold text-brand-text underline"
+                        className="ps-6 text-xs font-semibold text-brand-text underline"
                       >
                         {t("admin.practice.profile.source", {
                           title: profileSources[profile.key]?.title ?? "",
@@ -243,7 +243,7 @@ function ProfileCard({
                     ) : (
                       <>
                         <p>{t("admin.practice.hint.changes")}</p>
-                        <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4">
+                        <ul className="mt-1 flex list-disc flex-col gap-0.5 ps-4">
                           {sets.map((row) => (
                             <li key={row.key}>
                               {row.name}: {row.values[profile.key]}
@@ -273,7 +273,7 @@ function ProfileCard({
                   {t("admin.practice.profile.nothingChanges")}
                 </p>
               ) : (
-                <ul className="flex list-disc flex-col gap-0.5 pl-5 text-ink-2">
+                <ul className="flex list-disc flex-col gap-0.5 ps-5 text-ink-2">
                   {preview.practice.map((change) => {
                     const setting = byKey.get(change.key);
                     return (

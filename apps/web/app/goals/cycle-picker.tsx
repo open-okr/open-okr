@@ -118,7 +118,7 @@ export function CyclePicker({
         </Button>
 
         {open ? (
-          <div className="absolute left-0 top-9 z-30 w-64 rounded-lg border border-line bg-surface p-1.5 shadow-popover">
+          <div className="absolute start-0 top-9 z-30 w-64 rounded-lg border border-line bg-surface p-1.5 shadow-popover">
             <TextInput
               type="search"
               value={query}

@@ -310,10 +310,10 @@ export async function InputPack({
                   {/* A fixed share that may wrap, so the longest entry ("Weeks
                       1 to 2 of the quarter") no longer sets the width and
                       Activity takes the rest. */}
-                  <th className="w-1/4 px-3.5 py-1.5 text-left text-xs font-bold tracking-wide text-ink-3 uppercase">
+                  <th className="w-1/4 px-3.5 py-1.5 text-start text-xs font-bold tracking-wide text-ink-3 uppercase">
                     {t("cycle.inputPack.weeksBefore")}
                   </th>
-                  <th className="px-3.5 py-1.5 text-left text-xs font-bold tracking-wide text-ink-3 uppercase">
+                  <th className="px-3.5 py-1.5 text-start text-xs font-bold tracking-wide text-ink-3 uppercase">
                     {t("common.activity")}
                   </th>
                 </tr>

@@ -121,7 +121,7 @@ function CopilotTrigger({
           onClick();
         }
       }}
-      className="inline-flex h-7.5 cursor-pointer items-center rounded-control border border-line bg-surface pr-1.5 transition-colors duration-fast ease-out hover:border-line-2"
+      className="inline-flex h-7.5 cursor-pointer items-center rounded-control border border-line bg-surface pe-1.5 transition-colors duration-fast ease-out hover:border-line-2"
       // The product tour's Ask AI step lights this (plan 0.8.0 T1).
       data-tour-target="ask-ai"
     >
@@ -1126,7 +1126,7 @@ export function CopilotPanel({
             finalFocus={triggerRef}
             // 512px, widened to 768px, on the container scale so compact
             // density does not narrow it; a full-screen sheet below 768px.
-            className={`fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-line bg-bg shadow-lg outline-none ${
+            className={`fixed inset-y-0 end-0 z-40 flex w-full flex-col border-s border-line bg-bg shadow-lg outline-none ${
               expanded ? "md:max-w-3xl" : "md:max-w-lg"
             }`}
           >
@@ -1147,7 +1147,7 @@ export function CopilotPanel({
               {anchored && view === "chat" ? (
                 <Chip tone="neutral">{t(ABOUT_KEY[anchored.type])}</Chip>
               ) : null}
-              <div className="ml-auto flex items-center gap-1">
+              <div className="ms-auto flex items-center gap-1">
                 {/* A label beside the icon from 640px; below that the icon,
                   with the same words for a screen reader. */}
                 <Button
@@ -1242,7 +1242,7 @@ export function CopilotPanel({
                                   variant="default"
                                   disabled={busy}
                                   onClick={() => void send(t(key))}
-                                  className="h-auto w-full justify-start whitespace-normal py-2 text-left font-normal"
+                                  className="h-auto w-full justify-start whitespace-normal py-2 text-start font-normal"
                                 >
                                   {t(key)}
                                 </Button>
@@ -1395,7 +1395,10 @@ export function CopilotPanel({
                   variant="default"
                   onClick={stick.toEnd}
                   aria-label={t("copilot.copilotPanel.jumpToLatest")}
-                  className="absolute bottom-3 left-1/2 size-8 -translate-x-1/2 rounded-full px-0 shadow-lg"
+                  className={
+                    /* direction-neutral: Keep the element centered in its container. */
+                    "absolute bottom-3 left-1/2 size-8 -translate-x-1/2 rounded-full px-0 shadow-lg"
+                  }
                 >
                   <ArrowDown className="size-4" aria-hidden="true" />
                 </Button>

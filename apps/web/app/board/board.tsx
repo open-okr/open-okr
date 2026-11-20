@@ -638,7 +638,7 @@ function Card({
                   type="button"
                   aria-label={t("board.board.moveBack", { title: card.title })}
                   onClick={() => onShift(-1)}
-                  className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand"
+                  className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand rtl:-scale-x-100"
                 >
                   ←
                 </button>
@@ -646,7 +646,7 @@ function Card({
                   type="button"
                   aria-label={t("board.board.moveOn", { title: card.title })}
                   onClick={() => onShift(1)}
-                  className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand"
+                  className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand rtl:-scale-x-100"
                 >
                   →
                 </button>

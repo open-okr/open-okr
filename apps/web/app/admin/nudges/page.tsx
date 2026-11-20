@@ -153,7 +153,7 @@ export default async function NudgeVolumePage() {
               aria-label={t("admin.nudges.theNoisiestRules")}
               // Scrolls inside the card after about five rows, because it
               // lists every rule that has ever fired.
-              className="relative flex max-h-[220px] flex-col overflow-y-auto pr-1.5 overscroll-contain"
+              className="relative flex max-h-[220px] flex-col overflow-y-auto pe-1.5 overscroll-contain"
             >
               {volume.rules.map((rule) => (
                 <li

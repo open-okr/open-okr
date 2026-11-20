@@ -328,7 +328,7 @@ export default async function AgentsPage() {
               aria-label={t("common.recentRuns")}
               // biome-ignore lint/a11y/noNoninteractiveTabindex: a list that scrolls has to be reachable from the keyboard.
               tabIndex={0}
-              className="flex max-h-[420px] flex-col overflow-y-auto pr-1.5"
+              className="flex max-h-[420px] flex-col overflow-y-auto pe-1.5"
             >
               {runs.map((run) => (
                 <li
