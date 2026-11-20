@@ -27,6 +27,7 @@ import type { AgentDrafter, ReviewableGoal } from "../agents/drafter.ts";
 import { type AgentScope, agentSeesGoal } from "../agents/scope.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
+import { resolveDraftLanguageInTx } from "../settings/member-language.ts";
 import { reconcileFindingsInTx, type WantedFinding } from "./service.ts";
 
 /** The four §5.3 types, reconciled one slice at a time. */
@@ -136,7 +137,10 @@ export async function sweepSemanticInTx(
 
   // The capability is optional: a host may draft without reviewing, and a
   // missing capability reads the same as one that declined.
-  const findings = (await input.drafter.reviewAlignment?.(reviewable)) ?? null;
+  const findings =
+    (await input.drafter.reviewAlignment?.(reviewable, {
+      locale: await resolveDraftLanguageInTx(tx, input.workspaceId),
+    })) ?? null;
   if (findings === null) {
     // The model could not answer. Distinct from an empty list, and treated the
     // same as having no provider: yesterday's findings stay.

@@ -16,7 +16,11 @@
  * overriding it at the next restart. §4.2 calls the environment "bootstrap",
  * and that is what it is: a starting value, not an override.
  */
-import { systemSettings, withInstanceAdmin } from "@openokr/db";
+import {
+  systemSettings,
+  type WorkspaceTx,
+  withInstanceAdmin,
+} from "@openokr/db";
 import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
@@ -95,10 +99,10 @@ export async function readSettingRows(
 
 /** One stored setting's plain value, or undefined when it is not set. */
 export async function readSetting(
-  pool: Pool,
+  source: Pool | WorkspaceTx,
   key: string,
 ): Promise<unknown | undefined> {
-  const db = drizzle(pool);
+  const db = "select" in source ? source : drizzle(source);
   const [row] = await db
     .select({ value: systemSettings.value })
     .from(systemSettings)

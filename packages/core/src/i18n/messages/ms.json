@@ -113,6 +113,7 @@
   "exports.column.status": "Status semasa",
   "exports.column.task": "Tugas",
   "exports.column.unit": "Unit ukuran",
+  "filterAssist.refused": "Senarai ini tidak boleh ditapis berdasarkan perkara itu.",
   "health.abandoned": "Ditinggalkan",
   "health.achieved": "Tercapai",
   "health.caution": "Berisiko",

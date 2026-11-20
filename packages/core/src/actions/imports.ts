@@ -27,6 +27,7 @@ import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { LEGACY_SOURCES } from "../imports/legacy.ts";
 import { templateFor } from "../imports/templates/index.ts";
 import { OperationError } from "../operations/errors.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { DEFAULT_IMPORT_ROW_LIMIT } from "../settings/registry.ts";
 import { actingMemberId } from "./api-tokens.ts";
 import {
@@ -322,6 +323,7 @@ export const proposeImportMapping = defineReadAction({
     >;
     try {
       proposed = await drafter.proposeImportMapping({
+        locale: await resolveMemberLanguage(context),
         entity: template.entity,
         describe: template.describe,
         headers: input.headers,

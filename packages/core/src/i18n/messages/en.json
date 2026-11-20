@@ -113,6 +113,7 @@
   "exports.column.status": "Status",
   "exports.column.task": "Task",
   "exports.column.unit": "Unit",
+  "filterAssist.refused": "That is not something this list can filter on.",
   "health.abandoned": "Abandoned",
   "health.achieved": "Achieved",
   "health.caution": "At risk",

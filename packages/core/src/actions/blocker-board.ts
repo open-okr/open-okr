@@ -14,6 +14,7 @@
  * how interesting each item reads is the failure this separation prevents, and
  * the summary is refused if it names a blocker that is not on the board.
  */
+
 import {
   activeOnly,
   BLOCKER_TYPES,
@@ -43,6 +44,7 @@ import { ADDRESS } from "../ids/address.ts";
 import { resolveRhythmWithLadders } from "../nudges/ladders.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import {
   type ActionCallContext,
   defineReadAction,
@@ -253,6 +255,7 @@ export const summariseBlockers = defineReadAction({
     let summary: string | null = null;
     try {
       summary = await drafter.summariseBlockers({
+        locale: await resolveMemberLanguage(context),
         blockers: board.map((blocker) => ({
           type: blocker.type,
           nextAction: blocker.nextAction,

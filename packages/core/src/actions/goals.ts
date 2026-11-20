@@ -99,6 +99,7 @@ import { richTextSchema } from "../rich-text/field-schema.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { recomputeAlignmentFor, scopesHangingFrom } from "./alignment.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -3324,6 +3325,7 @@ export const rewriteKeyResult = defineReadAction({
       return null;
     }
 
+    const locale = await resolveMemberLanguage(context);
     return withContext(
       drizzle(context.pool),
       { workspaceId: context.workspaceId, userId },
@@ -3400,6 +3402,7 @@ export const rewriteKeyResult = defineReadAction({
         try {
           suggestion =
             (await drafter.rewriteForRule?.({
+              locale,
               text: row.title,
               ruleId: check.id,
               // The catalogue's own words for the failing condition, so the

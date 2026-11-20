@@ -33,6 +33,7 @@ import {
 import { findPersonalData } from "../ai/personal-data.ts";
 import { OperationError } from "../operations/errors.ts";
 import type { OperationTx } from "../operations/operation.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { actingMemberId } from "./api-tokens.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { ACTIONS, getAction } from "./registry.ts";
@@ -338,6 +339,7 @@ export const planAgentRun = defineReadAction({
     }
     const menu = plannerMenu(ACTIONS);
     const planned = await drafter.planRun({
+      locale: await resolveMemberLanguage(context),
       agentName: prepared.agent.name,
       stage: prepared.stage,
       instructions: prepared.instructions.text,

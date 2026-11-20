@@ -30,18 +30,22 @@ import {
   currentPromptVersions,
   DEFAULT_PROMPTS,
   evaluationPasses,
+  type LocaleCode,
+  languageName,
   type PromptEvaluation,
   type PromptEvaluator,
   type PromptKey,
 } from "@openokr/core";
 import type { Pool } from "pg";
-import { createProviderDrafter } from "../drafter.ts";
+import { createProviderDrafter, withWritingLanguage } from "../drafter.ts";
+import { matchesReplyLanguage } from "./locale-replies.ts";
 
 /** Every check a fixture runs, in the order a report lists them (design §4). */
 const EVALUATION_CHECKS = [
   "result",
   "schema",
   "prompt",
+  "language",
   "personal-data",
   "budget",
   "latency",
@@ -84,6 +88,7 @@ const CHARACTERS_PER_TOKEN = 4;
 /** One request and one golden reply, for one capability. */
 interface EvaluationFixture {
   readonly name: string;
+  readonly locale?: LocaleCode;
   /**
    * What a well-behaved model answers. A list is a streamed answer, in the
    * pieces it arrives in.
@@ -369,7 +374,10 @@ function judge(
       break;
     }
     if (options.expectedPrompt !== null) {
-      if (leading.content !== options.expectedPrompt) {
+      if (
+        leading.content !==
+        withWritingLanguage(options.expectedPrompt, fixture.locale)
+      ) {
         fail("prompt", "the system message is not the prompt under test");
         break;
       }
@@ -377,6 +385,34 @@ function judge(
       fail("prompt", "the system message is empty");
       break;
     }
+    if (fixture.locale !== undefined) {
+      const language = languageName(fixture.locale);
+      const directive =
+        set.capability === "answerGrounded" ||
+        set.capability === "streamGrounded"
+          ? `Write the answer in ${language}.`
+          : `Write human-readable text in ${language}.`;
+      if (!leading.content.includes(directive)) {
+        fail("prompt", `the system message does not request ${language}`);
+        break;
+      }
+    }
+  }
+
+  if (
+    fixture.locale !== undefined &&
+    outcome.result != null &&
+    outcome.result !== MISSING &&
+    !matchesReplyLanguage(
+      outcome.result,
+      fixture.locale,
+      options.live !== undefined,
+    )
+  ) {
+    fail(
+      "language",
+      `the reply does not read as ${languageName(fixture.locale)}`,
+    );
   }
 
   for (const { request } of outcome.requests) {

@@ -12,6 +12,8 @@ import {
   DEFAULT_PROMPTS,
   evaluationPasses,
   knownPromptKeys,
+  LOCALES,
+  languageName,
   PROMPT_KEYS,
   type PromptEvaluator,
 } from "@openokr/core";
@@ -28,8 +30,111 @@ import { EVALUATION_SETS } from "../src/evaluation/sets.ts";
 const OBJECTIVE = PROMPT_KEYS.draftObjective;
 const REWRITE = PROMPT_KEYS.rewriteForRule;
 
+const WRITING_CAPABILITIES = [
+  "answerGrounded",
+  "clusterNotes",
+  "decomposeKeyResult",
+  "draftCheckIn",
+  "draftMinutes",
+  "draftObjective",
+  "draftRetrospective",
+  "narrateDiagnostic",
+  "narrateDigest",
+  "narrateTrend",
+  "parseListFilter",
+  "planRun",
+  "proposeAction",
+  "proposeImportMapping",
+  "proposeObjectives",
+  "refineRecoveryTitle",
+  "reviewAlignment",
+  "rewriteForRule",
+  "streamGrounded",
+  "suggestKpi",
+  "suggestParent",
+  "summariseBlockers",
+  "summariseThread",
+];
+const WRITING_LOCALES = LOCALES.map(({ code }) => code);
+
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe("writing in the member's language", () => {
+  it.each(WRITING_CAPABILITIES)(
+    "%s has a prompt and reply in every locale",
+    async (capability) => {
+      const set = EVALUATION_SETS.find(
+        (entry) => entry.capability === capability,
+      );
+      if (!set) throw new Error(`No ${capability} set.`);
+      const localised = set.fixtures.filter((fixture) => "locale" in fixture);
+      expect(localised.map((fixture) => fixture.locale)).toEqual(
+        WRITING_LOCALES,
+      );
+      const report = await evaluateSet({ ...set, fixtures: localised });
+      expect(report.outcomes.flatMap((outcome) => outcome.failures)).toEqual(
+        [],
+      );
+    },
+  );
+
+  it("rejects a Chinese or Arabic fixture whose model reply is English", async () => {
+    const set = EVALUATION_SETS.find(
+      (entry) => entry.capability === "rewriteForRule",
+    );
+    if (!set) throw new Error("No rewriteForRule set.");
+    const english = set.fixtures[0];
+    if (!english) throw new Error("No English reply.");
+    const miswritten = set.fixtures
+      .filter(
+        (fixture) =>
+          "locale" in fixture &&
+          (fixture.locale === "zh-Hans" || fixture.locale === "ar"),
+      )
+      .map((fixture) => ({
+        ...fixture,
+        reply: english.reply,
+        expected: english.expected,
+      }));
+    const report = await evaluateSet({ ...set, fixtures: miswritten });
+    expect(report.outcomes).toHaveLength(2);
+    for (const outcome of report.outcomes) {
+      expect(outcome.failures).toEqual([
+        expect.objectContaining({ check: "language" }),
+      ]);
+    }
+  });
+
+  it("honours an explicit English answer request over the member's Malay preference", async () => {
+    const provider = new MockAIProvider({
+      chatResponse: {
+        content: "Activation is at 41%.\nSOURCES: none",
+        usage: { inputTokens: 0, outputTokens: 0 },
+      },
+    });
+    const drafter = createProviderDrafter({
+      provider,
+      model: "evaluation",
+      costCapUsd: 1,
+      costInPerMillion: 0,
+      costOutPerMillion: 0,
+    });
+    const answer = await drafter.answerGrounded?.({
+      question: "Bagaimanakah pengaktifan? Please reply in English.",
+      history: [],
+      sources: [],
+      locale: "ms",
+    });
+    expect(answer?.text).toBe("Activation is at 41%.");
+    const [call] = provider.calls;
+    expect(call?.method).toBe("chat");
+    if (call?.method === "chat") {
+      const prompt = call.request.messages[0]?.content;
+      expect(prompt).toContain(`Write the answer in ${languageName("en")}.`);
+    }
+  });
 });
 
 describe("every set, against the built-in prompts", () => {
@@ -373,6 +478,8 @@ describe("the versions a drafter may send", () => {
 });
 
 describe("the drafter and a workspace's version", () => {
+  const english =
+    " Write human-readable text in English. Keep schema keys, enum values, and identifiers unchanged.";
   const draftWith = async (systemPrompts?: Record<string, string>) => {
     const provider = new MockAIProvider({
       chatResponse: {
@@ -402,16 +509,18 @@ describe("the drafter and a workspace's version", () => {
 
   it("sends the workspace's version when it has one", async () => {
     expect(await draftWith({ [REWRITE]: "Our own words." })).toBe(
-      "Our own words.",
+      `Our own words.${english}`,
     );
   });
 
   it("sends the built-in text otherwise, or for a blank version", async () => {
-    expect(await draftWith()).toBe(DEFAULT_PROMPTS[REWRITE]);
-    expect(await draftWith({ [REWRITE]: "  " })).toBe(DEFAULT_PROMPTS[REWRITE]);
+    expect(await draftWith()).toBe(DEFAULT_PROMPTS[REWRITE] + english);
+    expect(await draftWith({ [REWRITE]: "  " })).toBe(
+      DEFAULT_PROMPTS[REWRITE] + english,
+    );
     // Another key's version is not this capability's.
     expect(await draftWith({ [OBJECTIVE]: "Not mine." })).toBe(
-      DEFAULT_PROMPTS[REWRITE],
+      DEFAULT_PROMPTS[REWRITE] + english,
     );
   });
 });

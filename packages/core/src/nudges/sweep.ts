@@ -66,6 +66,7 @@ import { DEFAULT_DAILY_SUMMARY_TIME } from "../notifications/settings.ts";
 import { OperationError } from "../operations/errors.ts";
 import { workspaceAdministratorIds } from "../people/lifecycle.ts";
 import { practiceFromRow } from "../practice/settings.ts";
+import { resolveDraftLanguageInTx } from "../settings/member-language.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
 import {
   type DueNudge,
@@ -340,6 +341,8 @@ export async function dueKpiCorridorNudges(
         // what P3-T14 golden-master tested and what the deterministic path has
         // always proposed.
         const refined = await refinedRecoveryTitle(
+          tx,
+          input.workspaceId,
           input.drafter,
           kpi.title,
           achievement,
@@ -421,6 +424,8 @@ export async function dueKpiCorridorNudges(
  * §6.5's `recoveryObjective` whenever this returns null.
  */
 async function refinedRecoveryTitle(
+  tx: WorkspaceTx,
+  workspaceId: string,
   drafter: AgentDrafter | undefined,
   kpiTitle: string,
   achievementPct: number | null,
@@ -431,6 +436,7 @@ async function refinedRecoveryTitle(
   try {
     return (
       (await drafter.refineRecoveryTitle?.({
+        locale: await resolveDraftLanguageInTx(tx, workspaceId),
         kpiTitle,
         templateTitle: recoveryObjective(kpiTitle),
         achievementPct,

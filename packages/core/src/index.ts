@@ -152,6 +152,7 @@ export type {
   ThreadSummary,
   TrendContext,
   TrendPoint,
+  WritingLocale,
 } from "./agents/drafter.ts";
 export { PROPOSAL_DROP_REASONS } from "./agents/drafter.ts";
 export {
@@ -1337,6 +1338,8 @@ export {
   statusHueOf,
 } from "./settings/brand-colour.ts";
 export {
+  LOCALES,
+  type LocaleCode,
   languageName,
   resolveMemberLanguage,
 } from "./settings/member-language.ts";

@@ -79,6 +79,7 @@ import {
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import type { RichTextDocument } from "../rich-text/schema.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { errorNameOf, logProposalDrop } from "./proposal-drops.ts";
 
 /** One thing the model may be shown and point at by number. */
@@ -2098,6 +2099,7 @@ export async function proposeFromRequest(
     null;
   try {
     authored = await drafter.proposeAction({
+      locale: await resolveMemberLanguage(context),
       onDropped: dropped,
       request: input.request,
       // Labels only. No identifier reaches the model.

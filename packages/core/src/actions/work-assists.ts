@@ -30,6 +30,7 @@ import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { ADDRESS, subjectAddress } from "../ids/address.ts";
 import { OperationError } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { listCommentsAction } from "./comments.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
 import { readGoal } from "./goals.ts";
@@ -151,6 +152,7 @@ export const summariseThread = defineReadAction({
     >;
     try {
       summarised = await drafter.summariseThread({
+        locale: await resolveMemberLanguage(context),
         subject: subjectWords(input.subjectType),
         comments: recent,
       });
@@ -239,6 +241,7 @@ export const decomposeKeyResult = defineReadAction({
     >;
     try {
       drafted = await drafter.decomposeKeyResult({
+        locale: await resolveMemberLanguage(context),
         goalTitle: goal.title,
         keyResultTitle: keyResult.title,
         unit: keyResult.unit,

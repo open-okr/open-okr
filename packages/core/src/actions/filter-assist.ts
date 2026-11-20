@@ -22,6 +22,8 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { ASSIST_FEATURE_KEYS } from "../ai/assist-keys.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
+import { serverTranslate } from "../i18n/catalogue.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { listCycles } from "./cycles.ts";
 import { defineReadAction } from "./define.ts";
 
@@ -96,11 +98,13 @@ export const parseListFilter = defineReadAction({
       CYCLE_LIMIT,
     );
 
+    const locale = await resolveMemberLanguage(context);
     let parsed: Awaited<
       ReturnType<NonNullable<typeof drafter.parseListFilter>>
     >;
     try {
       parsed = await drafter.parseListFilter({
+        locale,
         sentence: input.sentence,
         cycles: cycles.map((cycle) => cycle.name),
         levels: [...LEVELS],
@@ -117,7 +121,7 @@ export const parseListFilter = defineReadAction({
         kind: "refused" as const,
         reason:
           parsed.reason.trim() === ""
-            ? "That is not something this list can filter on."
+            ? serverTranslate(locale, "filterAssist.refused")
             : parsed.reason.trim(),
       };
     }

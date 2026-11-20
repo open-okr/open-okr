@@ -52,6 +52,7 @@ import { workspaceTimeZone } from "../cycles/service.ts";
 import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import type { RichTextDocument } from "../rich-text/schema.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
 import { readKpiDetail } from "./kpis.ts";
 
@@ -469,6 +470,7 @@ export const narrateDigest = defineReadAction({
     let narrative: string | null = null;
     try {
       narrative = await drafter.narrateDigest({
+        locale: await resolveMemberLanguage(context),
         lines: deterministic.lines,
       });
     } catch {
@@ -588,6 +590,7 @@ export const narrateTrend = defineReadAction({
     let narrated: Awaited<ReturnType<NonNullable<typeof drafter.narrateTrend>>>;
     try {
       narrated = await drafter.narrateTrend({
+        locale: await resolveMemberLanguage(context),
         title: detail.kpi.title,
         unit: detail.kpi.unit,
         direction: detail.kpi.direction,
