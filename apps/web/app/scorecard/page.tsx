@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { directionFor } from "@openokr/formats";
 import {
   Bar,
   Card,
@@ -11,6 +12,7 @@ import {
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { pageTitle } from "../../lib/page-title.ts";
+import { timeAxisX } from "../../lib/reading-direction.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
@@ -31,8 +33,8 @@ const BAND_TONE = {
 /**
  * The scorecard (METHOD.md §8.9, TECHNICAL-PLAN §4.6, P3-T15).
  *
- * One row per archived cycle, oldest first, so the trend reads left to right
- * the way time does. The band table and the verdict come from the snapshot
+ * One row per archived cycle, oldest first in reading order.
+ * The band table and the verdict come from the snapshot
  * rather than being recomputed here: a scorecard that recalculated would drift
  * from the number the review actually agreed on.
  *
@@ -41,7 +43,8 @@ const BAND_TONE = {
  * answer different questions.
  */
 export default async function ScorecardPage() {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  const direction = directionFor(locale);
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -82,7 +85,7 @@ export default async function ScorecardPage() {
   const trend = points
     .map(
       (point) =>
-        `${point.index * trendStep},${trendHeight - point.value * trendHeight}`,
+        `${timeAxisX(point.index * trendStep, trendWidth, direction)},${trendHeight - point.value * trendHeight}`,
     )
     .join(" ");
 

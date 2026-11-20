@@ -1,6 +1,8 @@
 "use client";
 
+import { useDirection } from "@base-ui-components/react/direction-provider";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
+import { horizontalArrowStep } from "../../../lib/reading-direction.ts";
 
 /** One provider: its tab (name and chips) and the card that tab shows. */
 export interface ProviderTab {
@@ -26,12 +28,12 @@ export function ProviderTabs({
   readonly tabs: readonly ProviderTab[];
   readonly label: string;
 }) {
+  const direction = useDirection();
   const [current, setCurrent] = useState(tabs[0]?.kind ?? "");
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const move = (event: KeyboardEvent, index: number) => {
-    const step =
-      event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    const step = horizontalArrowStep(event.key, direction);
     if (step === 0) {
       return;
     }

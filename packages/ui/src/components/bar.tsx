@@ -87,7 +87,10 @@ export function Bar({
           "block h-full rounded-full bg-brand-strong",
           animateOnMount && "animate-grow-bar",
         )}
-        style={{ width: `${(clamped / ceiling) * 100}%` }}
+        style={{
+          width: `${(clamped / ceiling) * 100}%`,
+          marginInlineEnd: "auto",
+        }}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import "@xyflow/react/dist/style.css";
+import { useDirection } from "@base-ui-components/react/direction-provider";
 import type { GoalLevel } from "@openokr/db";
 import {
   Button,
@@ -33,6 +34,7 @@ import {
   useOkrMutation,
   useOkrTree,
 } from "../../lib/okr-tree/use-okr-tree.ts";
+import { horizontalArrowStep } from "../../lib/reading-direction.ts";
 import { linkGoals } from "./alignment-actions.ts";
 import { AlignmentPanel, type AlignmentReading } from "./alignment-panel.tsx";
 import { addKeyResult, addObjective } from "./editor-actions.ts";
@@ -153,6 +155,7 @@ function LiveDiagram({
   readonly alignment: AlignmentReading | null;
   readonly levels: readonly string[];
 }) {
+  const direction = useDirection();
   const { t } = useTranslations();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -199,17 +202,35 @@ function LiveDiagram({
     () => ({ ...tree, goals: filterGoals(tree.goals, filters) }),
     [tree, filters],
   );
-  const layout = useMemo(
-    () =>
-      layoutOkrTree(shown, {
-        collapsed,
-        dependencies,
-        actions: canEdit,
-        drafts: keyResultDrafts,
-        draftChildOf: childDraft,
-      }),
-    [shown, collapsed, dependencies, canEdit, keyResultDrafts, childDraft],
-  );
+  const layout = useMemo(() => {
+    const treeLayout = layoutOkrTree(shown, {
+      collapsed,
+      dependencies,
+      actions: canEdit,
+      drafts: keyResultDrafts,
+      draftChildOf: childDraft,
+    });
+    if (direction === "ltr") {
+      return treeLayout;
+    }
+    // React Flow positions cards in physical coordinates. Keep the first
+    // sibling at inline start so the arrow keys follow the visual order.
+    return {
+      ...treeLayout,
+      nodes: treeLayout.nodes.map((node) => ({
+        ...node,
+        x: -node.x - node.width,
+      })),
+    };
+  }, [
+    shown,
+    collapsed,
+    dependencies,
+    canEdit,
+    keyResultDrafts,
+    childDraft,
+    direction,
+  ]);
 
   const toggle = useCallback(
     (id: string) =>
@@ -415,19 +436,20 @@ function LiveDiagram({
       return;
     }
     const id = focused.dataset.nodeId as string;
+    const step = horizontalArrowStep(event.key, direction);
     // Alt with an arrow moves the card among its siblings, as Alt with an
     // arrow moves a row in the list (P9-T10b).
     if (
       event.altKey &&
       canEdit &&
-      (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
+      step !== 0 &&
       byId.get(id)?.kind === "objective"
     ) {
       event.preventDefault();
       const above = layout.parentOf.get(id);
       const row = above ? (layout.childrenOf.get(above) ?? []) : [];
       const at = row.indexOf(id);
-      placeAmongSiblings(id, event.key === "ArrowLeft" ? at - 1 : at + 1);
+      placeAmongSiblings(id, at + step);
       requestAnimationFrame(() => focusNode(id));
       return;
     }
@@ -437,12 +459,11 @@ function LiveDiagram({
     const go: Record<string, string | undefined> = {
       ArrowUp: parent,
       ArrowDown: layout.childrenOf.get(id)?.[0],
-      ArrowLeft: at > 0 ? siblings[at - 1] : undefined,
-      ArrowRight: at >= 0 ? siblings[at + 1] : undefined,
     };
-    if (event.key in go) {
+    if (step !== 0 || event.key in go) {
       event.preventDefault();
-      const next = go[event.key];
+      const nextSibling = at < 0 ? undefined : siblings[at + step];
+      const next = step === 0 ? go[event.key] : nextSibling;
       if (next) {
         focusNode(next);
       }
@@ -834,7 +855,13 @@ function LiveDiagram({
                 const centre = node.position.x + (node.width ?? 0) / 2;
                 const slot = siblings.filter((sibling) => {
                   const box = byId.get(sibling);
-                  return box ? box.x + box.width / 2 < centre : false;
+                  if (!box) {
+                    return false;
+                  }
+                  const siblingCentre = box.x + box.width / 2;
+                  return direction === "rtl"
+                    ? siblingCentre > centre
+                    : siblingCentre < centre;
                 }).length;
                 placeAmongSiblings(node.id, slot);
               }}

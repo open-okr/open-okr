@@ -247,7 +247,7 @@ export function StrengthMeter({
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-raised">
         <div
           className={`h-full rounded-full ${tone.bar}`}
-          style={{ width: `${score}%` }}
+          style={{ width: `${score}%`, marginInlineEnd: "auto" }}
         />
       </div>
       <p className="text-xs text-ink-3">

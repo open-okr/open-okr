@@ -194,7 +194,10 @@ export function Wizard({
           >
             <div
               className="h-full rounded-full bg-brand"
-              style={{ width: `${((index + 1) / STEPS.length) * 100}%` }}
+              style={{
+                width: `${((index + 1) / STEPS.length) * 100}%`,
+                marginInlineEnd: "auto",
+              }}
             />
           </div>
         </div>

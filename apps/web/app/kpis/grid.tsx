@@ -1,5 +1,6 @@
 "use client";
 
+import { useDirection } from "@base-ui-components/react/direction-provider";
 import { type KpiFrequency, normalisePeriod } from "@openokr/method";
 import {
   Avatar,
@@ -11,6 +12,7 @@ import {
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { INDICATOR_NAME_KEYS, nameOf } from "../../lib/identifier-names.ts";
+import { horizontalArrowStep } from "../../lib/reading-direction.ts";
 import { recordCell } from "./actions.ts";
 import { CategorySubtotal, RowSparkline } from "./grid-extras.tsx";
 import { kpiCount } from "./kpi-count.ts";
@@ -241,6 +243,7 @@ export function KpiGrid({
    */
   readonly addHref: string;
 }) {
+  const direction = useDirection();
   const { t, locale } = useTranslations();
   const language = locale === "pseudo" ? "en" : locale;
 
@@ -310,12 +313,9 @@ export function KpiGrid({
         move(-1, 0);
         break;
       case "ArrowRight":
-        event.preventDefault();
-        move(0, 1);
-        break;
       case "ArrowLeft":
         event.preventDefault();
-        move(0, -1);
+        move(0, horizontalArrowStep(event.key, direction));
         break;
       default:
         break;

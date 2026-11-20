@@ -14,6 +14,7 @@ import {
   useTransition,
 } from "react";
 import { finishTour } from "../app/tour-actions";
+import { horizontalArrowStep } from "./reading-direction.ts";
 
 /**
  * The product tour on a first sign-in (UIUX-PLAN S-34, plan 0.8.0 T1).
@@ -297,18 +298,16 @@ export function ProductTour({
       end();
       return;
     }
-    if (phase === "touring" && event.key === "ArrowRight") {
+    const step = horizontalArrowStep(event.key, direction);
+    if (phase === "touring" && step !== 0) {
       event.preventDefault();
-      // Forward only: on the last step the next thing is leaving the page
-      // or finishing, which is the button's to do (UAT 0.8.0 Q-5).
-      if (!last) {
+      if (step < 0) {
+        back();
+      } else if (!last) {
+        // On the last step, finishing or leaving is the button's to do
+        // (UAT 0.8.0 Q-5).
         next();
       }
-      return;
-    }
-    if (phase === "touring" && event.key === "ArrowLeft") {
-      event.preventDefault();
-      back();
       return;
     }
     if (event.key === "Tab" && dialogRef.current) {

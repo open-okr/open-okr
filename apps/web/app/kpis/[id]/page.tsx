@@ -4,6 +4,7 @@ import {
   OperationError,
   RHYTHM_ASSIST_KEYS,
 } from "@openokr/core";
+import { directionFor } from "@openokr/formats";
 import {
   Bar,
   Card,
@@ -23,6 +24,7 @@ import { KPI_ACHIEVEMENT_MAX } from "../../../lib/ceilings.ts";
 import { memberOption } from "../../../lib/entity-options.ts";
 import { searchHumans } from "../../../lib/member-search.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
+import { timeAxisX } from "../../../lib/reading-direction.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -102,7 +104,8 @@ export default async function KpiDetailPage({
 }: {
   readonly params: Promise<{ readonly id: string }>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  const direction = directionFor(locale);
 
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
@@ -185,7 +188,7 @@ export default async function KpiDetailPage({
     .map((record, index) =>
       record.actualValue === null
         ? null
-        : `${index * step},${y(record.actualValue)}`,
+        : `${timeAxisX(index * step, width, direction)},${y(record.actualValue)}`,
     )
     .filter((point): point is string => point !== null)
     .join(" ");
