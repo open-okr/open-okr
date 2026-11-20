@@ -311,7 +311,7 @@ describe("the password notice", () => {
     expect(built.subject).toBe("Kata laluan Northwind OKR anda telah ditukar");
     expect(built.html).toContain('<html lang="ms" dir="ltr">');
     expect(built.text).toContain(
-      "telah ditukar pada 11 November 2026 jam 07:05 (UTC).",
+      "telah ditukar pada 11 November 2026 jam 07:05 PG (UTC).",
     );
     expect(built.text).toContain("Tetapkan semula kata laluan");
   });
@@ -413,7 +413,7 @@ describe("a change of sign-in email", () => {
       at: AT,
       baseUrl: BASE,
     });
-    expect(notice.text).toContain("pada 11 November 2026 jam 07:05 (UTC).");
+    expect(notice.text).toContain("pada 11 November 2026 jam 07:05 PG (UTC).");
     const taken = emailChangeTakenMail({
       instanceName: "Northwind OKR",
       locale: "ms",
