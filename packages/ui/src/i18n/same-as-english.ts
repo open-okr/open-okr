@@ -29,9 +29,6 @@ export const SAME_AS_ENGLISH: Record<string, Record<string, string>> = {
       '"Demo" is the word Malay uses, as for logo and favicon above; the pill\'s full sentence is translated (plan 0.8.0 D1).',
     "method.detail.okrCoach":
       '"Demo" is the word Malay uses, as for logo and favicon above; the pill\'s full sentence is translated (plan 0.8.0 D1).',
-    "nudge.champion":
-      "Method role title Champion retained in Malay (languages §13).",
-    "nudge.coach": "Method role title Coach retained in Malay (languages §13).",
     "admin.ai.providerAnthropic":
       '"Demo" is the word Malay uses, as for logo and favicon above; the pill\'s full sentence is translated (plan 0.8.0 D1).',
     "admin.ai.providerGoogle":
@@ -140,33 +137,33 @@ export const SAME_AS_ENGLISH: Record<string, Record<string, string>> = {
     "admin.imports.archiveImportCard.leftOutColumns":
       "A table and the columns an older archive carried, both named as stored.",
     "common.caution":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "copilot.copilotPanel.preview.cycle":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "copilot.copilotPanel.preview.keyResult":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "copilot.copilotPanel.preview.objective":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "copilot.copilotPanel.preview.space":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "goals.detail.decompose.refused":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "board.board.movedTo":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "checkIn.timeline.bylineDate":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "checkIn.walkerLine":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "cycle.actions.measureRefusedBecause":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "documents.subjectDocuments.authorAndVersions":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "initiatives.metaKeyResults":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "initiatives.metaWindowKeyResults":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "workMapHeader.scopeSummary":
-      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).",
+      "The label for the caution status is the \"At risk\" term's own hole, so a workspace's rename reaches it (METHOD.md section 3.5, P9-T15b-a).",
     "cycle.drafting.space":
       "Only a term, which each language fills with its own word or the workspace's rename (M-14), sometimes beside a hole or a bracket.",
     "board.scope.inSpace":
@@ -290,5 +287,15 @@ export const SAME_AS_ENGLISH: Record<string, Record<string, string>> = {
       "The Outdated stat's unit is the objective term's own hole.",
     "workMapHeader.outdatedUnit.other":
       "The Outdated stat's unit is the objective term's own hole.",
+  },
+};
+
+/** Server-only exceptions, checked against the server message catalogue. */
+export const SERVER_SAME_AS_ENGLISH: Record<string, Record<string, string>> = {
+  ms: {
+    "nudge.champion":
+      "The server keeps the Champion role title in Malay (languages section 13).",
+    "nudge.coach":
+      "The server keeps the Coach role title in Malay (languages section 13).",
   },
 };

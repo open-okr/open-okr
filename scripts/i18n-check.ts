@@ -18,7 +18,10 @@ import {
   type CheckIssue,
   checkCatalogues,
 } from "../packages/ui/src/i18n/check.ts";
-import { SAME_AS_ENGLISH } from "../packages/ui/src/i18n/same-as-english.ts";
+import {
+  SAME_AS_ENGLISH,
+  SERVER_SAME_AS_ENGLISH,
+} from "../packages/ui/src/i18n/same-as-english.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const UI_MESSAGES_DIR = join(ROOT, "packages/ui/src/i18n/messages");
@@ -81,7 +84,7 @@ async function main(): Promise<void> {
 
   const coreResult = await checkDirectory(
     CORE_MESSAGES_DIR,
-    SAME_AS_ENGLISH,
+    SERVER_SAME_AS_ENGLISH,
     {},
     isRelease,
   );
