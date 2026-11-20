@@ -1,0 +1,2156 @@
+[
+  {
+    "file": "apps/web/app/(auth)/sign-in/page.tsx",
+    "line": 483,
+    "pattern": "text-left",
+    "context": "className=\"flex flex-col gap-0.5 rounded-md border border-line px-2.5 py-1.5 text-left hover:border-ink-4\""
+  },
+  {
+    "file": "apps/web/app/account/api-tokens/page.tsx",
+    "line": 235,
+    "pattern": "pr-1.5",
+    "context": "className=\"max-h-[296px] overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line\""
+  },
+  {
+    "file": "apps/web/app/account/api-tokens/token-form.tsx",
+    "line": 113,
+    "pattern": "mr-auto",
+    "context": "<div className=\"mr-auto min-w-0\">{outcome}</div>"
+  },
+  {
+    "file": "apps/web/app/account/channels/cadence-form.tsx",
+    "line": 171,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-xs text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/account/connections/page.tsx",
+    "line": 73,
+    "pattern": "pr-1.5",
+    "context": "className=\"max-h-[296px] overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line\""
+  },
+  {
+    "file": "apps/web/app/account/security/sessions.tsx",
+    "line": 95,
+    "pattern": "pr-1.5",
+    "context": "className=\"max-h-[296px] overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line\""
+  },
+  {
+    "file": "apps/web/app/admin/agents/agent-instructions.tsx",
+    "line": 191,
+    "pattern": "pr-1.5",
+    "context": "className=\"flex max-h-[296px] flex-col gap-1 overflow-y-auto pr-1.5\""
+  },
+  {
+    "file": "apps/web/app/admin/agents/agent-instructions.tsx",
+    "line": 321,
+    "pattern": "pl-5",
+    "context": "className=\"flex list-decimal flex-col gap-1 pl-5 text-xs\""
+  },
+  {
+    "file": "apps/web/app/admin/agents/agent-tabs.tsx",
+    "line": 70,
+    "pattern": "text-left",
+    "context": "? \"flex min-w-32 flex-col items-start gap-1 rounded-lg border border-brand-line bg-brand-weak px-3 py-2 text-left\""
+  },
+  {
+    "file": "apps/web/app/admin/agents/agent-tabs.tsx",
+    "line": 71,
+    "pattern": "text-left",
+    "context": ": \"flex min-w-32 flex-col items-start gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-left hover:bg-raised\""
+  },
+  {
+    "file": "apps/web/app/admin/agents/page.tsx",
+    "line": 331,
+    "pattern": "pr-1.5",
+    "context": "className=\"flex max-h-[420px] flex-col overflow-y-auto pr-1.5\""
+  },
+  {
+    "file": "apps/web/app/admin/agents/proposal-queue.tsx",
+    "line": 166,
+    "pattern": "pr-1.5",
+    "context": "className=\"flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5\""
+  },
+  {
+    "file": "apps/web/app/admin/ai/agent-calls-card.tsx",
+    "line": 118,
+    "pattern": "pr-1.5",
+    "context": "className=\"relative flex max-h-[200px] flex-col gap-1 overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line px-3 py-2 text-xs text-ink-3\""
+  },
+  {
+    "file": "apps/web/app/admin/ai/governance.tsx",
+    "line": 177,
+    "pattern": "pr-1.5",
+    "context": "className=\"relative flex max-h-[296px] flex-col gap-1.5 overflow-y-auto pr-1.5 overscroll-contain\""
+  },
+  {
+    "file": "apps/web/app/admin/ai/governance.tsx",
+    "line": 345,
+    "pattern": "text-left",
+    "context": "<table className=\"w-full text-left text-xs\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/governance.tsx",
+    "line": 348,
+    "pattern": "pr-3",
+    "context": "<th className=\"py-1 pr-3 font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/governance.tsx",
+    "line": 351,
+    "pattern": "pr-3",
+    "context": "<th className=\"py-1 pr-3 font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/governance.tsx",
+    "line": 354,
+    "pattern": "pr-3",
+    "context": "<th className=\"py-1 pr-3 font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/governance.tsx",
+    "line": 357,
+    "pattern": "pr-3",
+    "context": "<th className=\"py-1 pr-3 font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/governance.tsx",
+    "line": 366,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3 text-ink\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/governance.tsx",
+    "line": 369,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/governance.tsx",
+    "line": 374,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3\">{budget.metric}</td>"
+  },
+  {
+    "file": "apps/web/app/admin/ai/governance.tsx",
+    "line": 375,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3\">{budget.period}</td>"
+  },
+  {
+    "file": "apps/web/app/admin/ai/governance.tsx",
+    "line": 376,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3 tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/page.tsx",
+    "line": 467,
+    "pattern": "text-left",
+    "context": "<table className=\"w-full text-left text-xs\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/page.tsx",
+    "line": 470,
+    "pattern": "pr-3",
+    "context": "<th className=\"py-1 pr-3 font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/page.tsx",
+    "line": 473,
+    "pattern": "pr-3",
+    "context": "<th className=\"py-1 pr-3 font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/page.tsx",
+    "line": 476,
+    "pattern": "pr-3",
+    "context": "<th className=\"py-1 pr-3 font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/page.tsx",
+    "line": 479,
+    "pattern": "pr-3",
+    "context": "<th className=\"py-1 pr-3 font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/page.tsx",
+    "line": 482,
+    "pattern": "pr-3",
+    "context": "<th className=\"py-1 pr-3 font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/page.tsx",
+    "line": 496,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3 text-ink\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/page.tsx",
+    "line": 498,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 font-mono text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/page.tsx",
+    "line": 502,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/page.tsx",
+    "line": 505,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3 tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/page.tsx",
+    "line": 508,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3 tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/page.tsx",
+    "line": 511,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/provider-settings-form.tsx",
+    "line": 116,
+    "pattern": "pl-6",
+    "context": "<p className=\"pl-6 text-xs text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/admin/ai/provider-tabs.tsx",
+    "line": 67,
+    "pattern": "text-left",
+    "context": "? \"flex min-w-32 flex-col items-start gap-1 rounded-lg border border-brand-line bg-brand-weak px-3 py-2 text-left\""
+  },
+  {
+    "file": "apps/web/app/admin/ai/provider-tabs.tsx",
+    "line": 68,
+    "pattern": "text-left",
+    "context": ": \"flex min-w-32 flex-col items-start gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-left hover:bg-raised\""
+  },
+  {
+    "file": "apps/web/app/admin/ai/ratings-card.tsx",
+    "line": 109,
+    "pattern": "pr-1.5",
+    "context": "className=\"relative flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain\""
+  },
+  {
+    "file": "apps/web/app/admin/audit/audit-log.tsx",
+    "line": 174,
+    "pattern": "text-left",
+    "context": "className={`w-full text-left text-xs ${state.busy === \"replace\" ? \"opacity-60\" : \"\"}`}"
+  },
+  {
+    "file": "apps/web/app/admin/audit/audit-log.tsx",
+    "line": 183,
+    "pattern": "pr-3",
+    "context": "className=\"sticky top-0 z-10 bg-surface py-1 pr-3 font-semibold\""
+  },
+  {
+    "file": "apps/web/app/admin/audit/audit-log.tsx",
+    "line": 189,
+    "pattern": "pr-3",
+    "context": "className=\"sticky top-0 z-10 bg-surface py-1 pr-3 font-semibold\""
+  },
+  {
+    "file": "apps/web/app/admin/audit/audit-log.tsx",
+    "line": 195,
+    "pattern": "pr-3",
+    "context": "className=\"sticky top-0 z-10 bg-surface py-1 pr-3 font-semibold\""
+  },
+  {
+    "file": "apps/web/app/admin/audit/audit-log.tsx",
+    "line": 201,
+    "pattern": "pr-3",
+    "context": "className=\"sticky top-0 z-10 bg-surface py-1 pr-3 font-semibold\""
+  },
+  {
+    "file": "apps/web/app/admin/audit/audit-log.tsx",
+    "line": 220,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3 whitespace-nowrap tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/admin/audit/audit-log.tsx",
+    "line": 223,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3\">"
+  },
+  {
+    "file": "apps/web/app/admin/audit/audit-log.tsx",
+    "line": 241,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3 font-mono text-ink\">"
+  },
+  {
+    "file": "apps/web/app/admin/audit/audit-log.tsx",
+    "line": 244,
+    "pattern": "pr-3",
+    "context": "<td className=\"py-1.5 pr-3\">"
+  },
+  {
+    "file": "apps/web/app/admin/backups/page.tsx",
+    "line": 76,
+    "pattern": "pr-1.5",
+    "context": "className=\"flex max-h-[296px] flex-col divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain\""
+  },
+  {
+    "file": "apps/web/app/admin/backups/page.tsx",
+    "line": 116,
+    "pattern": "ml-auto",
+    "context": "className={`ml-auto ${linkClass}`}"
+  },
+  {
+    "file": "apps/web/app/admin/backups/page.tsx",
+    "line": 141,
+    "pattern": "ml-auto",
+    "context": "className={`ml-auto ${linkClass}`}"
+  },
+  {
+    "file": "apps/web/app/admin/backups/page.tsx",
+    "line": 149,
+    "pattern": "ml-auto",
+    "context": "className={`ml-auto ${linkClass}`}"
+  },
+  {
+    "file": "apps/web/app/admin/branding/branding-mirror.tsx",
+    "line": 136,
+    "pattern": "border-r",
+    "context": "<div className=\"flex flex-col gap-2 border-r border-line bg-raised p-3\">"
+  },
+  {
+    "file": "apps/web/app/admin/channels/page.tsx",
+    "line": 345,
+    "pattern": "pr-1.5",
+    "context": "className=\"flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain\""
+  },
+  {
+    "file": "apps/web/app/admin/channels/page.tsx",
+    "line": 411,
+    "pattern": "pr-1.5",
+    "context": "className=\"flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain\""
+  },
+  {
+    "file": "apps/web/app/admin/channels/page.tsx",
+    "line": 511,
+    "pattern": "pr-1.5",
+    "context": "className=\"flex max-h-52 flex-col gap-1.5 overflow-y-auto pr-1.5 overscroll-contain\""
+  },
+  {
+    "file": "apps/web/app/admin/connections/page.tsx",
+    "line": 103,
+    "pattern": "pr-1.5",
+    "context": "className=\"relative flex max-h-[420px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain\""
+  },
+  {
+    "file": "apps/web/app/admin/deleted/page.tsx",
+    "line": 108,
+    "pattern": "pr-1.5",
+    "context": "className=\"relative max-h-[420px] divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line\""
+  },
+  {
+    "file": "apps/web/app/admin/deleted/restore-button.tsx",
+    "line": 70,
+    "pattern": "text-right",
+    "context": "<span role=\"alert\" className=\"text-right text-xs text-bad\">"
+  },
+  {
+    "file": "apps/web/app/admin/general/close-workspace-card.tsx",
+    "line": 129,
+    "pattern": "pl-5",
+    "context": "<ul className=\"col-span-12 flex list-disc flex-col gap-1 pl-5 text-sm text-ink-2\">"
+  },
+  {
+    "file": "apps/web/app/admin/imports/archive-import-card.tsx",
+    "line": 158,
+    "pattern": "mr-3",
+    "context": "className=\"text-sm text-ink file:mr-3 file:rounded-md file:border-0 file:bg-brand file:px-2.5 file:py-1.5 file:text-xs file:font-semibold file:text-on-brand\""
+  },
+  {
+    "file": "apps/web/app/admin/imports/archive-import-card.tsx",
+    "line": 209,
+    "pattern": "pl-3",
+    "context": "<ul className=\"mt-1 flex flex-col gap-0.5 pl-3\">"
+  },
+  {
+    "file": "apps/web/app/admin/imports/page.tsx",
+    "line": 83,
+    "pattern": "pr-1.5",
+    "context": "className=\"relative max-h-[296px] divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line\""
+  },
+  {
+    "file": "apps/web/app/admin/imports/wizard.tsx",
+    "line": 200,
+    "pattern": "mr-2",
+    "context": "className=\"text-sm font-normal text-ink-2 file:mr-2 file:rounded-control file:border file:border-line-2 file:bg-surface file:px-2 file:py-1 file:text-xs file:font-semibold file:text-ink-2\""
+  },
+  {
+    "file": "apps/web/app/admin/imports/wizard.tsx",
+    "line": 244,
+    "pattern": "pr-1.5",
+    "context": "className=\"relative max-h-[296px] divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line\""
+  },
+  {
+    "file": "apps/web/app/admin/imports/wizard.tsx",
+    "line": 510,
+    "pattern": "text-left",
+    "context": "<table className=\"w-full text-left text-xs\">"
+  },
+  {
+    "file": "apps/web/app/admin/invitations/invite-form.tsx",
+    "line": 84,
+    "pattern": "mr-auto",
+    "context": "<div className=\"mr-auto min-w-0\">"
+  },
+  {
+    "file": "apps/web/app/admin/invitations/page.tsx",
+    "line": 311,
+    "pattern": "pr-1.5",
+    "context": "className=\"max-h-[296px] overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line\""
+  },
+  {
+    "file": "apps/web/app/admin/nudges/page.tsx",
+    "line": 156,
+    "pattern": "pr-1.5",
+    "context": "className=\"relative flex max-h-[220px] flex-col overflow-y-auto pr-1.5 overscroll-contain\""
+  },
+  {
+    "file": "apps/web/app/admin/plan/page.tsx",
+    "line": 259,
+    "pattern": "pr-1.5",
+    "context": "className={`relative max-h-[296px] overflow-y-auto pr-1.5 overscroll-contain ${listBox}`}"
+  },
+  {
+    "file": "apps/web/app/admin/practice/practice-form.tsx",
+    "line": 192,
+    "pattern": "pr-2",
+    "context": "\"col-span-12 flex items-start gap-1 rounded-control border py-2 pr-2 pl-3 text-sm\","
+  },
+  {
+    "file": "apps/web/app/admin/practice/practice-form.tsx",
+    "line": 192,
+    "pattern": "pl-3",
+    "context": "\"col-span-12 flex items-start gap-1 rounded-control border py-2 pr-2 pl-3 text-sm\","
+  },
+  {
+    "file": "apps/web/app/admin/practice/practice-form.tsx",
+    "line": 228,
+    "pattern": "pl-6",
+    "context": "className=\"pl-6 text-xs font-semibold text-brand-text underline\""
+  },
+  {
+    "file": "apps/web/app/admin/practice/practice-form.tsx",
+    "line": 246,
+    "pattern": "pl-4",
+    "context": "<ul className=\"mt-1 flex list-disc flex-col gap-0.5 pl-4\">"
+  },
+  {
+    "file": "apps/web/app/admin/practice/practice-form.tsx",
+    "line": 276,
+    "pattern": "pl-5",
+    "context": "<ul className=\"flex list-disc flex-col gap-0.5 pl-5 text-ink-2\">"
+  },
+  {
+    "file": "apps/web/app/admin/practice/profile-comparison.tsx",
+    "line": 51,
+    "pattern": "left-1/2",
+    "context": "className=\"fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-surface shadow-(--shadow-popover) outline-none\""
+  },
+  {
+    "file": "apps/web/app/admin/practice/profile-comparison.tsx",
+    "line": 51,
+    "pattern": "-translate-x-1/2",
+    "context": "className=\"fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-surface shadow-(--shadow-popover) outline-none\""
+  },
+  {
+    "file": "apps/web/app/admin/practice/profile-comparison.tsx",
+    "line": 82,
+    "pattern": "left-0",
+    "context": "className=\"sticky top-0 left-0 z-20 w-[30%] border-b border-line bg-raised px-3 py-2 text-left align-top text-xs font-semibold text-ink-2\""
+  },
+  {
+    "file": "apps/web/app/admin/practice/profile-comparison.tsx",
+    "line": 82,
+    "pattern": "text-left",
+    "context": "className=\"sticky top-0 left-0 z-20 w-[30%] border-b border-line bg-raised px-3 py-2 text-left align-top text-xs font-semibold text-ink-2\""
+  },
+  {
+    "file": "apps/web/app/admin/practice/profile-comparison.tsx",
+    "line": 90,
+    "pattern": "text-left",
+    "context": "className=\"sticky top-0 z-10 border-b border-line bg-raised px-3 py-2 text-left align-top text-xs font-semibold text-ink-2\""
+  },
+  {
+    "file": "apps/web/app/admin/practice/profile-comparison.tsx",
+    "line": 109,
+    "pattern": "left-0",
+    "context": "className=\"sticky left-0 bg-surface px-3 py-2.5 text-left align-top text-sm font-medium text-ink\""
+  },
+  {
+    "file": "apps/web/app/admin/practice/profile-comparison.tsx",
+    "line": 109,
+    "pattern": "text-left",
+    "context": "className=\"sticky left-0 bg-surface px-3 py-2.5 text-left align-top text-sm font-medium text-ink\""
+  },
+  {
+    "file": "apps/web/app/admin/rhythm/rhythm-form.tsx",
+    "line": 386,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 font-normal text-ink-4\">"
+  },
+  {
+    "file": "apps/web/app/admin/rhythm/rhythm-form.tsx",
+    "line": 559,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-ink-4\">"
+  },
+  {
+    "file": "apps/web/app/admin/roles/role-matrix.tsx",
+    "line": 154,
+    "pattern": "text-left",
+    "context": "className=\"w-[160px] px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-ink-3\""
+  },
+  {
+    "file": "apps/web/app/admin/roles/role-matrix.tsx",
+    "line": 162,
+    "pattern": "text-left",
+    "context": "className=\"px-1 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-ink-3\""
+  },
+  {
+    "file": "apps/web/app/admin/roles/role-matrix.tsx",
+    "line": 175,
+    "pattern": "text-left",
+    "context": "<th scope=\"row\" className=\"w-[160px] px-3 py-2.5 text-left\">"
+  },
+  {
+    "file": "apps/web/app/admin/roles/role-matrix.tsx",
+    "line": 240,
+    "pattern": "pl-1",
+    "context": "inputClassName=\"h-7 w-full min-w-0 pl-1 pr-5! bg-position-[right_0.25rem_center] text-xs\""
+  },
+  {
+    "file": "apps/web/app/admin/roles/role-matrix.tsx",
+    "line": 240,
+    "pattern": "pr-5!",
+    "context": "inputClassName=\"h-7 w-full min-w-0 pl-1 pr-5! bg-position-[right_0.25rem_center] text-xs\""
+  },
+  {
+    "file": "apps/web/app/admin/roles/role-matrix.tsx",
+    "line": 240,
+    "pattern": "bg-position-[right_0.25rem_center]",
+    "context": "inputClassName=\"h-7 w-full min-w-0 pl-1 pr-5! bg-position-[right_0.25rem_center] text-xs\""
+  },
+  {
+    "file": "apps/web/app/admin/roles/role-matrix.tsx",
+    "line": 264,
+    "pattern": "text-right",
+    "context": "<td className=\"px-3 py-2.5 text-right\">"
+  },
+  {
+    "file": "apps/web/app/admin/sso/domain-verification.tsx",
+    "line": 240,
+    "pattern": "left-1/2",
+    "context": "className=\"fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-surface shadow-(--shadow-popover) outline-none\""
+  },
+  {
+    "file": "apps/web/app/admin/sso/domain-verification.tsx",
+    "line": 240,
+    "pattern": "-translate-x-1/2",
+    "context": "className=\"fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-surface shadow-(--shadow-popover) outline-none\""
+  },
+  {
+    "file": "apps/web/app/admin/sso/page.tsx",
+    "line": 95,
+    "pattern": "pr-1.5",
+    "context": "className=\"relative flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain\""
+  },
+  {
+    "file": "apps/web/app/admin/support/page.tsx",
+    "line": 148,
+    "pattern": "pr-1.5",
+    "context": "className=\"relative max-h-[296px] divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line\""
+  },
+  {
+    "file": "apps/web/app/admin/webhooks/page.tsx",
+    "line": 207,
+    "pattern": "pr-1.5",
+    "context": "\"relative flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain\";"
+  },
+  {
+    "file": "apps/web/app/copilot/composer.tsx",
+    "line": 57,
+    "pattern": "pr-1",
+    "context": "<div className=\"flex items-end gap-1.5 rounded-xl border border-line-2 bg-surface py-1 pr-1 pl-1 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line\">"
+  },
+  {
+    "file": "apps/web/app/copilot/composer.tsx",
+    "line": 57,
+    "pattern": "pl-1",
+    "context": "<div className=\"flex items-end gap-1.5 rounded-xl border border-line-2 bg-surface py-1 pr-1 pl-1 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line\">"
+  },
+  {
+    "file": "apps/web/app/copilot/copilot-panel.tsx",
+    "line": 124,
+    "pattern": "pr-1.5",
+    "context": "className=\"inline-flex h-7.5 cursor-pointer items-center rounded-control border border-line bg-surface pr-1.5 transition-colors duration-fast ease-out hover:border-line-2\""
+  },
+  {
+    "file": "apps/web/app/copilot/copilot-panel.tsx",
+    "line": 1129,
+    "pattern": "right-0",
+    "context": "className={`fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-line bg-bg shadow-lg outline-none ${"
+  },
+  {
+    "file": "apps/web/app/copilot/copilot-panel.tsx",
+    "line": 1129,
+    "pattern": "border-l",
+    "context": "className={`fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-line bg-bg shadow-lg outline-none ${"
+  },
+  {
+    "file": "apps/web/app/copilot/copilot-panel.tsx",
+    "line": 1150,
+    "pattern": "ml-auto",
+    "context": "<div className=\"ml-auto flex items-center gap-1\">"
+  },
+  {
+    "file": "apps/web/app/copilot/copilot-panel.tsx",
+    "line": 1245,
+    "pattern": "text-left",
+    "context": "className=\"h-auto w-full justify-start whitespace-normal py-2 text-left font-normal\""
+  },
+  {
+    "file": "apps/web/app/copilot/copilot-panel.tsx",
+    "line": 1398,
+    "pattern": "left-1/2",
+    "context": "className=\"absolute bottom-3 left-1/2 size-8 -translate-x-1/2 rounded-full px-0 shadow-lg\""
+  },
+  {
+    "file": "apps/web/app/copilot/copilot-panel.tsx",
+    "line": 1398,
+    "pattern": "-translate-x-1/2",
+    "context": "className=\"absolute bottom-3 left-1/2 size-8 -translate-x-1/2 rounded-full px-0 shadow-lg\""
+  },
+  {
+    "file": "apps/web/app/copilot/proposal-card.tsx",
+    "line": 231,
+    "pattern": "ml-auto",
+    "context": "className=\"ml-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-text hover:underline\""
+  },
+  {
+    "file": "apps/web/app/copilot/step-line.tsx",
+    "line": 142,
+    "pattern": "pl-1",
+    "context": "<ul className=\"mt-1 flex flex-col gap-0.5 pl-1\">"
+  },
+  {
+    "file": "apps/web/app/copilot/thread-list.tsx",
+    "line": 134,
+    "pattern": "text-left",
+    "context": "className={`min-w-0 flex-1 truncate rounded-control px-2 py-1.5 text-left text-sm hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-strong ${"
+  },
+  {
+    "file": "apps/web/app/copilot/turn.tsx",
+    "line": 234,
+    "pattern": "text-right",
+    "context": "<span className=\"w-5 shrink-0 text-right tabular-nums text-ink-4\">"
+  },
+  {
+    "file": "apps/web/app/cycle/annual-frame.tsx",
+    "line": 367,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-xs text-ink-3\">{one.note}</span>"
+  },
+  {
+    "file": "apps/web/app/cycle/annual-objectives.tsx",
+    "line": 72,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-xs text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/cycle/drafting.tsx",
+    "line": 236,
+    "pattern": "pl-4",
+    "context": "<ul className=\"mt-1.5 flex list-disc flex-col gap-0.5 pl-4 text-xs text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/cycle/guidance-rail.tsx",
+    "line": 41,
+    "pattern": "border-l-2",
+    "context": "<p className=\"border-brand-line border-l-2 pl-2.5 text-sm text-ink italic\">"
+  },
+  {
+    "file": "apps/web/app/cycle/guidance-rail.tsx",
+    "line": 41,
+    "pattern": "pl-2.5",
+    "context": "<p className=\"border-brand-line border-l-2 pl-2.5 text-sm text-ink italic\">"
+  },
+  {
+    "file": "apps/web/app/cycle/guidance-rail.tsx",
+    "line": 49,
+    "pattern": "pl-4",
+    "context": "<ul className=\"flex list-disc flex-col gap-1.5 pl-4 text-sm text-ink-2\">"
+  },
+  {
+    "file": "apps/web/app/cycle/input-pack.tsx",
+    "line": 313,
+    "pattern": "text-left",
+    "context": "<th className=\"w-1/4 px-3.5 py-1.5 text-left text-xs font-bold tracking-wide text-ink-3 uppercase\">"
+  },
+  {
+    "file": "apps/web/app/cycle/input-pack.tsx",
+    "line": 316,
+    "pattern": "text-left",
+    "context": "<th className=\"px-3.5 py-1.5 text-left text-xs font-bold tracking-wide text-ink-3 uppercase\">"
+  },
+  {
+    "file": "apps/web/app/cycle/page.tsx",
+    "line": 554,
+    "pattern": "pl-4",
+    "context": "<ul className=\"flex list-disc flex-col gap-0.5 pl-4 text-xs text-warn\">"
+  },
+  {
+    "file": "apps/web/app/cycle/page.tsx",
+    "line": 585,
+    "pattern": "pl-4",
+    "context": "<ul className=\"flex list-disc flex-col gap-0.5 pl-4 text-sm text-ink-2\">"
+  },
+  {
+    "file": "apps/web/app/cycle/page.tsx",
+    "line": 637,
+    "pattern": "pl-4",
+    "context": "<ul className=\"mt-0.5 list-[circle] pl-4 text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/cycle/review-and-learn.tsx",
+    "line": 410,
+    "pattern": "ml-2",
+    "context": "<span className=\"ml-2 text-xs text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/cycle/review-and-learn.tsx",
+    "line": 512,
+    "pattern": "pl-4",
+    "context": "<ul className=\"list-disc pl-4\">"
+  },
+  {
+    "file": "apps/web/app/cycle/rule-verdict.tsx",
+    "line": 188,
+    "pattern": "ml-auto",
+    "context": "className=\"ml-auto\""
+  },
+  {
+    "file": "apps/web/app/cycle/running-cadence.tsx",
+    "line": 317,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-xs text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/globals.css",
+    "line": 101,
+    "pattern": "padding-left",
+    "context": "padding-left: 3px;"
+  },
+  {
+    "file": "apps/web/app/globals.css",
+    "line": 102,
+    "pattern": "padding-right",
+    "context": "padding-right: 3px;"
+  },
+  {
+    "file": "apps/web/app/globals.css",
+    "line": 121,
+    "pattern": "padding-left",
+    "context": "padding-left: 5px;"
+  },
+  {
+    "file": "apps/web/app/globals.css",
+    "line": 134,
+    "pattern": "padding-right",
+    "context": "padding-right: 14px;"
+  },
+  {
+    "file": "apps/web/app/globals.css",
+    "line": 155,
+    "pattern": "padding-right",
+    "context": "padding-right: 22px;"
+  },
+  {
+    "file": "apps/web/app/globals.css",
+    "line": 195,
+    "pattern": "margin-left",
+    "context": "margin-left: 1px;"
+  },
+  {
+    "file": "apps/web/app/globals.css",
+    "line": 103,
+    "pattern": "text-align: left",
+    "context": "text-align: left;"
+  },
+  {
+    "file": "apps/web/app/goals/[id]/decompose.tsx",
+    "line": 229,
+    "pattern": "pl-3",
+    "context": "<fieldset className=\"flex flex-col gap-1 pl-3\">"
+  },
+  {
+    "file": "apps/web/app/goals/[id]/key-result-update.tsx",
+    "line": 125,
+    "pattern": "border-l",
+    "context": "<span className=\"flex items-center gap-1 border-l border-line pl-1.5\">"
+  },
+  {
+    "file": "apps/web/app/goals/[id]/key-result-update.tsx",
+    "line": 125,
+    "pattern": "pl-1.5",
+    "context": "<span className=\"flex items-center gap-1 border-l border-line pl-1.5\">"
+  },
+  {
+    "file": "apps/web/app/goals/[id]/page.tsx",
+    "line": 703,
+    "pattern": "ml-auto",
+    "context": "<Button type=\"submit\" className=\"ml-auto\">"
+  },
+  {
+    "file": "apps/web/app/goals/alignment-panel.tsx",
+    "line": 188,
+    "pattern": "text-left",
+    "context": "className=\"text-left text-xs text-brand-text underline\""
+  },
+  {
+    "file": "apps/web/app/goals/alignment-panel.tsx",
+    "line": 378,
+    "pattern": "text-left",
+    "context": "className=\"self-start text-left text-xs text-brand-text underline\""
+  },
+  {
+    "file": "apps/web/app/goals/cycle-picker.tsx",
+    "line": 121,
+    "pattern": "left-0",
+    "context": "<div className=\"absolute left-0 top-9 z-30 w-64 rounded-lg border border-line bg-surface p-1.5 shadow-popover\">"
+  },
+  {
+    "file": "apps/web/app/goals/filter-select.tsx",
+    "line": 78,
+    "pattern": "pl-2",
+    "context": "<div className=\"flex min-w-0 items-center gap-1 rounded-control bg-raised p-0.5 pl-2\">"
+  },
+  {
+    "file": "apps/web/app/goals/goals-toolbar.tsx",
+    "line": 66,
+    "pattern": "ml-auto",
+    "context": "<div className=\"ml-auto flex items-center gap-2 py-1.75 max-md:w-full max-md:pt-2.5 max-md:pb-1\">"
+  },
+  {
+    "file": "apps/web/app/goals/goals-toolbar.tsx",
+    "line": 73,
+    "pattern": "mr-auto",
+    "context": "className={`inline-flex h-7.5 items-center gap-1.5 rounded-control border px-2.75 text-[12.5px] font-semibold whitespace-nowrap max-md:mr-auto ${"
+  },
+  {
+    "file": "apps/web/app/goals/okr-cells.tsx",
+    "line": 283,
+    "pattern": "text-right",
+    "context": "\"h-auto text-right text-xs font-semibold\","
+  },
+  {
+    "file": "apps/web/app/goals/okr-cells.tsx",
+    "line": 458,
+    "pattern": "ml-1",
+    "context": "<span className=\"ml-1 text-ink-4\">{relative}</span>"
+  },
+  {
+    "file": "apps/web/app/goals/okr-cells.tsx",
+    "line": 736,
+    "pattern": "left-0",
+    "context": "floating && \"absolute top-full left-0 z-10 mt-1 w-64 shadow-md\","
+  },
+  {
+    "file": "apps/web/app/goals/okr-cells.tsx",
+    "line": 1036,
+    "pattern": "pl-14",
+    "context": "inset ? \"border-b border-line px-3.5 pl-14\" : \"rounded-control px-2\","
+  },
+  {
+    "file": "apps/web/app/goals/okr-check-in.tsx",
+    "line": 272,
+    "pattern": "text-right",
+    "context": "inputClassName=\"h-auto w-24 py-1 text-right text-xs\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-diagram-cards.tsx",
+    "line": 126,
+    "pattern": "text-left",
+    "context": "className={`relative flex h-full w-full flex-col overflow-hidden rounded-lg border bg-surface text-left shadow-sm ${linkFrom ? \"border-brand ring-2 ring-brand\" : \"border-line\"}`}"
+  },
+  {
+    "file": "apps/web/app/goals/okr-diagram-cards.tsx",
+    "line": 145,
+    "pattern": "left-2.5",
+    "context": "className=\"!left-2.5 !top-2.5 !h-3.5 !w-3.5 !translate-x-0 !translate-y-0 !rounded-sm !border !border-line-2 !bg-raised hover:!border-brand hover:!bg-brand-weak\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-diagram-cards.tsx",
+    "line": 145,
+    "pattern": "translate-x-0",
+    "context": "className=\"!left-2.5 !top-2.5 !h-3.5 !w-3.5 !translate-x-0 !translate-y-0 !rounded-sm !border !border-line-2 !bg-raised hover:!border-brand hover:!bg-brand-weak\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-diagram-cards.tsx",
+    "line": 150,
+    "pattern": "pr-10",
+    "context": "className={`flex items-center gap-1.5 pr-10 text-xs font-semibold capitalize text-ink-3 ${shared.canEdit ? \"pl-4\" : \"\"}`}"
+  },
+  {
+    "file": "apps/web/app/goals/okr-diagram-cards.tsx",
+    "line": 150,
+    "pattern": "pl-4",
+    "context": "className={`flex items-center gap-1.5 pr-10 text-xs font-semibold capitalize text-ink-3 ${shared.canEdit ? \"pl-4\" : \"\"}`}"
+  },
+  {
+    "file": "apps/web/app/goals/okr-diagram-cards.tsx",
+    "line": 277,
+    "pattern": "ml-auto",
+    "context": "className=\"nodrag ml-auto rounded-control px-1.5 py-0.5 text-[11px] font-semibold text-ink-3 hover:bg-raised hover:text-ink\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-diagram-cards.tsx",
+    "line": 297,
+    "pattern": "right-1.5",
+    "context": "className=\"nodrag absolute right-1.5 top-1.5 rounded-control px-1 text-[10px] font-semibold text-ink-3 hover:bg-raised hover:text-ink\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-diagram-cards.tsx",
+    "line": 685,
+    "pattern": "text-left",
+    "context": "<div className=\"flex h-full w-full flex-col overflow-hidden rounded-lg border border-dashed border-line bg-raised text-left\">"
+  },
+  {
+    "file": "apps/web/app/goals/okr-drawer.tsx",
+    "line": 230,
+    "pattern": "right-0",
+    "context": "className=\"fixed inset-y-0 right-0 z-40 flex w-full max-w-lg flex-col border-l border-line bg-surface shadow-lg outline-none\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-drawer.tsx",
+    "line": 230,
+    "pattern": "border-l",
+    "context": "className=\"fixed inset-y-0 right-0 z-40 flex w-full max-w-lg flex-col border-l border-line bg-surface shadow-lg outline-none\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-drawer.tsx",
+    "line": 1175,
+    "pattern": "text-left",
+    "context": "className=\"text-left text-xs font-semibold text-brand-text hover:underline\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 224,
+    "pattern": "inset-x-2",
+    "context": "className={`pointer-events-none absolute inset-x-2 z-10 h-0.5 rounded-full bg-brand ${edge}`}"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 895,
+    "pattern": "pr-3.5",
+    "context": "className={`grid gap-x-3.5 border-y border-line bg-bg py-1.5 pr-3.5 pl-3 text-[11.5px] font-semibold text-ink-3 md:pl-[42px] [&>span:not(:first-child)]:hidden md:[&>span:not(:first-child)]:block ${KEY_RESULT_GRID}`}"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 895,
+    "pattern": "pl-3",
+    "context": "className={`grid gap-x-3.5 border-y border-line bg-bg py-1.5 pr-3.5 pl-3 text-[11.5px] font-semibold text-ink-3 md:pl-[42px] [&>span:not(:first-child)]:hidden md:[&>span:not(:first-child)]:block ${KEY_RESULT_GRID}`}"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 895,
+    "pattern": "pl-[42px]",
+    "context": "className={`grid gap-x-3.5 border-y border-line bg-bg py-1.5 pr-3.5 pl-3 text-[11.5px] font-semibold text-ink-3 md:pl-[42px] [&>span:not(:first-child)]:hidden md:[&>span:not(:first-child)]:block ${KEY_RESULT_GRID}`}"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 964,
+    "pattern": "pl-11",
+    "context": "className=\"flex flex-wrap items-center gap-2 border-b border-line bg-bad-bg px-3.5 py-1.5 pl-11 text-xs text-bad\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1040,
+    "pattern": "pr-3.5",
+    "context": "className=\"group relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 py-3 pr-3.5 pl-3 md:grid-cols-[1.5rem_minmax(0,1fr)_auto] md:pl-2.5\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1040,
+    "pattern": "pl-3",
+    "context": "className=\"group relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 py-3 pr-3.5 pl-3 md:grid-cols-[1.5rem_minmax(0,1fr)_auto] md:pl-2.5\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1040,
+    "pattern": "pl-2.5",
+    "context": "className=\"group relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 py-3 pr-3.5 pl-3 md:grid-cols-[1.5rem_minmax(0,1fr)_auto] md:pl-2.5\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1170,
+    "pattern": "ml-0.5",
+    "context": "className=\"ml-0.5 size-4 text-[7px]\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1190,
+    "pattern": "ml-1",
+    "context": "className=\"ml-1 h-4.5 bg-warn-bg text-[11px] text-warn\""
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1225,
+    "pattern": "text-right",
+    "context": "<span className=\"w-10 text-right text-[13px] font-bold tabular-nums text-ink\">"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1296,
+    "pattern": "pr-3.5",
+    "context": "className={`group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1.5 border-b border-line py-2.5 pr-3.5 pl-3 hover:bg-bg md:pl-2.5 ${KEY_RESULT_GRID}`}"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1296,
+    "pattern": "pl-3",
+    "context": "className={`group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1.5 border-b border-line py-2.5 pr-3.5 pl-3 hover:bg-bg md:pl-2.5 ${KEY_RESULT_GRID}`}"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1296,
+    "pattern": "pl-2.5",
+    "context": "className={`group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1.5 border-b border-line py-2.5 pr-3.5 pl-3 hover:bg-bg md:pl-2.5 ${KEY_RESULT_GRID}`}"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1472,
+    "pattern": "text-right",
+    "context": "<span className=\"w-9 text-right text-xs font-semibold tabular-nums text-ink-2\">"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1685,
+    "pattern": "text-left",
+    "context": "\"flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-ink-2 outline-none data-[highlighted]:bg-brand-weak data-[highlighted]:text-brand-text\";"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1871,
+    "pattern": "pl-3",
+    "context": "const padding = indented ? \"pl-3 md:pl-11\" : \"pl-3.5\";"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1871,
+    "pattern": "pl-11",
+    "context": "const padding = indented ? \"pl-3 md:pl-11\" : \"pl-3.5\";"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1871,
+    "pattern": "pl-3.5",
+    "context": "const padding = indented ? \"pl-3 md:pl-11\" : \"pl-3.5\";"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1905,
+    "pattern": "pr-3.5",
+    "context": "className={`flex w-full items-center gap-2 border-b border-line py-2 pr-3.5 text-left text-xs font-semibold text-brand-text hover:bg-brand-weak disabled:text-ink-4 ${padding}`}"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1905,
+    "pattern": "text-left",
+    "context": "className={`flex w-full items-center gap-2 border-b border-line py-2 pr-3.5 text-left text-xs font-semibold text-brand-text hover:bg-brand-weak disabled:text-ink-4 ${padding}`}"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1920,
+    "pattern": "pr-3.5",
+    "context": "<div className={`border-b border-line py-2 pr-3.5 ${padding}`}>"
+  },
+  {
+    "file": "apps/web/app/goals/okr-table.tsx",
+    "line": 1928,
+    "pattern": "pr-3.5",
+    "context": "className={`flex flex-col gap-1 border-b border-line py-2 pr-3.5 ${padding}`}"
+  },
+  {
+    "file": "apps/web/app/goals/page.tsx",
+    "line": 956,
+    "pattern": "ml-1",
+    "context": "className={`ml-1 text-[11.5px] font-medium ${"
+  },
+  {
+    "file": "apps/web/app/goals/page.tsx",
+    "line": 1129,
+    "pattern": "pr-1",
+    "context": "className=\"inline-flex h-6.5 items-center gap-1.5 rounded-full bg-brand-weak pr-1 pl-2.5 text-xs font-semibold text-brand-text hover:bg-brand-line\""
+  },
+  {
+    "file": "apps/web/app/goals/page.tsx",
+    "line": 1129,
+    "pattern": "pl-2.5",
+    "context": "className=\"inline-flex h-6.5 items-center gap-1.5 rounded-full bg-brand-weak pr-1 pl-2.5 text-xs font-semibold text-brand-text hover:bg-brand-line\""
+  },
+  {
+    "file": "apps/web/app/goals/restricted-writing.tsx",
+    "line": 37,
+    "pattern": "pl-4",
+    "context": "<ul className=\"flex list-disc flex-col gap-0.5 pl-4\">"
+  },
+  {
+    "file": "apps/web/app/inbox/page.tsx",
+    "line": 205,
+    "pattern": "ml-1",
+    "context": "<span className=\"ml-1 font-normal tabular-nums opacity-75\">"
+  },
+  {
+    "file": "apps/web/app/kpis/[id]/page.tsx",
+    "line": 493,
+    "pattern": "text-left",
+    "context": "<th className=\"px-3 py-1.5 text-left font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/kpis/[id]/page.tsx",
+    "line": 496,
+    "pattern": "text-right",
+    "context": "<th className=\"px-3 py-1.5 text-right font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/kpis/[id]/page.tsx",
+    "line": 499,
+    "pattern": "text-right",
+    "context": "<th className=\"px-3 py-1.5 text-right font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/kpis/[id]/page.tsx",
+    "line": 520,
+    "pattern": "text-right",
+    "context": "<td className=\"px-3 py-1.5 text-right text-ink tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/kpis/[id]/page.tsx",
+    "line": 523,
+    "pattern": "text-right",
+    "context": "<td className=\"px-3 py-1.5 text-right text-ink-3 tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/kpis/grid-extras.tsx",
+    "line": 158,
+    "pattern": "mr-0.5",
+    "context": "{count ? <span className=\"mr-0.5 text-ink-3\">{count}</span> : null}"
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 362,
+    "pattern": "left-0",
+    "context": "<th className=\"sticky left-0 z-10 h-8.5 w-[270px] border-r border-b border-line bg-bg px-3 text-left font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 362,
+    "pattern": "border-r",
+    "context": "<th className=\"sticky left-0 z-10 h-8.5 w-[270px] border-r border-b border-line bg-bg px-3 text-left font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 362,
+    "pattern": "text-left",
+    "context": "<th className=\"sticky left-0 z-10 h-8.5 w-[270px] border-r border-b border-line bg-bg px-3 text-left font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 365,
+    "pattern": "text-left",
+    "context": "<th className=\"min-w-23 border-b border-line bg-bg px-2 text-left font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 368,
+    "pattern": "border-r",
+    "context": "<th className=\"min-w-30 border-r border-b border-line bg-bg px-2.5 text-left font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 368,
+    "pattern": "text-left",
+    "context": "<th className=\"min-w-30 border-r border-b border-line bg-bg px-2.5 text-left font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 396,
+    "pattern": "text-left",
+    "context": "className=\"h-10 border-b border-line bg-bg p-0 text-left font-normal\""
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 398,
+    "pattern": "left-0",
+    "context": "<span className=\"sticky left-0 inline-flex items-center gap-2.5 px-3 whitespace-nowrap\">"
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 414,
+    "pattern": "left-0",
+    "context": "className=\"sticky left-0 z-10 w-[270px] max-w-[270px] border-r border-b border-line bg-surface px-3 py-2 text-left font-normal group-hover:bg-bg\""
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 414,
+    "pattern": "border-r",
+    "context": "className=\"sticky left-0 z-10 w-[270px] max-w-[270px] border-r border-b border-line bg-surface px-3 py-2 text-left font-normal group-hover:bg-bg\""
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 414,
+    "pattern": "text-left",
+    "context": "className=\"sticky left-0 z-10 w-[270px] max-w-[270px] border-r border-b border-line bg-surface px-3 py-2 text-left font-normal group-hover:bg-bg\""
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 451,
+    "pattern": "border-r",
+    "context": "className=\"border-r border-b border-line px-2.5 group-hover:bg-bg\""
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 599,
+    "pattern": "left-0",
+    "context": "<span className=\"sticky left-0 inline-flex px-3\">"
+  },
+  {
+    "file": "apps/web/app/kpis/grid.tsx",
+    "line": 682,
+    "pattern": "ml-auto",
+    "context": "<span className=\"ml-auto\">"
+  },
+  {
+    "file": "apps/web/app/kpis/kpi-panel.tsx",
+    "line": 103,
+    "pattern": "right-0",
+    "context": "? \"fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-line bg-surface shadow-lg outline-none\""
+  },
+  {
+    "file": "apps/web/app/kpis/kpi-panel.tsx",
+    "line": 103,
+    "pattern": "border-l",
+    "context": "? \"fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-line bg-surface shadow-lg outline-none\""
+  },
+  {
+    "file": "apps/web/app/kpis/kpi-panel.tsx",
+    "line": 104,
+    "pattern": "left-1/2",
+    "context": ": \"fixed top-28 left-1/2 z-40 flex w-[calc(100%-1.5rem)] max-w-sm -translate-x-1/2 flex-col rounded-xl border border-line bg-surface shadow-(--shadow-popover) outline-none\""
+  },
+  {
+    "file": "apps/web/app/kpis/kpi-panel.tsx",
+    "line": 104,
+    "pattern": "-translate-x-1/2",
+    "context": ": \"fixed top-28 left-1/2 z-40 flex w-[calc(100%-1.5rem)] max-w-sm -translate-x-1/2 flex-col rounded-xl border border-line bg-surface shadow-(--shadow-popover) outline-none\""
+  },
+  {
+    "file": "apps/web/app/kpis/kpi-tabs.tsx",
+    "line": 49,
+    "pattern": "ml-1",
+    "context": "className={`ml-1 text-[11.5px] font-medium ${"
+  },
+  {
+    "file": "apps/web/app/kpis/page.tsx",
+    "line": 327,
+    "pattern": "pr-1",
+    "context": "className=\"inline-flex h-6.5 items-center gap-1.5 rounded-full bg-brand-weak pr-1 pl-2.5 text-xs font-semibold text-brand-text hover:bg-brand-line\""
+  },
+  {
+    "file": "apps/web/app/kpis/page.tsx",
+    "line": 327,
+    "pattern": "pl-2.5",
+    "context": "className=\"inline-flex h-6.5 items-center gap-1.5 rounded-full bg-brand-weak pr-1 pl-2.5 text-xs font-semibold text-brand-text hover:bg-brand-line\""
+  },
+  {
+    "file": "apps/web/app/kpis/page.tsx",
+    "line": 373,
+    "pattern": "ml-auto",
+    "context": "<div className=\"ml-auto flex items-center gap-2 max-md:ml-0 max-md:w-full\">"
+  },
+  {
+    "file": "apps/web/app/kpis/page.tsx",
+    "line": 373,
+    "pattern": "ml-0",
+    "context": "<div className=\"ml-auto flex items-center gap-2 max-md:ml-0 max-md:w-full\">"
+  },
+  {
+    "file": "apps/web/app/kpis/recovery/page.tsx",
+    "line": 99,
+    "pattern": "inset-x-0",
+    "context": "className=\"absolute inset-x-0 top-2 h-1.5 rounded-full\""
+  },
+  {
+    "file": "apps/web/app/kpis/recovery/page.tsx",
+    "line": 106,
+    "pattern": "-translate-x-1/2",
+    "context": "className=\"absolute top-0.5 h-4.5 w-0.5 -translate-x-1/2 rounded-full bg-ink\""
+  },
+  {
+    "file": "apps/web/app/kpis/recovery/page.tsx",
+    "line": 107,
+    "pattern": "left",
+    "context": "style={{ left: at(achievementPct) }}"
+  },
+  {
+    "file": "apps/web/app/kpis/recovery/page.tsx",
+    "line": 114,
+    "pattern": "-translate-x-1/2",
+    "context": "className=\"absolute top-4 -translate-x-1/2 text-[10px] text-ink-4 tabular-nums\""
+  },
+  {
+    "file": "apps/web/app/kpis/recovery/page.tsx",
+    "line": 115,
+    "pattern": "left",
+    "context": "style={{ left: at(line) }}"
+  },
+  {
+    "file": "apps/web/app/kpis/recovery/page.tsx",
+    "line": 700,
+    "pattern": "pl-4",
+    "context": "<ul className=\"flex list-disc flex-col gap-0.5 pl-4\">"
+  },
+  {
+    "file": "apps/web/app/kpis/trees/page.tsx",
+    "line": 106,
+    "pattern": "ml-auto",
+    "context": "className={`${buttonVariants({ variant: \"primary\", size: \"sm\" })} ml-auto max-md:ml-0 max-md:w-full max-md:justify-center`}"
+  },
+  {
+    "file": "apps/web/app/kpis/trees/page.tsx",
+    "line": 106,
+    "pattern": "ml-0",
+    "context": "className={`${buttonVariants({ variant: \"primary\", size: \"sm\" })} ml-auto max-md:ml-0 max-md:w-full max-md:justify-center`}"
+  },
+  {
+    "file": "apps/web/app/kpis/trees/tree-rows.tsx",
+    "line": 141,
+    "pattern": "paddingLeft",
+    "context": "style={{ paddingLeft: `${Math.max(depth - 1, 0) * 1.25}rem` }}"
+  },
+  {
+    "file": "apps/web/app/kpis/trees/tree-rows.tsx",
+    "line": 146,
+    "pattern": "ml-1.5",
+    "context": "className=\"-mt-3 ml-1.5 h-5.5 w-4.5 flex-none rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-2\""
+  },
+  {
+    "file": "apps/web/app/kpis/trees/tree-rows.tsx",
+    "line": 146,
+    "pattern": "rounded-bl-md",
+    "context": "className=\"-mt-3 ml-1.5 h-5.5 w-4.5 flex-none rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-2\""
+  },
+  {
+    "file": "apps/web/app/kpis/trees/tree-rows.tsx",
+    "line": 146,
+    "pattern": "border-l-[1.5px]",
+    "context": "className=\"-mt-3 ml-1.5 h-5.5 w-4.5 flex-none rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-2\""
+  },
+  {
+    "file": "apps/web/app/kpis/trees/tree-rows.tsx",
+    "line": 205,
+    "pattern": "text-right",
+    "context": "<span className=\"w-11 text-right text-xs font-semibold text-ink-2 tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/menu-row-class.ts",
+    "line": 9,
+    "pattern": "text-left",
+    "context": "\"block w-full rounded-md px-2.5 py-1.5 text-left text-sm text-ink-2 data-highlighted:bg-raised hover:bg-raised\";"
+  },
+  {
+    "file": "apps/web/app/operator/[workspaceId]/page.tsx",
+    "line": 253,
+    "pattern": "border-r",
+    "context": "<div className=\"rounded-lg border-y border-r border-l-4 border-bad-dot bg-bad-bg px-4 py-3 text-bad\">"
+  },
+  {
+    "file": "apps/web/app/operator/[workspaceId]/page.tsx",
+    "line": 253,
+    "pattern": "border-l-4",
+    "context": "<div className=\"rounded-lg border-y border-r border-l-4 border-bad-dot bg-bad-bg px-4 py-3 text-bad\">"
+  },
+  {
+    "file": "apps/web/app/operator/[workspaceId]/page.tsx",
+    "line": 265,
+    "pattern": "border-l-4",
+    "context": "className={`rounded-lg border-l-4 border-y border-r px-4 py-3 ${"
+  },
+  {
+    "file": "apps/web/app/operator/[workspaceId]/page.tsx",
+    "line": 265,
+    "pattern": "border-r",
+    "context": "className={`rounded-lg border-l-4 border-y border-r px-4 py-3 ${"
+  },
+  {
+    "file": "apps/web/app/operator/adopt-waiting.tsx",
+    "line": 50,
+    "pattern": "border-r",
+    "context": "className=\"flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border-y border-r border-l-4 border-info-dot bg-info-bg px-4 py-3 text-info text-sm\""
+  },
+  {
+    "file": "apps/web/app/operator/adopt-waiting.tsx",
+    "line": 50,
+    "pattern": "border-l-4",
+    "context": "className=\"flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border-y border-r border-l-4 border-info-dot bg-info-bg px-4 py-3 text-info text-sm\""
+  },
+  {
+    "file": "apps/web/app/operator/default-plan/page.tsx",
+    "line": 58,
+    "pattern": "border-r",
+    "context": "className=\"rounded-lg border-y border-r border-l-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn\""
+  },
+  {
+    "file": "apps/web/app/operator/default-plan/page.tsx",
+    "line": 58,
+    "pattern": "border-l-4",
+    "context": "className=\"rounded-lg border-y border-r border-l-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn\""
+  },
+  {
+    "file": "apps/web/app/operator/instance/page.tsx",
+    "line": 226,
+    "pattern": "text-right",
+    "context": "<td className=\"px-4 py-2.5 text-right align-top\">"
+  },
+  {
+    "file": "apps/web/app/operator/instance/preflight-notice.tsx",
+    "line": 34,
+    "pattern": "pl-5",
+    "context": "<ul className=\"mt-1.5 flex list-disc flex-col gap-1 pl-5 text-sm text-ink-2\">"
+  },
+  {
+    "file": "apps/web/app/operator/page.tsx",
+    "line": 179,
+    "pattern": "border-r",
+    "context": "className=\"flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border-y border-r border-l-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn\""
+  },
+  {
+    "file": "apps/web/app/operator/page.tsx",
+    "line": 179,
+    "pattern": "border-l-4",
+    "context": "className=\"flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border-y border-r border-l-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn\""
+  },
+  {
+    "file": "apps/web/app/operator/page.tsx",
+    "line": 203,
+    "pattern": "border-r",
+    "context": "className=\"rounded-lg border-y border-r border-l-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn\""
+  },
+  {
+    "file": "apps/web/app/operator/page.tsx",
+    "line": 203,
+    "pattern": "border-l-4",
+    "context": "className=\"rounded-lg border-y border-r border-l-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn\""
+  },
+  {
+    "file": "apps/web/app/operator/page.tsx",
+    "line": 317,
+    "pattern": "text-left",
+    "context": "<tr className=\"border-line border-b text-left\">"
+  },
+  {
+    "file": "apps/web/app/operator/page.tsx",
+    "line": 327,
+    "pattern": "text-right",
+    "context": "<th className=\"p-3 text-right font-medium text-ink-2\">"
+  },
+  {
+    "file": "apps/web/app/operator/page.tsx",
+    "line": 330,
+    "pattern": "text-right",
+    "context": "<th className=\"p-3 text-right font-medium text-ink-2\">"
+  },
+  {
+    "file": "apps/web/app/operator/page.tsx",
+    "line": 333,
+    "pattern": "text-right",
+    "context": "<th className=\"p-3 text-right font-medium text-ink-2\">"
+  },
+  {
+    "file": "apps/web/app/operator/page.tsx",
+    "line": 401,
+    "pattern": "text-right",
+    "context": "className={`p-3 text-right tabular-nums ${"
+  },
+  {
+    "file": "apps/web/app/operator/page.tsx",
+    "line": 411,
+    "pattern": "text-right",
+    "context": "<td className=\"p-3 text-right tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/operator/page.tsx",
+    "line": 416,
+    "pattern": "text-right",
+    "context": "<td className=\"p-3 text-right tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/people/[id]/page.tsx",
+    "line": 168,
+    "pattern": "ml-auto",
+    "context": "<div className=\"ml-auto flex items-center gap-2\">"
+  },
+  {
+    "file": "apps/web/app/people/page.tsx",
+    "line": 46,
+    "pattern": "ml-5",
+    "context": "<ul className={depth > 0 ? \"ml-5 border-line border-l pl-3\" : \"\"}>"
+  },
+  {
+    "file": "apps/web/app/people/page.tsx",
+    "line": 46,
+    "pattern": "border-l",
+    "context": "<ul className={depth > 0 ? \"ml-5 border-line border-l pl-3\" : \"\"}>"
+  },
+  {
+    "file": "apps/web/app/people/page.tsx",
+    "line": 46,
+    "pattern": "pl-3",
+    "context": "<ul className={depth > 0 ? \"ml-5 border-line border-l pl-3\" : \"\"}>"
+  },
+  {
+    "file": "apps/web/app/people/page.tsx",
+    "line": 56,
+    "pattern": "ml-2",
+    "context": "<span className=\"ml-2 text-xs text-ink-3\">{node.title}</span>"
+  },
+  {
+    "file": "apps/web/app/scorecard/page.tsx",
+    "line": 168,
+    "pattern": "text-left",
+    "context": "<th className=\"px-3 py-1.5 text-left font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/scorecard/page.tsx",
+    "line": 171,
+    "pattern": "text-left",
+    "context": "<th className=\"px-3 py-1.5 text-left font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/scorecard/page.tsx",
+    "line": 174,
+    "pattern": "text-left",
+    "context": "<th className=\"px-3 py-1.5 text-left font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/scorecard/page.tsx",
+    "line": 177,
+    "pattern": "text-right",
+    "context": "<th className=\"px-3 py-1.5 text-right font-semibold\">1.0</th>"
+  },
+  {
+    "file": "apps/web/app/scorecard/page.tsx",
+    "line": 178,
+    "pattern": "text-right",
+    "context": "<th className=\"px-3 py-1.5 text-right font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/scorecard/page.tsx",
+    "line": 181,
+    "pattern": "text-right",
+    "context": "<th className=\"px-3 py-1.5 text-right font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/scorecard/page.tsx",
+    "line": 184,
+    "pattern": "text-right",
+    "context": "<th className=\"px-3 py-1.5 text-right font-semibold\">"
+  },
+  {
+    "file": "apps/web/app/scorecard/page.tsx",
+    "line": 197,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-xs text-ink-4\">"
+  },
+  {
+    "file": "apps/web/app/scorecard/page.tsx",
+    "line": 237,
+    "pattern": "text-right",
+    "context": "<td className=\"px-3 py-2 text-right text-ink-2 tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/scorecard/page.tsx",
+    "line": 240,
+    "pattern": "text-right",
+    "context": "<td className=\"px-3 py-2 text-right text-ink-2 tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/scorecard/page.tsx",
+    "line": 243,
+    "pattern": "text-right",
+    "context": "<td className=\"px-3 py-2 text-right text-ink-2 tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/scorecard/page.tsx",
+    "line": 246,
+    "pattern": "text-right",
+    "context": "<td className=\"px-3 py-2 text-right text-ink-2 tabular-nums\">"
+  },
+  {
+    "file": "apps/web/app/search/export-button.tsx",
+    "line": 127,
+    "pattern": "right-0",
+    "context": "<span className=\"absolute top-full right-0 z-10 mt-1 w-64 rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs shadow-(--shadow-popover)\">"
+  },
+  {
+    "file": "apps/web/app/search/palette.tsx",
+    "line": 566,
+    "pattern": "text-left",
+    "context": "? \"flex w-full cursor-pointer flex-col items-start gap-0.5 bg-brand-weak px-3 py-2 text-left outline-2 outline-brand -outline-offset-2\""
+  },
+  {
+    "file": "apps/web/app/search/palette.tsx",
+    "line": 567,
+    "pattern": "text-left",
+    "context": ": \"flex w-full cursor-pointer flex-col items-start gap-0.5 px-3 py-2 text-left\""
+  },
+  {
+    "file": "apps/web/app/search/palette.tsx",
+    "line": 575,
+    "pattern": "ml-auto",
+    "context": "<span className=\"ml-auto shrink-0 text-xs text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/search/palette.tsx",
+    "line": 609,
+    "pattern": "ml-auto",
+    "context": "<span role=\"status\" className=\"ml-auto\">"
+  },
+  {
+    "file": "apps/web/app/session/[id]/blocker-panel.tsx",
+    "line": 101,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-xs text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/session/[id]/blocker-panel.tsx",
+    "line": 116,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/session/[id]/commitments.tsx",
+    "line": 105,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-xs text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/session/[id]/commitments.tsx",
+    "line": 207,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-xs text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/session/[id]/commitments.tsx",
+    "line": 385,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-xs text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/session/[id]/commitments.tsx",
+    "line": 429,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-xs text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/session/[id]/next-actions.tsx",
+    "line": 176,
+    "pattern": "ml-1.5",
+    "context": "<span className=\"ml-1.5 text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/session/[id]/root-cause.tsx",
+    "line": 232,
+    "pattern": "right-2.5",
+    "context": "<Spinner className=\"absolute top-1/2 right-2.5 -translate-y-1/2 text-ink-3\" />"
+  },
+  {
+    "file": "apps/web/app/sessions/page.tsx",
+    "line": 83,
+    "pattern": "ml-auto",
+    "context": "<span className=\"ml-auto flex-none text-xs font-semibold text-brand-text\">"
+  },
+  {
+    "file": "apps/web/app/setup/check-list.tsx",
+    "line": 43,
+    "pattern": "pl-4",
+    "context": "<dd className=\"pl-4 text-xs text-ink-4\">{test.detail}</dd>"
+  },
+  {
+    "file": "apps/web/app/spaces/[id]/page.tsx",
+    "line": 431,
+    "pattern": "ml-auto",
+    "context": "<span className=\"ml-auto flex-none text-xs font-semibold text-brand-text\">"
+  },
+  {
+    "file": "apps/web/app/tasks/[id]/controls.tsx",
+    "line": 102,
+    "pattern": "ml-auto",
+    "context": "className=\"ml-auto inline-flex items-center gap-1.5 text-xs text-ink-4 hover:text-bad\""
+  },
+  {
+    "file": "apps/web/app/work-map-header.tsx",
+    "line": 115,
+    "pattern": "ml-auto",
+    "context": "? \"ml-auto font-semibold text-bad\""
+  },
+  {
+    "file": "apps/web/app/work-map-header.tsx",
+    "line": 116,
+    "pattern": "ml-auto",
+    "context": ": \"ml-auto font-semibold text-brand-text\""
+  },
+  {
+    "file": "apps/web/app/work-map.tsx",
+    "line": 233,
+    "pattern": "text-left",
+    "context": "<table className=\"w-full border-collapse text-left\">"
+  },
+  {
+    "file": "apps/web/app/work-map.tsx",
+    "line": 268,
+    "pattern": "text-right",
+    "context": "className=\"px-3 py-2 text-right text-[10px] font-bold tracking-wider text-ink-4 uppercase\""
+  },
+  {
+    "file": "apps/web/app/work-map.tsx",
+    "line": 290,
+    "pattern": "paddingLeft",
+    "context": "paddingLeft: `${Math.max(node.depth - 1, 0) * 18}px`,"
+  },
+  {
+    "file": "apps/web/app/work-map.tsx",
+    "line": 299,
+    "pattern": "ml-1",
+    "context": "className=\"-mt-3 ml-1 h-5 w-3.5 flex-none rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-2\""
+  },
+  {
+    "file": "apps/web/app/work-map.tsx",
+    "line": 299,
+    "pattern": "rounded-bl-md",
+    "context": "className=\"-mt-3 ml-1 h-5 w-3.5 flex-none rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-2\""
+  },
+  {
+    "file": "apps/web/app/work-map.tsx",
+    "line": 299,
+    "pattern": "border-l-[1.5px]",
+    "context": "className=\"-mt-3 ml-1 h-5 w-3.5 flex-none rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-2\""
+  },
+  {
+    "file": "apps/web/app/work-map.tsx",
+    "line": 341,
+    "pattern": "text-right",
+    "context": "<span className=\"w-9 text-right text-xs font-semibold tabular-nums text-ink-3\">"
+  },
+  {
+    "file": "apps/web/app/workspace-select.tsx",
+    "line": 39,
+    "pattern": "-ml-0.5",
+    "context": "inputClassName=\"-ml-0.5 h-auto w-full rounded-md border-none bg-transparent px-0 text-xs text-ink-4 focus:ring-0\""
+  },
+  {
+    "file": "apps/web/lib/activity-indicator.tsx",
+    "line": 80,
+    "pattern": "left-0",
+    "context": "className=\"nav-progress pointer-events-none fixed left-0 top-0 z-50 h-0.5 bg-brand\""
+  },
+  {
+    "file": "apps/web/lib/activity-indicator.tsx",
+    "line": 86,
+    "pattern": "inset-x-0",
+    "context": "className=\"fixed inset-x-0 bottom-4 z-50 mx-auto w-fit max-w-[calc(100%-2rem)] rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-lg\""
+  },
+  {
+    "file": "apps/web/lib/app-footer.tsx",
+    "line": 55,
+    "pattern": "ml-auto",
+    "context": "<div className=\"flex flex-wrap items-center gap-x-3.5 gap-y-1 md:ml-auto\">"
+  },
+  {
+    "file": "apps/web/lib/assist-reading.tsx",
+    "line": 91,
+    "pattern": "pl-4",
+    "context": "<ul className=\"flex list-disc flex-col gap-1 pl-4\">"
+  },
+  {
+    "file": "apps/web/lib/attachments.tsx",
+    "line": 254,
+    "pattern": "mr-2.5",
+    "context": "className=\"min-w-0 max-w-full text-xs text-ink-2 file:mr-2.5 file:cursor-pointer file:rounded-control file:border file:border-line-2 file:bg-surface file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-ink-2 hover:file:border-ink-4\""
+  },
+  {
+    "file": "apps/web/lib/nav-link.tsx",
+    "line": 79,
+    "pattern": "left-0",
+    "context": "className=\"nav-progress pointer-events-none fixed left-0 top-0 z-50 h-0.5 bg-brand\""
+  },
+  {
+    "file": "apps/web/lib/nav-link.tsx",
+    "line": 88,
+    "pattern": "inset-x-0",
+    "context": "className=\"fixed inset-x-0 bottom-4 z-50 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-lg\""
+  },
+  {
+    "file": "apps/web/lib/new-menu.tsx",
+    "line": 162,
+    "pattern": "text-left",
+    "context": "className=\"flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.75 text-left text-[13px] text-ink-2 outline-none data-[highlighted]:bg-brand-weak data-[highlighted]:text-brand-text\""
+  },
+  {
+    "file": "apps/web/lib/product-tour.tsx",
+    "line": 400,
+    "pattern": "left",
+    "context": "left: rect.left + rect.width + GAP,"
+  },
+  {
+    "file": "apps/web/lib/product-tour.tsx",
+    "line": 402,
+    "pattern": "left",
+    "context": ": { top: Math.max(GAP, rect.top), left: rect.left + rect.width + GAP }"
+  },
+  {
+    "file": "apps/web/lib/product-tour.tsx",
+    "line": 404,
+    "pattern": "left",
+    "context": "? { bottom: viewportHeight - rect.top + GAP, left: cardLeft }"
+  },
+  {
+    "file": "apps/web/lib/product-tour.tsx",
+    "line": 405,
+    "pattern": "left",
+    "context": ": { top: rect.top + rect.height + GAP, left: cardLeft }"
+  },
+  {
+    "file": "apps/web/lib/product-tour.tsx",
+    "line": 406,
+    "pattern": "left",
+    "context": ": { top: GAP * 6, left: Math.max(GAP, (viewportWidth - CARD_WIDTH) / 2) };"
+  },
+  {
+    "file": "apps/web/lib/product-tour.tsx",
+    "line": 420,
+    "pattern": "left",
+    "context": "left: rect.left,"
+  },
+  {
+    "file": "apps/web/lib/product-tour.tsx",
+    "line": 478,
+    "pattern": "ml-auto",
+    "context": "<div className=\"ml-auto flex flex-wrap items-center justify-end gap-2\">"
+  },
+  {
+    "file": "apps/web/lib/rule-preview.tsx",
+    "line": 77,
+    "pattern": "pl-4",
+    "context": "<ul className=\"list-disc pl-4\">"
+  },
+  {
+    "file": "apps/web/lib/site-messages.tsx",
+    "line": 57,
+    "pattern": "border-l-4",
+    "context": "className={`flex items-start gap-3 rounded-lg border-l-4 border-y border-r px-4 py-3 ${"
+  },
+  {
+    "file": "apps/web/lib/site-messages.tsx",
+    "line": 57,
+    "pattern": "border-r",
+    "context": "className={`flex items-start gap-3 rounded-lg border-l-4 border-y border-r px-4 py-3 ${"
+  },
+  {
+    "file": "apps/web/lib/stale-deployment-watcher.tsx",
+    "line": 51,
+    "pattern": "inset-x-0",
+    "context": "className=\"fixed inset-x-0 bottom-0 z-50 bg-raised px-3 py-2 text-center text-sm text-ink\""
+  },
+  {
+    "file": "apps/web/lib/support-banner.tsx",
+    "line": 88,
+    "pattern": "border-r",
+    "context": "className=\"mb-4.5 flex flex-wrap items-start gap-3 rounded-lg border-y border-r border-l-4 border-bad-dot bg-bad-bg px-4 py-3 text-bad\""
+  },
+  {
+    "file": "apps/web/lib/support-banner.tsx",
+    "line": 88,
+    "pattern": "border-l-4",
+    "context": "className=\"mb-4.5 flex flex-wrap items-start gap-3 rounded-lg border-y border-r border-l-4 border-bad-dot bg-bad-bg px-4 py-3 text-bad\""
+  },
+  {
+    "file": "packages/ui/src/components/answer-text.tsx",
+    "line": 464,
+    "pattern": "pl-0.5",
+    "context": "<li key={itemIndex} className=\"pl-0.5\">"
+  },
+  {
+    "file": "packages/ui/src/components/answer-text.tsx",
+    "line": 479,
+    "pattern": "pl-5",
+    "context": "className=\"flex list-decimal flex-col gap-1 pl-5\""
+  },
+  {
+    "file": "packages/ui/src/components/answer-text.tsx",
+    "line": 485,
+    "pattern": "pl-5",
+    "context": "<ul key={index} className=\"flex list-disc flex-col gap-1 pl-5\">"
+  },
+  {
+    "file": "packages/ui/src/components/avatar.tsx",
+    "line": 135,
+    "pattern": "-ml-1.5",
+    "context": "<div className=\"flex [&>*]:-ml-1.5 [&>*]:shadow-[0_0_0_2px_var(--color-surface)] [&>*:first-child]:ml-0\">"
+  },
+  {
+    "file": "packages/ui/src/components/avatar.tsx",
+    "line": 135,
+    "pattern": "ml-0",
+    "context": "<div className=\"flex [&>*]:-ml-1.5 [&>*]:shadow-[0_0_0_2px_var(--color-surface)] [&>*:first-child]:ml-0\">"
+  },
+  {
+    "file": "packages/ui/src/feedback/toast.tsx",
+    "line": 198,
+    "pattern": "right-4",
+    "context": "<div className=\"pointer-events-none fixed right-4 bottom-16 left-4 z-50 flex flex-col items-end gap-2 md:bottom-4 md:left-auto md:w-96\">"
+  },
+  {
+    "file": "packages/ui/src/feedback/toast.tsx",
+    "line": 198,
+    "pattern": "left-4",
+    "context": "<div className=\"pointer-events-none fixed right-4 bottom-16 left-4 z-50 flex flex-col items-end gap-2 md:bottom-4 md:left-auto md:w-96\">"
+  },
+  {
+    "file": "packages/ui/src/feedback/toast.tsx",
+    "line": 198,
+    "pattern": "left-auto",
+    "context": "<div className=\"pointer-events-none fixed right-4 bottom-16 left-4 z-50 flex flex-col items-end gap-2 md:bottom-4 md:left-auto md:w-96\">"
+  },
+  {
+    "file": "packages/ui/src/feedback/toast.tsx",
+    "line": 289,
+    "pattern": "ml-auto",
+    "context": "className=\"ml-auto shrink-0 rounded-md px-2 py-0.5 text-sm font-semibold text-brand-text hover:bg-ink/[0.045] focus:outline-2 focus:outline-brand\""
+  },
+  {
+    "file": "packages/ui/src/feedback/toast.tsx",
+    "line": 302,
+    "pattern": "ml-auto",
+    "context": "!toast.action && \"ml-auto\","
+  },
+  {
+    "file": "packages/ui/src/fields/confidence-input.tsx",
+    "line": 128,
+    "pattern": "text-right",
+    "context": "inputClassName={cn(\"w-16 text-right\", inputClassName)}"
+  },
+  {
+    "file": "packages/ui/src/fields/copy-field.tsx",
+    "line": 88,
+    "pattern": "border-l",
+    "context": "className=\"flex w-7.5 shrink-0 items-center justify-center border-l border-line-2 text-ink-3 hover:bg-raised hover:text-ink focus-visible:bg-raised focus-visible:outline-none\""
+  },
+  {
+    "file": "packages/ui/src/fields/entity-picker.tsx",
+    "line": 336,
+    "pattern": "pr-7",
+    "context": "\"pr-7\","
+  },
+  {
+    "file": "packages/ui/src/fields/entity-picker.tsx",
+    "line": 343,
+    "pattern": "right-2",
+    "context": "className=\"pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-ink-3\""
+  },
+  {
+    "file": "packages/ui/src/fields/secret-input.tsx",
+    "line": 42,
+    "pattern": "right-0",
+    "context": "className=\"absolute inset-y-0 right-0 flex w-8 items-center justify-center rounded-r-control text-ink-3 outline-none hover:text-ink-2 focus-visible:ring-2 focus-visible:ring-brand-line\""
+  },
+  {
+    "file": "packages/ui/src/fields/secret-input.tsx",
+    "line": 42,
+    "pattern": "rounded-r-control",
+    "context": "className=\"absolute inset-y-0 right-0 flex w-8 items-center justify-center rounded-r-control text-ink-3 outline-none hover:text-ink-2 focus-visible:ring-2 focus-visible:ring-brand-line\""
+  },
+  {
+    "file": "packages/ui/src/fields/select-input.tsx",
+    "line": 13,
+    "pattern": "bg-position-[right_0.5rem_center]",
+    "context": "\"h-7.5 w-full appearance-none rounded-control border border-line-2 bg-surface bg-(image:--select-chevron) bg-size-[12px] bg-position-[right_0.5rem_center] bg-no-repeat pr-7 pl-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line aria-[invalid=true]:border-bad-dot disabled:opacity-60\";"
+  },
+  {
+    "file": "packages/ui/src/fields/select-input.tsx",
+    "line": 13,
+    "pattern": "pr-7",
+    "context": "\"h-7.5 w-full appearance-none rounded-control border border-line-2 bg-surface bg-(image:--select-chevron) bg-size-[12px] bg-position-[right_0.5rem_center] bg-no-repeat pr-7 pl-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line aria-[invalid=true]:border-bad-dot disabled:opacity-60\";"
+  },
+  {
+    "file": "packages/ui/src/fields/select-input.tsx",
+    "line": 13,
+    "pattern": "pl-2",
+    "context": "\"h-7.5 w-full appearance-none rounded-control border border-line-2 bg-surface bg-(image:--select-chevron) bg-size-[12px] bg-position-[right_0.5rem_center] bg-no-repeat pr-7 pl-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line aria-[invalid=true]:border-bad-dot disabled:opacity-60\";"
+  },
+  {
+    "file": "packages/ui/src/fields/select-input.tsx",
+    "line": 88,
+    "pattern": "pr-7",
+    "context": "className={cn(SELECT_CLASS, inputClassName, \"pr-7\")}"
+  },
+  {
+    "file": "packages/ui/src/fields/text-input.tsx",
+    "line": 118,
+    "pattern": "pr-8",
+    "context": "trailing ? \"pr-8\" : null,"
+  },
+  {
+    "file": "packages/ui/src/fields/timezone-select.tsx",
+    "line": 274,
+    "pattern": "pr-8",
+    "context": "\"pr-8\","
+  },
+  {
+    "file": "packages/ui/src/fields/timezone-select.tsx",
+    "line": 280,
+    "pattern": "right-2",
+    "context": "className=\"pointer-events-none absolute top-1/2 right-2 size-4 -translate-y-1/2 text-ink-3\""
+  },
+  {
+    "file": "packages/ui/src/keyboard/shortcut-overlay.tsx",
+    "line": 56,
+    "pattern": "left-1/2",
+    "context": "<Dialog.Popup className=\"fixed top-1/2 left-1/2 max-h-[80vh] w-105 -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-4 shadow-(--shadow-popover)\">"
+  },
+  {
+    "file": "packages/ui/src/keyboard/shortcut-overlay.tsx",
+    "line": 56,
+    "pattern": "-translate-x-1/2",
+    "context": "<Dialog.Popup className=\"fixed top-1/2 left-1/2 max-h-[80vh] w-105 -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-4 shadow-(--shadow-popover)\">"
+  },
+  {
+    "file": "packages/ui/src/rich-text/suggestion-list.tsx",
+    "line": 85,
+    "pattern": "text-left",
+    "context": "\"flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-ink-2\","
+  },
+  {
+    "file": "packages/ui/src/rich-text/suggestion-list.tsx",
+    "line": 132,
+    "pattern": "left",
+    "context": "element.style.left = `${rect.left}px`;"
+  },
+  {
+    "file": "packages/ui/src/shell/app-shell.tsx",
+    "line": 58,
+    "pattern": "left-2",
+    "context": "className=\"sr-only rounded-md bg-surface px-3 py-2 text-sm font-semibold text-ink shadow-elev-card focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:outline-2 focus:outline-brand\""
+  },
+  {
+    "file": "packages/ui/src/shell/cycle-strip.tsx",
+    "line": 58,
+    "pattern": "ml-auto",
+    "context": "<span className=\"ml-auto font-bold\">{due}</span>"
+  },
+  {
+    "file": "packages/ui/src/shell/mobile-more.tsx",
+    "line": 87,
+    "pattern": "inset-x-0",
+    "context": "className=\"fixed inset-x-0 bottom-14 max-h-[70vh] overflow-y-auto border-t border-line bg-surface px-4 py-3 shadow-lg\""
+  },
+  {
+    "file": "packages/ui/src/shell/mobile-tab-bar.tsx",
+    "line": 82,
+    "pattern": "inset-x-0",
+    "context": "className=\"fixed inset-x-0 bottom-0 z-10 flex h-14 flex-none items-center justify-around border-t border-line bg-surface md:hidden\""
+  },
+  {
+    "file": "packages/ui/src/shell/sidebar.tsx",
+    "line": 89,
+    "pattern": "border-r",
+    "context": "\"side hidden flex-col gap-0.5 overflow-y-auto border-r border-line md:flex\","
+  },
+  {
+    "file": "packages/ui/src/shell/sidebar.tsx",
+    "line": 153,
+    "pattern": "-right-1",
+    "context": "<span className=\"absolute -top-1 -right-1 size-2 rounded-full bg-bad ring-2 ring-surface xl:hidden xl:in-data-[sidebar=rail]:block\" />"
+  },
+  {
+    "file": "packages/ui/src/shell/sidebar.tsx",
+    "line": 176,
+    "pattern": "ml-auto",
+    "context": "className=\"ml-auto hidden h-4.25 items-center rounded-full bg-bad-solid px-1.5 text-[10.5px] font-bold text-on-bad-solid xl:inline-flex xl:in-data-[sidebar=rail]:hidden\""
+  },
+  {
+    "file": "packages/ui/src/shell/topbar.tsx",
+    "line": 56,
+    "pattern": "ml-auto",
+    "context": "<div className=\"ml-auto flex items-center gap-2.5\">"
+  },
+  {
+    "file": "packages/ui/src/shell/topbar.tsx",
+    "line": 86,
+    "pattern": "ml-3.5",
+    "context": "<label className=\"ml-3.5 hidden h-7.75 w-75 items-center gap-1.5 rounded-[9px] border border-line bg-bg px-2.5 text-sm text-ink-4 transition-colors duration-fast ease-out hover:border-line-2 sm:flex\">"
+  },
+  {
+    "file": "packages/ui/src/shell/topbar.tsx",
+    "line": 95,
+    "pattern": "ml-auto",
+    "context": "<Kbd className=\"ml-auto\">⌘K</Kbd>"
+  },
+  {
+    "file": "packages/ui/src/styles/agent-face.css",
+    "line": 313,
+    "pattern": "transform: translateX(3.4px)",
+    "context": "transform: translateX(3.4px);"
+  },
+  {
+    "file": "packages/ui/src/styles/agent-face.css",
+    "line": 316,
+    "pattern": "transform: translateX(3.4px)",
+    "context": "transform: translateX(3.4px);"
+  },
+  {
+    "file": "packages/ui/src/styles/agent-face.css",
+    "line": 321,
+    "pattern": "transform: translateX(0)",
+    "context": "transform: translateX(0);"
+  },
+  {
+    "file": "packages/ui/src/styles/agent-face.css",
+    "line": 327,
+    "pattern": "transform: translateX(-3.4px)",
+    "context": "transform: translateX(-3.4px);"
+  },
+  {
+    "file": "packages/ui/src/styles/agent-face.css",
+    "line": 330,
+    "pattern": "transform: translateX(-3.4px)",
+    "context": "transform: translateX(-3.4px);"
+  },
+  {
+    "file": "packages/ui/src/styles/agent-face.css",
+    "line": 335,
+    "pattern": "transform: translateX(0)",
+    "context": "transform: translateX(0);"
+  },
+  {
+    "file": "packages/ui/src/styles/tokens.css",
+    "line": 407,
+    "pattern": "transform: translateX(-10px)",
+    "context": "transform: translateX(-10px);"
+  }
+]

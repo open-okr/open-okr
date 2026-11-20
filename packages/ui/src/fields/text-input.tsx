@@ -100,6 +100,7 @@ export function TextInput({
               ? String(input.defaultValue ?? "")
               : undefined
           }
+          dir="auto"
           {...input}
           aria-label={hideLabel ? label : input["aria-label"]}
           name={name}

@@ -78,7 +78,7 @@ describe("the invitation", () => {
       expiresAt: null,
     });
     expect(built.subject).toBe("Anda dijemput ke Northwind Labs");
-    expect(built.html).toContain('<html lang="ms">');
+    expect(built.html).toContain('<html lang="ms" dir="ltr">');
     expect(built.html).toContain("Terima jemputan");
   });
 });
@@ -226,7 +226,7 @@ describe("the confirmation mail", () => {
       hours: 24,
     });
     expect(built.subject).toBe("Sahkan alamat e-mel anda untuk Northwind OKR");
-    expect(built.html).toContain('<html lang="ms">');
+    expect(built.html).toContain('<html lang="ms" dir="ltr">');
     expect(built.text).toContain("Pautan ini berfungsi selama 24 jam.");
   });
 });
@@ -309,7 +309,7 @@ describe("the password notice", () => {
   it("is written in the instance's language", () => {
     const built = notice({ locale: "ms" });
     expect(built.subject).toBe("Kata laluan Northwind OKR anda telah ditukar");
-    expect(built.html).toContain('<html lang="ms">');
+    expect(built.html).toContain('<html lang="ms" dir="ltr">');
     expect(built.text).toContain(
       "telah ditukar pada 11 November 2026 jam 07:05 (UTC).",
     );
@@ -403,7 +403,7 @@ describe("a change of sign-in email", () => {
       url: URL_,
       hours: 24,
     });
-    expect(link.html).toContain('<html lang="ms">');
+    expect(link.html).toContain('<html lang="ms" dir="ltr">');
     expect(link.text).toContain("Ia berfungsi selama 24 jam");
     const notice = emailChangeNoticeMail({
       instanceName: "Northwind OKR",

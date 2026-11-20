@@ -20,7 +20,11 @@
  * either: it arrives as editor JSON and is drawn by the shared sanitising
  * renderer, the way every other surface draws it.
  */
-import { richTextAsLine } from "@openokr/formats";
+import {
+  directionFor,
+  type LocaleDirection,
+  richTextAsLine,
+} from "@openokr/formats";
 import { plainTextBlocks } from "../rich-text/excerpt.ts";
 import { renderRichTextToHtml } from "../rich-text/render.ts";
 import {
@@ -274,7 +278,12 @@ function blockHtml(
   block: EmailBlock,
   button: string,
   labels: EmailFrame["labels"],
+  direction: LocaleDirection,
 ): string {
+  // Word's mail renderer needs physical properties for asymmetric padding.
+  const start = direction === "rtl" ? "right" : "left";
+  const end = direction === "rtl" ? "left" : "right";
+  const arrow = direction === "rtl" ? "&larr;" : "&rarr;";
   switch (block.kind) {
     case "eyebrow":
       return `<p class="em-ink3" style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:${INK_3};">${escapeHtml(block.text)}</p>`;
@@ -290,18 +299,18 @@ function blockHtml(
         `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="${button}" style="border-radius:8px;background:${button};">` +
         `<a href="${href}" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">${escapeHtml(block.label)}</a>` +
         `</td></tr></table>` +
-        `<p class="em-ink3" style="margin:14px 0 18px;font-size:12px;line-height:1.5;color:${INK_3};">${escapeHtml(labels.linkFallback)}<br><a class="em-link" href="${href}" style="color:${LINK};word-break:break-all;">${href}</a></p>`
+        `<p class="em-ink3" style="margin:14px 0 18px;font-size:12px;line-height:1.5;color:${INK_3};">${escapeHtml(labels.linkFallback)}<br><a class="em-link" href="${href}" dir="ltr" style="color:${LINK};word-break:break-all;">${href}</a></p>`
       );
     }
     case "notice":
-      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 4px;"><tr><td class="em-soft em-ink2" style="background:${PAGE};border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.5;color:${INK_2};">${inlineHtml(block.parts)}</td></tr></table>`;
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 4px;"><tr><td class="em-soft em-ink2" style="text-align:start;background:${PAGE};border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.5;color:${INK_2};">${inlineHtml(block.parts)}</td></tr></table>`;
     case "agent":
       return (
         `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 12px;"><tr>` +
         `<td class="em-chip" width="28" height="28" align="center" style="width:28px;height:28px;background:${TONES.brand.bg};border-radius:999px;color:${LINK};font:700 11px/28px ${FONT};">${escapeHtml(block.initials)}</td>` +
-        `<td style="padding-left:9px;font-family:${FONT};">` +
+        `<td style="text-align:start;padding-${start}:9px;font-family:${FONT};">` +
         `<span class="em-ink" style="font-size:13px;font-weight:700;color:${INK};">${escapeHtml(block.name)}</span>` +
-        `<span class="em-soft em-ink3" style="display:inline-block;margin-left:4px;padding:0 5px;border-radius:4px;background:${PAGE};color:${INK_3};font-size:10px;font-weight:700;letter-spacing:.4px;">${escapeHtml(block.badge)}</span><br>` +
+        `<span class="em-soft em-ink3" style="display:inline-block;margin-${start}:4px;padding:0 5px;border-radius:4px;background:${PAGE};color:${INK_3};font-size:10px;font-weight:700;letter-spacing:.4px;">${escapeHtml(block.badge)}</span><br>` +
         `<span class="em-ink3" style="font-size:12px;color:${INK_4};">${escapeHtml(block.role)}</span>` +
         `</td></tr></table>`
       );
@@ -316,10 +325,10 @@ function blockHtml(
               : "",
           ].join("");
           const link = item.link
-            ? `<a class="em-link" href="${safeHref(item.link.href)}" style="font-size:13px;color:${LINK};text-decoration:none;">${escapeHtml(item.link.label)} &rarr;</a>`
+            ? `<a class="em-link" href="${safeHref(item.link.href)}" style="font-size:13px;color:${LINK};text-decoration:none;">${escapeHtml(item.link.label)} ${arrow}</a>`
             : "";
           return (
-            `<tr><td class="em-line" style="padding:12px 0;border-top:1px solid ${LINE};${last ? `border-bottom:1px solid ${LINE};` : ""}">` +
+            `<tr><td class="em-line" style="text-align:start;padding:12px 0;border-top:1px solid ${LINE};${last ? `border-bottom:1px solid ${LINE};` : ""}">` +
             head +
             (item.parts.length > 0
               ? `<p class="em-ink" style="margin:${head ? "6px" : "0"} 0 2px;font-size:14px;line-height:1.5;color:${INK};">${inlineHtml(item.parts)}</p>`
@@ -339,11 +348,11 @@ function blockHtml(
         .map((nudge) => {
           const edge = TONES[nudge.tone].fg;
           return (
-            `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px;"><tr><td class="em-edge" style="border:1px solid ${LINE};border-left:3px solid ${edge};border-radius:8px;padding:12px 14px;">` +
+            `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px;"><tr><td class="em-edge" style="text-align:start;border:1px solid ${LINE};border-${start}:3px solid ${edge};border-radius:8px;padding:12px 14px;">` +
             `<p class="em-ink" style="margin:0 0 4px;font-size:14px;font-weight:600;color:${INK};">${escapeHtml(nudge.title)}</p>` +
             `<p class="em-ink2" style="margin:0 0 8px;font-size:13px;line-height:1.5;color:${INK_2};">${escapeHtml(nudge.body)}</p>` +
-            `<a class="em-link" href="${safeHref(nudge.link.href)}" style="font-size:13px;font-weight:600;color:${LINK};text-decoration:none;">${escapeHtml(nudge.link.label)} &rarr;</a>` +
-            `<span class="em-ink3" style="float:right;font-size:11px;color:${INK_4};font-family:${MONO};">${escapeHtml(nudge.rule)}</span>` +
+            `<a class="em-link" href="${safeHref(nudge.link.href)}" style="font-size:13px;font-weight:600;color:${LINK};text-decoration:none;">${escapeHtml(nudge.link.label)} ${arrow}</a>` +
+            `<span dir="ltr" class="em-ink3" style="float:${end};font-size:11px;color:${INK_4};font-family:${MONO};">${escapeHtml(nudge.rule)}</span>` +
             `</td></tr></table>`
           );
         })
@@ -352,7 +361,7 @@ function blockHtml(
       const cells = block.tiles
         .map(
           (tile) =>
-            `<td width="${Math.floor(100 / block.tiles.length) - 1}%" class="em-${tile.tone}" style="background:${TONES[tile.tone].bg};border-radius:8px;padding:10px 12px;color:${TONES[tile.tone].fg};">` +
+            `<td width="${Math.floor(100 / block.tiles.length) - 1}%" class="em-${tile.tone}" style="text-align:start;background:${TONES[tile.tone].bg};border-radius:8px;padding:10px 12px;color:${TONES[tile.tone].fg};">` +
             `<p style="margin:0;font-size:20px;font-weight:700;color:${TONES[tile.tone].fg};">${escapeHtml(tile.value)}</p>` +
             `<p style="margin:0;font-size:12px;color:${TONES[tile.tone].fg};">${escapeHtml(tile.label)}</p></td>`,
         )
@@ -364,7 +373,7 @@ function blockHtml(
     case "list":
       return (
         `<p class="em-ink" style="margin:0 0 6px;font-size:13px;font-weight:700;color:${INK};">${escapeHtml(block.title)}</p>` +
-        `<ul class="em-ink2" style="margin:0 0 14px;padding-left:18px;font-size:14px;line-height:1.6;color:${INK_2};">` +
+        `<ul class="em-ink2" style="margin:0 0 14px;padding-${start}:18px;font-size:14px;line-height:1.6;color:${INK_2};">` +
         block.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("") +
         `</ul>`
       );
@@ -437,7 +446,7 @@ const STYLE = `<style>
 .em-ink2{color:#cbd5e1 !important;}
 .em-ink3{color:#94a3b8 !important;}
 .em-line{border-color:#1e293b !important;}
-.em-edge{border-top-color:#1e293b !important;border-right-color:#1e293b !important;border-bottom-color:#1e293b !important;}
+.em-edge{border-top-color:#1e293b !important;border-inline-end-color:#1e293b !important;border-bottom-color:#1e293b !important;}
 .em-soft{background:#1a2332 !important;}
 .em-link{color:#818cf8 !important;}
 .em-chip{background:#1e1b4b !important;color:#a5b4fc !important;}
@@ -454,6 +463,8 @@ export function renderEmail(
   blocks: readonly EmailBlock[],
 ): RenderedEmail {
   const button = buttonColour(frame.brand.color);
+  const direction = directionFor(frame.lang);
+  const start = direction === "rtl" ? "right" : "left";
   const name = escapeHtml(frame.brand.name);
   const footer =
     inlineHtml(frame.footer) +
@@ -462,7 +473,7 @@ export function renderEmail(
       : "");
 
   const html =
-    `<!doctype html><html lang="${escapeHtml(frame.lang)}"><head>` +
+    `<!doctype html><html lang="${escapeHtml(frame.lang)}" dir="${direction}"><head>` +
     `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
     `<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">` +
     `<title>${name}</title>${STYLE}</head>` +
@@ -470,16 +481,18 @@ export function renderEmail(
     (frame.preheader
       ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(frame.preheader)}</div>`
       : "") +
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:${PAGE};"><tr><td align="center" style="padding:24px 12px;">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" dir="${direction}" class="em-bg" style="background:${PAGE};"><tr><td align="center" style="padding:24px 12px;">` +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">` +
     `<tr><td style="padding:0 4px 14px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr>` +
     `<td width="24" height="24" align="center" style="width:24px;height:24px;background:${button};border-radius:6px;color:#ffffff;font:700 10px/24px ${FONT};">${escapeHtml(brandInitials(frame.brand.name))}</td>` +
-    `<td class="em-ink" style="padding-left:8px;font:650 14px ${FONT};color:${INK};">${name}</td>` +
+    `<td class="em-ink" style="text-align:start;padding-${start}:8px;font:650 14px ${FONT};color:${INK};">${name}</td>` +
     `</tr></table></td></tr>` +
-    `<tr><td class="em-card" style="background:#ffffff;border:1px solid ${LINE};border-radius:12px;padding:24px;font-family:${FONT};">` +
-    blocks.map((block) => blockHtml(block, button, frame.labels)).join("") +
+    `<tr><td class="em-card" style="text-align:start;background:#ffffff;border:1px solid ${LINE};border-radius:12px;padding:24px;font-family:${FONT};">` +
+    blocks
+      .map((block) => blockHtml(block, button, frame.labels, direction))
+      .join("") +
     `</td></tr>` +
-    `<tr><td class="em-ink3" style="padding:14px 4px 0;font:12px/1.5 ${FONT};color:${INK_4};">${footer}</td></tr>` +
+    `<tr><td class="em-ink3" style="text-align:start;padding:14px 4px 0;font:12px/1.5 ${FONT};color:${INK_4};">${footer}</td></tr>` +
     `</table></td></tr></table></body></html>`;
 
   const lines = [

@@ -8,9 +8,18 @@ import type { Catalogue, Locale } from "./catalogue.ts";
 import en from "./messages/en.json";
 import ms from "./messages/ms.json";
 
+/** Preview fixture for the layout before the Arabic catalogue ships (§9). */
+export const PSEUDO_RTL = {
+  dir: "rtl",
+  catalogue: Object.fromEntries(
+    Object.entries(en).map(([key, value]) => [key, `\u202e${value}\u202c`]),
+  ),
+} as const;
+
 export const CATALOGUES: Readonly<
-  Record<"en" | "ms", Catalogue> & Partial<Record<Locale, Catalogue>>
-> = { en, ms };
+  Record<"en" | "ms" | "pseudo-rtl", Catalogue> &
+    Partial<Record<Locale, Catalogue>>
+> = { en, ms, "pseudo-rtl": PSEUDO_RTL.catalogue };
 
 /** Keys present in the source but missing from another locale's catalogue.
  * Empty means every locale is at least "stubbed": present, not necessarily

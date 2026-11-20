@@ -97,6 +97,7 @@ export function TextArea({
         </label>
       )}
       <textarea
+        dir="auto"
         {...area}
         // Its own counter's box, and the caller's when it passes one: a cell
         // that grows with its text still needs to know when it has focus.

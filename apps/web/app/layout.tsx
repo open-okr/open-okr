@@ -1,4 +1,6 @@
+import { DirectionProvider } from "@base-ui-components/react/direction-provider";
 import { loadEnv } from "@openokr/config";
+import { directionFor } from "@openokr/formats";
 import {
   QueryProvider,
   ThemeProvider,
@@ -99,6 +101,7 @@ export default async function RootLayout({
   // signed-out screens too. `resolveLocale` never throws and answers English
   // for a visitor the product does not know yet.
   const locale = await resolveLocale();
+  const direction = directionFor(locale);
   // For the client components that name the instance, the sign-in heading
   // first among them (M-33). Never throws, so it cannot take the layout down.
   const instanceName = await getInstanceName();
@@ -114,6 +117,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
+      dir={direction}
       className={geistSans.variable}
       data-theme="light"
       data-density="comfortable"
@@ -148,26 +152,28 @@ export default async function RootLayout({
          * the server keeps a report only from a signed-in person.
          */}
         <ClientErrorReporter />
-        <ThemeProvider>
-          <TranslationsProvider locale={locale} renamed={renamed}>
-            {/*
-             * Here rather than in the shell (M-13). Each top-level screen
-             * renders the shell afresh, so a provider inside it was replaced
-             * on every move between screens and its toasts went with it. A
-             * delete's undo is offered on the page that sends you somewhere
-             * else, and has to still be there when you arrive.
-             */}
-            <ToastProvider
-              dismissLabel={translate(catalogue, "common.dismiss")}
-            >
-              <QueryProvider buildId={loadEnv().APP_BUILD_ID}>
-                <InstanceNameProvider name={instanceName}>
-                  {children}
-                </InstanceNameProvider>
-              </QueryProvider>
-            </ToastProvider>
-          </TranslationsProvider>
-        </ThemeProvider>
+        <DirectionProvider direction={direction}>
+          <ThemeProvider>
+            <TranslationsProvider locale={locale} renamed={renamed}>
+              {/*
+               * Here rather than in the shell (M-13). Each top-level screen
+               * renders the shell afresh, so a provider inside it was replaced
+               * on every move between screens and its toasts went with it. A
+               * delete's undo is offered on the page that sends you somewhere
+               * else, and has to still be there when you arrive.
+               */}
+              <ToastProvider
+                dismissLabel={translate(catalogue, "common.dismiss")}
+              >
+                <QueryProvider buildId={loadEnv().APP_BUILD_ID}>
+                  <InstanceNameProvider name={instanceName}>
+                    {children}
+                  </InstanceNameProvider>
+                </QueryProvider>
+              </ToastProvider>
+            </TranslationsProvider>
+          </ThemeProvider>
+        </DirectionProvider>
       </body>
     </html>
   );

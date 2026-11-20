@@ -3,8 +3,11 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { EmailInput } from "../src/fields/email-input.tsx";
+import { IdentifierInput } from "../src/fields/identifier-input.tsx";
 import { SecretInput } from "../src/fields/secret-input.tsx";
+import { TextArea } from "../src/fields/text-area.tsx";
 import { TextInput } from "../src/fields/text-input.tsx";
+import { UrlInput } from "../src/fields/url-input.tsx";
 import { translate } from "../src/i18n/catalogue.ts";
 import { CATALOGUES } from "../src/i18n/catalogues.ts";
 import { TranslationsProvider } from "../src/i18n/use-translations.tsx";
@@ -27,6 +30,33 @@ function inEnglish(children: ReactNode) {
 }
 
 describe("a text field", () => {
+  it("follows the direction of user-written text in inputs and text areas", () => {
+    inEnglish(
+      <>
+        <TextInput label="Title" name="title" defaultValue="هدف" />
+        <TextArea label="Comment" name="comment" defaultValue="تعليق" />
+      </>,
+    );
+
+    expect(screen.getByLabelText("Title").getAttribute("dir")).toBe("auto");
+    expect(screen.getByLabelText("Comment").getAttribute("dir")).toBe("auto");
+  });
+
+  it("keeps addresses and identifiers left to right", () => {
+    inEnglish(
+      <>
+        <EmailInput label="Email" name="email" />
+        <UrlInput label="URL" name="url" />
+        <IdentifierInput label="Identifier" name="identifier" />
+        <SecretInput label="Key" name="key" />
+      </>,
+    );
+
+    for (const label of ["Email", "URL", "Identifier", "Key"]) {
+      expect(screen.getByLabelText(label).getAttribute("dir")).toBe("ltr");
+    }
+  });
+
   it("is named by its label and described by its description", () => {
     inEnglish(
       <TextInput

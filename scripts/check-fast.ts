@@ -43,6 +43,7 @@ const GATES: readonly Gate[] = [
   { label: "Contract drift", args: ["check:contract"] },
   { label: "Licences", args: ["check:licences"] },
   { label: "Catalogue gate", args: ["i18n:check"] },
+  { label: "Logical direction", args: ["check:direction"] },
   // CI runs these two on pull requests only, which is why a branch can look
   // green for days and fail the moment one opens. Cheap enough to run always.
   { label: "Sign-off", args: ["check:signoff", BASE, "HEAD"] },

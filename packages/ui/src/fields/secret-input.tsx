@@ -27,6 +27,7 @@ export function SecretInput({
   return (
     <TextInput
       {...props}
+      dir="ltr"
       id={controlId}
       type={revealed ? "text" : "password"}
       spellCheck={false}

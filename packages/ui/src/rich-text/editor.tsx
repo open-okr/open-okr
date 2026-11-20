@@ -104,7 +104,22 @@ export interface RichTextEditorHandle {
  * document this component hands out goes through here first.
  */
 function plainJSON(json: unknown): unknown {
-  return JSON.parse(JSON.stringify(json));
+  return JSON.parse(
+    JSON.stringify(json, (key, value: unknown) => {
+      // Direction comes from the text. Keep the editor's generated direction
+      // out of writes so old servers can still validate them during upgrades.
+      if (
+        key === "attrs" &&
+        value &&
+        typeof value === "object" &&
+        "dir" in value
+      ) {
+        const { dir: _direction, ...attrs } = value;
+        return Object.keys(attrs).length ? attrs : undefined;
+      }
+      return value;
+    }),
+  );
 }
 
 const NO_SEARCH_RESULTS: readonly MentionSearchResult[] = [];
@@ -169,6 +184,7 @@ export const RichTextEditor = forwardRef<
     content: content as never,
     editable,
     autofocus: autoFocus ? "end" : false,
+    textDirection: "auto",
     // TipTap would append its base rules as an inline <style>, which the
     // Content-Security-Policy refuses in production. The same rules ship in
     // `styles/prosemirror.css` instead (completeness review L-22).

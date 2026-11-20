@@ -35,6 +35,7 @@ export function IdentifierInput({
   return (
     <TextInput
       {...props}
+      dir="ltr"
       maxLength={maxLength}
       onChange={(event) => {
         const control = event.currentTarget;
