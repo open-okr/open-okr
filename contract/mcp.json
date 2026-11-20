@@ -2387,9 +2387,16 @@
             "minLength": 1
           },
           "language": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 35
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 35
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "trustedEmailDomains": {
             "type": "array",

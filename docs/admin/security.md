@@ -7,6 +7,14 @@ a passkey, and a one-time code from an authenticator app with backup codes.
 Session tokens are hashed at rest, and a member can list their sessions and
 revoke one.
 
+### Preference cookies
+
+| Cookie | Purpose |
+|---|---|
+| `openokr_workspace` | Remembers the active workspace for a signed-in member. The next request checks it against their memberships. |
+| `openokr_tz` | Remembers the browser's timezone so a new member or workspace can start with their local time. |
+| `openokr_locale` | Remembers a visitor's language choice for one year. It is HTTP-only, uses `SameSite=Lax`, and is secure over HTTPS. Members in a workspace use their member, workspace, or instance language. |
+
 ### Sign-in protection
 
 Wrong passwords hold password sign-in for a while. Nothing needs unlocking:

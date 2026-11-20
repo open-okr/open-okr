@@ -34,6 +34,31 @@ test.describe("a Malay browser", () => {
       page.getByRole("heading", { name: /^Log masuk ke / }),
     ).toBeVisible();
   });
+
+  test("remembers an English choice on later visits", async ({ page, context }) => {
+    await page.goto("/sign-in");
+    await page.getByTestId("visitor-language").selectOption("en");
+    await page.getByRole("button", { name: "Guna", exact: true }).click();
+
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    const cookie = (await context.cookies()).find(
+      ({ name }) => name === "openokr_locale",
+    );
+    expect(cookie).toMatchObject({
+      value: "en",
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+    });
+    expect(cookie?.expires).toBeGreaterThan(
+      Date.now() / 1000 + 364 * 24 * 60 * 60,
+    );
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await page.getByTestId("visitor-language").selectOption("ms");
+    await page.getByRole("button", { name: "Apply", exact: true }).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "ms");
+  });
 });
 
 test("signed in, the member's and the workspace's language still win over a Malay browser", async ({

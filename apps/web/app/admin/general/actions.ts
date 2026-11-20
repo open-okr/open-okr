@@ -101,7 +101,7 @@ export async function submitGeneral(
   }
 
   const timezone = String(form.get("timezone") ?? "").trim();
-  const language = String(form.get("language") ?? "").trim();
+  const language = form.get("language");
   const trustedEmailDomains = String(form.get("trustedEmailDomains") ?? "")
     .split(",")
     .map((domain) => domain.trim())
@@ -139,7 +139,8 @@ export async function submitGeneral(
   try {
     await callAction(await context(), "settings.updateWorkspaceGeneral", {
       timezone: timezone === "" ? undefined : timezone,
-      language: language === "" ? undefined : language,
+      language:
+        typeof language === "string" ? language.trim() || null : undefined,
       trustedEmailDomains,
       // A checkbox that is off sends nothing at all, so the absence is the
       // value rather than a missing one (P8-T09).

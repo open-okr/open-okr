@@ -4,10 +4,12 @@ import {
 } from "@openokr/core";
 import { isShippedLocale, SHIPPED_LOCALES } from "@openokr/formats";
 import type { Locale } from "@openokr/ui";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { browserLocale } from "./accept-language.ts";
 import { getPool } from "./pool";
 import { requireWorkspace } from "./workspace";
+
+export const VISITOR_LANGUAGE_COOKIE = "openokr_locale";
 
 /**
  * Which catalogue this request renders in (UIUX-PLAN §8, P6-G22a).
@@ -17,14 +19,14 @@ import { requireWorkspace } from "./workspace";
  * `language` setting since the same task, and nothing ever selected anything:
  * the one place that decides was a literal.
  *
- * **Signed in**, the order is the member, then the workspace, then English. A
+ * **Signed in**, the order is the member, workspace, instance, then English. A
  * member's own answer wins because it is the more specific one; the
  * workspace's is what a member who has never chosen should get, because an
  * organisation that set a language meant it for the people in it.
  *
  * **Signed out**, or signed in with no workspace yet, there is nobody to ask,
- * so the order is the browser's language when the product ships it, then the
- * instance's, then English (Q-8, decided by Akmal on 12 November 2026). A
+ * so the order is the saved choice, the browser's language when the product
+ * ships it, then the instance's, then English (languages design section 8). A
  * Malay visitor to an English instance read its sign-in in English, which is
  * what the 0.8.0 acceptance test reported.
  *
@@ -62,10 +64,18 @@ export async function resolveLocale(): Promise<Locale> {
 }
 
 /**
- * A visitor's language: the browser's when shipped, then the instance's, then
- * English. Each step that cannot be read is passed over rather than raised.
+ * A visitor can override the browser's language. Unavailable values are
+ * skipped at each step, including a stale cookie after a downgrade.
  */
 async function visitorLocale(): Promise<Locale> {
+  try {
+    const saved = (await cookies()).get(VISITOR_LANGUAGE_COOKIE)?.value;
+    if (isShippedLocale(saved)) {
+      return saved;
+    }
+  } catch {
+    // The function can be called without a request, including during a build.
+  }
   try {
     const browser = browserLocale(
       (await headers()).get("accept-language"),

@@ -1,7 +1,7 @@
 "use client";
 
-import { LOCALES, type LocaleCode } from "@openokr/formats";
-import { Tooltip, useTheme, useTranslations } from "@openokr/ui";
+import { isShippedLocale, LOCALES, type LocaleCode } from "@openokr/formats";
+import { SelectInput, Tooltip, useTheme, useTranslations } from "@openokr/ui";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { setAppearance } from "./appearance-action.ts";
@@ -73,6 +73,7 @@ export function AppearanceControl({
   const [pendingLanguage, setPendingLanguage] = useState<LocaleCode | null>(
     language,
   );
+  const [savingLanguage, setSavingLanguage] = useState(false);
 
   const grid = layout === "grid";
   const fieldset = grid
@@ -138,37 +139,46 @@ export function AppearanceControl({
        * something else.
        */}
       {compact ? null : (
-        <fieldset className={fieldset}>
-          <legend className={legend}>
-            {t("admin.general.generalSettingsForm.language")}
-          </legend>
-          <div className={group}>
-            {LANGUAGES.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                data-testid={`language-${option.value}`}
-                aria-pressed={pendingLanguage === option.value}
-                onClick={() => {
-                  setPendingLanguage(option.value);
-                  remember({ language: option.value });
-                }}
-                className={
-                  pendingLanguage === option.value
-                    ? `rounded-md border border-brand-600 bg-brand ${pad} text-xs font-semibold text-on-brand ${grow}`
-                    : `rounded-md border border-line ${pad} text-xs font-semibold text-ink-2 hover:border-ink-4 ${grow}`
-                }
-              >
-                {t(option.label)}
-              </button>
-            ))}
-          </div>
-          {grid ? null : (
-            <span className="text-xs text-ink-4">
-              {t("appearance.bahasaMelayuNote")}
-            </span>
-          )}
-        </fieldset>
+        <SelectInput
+          label={t("admin.general.generalSettingsForm.language")}
+          data-testid="member-language"
+          className={fieldset}
+          value={pendingLanguage ?? ""}
+          disabled={savingLanguage}
+          description={grid ? undefined : t("appearance.bahasaMelayuNote")}
+          onChange={async (event) => {
+            const choice = event.currentTarget.value;
+            if (choice !== "" && !isShippedLocale(choice)) {
+              return;
+            }
+            const next = choice === "" ? null : choice;
+            setPendingLanguage(next);
+            setSavingLanguage(true);
+            try {
+              const { error } = await setAppearance({ language: next });
+              setProblem(error);
+              if (error) {
+                setPendingLanguage(pendingLanguage);
+              }
+            } finally {
+              setSavingLanguage(false);
+            }
+          }}
+        >
+          <option value="">{t("appearance.followWorkspace")}</option>
+          {LANGUAGES.map((option) => (
+            <option key={option.value} value={option.value} lang={option.value}>
+              {t(option.label)}
+            </option>
+          ))}
+          {pendingLanguage && !isShippedLocale(pendingLanguage) ? (
+            <option value={pendingLanguage} disabled>
+              {t("admin.general.generalSettingsForm.unavailableLanguage", {
+                code: pendingLanguage,
+              })}
+            </option>
+          ) : null}
+        </SelectInput>
       )}
 
       <fieldset className={fieldset}>

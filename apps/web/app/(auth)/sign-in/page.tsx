@@ -1,10 +1,12 @@
 "use client";
 
+import { LOCALES } from "@openokr/formats";
 import {
   Button,
   CodeInput,
   EmailInput,
   SecretInput,
+  SelectInput,
   useTranslations,
 } from "@openokr/ui";
 import Link from "next/link";
@@ -16,6 +18,7 @@ import { useInstanceName } from "../../../lib/instance-name-context";
 import { AuthCard, FormError } from "../auth-card";
 import { ResendLink, useLinkHours } from "../resend-link";
 import { pathAfterSignIn } from "./deletion-actions";
+import { setVisitorLanguage } from "./language-action";
 
 /**
  * What Better Auth answers a sign-in with while the account is being erased
@@ -49,7 +52,7 @@ interface DemoPersona {
  * one-time code challenge when a second factor is enrolled.
  */
 export default function SignInPage() {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
   // The instance this is, not the software it runs (M-33).
   const instanceName = useInstanceName();
 
@@ -396,6 +399,24 @@ export default function SignInPage() {
           pending={pending}
         >
           {pending ? t("auth.signIn.signingIn") : t("setup.account.signIn")}
+        </Button>
+      </form>
+      <form action={setVisitorLanguage} className="flex items-end gap-2">
+        <SelectInput
+          label={t("admin.general.generalSettingsForm.language")}
+          name="language"
+          data-testid="visitor-language"
+          defaultValue={locale}
+          className="flex-1"
+        >
+          {LOCALES.filter((entry) => entry.shipped).map((entry) => (
+            <option key={entry.code} value={entry.code} lang={entry.code}>
+              {t(entry.endonymKey)}
+            </option>
+          ))}
+        </SelectInput>
+        <Button type="submit" variant="secondary">
+          {t("common.apply")}
         </Button>
       </form>
 

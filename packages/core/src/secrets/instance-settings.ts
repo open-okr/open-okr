@@ -20,6 +20,10 @@ import { systemSettings, withInstanceAdmin } from "@openokr/db";
 import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import {
+  appendInstanceAuditInTx,
+  type RecordInstanceAuditEventInput,
+} from "../audit/instance-chain.ts";
 import { languageSchema } from "../settings/registry.ts";
 import {
   decryptSecret,
@@ -147,6 +151,7 @@ export async function writeSettings(
   pool: Pool,
   ring: KeyRing,
   writes: readonly SettingWrite[],
+  audit?: RecordInstanceAuditEventInput,
 ): Promise<void> {
   if (writes.length === 0) {
     return;
@@ -188,6 +193,9 @@ export async function writeSettings(
         .insert(systemSettings)
         .values(row)
         .onConflictDoUpdate({ target: systemSettings.key, set: row });
+    }
+    if (audit) {
+      await appendInstanceAuditInTx(tx, audit);
     }
   });
 }

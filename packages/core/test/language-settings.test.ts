@@ -50,6 +50,19 @@ it("skips an unavailable workspace language and preserves it when another settin
   });
 });
 
+it("clears the workspace language to follow the instance", async () => {
+  const call = await context();
+  const { admin } = await workerDb();
+  await admin.query(
+    "insert into system_settings (key, value) values ('instance.language', '\"ms\"'::jsonb)",
+  );
+
+  await expect(
+    callAction(call, "settings.updateWorkspaceGeneral", { language: null }),
+  ).resolves.toMatchObject({ settings: { language: null } });
+  expect(await resolveMemberLanguage(call, call.actor.memberId)).toBe("ms");
+});
+
 it.each(["xx", "zh-Hans"])(
   "refuses the unshipped workspace locale %s",
   async (language) => {

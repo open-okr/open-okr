@@ -87,7 +87,7 @@ export function GeneralSettingsForm({
 
   const stored: Values = {
     timezone: typeof settings.timezone === "string" ? settings.timezone : null,
-    language: String(settings.language ?? "en"),
+    language: typeof settings.language === "string" ? settings.language : "",
     domains: trustedEmailDomains.join(","),
     secondFactor: settings.requireSecondFactor === true,
   };
@@ -193,12 +193,15 @@ export function GeneralSettingsForm({
               change({ language: event.currentTarget.value })
             }
           >
+            <option value="">
+              {t("admin.general.generalSettingsForm.followInstance")}
+            </option>
             {LOCALES.filter((l) => l.shipped).map((l) => (
               <option key={l.code} value={l.code}>
                 {t(l.endonymKey)}
               </option>
             ))}
-            {!isShippedLocale(stored.language) ? (
+            {stored.language && !isShippedLocale(stored.language) ? (
               // A disabled option stays visible without submitting the old code.
               <option value={stored.language} disabled>
                 {t("admin.general.generalSettingsForm.unavailableLanguage", {

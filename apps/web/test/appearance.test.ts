@@ -136,7 +136,7 @@ describe("the appearance control", () => {
     expect(control).toContain("const LANGUAGES");
     // The placeholder itself is left out of the needle: Biome refuses a template
     // marker inside a plain string, and the prefix is what identifies the field.
-    expect(control).toContain("data-testid={`language-");
+    expect(control).toContain('data-testid="member-language"');
 
     // Not in the compact menu. A theme applies the instant it is clicked; a
     // language comes from the server, so choosing one navigates, and a control
