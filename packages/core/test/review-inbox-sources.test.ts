@@ -367,29 +367,9 @@ describe("an agent proposal obligation", () => {
   });
 
   it("falls back to workspace administration when its subject has no context of its own", async () => {
-    // A KPI resolves to no access context, so "edit on the subject" has no
-    // answer. The comment above the source promised administration as the
-    // fallback since P6-G02; the code asked the resolver anyway, caught its
-    // refusal as "no", and listed a KPI proposal for nobody at all.
-    const wb = await workerDb();
-    const kpi = await callAction(
-      { pool: wb.appPool, ...context() },
-      "kpis.create",
-      {
-        title: "Net retention",
-        ownerKind: "member",
-        memberId: otherId,
-        frequency: "monthly",
-        direction: "higher_better",
-        indicatorType: "lagging",
-        tier: "output",
-        aggregate: "sum",
-      },
-    );
-    await makeProposal({ type: "kpi", id: kpi.id });
-    const owed = await inbox(OWNER);
-    const proposal = owed.obligations.find((row) => row.kind === "proposal");
-    expect(proposal?.title).toContain("Net retention");
+    // Cycles have no access context of their own.
+    await makeProposal({ type: "cycle", id: cycleId });
+    expect(kinds(await inbox(OWNER))).toContain("proposal");
     expect(kinds(await inbox(OTHER))).not.toContain("proposal");
   });
 

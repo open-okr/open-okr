@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { LOCALES } from "@openokr/formats";
 import { CATALOGUES, missingKeys } from "@openokr/ui/catalogues";
 import { describe, expect, test } from "vitest";
 import {
@@ -205,15 +206,26 @@ describe("the catalogue itself", () => {
     .map((path) => readFileSync(path, "utf8"))
     .join("\n");
 
+  const endonyms = new Set<string>(LOCALES.map((locale) => locale.endonymKey));
+  const hasConsumer = (key: string) => {
+    if (endonyms.has(key) || sources.includes(`"${key}"`)) return true;
+    const pluralBase = key.replace(/\.(?:zero|one|two|few|many|other)$/, "");
+    return pluralBase !== key && sources.includes(`"${pluralBase}"`);
+  };
+
   test("every key has a consumer", () => {
     // Deferred from P2-T10 to here, in the module's own words: "a key with no
     // consumer is a translation somebody pays for and nobody sees". Four keys
     // were deleted on 7 September 2026 for exactly that, found by reading
     // rather than by a test. This is the test.
     const orphans = Object.keys(EN_CATALOGUE).filter(
-      (key) => !sources.includes(`"${key}"`),
+      (key) => !hasConsumer(key),
     );
     expect(orphans).toEqual([]);
+  });
+
+  test("rejects a made-up plural key with no consumer", () => {
+    expect(hasConsumer("coverage.fixtureNeverUsed.other")).toBe(false);
   });
 
   test("every key the source has, Bahasa Melayu has too", () => {

@@ -161,7 +161,7 @@ export async function mayDecideProposal(
     if (!recipients.has(memberId)) {
       return false;
     }
-    // A subject with no context of its own, such as a KPI, has nothing finer
+    // A subject with no context of its own, such as a cycle, has nothing finer
     // to ask. The proposed action's own authorisation is still what decides
     // whether applying it succeeds.
     return reachesSubject ? reachesSubject() : true;

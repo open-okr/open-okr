@@ -15,7 +15,7 @@ describe("formats sweep (§12)", () => {
     try {
       // Grep across apps/web and packages/*/src from repository root
       output = execSync(
-        `git grep -nE '"en-GB"|"ms-MY"|toLocale(Date|Time)?String\\(\\)' -- 'apps/web' 'packages/*/src'`,
+        `git grep -nE '"en-GB"|"ms-MY"|toLocale(Date|Time)?String\\(\\)' -- 'apps/web' 'packages/*/src' ':!apps/web/test/formats-sweep.test.ts'`,
         { cwd: repoRoot, encoding: "utf-8" },
       );
     } catch (e: unknown) {

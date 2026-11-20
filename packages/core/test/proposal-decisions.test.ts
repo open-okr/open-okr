@@ -500,6 +500,12 @@ describe("a recovery proposal in the KPI owner's inbox", () => {
       ),
     ).toBe(false);
 
+    // KA-D17 requires the deciding member to hold the KPI role.
+    await wb.admin.query(
+      "update workspace_members set role_id = (select id from workspace_roles where workspace_id = $1 and builtin_key = 'member') where id = $2",
+      [workspaceId, championMemberId],
+    );
+
     const applied = (await callAction(
       { pool: wb.appPool, ...context(CHAMPION) },
       "proposals.apply",
