@@ -30,7 +30,9 @@ import {
   BLOCKER_TYPE_DEFINITIONS,
   canonThresholds,
   CLOSE_DECISION_MEANINGS,
+  coachSentence,
   COACH_LINES,
+  COMMITTED_FLOOR_TEXT,
   CYCLE_CHECKS,
   compareProfiles,
   END_STATE_SHAPES,
@@ -56,7 +58,9 @@ import {
   roomPulseRead,
   ROOT_CAUSES,
   THRESHOLDS,
+  TRIGGER_CATALOGUE,
   WEEKLY_STEPS,
+  WORD_CHECKS_SKIPPED_NOTICE,
 } from "../packages/method/src/index.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -1136,6 +1140,44 @@ if (tablesCompared < 3) {
     "condition order",
     `only ${tablesCompared} condition tables found in METHOD.md §4; OBJ-1, OBJ-2 and KR-5 have one, so the parse is wrong`,
   );
+}
+
+// English method messages are sourced from the package. Translations use
+// these same keys, so changing a rule's words must update its source message.
+const englishUI: Record<string, unknown> = JSON.parse(
+  read("packages", "ui", "src", "i18n", "messages", "en.json"),
+);
+const englishServer: Record<string, unknown> = JSON.parse(
+  read("packages", "core", "src", "i18n", "messages", "en.json"),
+);
+function compareMessage(
+  catalogue: Record<string, unknown>,
+  key: string,
+  text: string,
+): void {
+  if (catalogue[key] !== text) {
+    fail("method message", `${key} must match the English text in packages/method`);
+  }
+}
+for (const check of QUALITY_CHECKS) {
+  const key = `method.rule.${check.id}`;
+  compareMessage(englishUI, `${key}.title`, check.title);
+  check.conditions.forEach((row, index) => {
+    const condition = `${key}.condition.${index + 1}`;
+    compareMessage(englishUI, `${condition}.label`, row.condition);
+    compareMessage(englishUI, `${condition}.prompt`, row.prompt);
+  });
+}
+for (const rule of TRIGGER_CATALOGUE) {
+  compareMessage(englishServer, `method.rule.${rule.key}.title`, rule.title);
+}
+for (const line of COACH_LINES) {
+  compareMessage(englishServer, `method.coach.${line.ruleKey}`, coachSentence(line));
+}
+compareMessage(englishUI, "method.coach.quality.committed_floor", COMMITTED_FLOOR_TEXT);
+compareMessage(englishUI, "method.wordChecksSkipped", WORD_CHECKS_SKIPPED_NOTICE);
+if (!method.includes(`"${WORD_CHECKS_SKIPPED_NOTICE}"`)) {
+  fail("method message", "METHOD.md §4 must quote the word-check notice");
 }
 
 // --- Report -----------------------------------------------------------------

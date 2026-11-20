@@ -6,6 +6,7 @@ import { useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { methodDocumentUrl } from "./app-version";
+import { methodConditionLabel, methodTitle } from "./method-words.ts";
 
 /** Catalogue keys for what kind of rule it is, one per kind. */
 const KIND_LABELS = {
@@ -51,6 +52,10 @@ export function RulePreview({
     );
   }
   const anchor = rule.section ? methodSectionAnchor(rule.section) : null;
+  const name =
+    rule.kind === "trigger"
+      ? rule.name
+      : `${rule.key} ${methodTitle(t, rule.key, rule.name.slice(rule.key.length + 1))}`;
 
   return (
     <PreviewCard.Root>
@@ -68,7 +73,7 @@ export function RulePreview({
             className="flex max-w-xs flex-col gap-1.5 rounded-lg border border-line bg-surface p-3 text-sm text-ink-2 shadow-(--shadow-popover)"
           >
             <div>
-              <p className="font-semibold text-ink">{rule.name}</p>
+              <p className="font-semibold text-ink">{name}</p>
               <p className="text-xs text-ink-3">{t(KIND_LABELS[rule.kind])}</p>
             </div>
             {rule.looksFor.length > 0 ? (
@@ -76,7 +81,9 @@ export function RulePreview({
                 <p>{t("rulePreview.looksFor")}</p>
                 <ul className="list-disc ps-4">
                   {rule.looksFor.map((condition) => (
-                    <li key={condition}>{condition}</li>
+                    <li key={condition}>
+                      {methodConditionLabel(t, rule.key, condition)}
+                    </li>
                   ))}
                 </ul>
               </div>

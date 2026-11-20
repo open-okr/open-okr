@@ -2,7 +2,6 @@
 
 import {
   applyEnforcement,
-  COMMITTED_FLOOR_TEXT,
   committedBelowFloor,
   evaluateKeyResults,
   evaluateObjective,
@@ -108,6 +107,7 @@ const viewOf = (
   status: verdict.status,
   prompt: verdict.prompt,
   condition: verdict.condition,
+  wordChecksSkipped: verdict.wordChecksSkipped,
   examples: examplesFor(verdict.id),
   offenders,
 });
@@ -268,6 +268,10 @@ export function DraftCoach({
         bands={thresholds["quality.strengthScoreBands"]}
       />
 
+      {verdicts.some((verdict) => verdict.wordChecksSkipped) ? (
+        <p className="text-xs text-ink-3">{t("method.wordChecksSkipped")}</p>
+      ) : null}
+
       <div className="flex flex-wrap gap-1.5">
         {views
           .filter((view) => view.status !== "pass")
@@ -291,7 +295,7 @@ export function DraftCoach({
           data-testid="committed-floor"
           className="rounded-control bg-warn-bg px-2.5 py-1.5 text-xs text-warn"
         >
-          {COMMITTED_FLOOR_TEXT}
+          {t("method.coach.quality.committed_floor")}
         </p>
       ) : null}
 

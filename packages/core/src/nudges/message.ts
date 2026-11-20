@@ -28,7 +28,7 @@ import {
   okrSessions,
   type WorkspaceTx,
 } from "@openokr/db";
-import { coachLineFor, coachSentence, trigger } from "@openokr/method";
+import { coachLineFor, trigger } from "@openokr/method";
 import { eq } from "drizzle-orm";
 import type { MessageButton, MessageDraft } from "../channels/builder.ts";
 import type { ChannelProviderKey } from "../channels/capabilities.ts";
@@ -158,7 +158,9 @@ export async function nudgeDraft(
 ): Promise<MessageDraft> {
   const locale = input.locale ?? "en";
   const name = instanceNameOr(input.instanceName);
-  const title = trigger(input.ruleKey)?.title ?? input.ruleKey;
+  const title = trigger(input.ruleKey)
+    ? serverTranslate(locale, `method.rule.${input.ruleKey}.title`)
+    : input.ruleKey;
   const subject = await subjectOf(tx, input);
   const link = input.baseUrl
     ? `${withoutTrailingSlashes(input.baseUrl)}${subject.path}`
@@ -198,7 +200,9 @@ export async function nudgeDraft(
     text: [
       headline,
       "",
-      ...(line ? [coachSentence(line), ""] : []),
+      ...(line
+        ? [serverTranslate(locale, `method.coach.${line.ruleKey}`), ""]
+        : []),
       // The rule key, on this message as on every other proactive message.
       ruleLine,
     ].join("\n"),

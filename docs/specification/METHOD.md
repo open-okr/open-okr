@@ -411,7 +411,9 @@ Statuses: **pass**, **warn** (worth another look), **fail** (a structural defect
 
 **Strength score** = (passes + 0.5 × warns) / evaluated checks, as a percentage, computed over the objective, key result and alignment checks of the set being drafted. A todo check counts in the denominator and adds nothing. Checks that are off are not evaluated. The cycle checks feed phase completion and the publish gates, not the strength score. Below 45% is red, 45% to below 75% is amber, 75% and above is green. *Source:* OpenOKR default. A product heuristic, not a published measure.
 
-**What word lists can and cannot do.** OBJ-1, KR-5 and parts of KR-2 match words. A word list will always be behind English, and the checks are measured against published OKRs (`packages/method/test/published-examples.test.ts`). So no word-list check blocks by default. A person decides what blocks, not a word.
+**What word lists can and cannot do.** OBJ-1 and KR-5 match words from the §4 lists. KR-2 and the digit conditions of OBJ-1, OBJ-2 and KR-5 count digits; Arabic-Indic digits count as digits. A word list will always be behind English, and the checks are measured against published OKRs (`packages/method/test/published-examples.test.ts`). So no word-list check blocks by default. A person decides what blocks, not a word.
+
+**Text that is not English.** Whether a title or key result is English is read from the text, never from the reader's language setting: text whose letters are mostly Han or Arabic is not English. For such text the word-list conditions of OBJ-1 and KR-5 are not evaluated, OBJ-2 does not count words, and the coach says so: "The word checks read English only, so this text was not checked for them." A check not evaluated is left out of the strength score, as a check that is off is. Every other check, and every digit condition, runs as for English text. A check not evaluated never blocks a publish gate.
 
 ### 4.1 Objective checks
 
