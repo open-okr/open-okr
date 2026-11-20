@@ -1,0 +1,18 @@
+{
+  "objective": "Objektif",
+  "keyResult": "Keputusan utama",
+  "checkIn": "Kemas kini",
+  "confidence": "Keyakinan",
+  "champion": "Pemilik",
+  "reviewer": "Penyemak",
+  "space": "Ruang",
+  "cycle": "Kitaran",
+  "initiative": "Inisiatif",
+  "kpi": "KPI",
+  "health.onTrack": "Mengikut jadual",
+  "health.caution": "Berisiko",
+  "health.offTrack": "Tersasar",
+  "health.healthy": "Sihat",
+  "health.watch": "Perlu dipantau",
+  "health.unhealthy": "Tidak sihat"
+}

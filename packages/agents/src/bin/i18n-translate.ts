@@ -71,6 +71,34 @@ if (
 const sourceCatalogue = JSON.parse(
   await readFile(join(messagesDir, "en.json"), "utf8"),
 ) as Record<string, string>;
+const sourceGlossary = JSON.parse(
+  await readFile(join(glossaryDir, "en.json"), "utf8"),
+) as Record<string, string>;
+
+async function glossaryFor(locale: string) {
+  const path = join(glossaryDir, `${locale}.json`);
+  let glossary: Record<string, string> = {};
+  try {
+    glossary = JSON.parse(await readFile(path, "utf8")) as Record<
+      string,
+      string
+    >;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  const missing = Object.keys(sourceGlossary).filter((key) => !glossary[key]);
+  return { path, glossary, missing };
+}
+
+function estimateTokens(
+  keys: readonly string[],
+  source: Record<string, string>,
+): number {
+  return keys.reduce(
+    (total, key) => total + Math.ceil((source[key] ?? "").length / 3.5) + 15,
+    0,
+  );
+}
 
 // Load pending ledger
 let pendingLedger: Record<string, string[]> = {};
@@ -134,11 +162,13 @@ if (isEstimate) {
       candidateKeys = pendingLedger[loc] ?? [];
     }
 
-    let estimatedInputTokens = 0;
-    for (const k of candidateKeys) {
-      const eng = sourceCatalogue[k] ?? "";
-      estimatedInputTokens += Math.ceil(eng.length / 3.5) + 15;
-    }
+    const { missing } = await glossaryFor(loc);
+    process.stdout.write(
+      `[${loc}] ${missing.length} glossary terms selected.\n`,
+    );
+    const estimatedInputTokens =
+      estimateTokens(candidateKeys, sourceCatalogue) +
+      estimateTokens(missing, sourceGlossary);
     const estimatedOutputTokens = estimatedInputTokens;
     const estimatedCostUsd =
       (estimatedInputTokens * costInPerMillion +
@@ -201,25 +231,7 @@ for (const loc of targetLocales) {
     targetCatalogue = {};
   }
 
-  // Load glossary
-  let glossary: Record<string, string> = {};
-  try {
-    const locGlossaryPath = join(glossaryDir, `${loc}.json`);
-    glossary = JSON.parse(await readFile(locGlossaryPath, "utf8")) as Record<
-      string,
-      string
-    >;
-  } catch {
-    try {
-      const enGlossaryPath = join(glossaryDir, "en.json");
-      glossary = JSON.parse(await readFile(enGlossaryPath, "utf8")) as Record<
-        string,
-        string
-      >;
-    } catch {
-      glossary = {};
-    }
-  }
+  const { path: glossaryPath, glossary, missing } = await glossaryFor(loc);
 
   let candidateKeys: string[] = [];
   if (values.keys) {
@@ -231,18 +243,9 @@ for (const loc of targetLocales) {
     candidateKeys = pendingLedger[loc] ?? [];
   }
 
-  if (candidateKeys.length === 0) {
-    process.stdout.write(`  ok  ${loc}: 0 keys to translate.\n`);
-    continue;
-  }
-
-  // Token and cost estimation
-  let estimatedInputTokens = 0;
-  for (const k of candidateKeys) {
-    const eng = sourceCatalogue[k] ?? "";
-    // ~1 token per 3.5 chars + JSON and prompt overhead
-    estimatedInputTokens += Math.ceil(eng.length / 3.5) + 15;
-  }
+  const estimatedInputTokens =
+    estimateTokens(candidateKeys, sourceCatalogue) +
+    estimateTokens(missing, sourceGlossary);
   const estimatedOutputTokens = estimatedInputTokens;
   const estimatedCostUsd =
     (estimatedInputTokens * costInPerMillion +
@@ -253,16 +256,57 @@ for (const loc of targetLocales) {
     `[${loc}] ${candidateKeys.length} keys selected. Estimated ~${estimatedInputTokens} input tokens, ~${estimatedOutputTokens} output tokens, ~$${estimatedCostUsd.toFixed(4)} USD.\n`,
   );
 
-  if (isEstimate) {
-    continue;
-  }
-
   if (wantsLive && estimatedCostUsd > 1.0) {
     process.stderr.write(
       `Estimated cost ($${estimatedCostUsd.toFixed(4)}) exceeds 1.00 USD spending cap. Aborting.\n`,
     );
     await client.stop();
     process.exit(1);
+  }
+
+  if (missing.length > 0) {
+    const draft = await translateCatalogue({
+      provider: client,
+      model: modelId,
+      locale: loc,
+      keys: missing,
+      sourceCatalogue: sourceGlossary,
+      targetCatalogue: glossary,
+      pendingKeys: missing,
+      sameAsEnglish: { kpi: "Method acronym" },
+      onProgress: (message) => process.stdout.write(`  glossary: ${message}\n`),
+    });
+    totalSpendUsd +=
+      (draft.inputTokens * costInPerMillion +
+        draft.outputTokens * costOutPerMillion) /
+      1_000_000;
+    if (draft.translatedCount > 0) {
+      const orderedGlossary = Object.fromEntries(
+        Object.keys(sourceGlossary).flatMap((key) =>
+          glossary[key] === undefined ? [] : [[key, glossary[key]]],
+        ),
+      );
+      await writeFile(
+        glossaryPath,
+        `${JSON.stringify(orderedGlossary, null, 2)}\n`,
+      );
+    }
+    process.stdout.write(
+      `  ${loc} glossary: ${draft.translatedCount} translated, ${draft.failedCount} failed (${draft.inputTokens} in, ${draft.outputTokens} out)\n`,
+    );
+    if (draft.failures.length > 0) {
+      for (const failure of draft.failures) {
+        process.stdout.write(
+          `      FAIL glossary.${failure.key}: ${failure.error}\n`,
+        );
+      }
+      continue;
+    }
+  }
+
+  if (candidateKeys.length === 0) {
+    process.stdout.write(`  ok  ${loc}: 0 keys to translate.\n`);
+    continue;
   }
 
   const result = await translateCatalogue({
