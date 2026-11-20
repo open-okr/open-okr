@@ -333,14 +333,14 @@ export function EntityPicker({
             onClick={(event) => event.stopPropagation()}
             className={cn(
               FIELD_CONTROL_CLASS,
-              "pr-7",
+              "pe-7",
               error ? "border-bad-dot" : null,
               inputClassName,
             )}
           />
           <ChevronDown
             aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-ink-3"
+            className="pointer-events-none absolute top-1/2 end-2 size-3.5 -translate-y-1/2 text-ink-3"
           />
         </div>
         <Combobox.Portal>

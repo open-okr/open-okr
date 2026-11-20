@@ -79,7 +79,7 @@ export function MobileTabBar({
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-10 flex h-14 flex-none items-center justify-around border-t border-line bg-surface md:hidden"
+      className="fixed start-0 end-0 bottom-0 z-10 flex h-14 flex-none items-center justify-around border-t border-line bg-surface md:hidden"
     >
       {items.map((item) => (
         <Link

@@ -195,7 +195,7 @@ export function ToastProvider({
        * copilot panel at 40; the command palette is also 50 and is a modal
        * over the whole page, so a toast underneath it is the right way round.
        */}
-      <div className="pointer-events-none fixed right-4 bottom-16 left-4 z-50 flex flex-col items-end gap-2 md:bottom-4 md:left-auto md:w-96">
+      <div className="pointer-events-none fixed end-4 bottom-16 start-4 z-50 flex flex-col items-end gap-2 md:bottom-4 md:start-auto md:w-96">
         {/*
          * Both regions exist from first paint and stay. A live region created
          * in the same commit as its text is not reliably announced, which is
@@ -286,7 +286,7 @@ function ToastRegion({
                 onDismiss(toast.id);
                 toast.action?.run();
               }}
-              className="ml-auto shrink-0 rounded-md px-2 py-0.5 text-sm font-semibold text-brand-text hover:bg-ink/[0.045] focus:outline-2 focus:outline-brand"
+              className="ms-auto shrink-0 rounded-md px-2 py-0.5 text-sm font-semibold text-brand-text hover:bg-ink/[0.045] focus:outline-2 focus:outline-brand"
             >
               {toast.action.label}
             </button>
@@ -299,7 +299,7 @@ function ToastRegion({
               "rounded-md px-1.5 py-0.5 text-sm text-ink-3 hover:text-ink focus:outline-2 focus:outline-brand",
               // The action takes the push to the right edge when there is one,
               // so the two buttons sit together rather than apart.
-              !toast.action && "ml-auto",
+              !toast.action && "ms-auto",
             )}
           >
             ✕

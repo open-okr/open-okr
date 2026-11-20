@@ -82,7 +82,7 @@ const SuggestionList = forwardRef<SuggestionListHandle, SuggestionListProps>(
             key={item.id}
             type="button"
             className={cn(
-              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-ink-2",
+              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-ink-2",
               index === selected
                 ? "bg-brand-weak text-brand-text"
                 : "hover:bg-raised",
@@ -129,7 +129,11 @@ export function createSuggestionRender<TItem extends SuggestionItem>() {
       }
       element.style.position = "fixed";
       element.style.top = `${rect.bottom + 4}px`;
-      element.style.left = `${rect.left}px`;
+      const inlineStart =
+        element.dir === "rtl"
+          ? document.documentElement.clientWidth - rect.right
+          : rect.left;
+      element.style.insetInlineStart = `${inlineStart}px`;
       element.style.zIndex = "50";
     }
 
@@ -157,6 +161,7 @@ export function createSuggestionRender<TItem extends SuggestionItem>() {
           props: { items: props.items, command: props.command },
         });
         element = renderer.element;
+        element.dir = getComputedStyle(props.editor.view.dom).direction;
         document.body.append(element);
         position(props.clientRect);
       },

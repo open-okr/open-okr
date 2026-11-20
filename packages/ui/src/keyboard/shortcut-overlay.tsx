@@ -53,7 +53,12 @@ export function ShortcutOverlay() {
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 bg-ink/20 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup className="fixed top-1/2 left-1/2 max-h-[80vh] w-105 -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-4 shadow-(--shadow-popover)">
+        <Dialog.Popup
+          className={
+            /* direction-neutral: position the popup at the viewport midpoint. */
+            "fixed top-1/2 left-1/2 max-h-[80vh] w-105 -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-4 shadow-(--shadow-popover)"
+          }
+        >
           <Dialog.Title className="text-lg font-bold text-ink">
             {t("shell.shortcuts.title")}
           </Dialog.Title>

@@ -84,7 +84,7 @@ export function MobileMore({
             setOpen(false);
           }
         }}
-        className="fixed inset-x-0 bottom-14 max-h-[70vh] overflow-y-auto border-t border-line bg-surface px-4 py-3 shadow-lg"
+        className="fixed start-0 end-0 bottom-14 max-h-[70vh] overflow-y-auto border-t border-line bg-surface px-4 py-3 shadow-lg"
       >
         {children}
       </div>
