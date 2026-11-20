@@ -14,7 +14,12 @@
       "ignoreBinaries": ["openssl"]
     },
     "apps/web": {
-      "entry": ["instrumentation.node.ts", "test/**/*.test.ts"]
+      "entry": [
+        "instrumentation.node.ts",
+        "public/fonts/noto-sans-arabic/fonts.css",
+        "public/fonts/noto-sans-sc/fonts.css",
+        "test/**/*.test.ts"
+      ]
     },
     "packages/core": {
       "ignoreBinaries": ["openssl"]
