@@ -861,6 +861,7 @@
   "admin.general.general": "Umum",
   "admin.general.generalSettingsForm.freeMailDomain": "{domain} ialah penyedia e-mel percuma dan tidak boleh dipercayai: sesiapa sahaja boleh mempunyai alamat di sana.",
   "admin.general.generalSettingsForm.language": "Bahasa",
+  "admin.general.generalSettingsForm.unavailableLanguage": "Tidak tersedia: {code}",
   "admin.general.generalSettingsForm.notADomain": "{domain} bukan domain. Tulis seperti example.com, tanpa @ dan tanpa alamat web.",
   "admin.general.generalSettingsForm.returnedToDefaults": "Kembali kepada tetapan lalai.",
   "admin.general.generalSettingsForm.saved": "Disimpan.",

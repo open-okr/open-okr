@@ -861,6 +861,7 @@
   "admin.general.general": "General",
   "admin.general.generalSettingsForm.freeMailDomain": "{domain} is a free mail provider and cannot be trusted: anybody can have an address there.",
   "admin.general.generalSettingsForm.language": "Language",
+  "admin.general.generalSettingsForm.unavailableLanguage": "Not available: {code}",
   "admin.general.generalSettingsForm.notADomain": "{domain} is not a domain. Write it like example.com, with no @ and no web address.",
   "admin.general.generalSettingsForm.returnedToDefaults": "Back to the defaults.",
   "admin.general.generalSettingsForm.saved": "Saved.",

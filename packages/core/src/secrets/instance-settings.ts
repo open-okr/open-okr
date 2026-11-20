@@ -20,6 +20,7 @@ import { systemSettings, withInstanceAdmin } from "@openokr/db";
 import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { languageSchema } from "../settings/registry.ts";
 import {
   decryptSecret,
   encryptSecret,
@@ -158,6 +159,10 @@ export async function writeSettings(
         write.secret === undefined
           ? undefined
           : encryptSecret(ring, write.secret);
+      const value =
+        write.key === "instance.language"
+          ? languageSchema.parse(write.value)
+          : write.value;
 
       const row = {
         key: write.key,
@@ -165,7 +170,7 @@ export async function writeSettings(
         // setting that exists with no plain part (a secret-only row such as
         // the mail password) is a different thing from a column with nothing
         // in it, and only one of the two is storable here.
-        value: write.value === undefined ? sql`'null'::jsonb` : write.value,
+        value: value === undefined ? sql`'null'::jsonb` : value,
         secretCiphertext: sealed?.ciphertext ?? null,
         secretDataKey: sealed?.dataKey ?? null,
         secretKeyId: sealed?.keyId ?? null,

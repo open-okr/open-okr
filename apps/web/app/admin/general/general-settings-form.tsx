@@ -1,6 +1,6 @@
 "use client";
 
-import { LOCALES } from "@openokr/formats";
+import { isShippedLocale, LOCALES } from "@openokr/formats";
 import {
   Button,
   Card,
@@ -198,12 +198,12 @@ export function GeneralSettingsForm({
                 {t(l.endonymKey)}
               </option>
             ))}
-            {settings.language &&
-            !LOCALES.filter((l) => l.shipped).some(
-              (l) => l.code === settings.language,
-            ) ? (
-              <option value={String(settings.language)}>
-                {String(settings.language)}
+            {!isShippedLocale(stored.language) ? (
+              // A disabled option stays visible without submitting the old code.
+              <option value={stored.language} disabled>
+                {t("admin.general.generalSettingsForm.unavailableLanguage", {
+                  code: stored.language,
+                })}
               </option>
             ) : null}
           </SelectInput>

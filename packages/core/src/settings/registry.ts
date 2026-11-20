@@ -4,6 +4,7 @@ import {
   IDENTIFIER_MAX_LENGTH,
   isHostName,
   isListedTimezone,
+  isShippedLocale,
   matchListedTimezone,
   ONE_WORD_PATTERN,
 } from "@openokr/formats";
@@ -147,7 +148,14 @@ export const timezoneSchema = z
   // takes `EST`, `+08:00` and a name in the wrong case, and each was stored.
   .refine(isListedTimezone, { message: "not a timezone on the list" });
 
-export const languageSchema = z.string().trim().min(2).max(35);
+export const languageSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(35)
+  .refine((value): boolean => isShippedLocale(value), {
+    message: "not a shipped locale",
+  });
 
 export const brandingSchema = z
   .object({

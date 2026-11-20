@@ -3740,7 +3740,15 @@
                               "type": "string",
                               "enum": [
                                 "en",
-                                "ms"
+                                "ms",
+                                "zh-Hans",
+                                "es",
+                                "ar",
+                                "de",
+                                "pt",
+                                "fr",
+                                "it",
+                                "id"
                               ]
                             },
                             {
