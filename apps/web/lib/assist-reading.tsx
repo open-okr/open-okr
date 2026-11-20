@@ -88,7 +88,7 @@ export function AssistReading({
               <h3 className="text-xs font-semibold text-ink-2">
                 {pointsHeading}
               </h3>
-              <ul className="flex list-disc flex-col gap-1 pl-4">
+              <ul className="flex list-disc flex-col gap-1 ps-4">
                 {reading.points.map((point) => (
                   <li key={point} className="text-sm text-ink-2">
                     {point}

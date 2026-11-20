@@ -55,7 +55,7 @@ export default async function DefaultPlanReviewPage() {
         <>
           {noCredits ? (
             <p
-              className="rounded-lg border-y border-r border-l-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn"
+              className="rounded-lg border-y border-e border-s-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn"
               role="status"
               data-testid="default-plan-no-credits"
             >

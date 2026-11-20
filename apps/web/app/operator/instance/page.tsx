@@ -232,7 +232,7 @@ export default async function OperatorInstancePage() {
                         ?.summary ?? ""}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-right align-top">
+                  <td className="px-4 py-2.5 text-end align-top">
                     <Chip tone={flag.value ? "ok" : "neutral"}>
                       {flag.value ? t("admin.ai.on") : t("admin.ai.off")}
                     </Chip>

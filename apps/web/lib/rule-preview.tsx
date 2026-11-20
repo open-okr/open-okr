@@ -74,7 +74,7 @@ export function RulePreview({
             {rule.looksFor.length > 0 ? (
               <div>
                 <p>{t("rulePreview.looksFor")}</p>
-                <ul className="list-disc pl-4">
+                <ul className="list-disc ps-4">
                   {rule.looksFor.map((condition) => (
                     <li key={condition}>{condition}</li>
                   ))}

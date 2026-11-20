@@ -1,5 +1,6 @@
 "use client";
 
+import { useDirection } from "@base-ui-components/react/direction-provider";
 import { Button, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import {
@@ -163,6 +164,7 @@ export function ProductTour({
   readonly askAvailable: boolean;
   readonly instanceName: string;
 }) {
+  const direction = useDirection();
   const { t } = useTranslations();
   const router = useRouter();
   const titleId = useId();
@@ -383,27 +385,41 @@ export function ProductTour({
     typeof window === "undefined" ? 1024 : window.innerWidth;
   const viewportHeight =
     typeof window === "undefined" ? 768 : window.innerHeight;
-  const besideLeft =
+  let rectStart = 0;
+  if (rect) {
+    rectStart =
+      direction === "rtl" ? viewportWidth - rect.left - rect.width : rect.left;
+  }
+  const besideStart =
     rect !== null &&
-    rect.left < viewportWidth / 3 &&
-    rect.left + rect.width + GAP + CARD_WIDTH < viewportWidth;
+    rectStart < viewportWidth / 3 &&
+    rectStart + rect.width + GAP + CARD_WIDTH < viewportWidth;
   const lowerHalf =
     rect !== null && rect.top + rect.height / 2 > viewportHeight / 2;
-  const cardLeft = rect
-    ? Math.min(Math.max(GAP, rect.left), viewportWidth - CARD_WIDTH - GAP)
+  const cardStart = rect
+    ? Math.min(Math.max(GAP, rectStart), viewportWidth - CARD_WIDTH - GAP)
     : 0;
   const cardStyle = rect
-    ? besideLeft
+    ? besideStart
       ? lowerHalf
         ? {
             bottom: Math.max(GAP, viewportHeight - rect.top - rect.height),
-            left: rect.left + rect.width + GAP,
+            insetInlineStart: rectStart + rect.width + GAP,
           }
-        : { top: Math.max(GAP, rect.top), left: rect.left + rect.width + GAP }
+        : {
+            top: Math.max(GAP, rect.top),
+            insetInlineStart: rectStart + rect.width + GAP,
+          }
       : lowerHalf
-        ? { bottom: viewportHeight - rect.top + GAP, left: cardLeft }
-        : { top: rect.top + rect.height + GAP, left: cardLeft }
-    : { top: GAP * 6, left: Math.max(GAP, (viewportWidth - CARD_WIDTH) / 2) };
+        ? {
+            bottom: viewportHeight - rect.top + GAP,
+            insetInlineStart: cardStart,
+          }
+        : { top: rect.top + rect.height + GAP, insetInlineStart: cardStart }
+    : {
+        top: GAP * 6,
+        insetInlineStart: Math.max(GAP, (viewportWidth - CARD_WIDTH) / 2),
+      };
 
   return (
     <div className="fixed inset-0 z-50" data-testid="tour" data-step={step.id}>
@@ -417,7 +433,7 @@ export function ProductTour({
           className="pointer-events-none absolute rounded-lg ring-2 ring-brand motion-safe:transition-all motion-safe:duration-200"
           style={{
             top: rect.top,
-            left: rect.left,
+            insetInlineStart: rectStart,
             width: rect.width,
             height: rect.height,
             boxShadow: "0 0 0 9999px rgb(15 23 42 / 0.55)",
@@ -475,7 +491,7 @@ export function ProductTour({
               {t("tour.skip")}
             </Button>
           )}
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <div className="ms-auto flex flex-wrap items-center justify-end gap-2">
             {index > 0 ? (
               <Button variant="ghost" onClick={back} data-testid="tour-back">
                 {t("tour.back")}

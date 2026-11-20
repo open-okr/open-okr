@@ -64,9 +64,17 @@ function Step({
       href={href}
       className="inline-flex items-center gap-1.5 text-ink-3 hover:text-brand-text"
     >
-      {keys === "[" ? <span aria-hidden="true">{arrow}</span> : null}
+      {keys === "[" ? (
+        <span aria-hidden="true" className="rtl:-scale-x-100">
+          {arrow}
+        </span>
+      ) : null}
       {label}
-      {keys === "]" ? <span aria-hidden="true">{arrow}</span> : null}
+      {keys === "]" ? (
+        <span aria-hidden="true" className="rtl:-scale-x-100">
+          {arrow}
+        </span>
+      ) : null}
       <Kbd aria-hidden="true">{keys}</Kbd>
     </Link>
   );

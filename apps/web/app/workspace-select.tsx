@@ -36,7 +36,7 @@ export function WorkspaceSelect({
         disabled={pending}
         onChange={(event) => event.currentTarget.form?.requestSubmit()}
         className="min-w-0 flex-1"
-        inputClassName="-ml-0.5 h-auto w-full rounded-md border-none bg-transparent px-0 text-xs text-ink-4 focus:ring-0"
+        inputClassName="-ms-0.5 h-auto w-full rounded-md border-none bg-transparent px-0 text-xs text-ink-4 focus:ring-0"
       >
         {memberships.map((membership) => (
           <option key={membership.workspaceId} value={membership.workspaceId}>

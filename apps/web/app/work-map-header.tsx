@@ -112,8 +112,8 @@ export async function WorkMapContextStrip({
         <span
           className={
             context.daysToDeadline < 0
-              ? "ml-auto font-semibold text-bad"
-              : "ml-auto font-semibold text-brand-text"
+              ? "ms-auto font-semibold text-bad"
+              : "ms-auto font-semibold text-brand-text"
           }
         >
           {context.daysToDeadline < 0

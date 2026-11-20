@@ -98,7 +98,7 @@ function OneBlocker({
         <span className="min-w-0 text-sm text-ink">
           {blocker.keyResultTitle ??
             t("session.detail.blockerPanel.noKeyResultNamed")}
-          <span className="ml-1.5 text-xs text-ink-3">
+          <span className="ms-1.5 text-xs text-ink-3">
             {blocker.type.replace(/_/g, " ")} · {blocker.ownerName}
           </span>
         </span>
@@ -113,7 +113,7 @@ function OneBlocker({
       <p className="text-xs text-ink-2">
         {blocker.nextAction}
         {blocker.resolved || blocker.dueOn === "" ? null : (
-          <span className="ml-1.5 text-ink-3">
+          <span className="ms-1.5 text-ink-3">
             {t("session.detail.blockerPanel.dueBy", { date: blocker.dueOn })}
           </span>
         )}

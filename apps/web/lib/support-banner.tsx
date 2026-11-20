@@ -85,7 +85,7 @@ export async function SupportBanner({
 
   return (
     <div
-      className="mb-4.5 flex flex-wrap items-start gap-3 rounded-lg border-y border-r border-l-4 border-bad-dot bg-bad-bg px-4 py-3 text-bad"
+      className="mb-4.5 flex flex-wrap items-start gap-3 rounded-lg border-y border-e border-s-4 border-bad-dot bg-bad-bg px-4 py-3 text-bad"
       // `alert` rather than `status`: a screen reader should be told this
       // without waiting for a pause, because it is about who is reading the
       // page they are on.

@@ -99,7 +99,7 @@ export function ChecklistLine({
             aria-busy={(pending && acting === "remove") || undefined}
             aria-label={`${t("common.remove")} "${title}"`}
             onClick={guardPress(pending, () => run("remove", onRemove))}
-            className="ml-auto inline-flex items-center gap-1.5 text-xs text-ink-4 hover:text-bad"
+            className="ms-auto inline-flex items-center gap-1.5 text-xs text-ink-4 hover:text-bad"
           >
             {pending && acting === "remove" ? <Spinner /> : null}
             <span>{t("common.remove")}</span>

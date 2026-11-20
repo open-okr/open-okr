@@ -80,7 +80,7 @@ async function SessionRow({ row }: { readonly row: Row }) {
           ) : null}
         </p>
       </div>
-      <span className="ml-auto flex-none text-xs font-semibold text-brand-text">
+      <span className="ms-auto flex-none text-xs font-semibold text-brand-text">
         {running ? t("sessions.rejoin") : t("cycle.drafting.open")}
       </span>
     </Link>

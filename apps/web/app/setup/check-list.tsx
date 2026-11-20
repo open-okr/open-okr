@@ -40,7 +40,7 @@ export function CheckList({ tests }: { tests: readonly ConnectionTest[] }) {
             <VerdictDot state={VERDICT_STATES[test.outcome]} />
             {PORT_NAMES[test.port] ?? test.port}: {LABELS[test.outcome]}
           </dt>
-          <dd className="pl-4 text-xs text-ink-4">{test.detail}</dd>
+          <dd className="ps-4 text-xs text-ink-4">{test.detail}</dd>
         </div>
       ))}
     </dl>

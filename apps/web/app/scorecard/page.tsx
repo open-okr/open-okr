@@ -165,23 +165,23 @@ export default async function ScorecardPage() {
               </caption>
               <thead>
                 <tr className="border-line border-b text-xs text-ink-3">
-                  <th className="px-3 py-1.5 text-left font-semibold">
+                  <th className="px-3 py-1.5 text-start font-semibold">
                     {t("scorecard.cycle")}
                   </th>
-                  <th className="px-3 py-1.5 text-left font-semibold">
+                  <th className="px-3 py-1.5 text-start font-semibold">
                     {t("scorecard.result")}
                   </th>
-                  <th className="px-3 py-1.5 text-left font-semibold">
+                  <th className="px-3 py-1.5 text-start font-semibold">
                     {t("scorecard.verdict")}
                   </th>
-                  <th className="px-3 py-1.5 text-right font-semibold">1.0</th>
-                  <th className="px-3 py-1.5 text-right font-semibold">
+                  <th className="px-3 py-1.5 text-end font-semibold">1.0</th>
+                  <th className="px-3 py-1.5 text-end font-semibold">
                     {t("scorecard.strong")}
                   </th>
-                  <th className="px-3 py-1.5 text-right font-semibold">
+                  <th className="px-3 py-1.5 text-end font-semibold">
                     {t("scorecard.partial")}
                   </th>
-                  <th className="px-3 py-1.5 text-right font-semibold">
+                  <th className="px-3 py-1.5 text-end font-semibold">
                     {t("scorecard.little")}
                   </th>
                 </tr>
@@ -194,7 +194,7 @@ export default async function ScorecardPage() {
                   >
                     <td className="px-3 py-2">
                       <span className="text-ink">{row.cycleName}</span>
-                      <span className="ml-1.5 text-xs text-ink-4">
+                      <span className="ms-1.5 text-xs text-ink-4">
                         {row.startsOn}
                       </span>
                       {/* §12 (P9-T14c): the bands this cycle was graded
@@ -234,16 +234,16 @@ export default async function ScorecardPage() {
                         {verdictLabel(row.verdict)}
                       </Chip>
                     </td>
-                    <td className="px-3 py-2 text-right text-ink-2 tabular-nums">
+                    <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
                       {row.fullyAchieved}
                     </td>
-                    <td className="px-3 py-2 text-right text-ink-2 tabular-nums">
+                    <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
                       {row.strong}
                     </td>
-                    <td className="px-3 py-2 text-right text-ink-2 tabular-nums">
+                    <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
                       {row.partial}
                     </td>
-                    <td className="px-3 py-2 text-right text-ink-2 tabular-nums">
+                    <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
                       {row.little}
                     </td>
                   </tr>

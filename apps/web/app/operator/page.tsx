@@ -176,7 +176,7 @@ export default async function OperatorWorkspacesPage({
 
       {withoutAPlan > 0 ? (
         <div
-          className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border-y border-r border-l-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border-y border-e border-s-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn"
           role="status"
           data-testid="no-plan-notice"
         >
@@ -200,7 +200,7 @@ export default async function OperatorWorkspacesPage({
 
       {overdue > 0 ? (
         <p
-          className="rounded-lg border-y border-r border-l-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn"
+          className="rounded-lg border-y border-e border-s-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn"
           role="status"
         >
           {t("operator.workspaces.overdue", { count: overdue })}
@@ -314,7 +314,7 @@ export default async function OperatorWorkspacesPage({
             <div className="overflow-x-auto rounded-lg border border-line bg-surface">
               <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="border-line border-b text-left">
+                  <tr className="border-line border-b text-start">
                     <th className="p-3 font-medium text-ink-2">
                       {t("operator.workspaces.columnWorkspace")}
                     </th>
@@ -324,13 +324,13 @@ export default async function OperatorWorkspacesPage({
                     <th className="p-3 font-medium text-ink-2">
                       {t("operator.workspaces.columnPlan")}
                     </th>
-                    <th className="p-3 text-right font-medium text-ink-2">
+                    <th className="p-3 text-end font-medium text-ink-2">
                       {t("operator.workspaces.columnSeats")}
                     </th>
-                    <th className="p-3 text-right font-medium text-ink-2">
+                    <th className="p-3 text-end font-medium text-ink-2">
                       {t("operator.workspaces.columnGoals")}
                     </th>
-                    <th className="p-3 text-right font-medium text-ink-2">
+                    <th className="p-3 text-end font-medium text-ink-2">
                       {t("operator.workspaces.columnStorage")}
                     </th>
                     <th className="p-3 font-medium text-ink-2">
@@ -398,7 +398,7 @@ export default async function OperatorWorkspacesPage({
                           );
                           return (
                             <td
-                              className={`p-3 text-right tabular-nums ${
+                              className={`p-3 text-end tabular-nums ${
                                 seats.atLimit ? "font-semibold text-warn" : ""
                               }`}
                             >
@@ -408,12 +408,12 @@ export default async function OperatorWorkspacesPage({
                             </td>
                           );
                         })()}
-                        <td className="p-3 text-right tabular-nums">
+                        <td className="p-3 text-end tabular-nums">
                           {rows
                             ? rows.goalCount
                             : t("operator.workspaces.notMeasured")}
                         </td>
-                        <td className="p-3 text-right tabular-nums">
+                        <td className="p-3 text-end tabular-nums">
                           {rows
                             ? formatBytes(rows.storageBytes)
                             : t("operator.workspaces.notMeasured")}

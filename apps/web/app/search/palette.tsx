@@ -563,8 +563,8 @@ export function CommandPalette({
                         onClick={() => run(row)}
                         className={
                           selected
-                            ? "flex w-full cursor-pointer flex-col items-start gap-0.5 bg-brand-weak px-3 py-2 text-left outline-2 outline-brand -outline-offset-2"
-                            : "flex w-full cursor-pointer flex-col items-start gap-0.5 px-3 py-2 text-left"
+                            ? "flex w-full cursor-pointer flex-col items-start gap-0.5 bg-brand-weak px-3 py-2 text-start outline-2 outline-brand -outline-offset-2"
+                            : "flex w-full cursor-pointer flex-col items-start gap-0.5 px-3 py-2 text-start"
                         }
                       >
                         <span className="flex w-full items-baseline gap-2">
@@ -572,7 +572,7 @@ export function CommandPalette({
                             {row.title}
                           </span>
                           {row.kind ? (
-                            <span className="ml-auto shrink-0 text-xs text-ink-3">
+                            <span className="ms-auto shrink-0 text-xs text-ink-3">
                               {t(row.kind)}
                             </span>
                           ) : null}
@@ -606,7 +606,7 @@ export function CommandPalette({
             {t("search.palette.hintClose")}
           </span>
           {pending && found ? (
-            <span role="status" className="ml-auto">
+            <span role="status" className="ms-auto">
               {t("search.palette.looking")}
             </span>
           ) : null}
