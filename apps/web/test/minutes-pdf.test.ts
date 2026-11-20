@@ -66,7 +66,7 @@ describe("minutes PDF localisation (languages §13, AC-28)", () => {
     const text = minutesToMarkdown(minutes, "ms");
     expect(text).toContain("## Ringkasan eksekutif");
     expect(text).toContain("17 Jun 2026");
-    expect(text).toContain(new Intl.NumberFormat("ms-MY").format(1_250));
+    expect(text).toContain("1,250");
     expect(text).not.toContain("## Executive summary");
     expect(text).not.toContain("2026-06-17");
   });
