@@ -71,6 +71,7 @@ describe("locales registry", () => {
       "de",
       "pt",
       "fr",
+      "it",
     ]);
     for (const loc of LOCALES) {
       if (
@@ -81,7 +82,8 @@ describe("locales registry", () => {
         loc.code === "ar" ||
         loc.code === "de" ||
         loc.code === "pt" ||
-        loc.code === "fr"
+        loc.code === "fr" ||
+        loc.code === "it"
       ) {
         expect(loc.shipped, `${loc.code} should be shipped`).toBe(true);
         expect(isShippedLocale(loc.code)).toBe(true);

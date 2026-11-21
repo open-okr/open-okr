@@ -111,7 +111,7 @@ describe("a signed-out page", () => {
 
   test("AC-1: a German instance renders German when the visitor has no available choice", async () => {
     state.deShipped = true;
-    state.acceptLanguage = "it";
+    state.acceptLanguage = "id";
     state.instanceLanguage = "de";
     expect(await resolveLocale()).toBe("de");
   });
@@ -128,7 +128,7 @@ describe("a signed-out page", () => {
   });
 
   test("a browser language the product does not ship falls to the instance's", async () => {
-    state.acceptLanguage = "it-IT,it;q=0.9";
+    state.acceptLanguage = "id-ID,id;q=0.9";
     state.instanceLanguage = "ms";
     expect(await resolveLocale()).toBe("ms");
   });
@@ -139,7 +139,7 @@ describe("a signed-out page", () => {
   });
 
   test("an instance language the product does not ship falls to English", async () => {
-    state.acceptLanguage = "it";
+    state.acceptLanguage = "id";
     state.instanceLanguage = "id";
     expect(await resolveLocale()).toBe("en");
   });
@@ -191,7 +191,7 @@ describe("a signed-in page, unchanged", () => {
     state.signedIn = true;
     state.instanceLanguage = "ms";
     state.workspaceLanguage = "en";
-    state.memberLanguage = "it"; // it is not shipped, skipped
+    state.memberLanguage = "id"; // id is not shipped, skipped
     expect(await resolveLocale()).toBe("en");
 
     // Member chooses "Follow workspace" (memberLanguage becomes null)

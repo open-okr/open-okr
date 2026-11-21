@@ -113,7 +113,7 @@ export const LOCALES = [
     direction: "ltr",
     endonymKey: "appearance.italian",
     fontFamily: "Geist",
-    shipped: false,
+    shipped: true,
     languageName: "Italian (Italiano)",
   },
   {

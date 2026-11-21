@@ -90,7 +90,7 @@ test("signed in, the member's and the workspace's language still win over a Mala
 });
 
 test.describe("a browser asking for a language the product does not ship", () => {
-  test.use({ locale: "it-IT" });
+  test.use({ locale: "id-ID" });
 
   test("reads the sign-in page in the instance's language", async ({ page }) => {
     await page.goto("/sign-in");

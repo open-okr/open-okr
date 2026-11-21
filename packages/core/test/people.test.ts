@@ -840,7 +840,7 @@ describe("a member's language (P6-G22a)", () => {
       callAction(
         { pool: wb.appPool, ...context(OWNER) },
         "people.updateOwnProfile",
-        { language: "it" } as never,
+        { language: "id" } as never,
       ),
     ).rejects.toThrow();
   });

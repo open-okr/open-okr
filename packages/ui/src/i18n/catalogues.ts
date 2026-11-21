@@ -10,6 +10,7 @@ import de from "./messages/de.json";
 import en from "./messages/en.json";
 import es from "./messages/es.json";
 import fr from "./messages/fr.json";
+import it from "./messages/it.json";
 import ms from "./messages/ms.json";
 import pt from "./messages/pt.json";
 import zhHans from "./messages/zh-Hans.json";
@@ -34,6 +35,7 @@ export const CATALOGUES: Readonly<
   de,
   pt,
   fr,
+  it,
   "pseudo-rtl": PSEUDO_RTL.catalogue,
 };
 
