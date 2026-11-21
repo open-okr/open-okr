@@ -211,7 +211,8 @@
                 "type": "string",
                 "enum": [
                   "en",
-                  "ms"
+                  "ms",
+                  "zh-Hans"
                 ]
               },
               {

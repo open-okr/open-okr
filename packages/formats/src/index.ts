@@ -57,6 +57,7 @@ export {
 export {
   type Catalogue,
   type MessageValues,
+  messageHasLetters,
   messageHoles,
   translate,
 } from "./messages.ts";

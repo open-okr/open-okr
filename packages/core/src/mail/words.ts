@@ -5,28 +5,27 @@
  * Words now live in the server message catalogues under `packages/core/src/i18n/messages/`.
  * This file preserves typed exports and resolution functions.
  */
-import { isShippedLocale } from "@openokr/formats";
-import { serverTranslate } from "../i18n/catalogue.ts";
+import {
+  isShippedLocale,
+  SHIPPED_LOCALES,
+  type ShippedLocaleCode,
+} from "@openokr/formats";
+import { getServerCatalogue, serverTranslate } from "../i18n/catalogue.ts";
 import en from "../i18n/messages/en.json" with { type: "json" };
-import ms from "../i18n/messages/ms.json" with { type: "json" };
 
-export type MailLocale = "en" | "ms";
+export type MailLocale = ShippedLocaleCode;
 
 export type MailWordKey = keyof typeof en;
 
 const WORDS: Readonly<
   Record<MailLocale, Readonly<Record<MailWordKey, string>>>
-> = {
-  en,
-  ms: ms as unknown as Record<MailWordKey, string>,
-};
+> = Object.fromEntries(
+  SHIPPED_LOCALES.map((locale) => [locale, getServerCatalogue(locale)]),
+) as Record<MailLocale, Readonly<Record<MailWordKey, string>>>;
 
-/** The locale a stored language reads as: Malay where it says so, English otherwise. */
+/** The locale a stored language reads as, with English as the fallback. */
 export function mailLocale(language: string | null | undefined): MailLocale {
-  if (language && isShippedLocale(language)) {
-    return language as MailLocale;
-  }
-  return "en";
+  return isShippedLocale(language) ? language : "en";
 }
 
 export type MailWords = (

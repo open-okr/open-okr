@@ -1,3 +1,25 @@
+import { LOCALES } from "@openokr/formats";
+
+const ENDONYMS = Object.fromEntries(
+  LOCALES.map(({ endonymKey }) => [endonymKey, "Language endonym"]),
+);
+
+const VENDOR_NAMES = {
+  "admin.ai.providerAnthropic": "Vendor name",
+  "admin.ai.providerGoogle": "Vendor name",
+  "admin.ai.providerOpenai": "Vendor name",
+  "admin.ai.providerOllama": "Product name",
+  "admin.ai.providerOpenrouter": "Product name",
+  "admin.channels.groupWhatsapp": "Product name",
+  "channels.slack": "Product name",
+  "channels.teams": "Product name",
+  "channels.telegram": "Product name",
+  "channels.whatsapp": "Product name",
+  "people.detail.profileForm.slack": "Product name",
+  "people.detail.profileForm.telegram": "Product name",
+  "people.detail.profileForm.whatsapp": "Product name",
+};
+
 /**
  * Ledger of keys whose values are legitimately identical to English
  * in each language (docs/design/languages.md §6.4).
@@ -6,7 +28,9 @@
  * is the same as in English.
  */
 export const SAME_AS_ENGLISH: Record<string, Record<string, string>> = {
+  "zh-Hans": { ...ENDONYMS, ...VENDOR_NAMES },
   ms: {
+    "appearance.simplifiedChinese": "Language endonym",
     "admin.branding.images.faviconTitle":
       'Product, vendor and language names. "Logo" and "Favicon" are the words Malay uses, and the file summary is two placeholders and a unit (docs/design/workspace-logo-favicon.md).',
     "admin.branding.images.fileSummary":

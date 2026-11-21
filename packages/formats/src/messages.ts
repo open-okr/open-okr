@@ -24,6 +24,11 @@ export function messageHoles(message: string): readonly string[] {
   ];
 }
 
+/** Whether a template contains letters outside named holes. */
+export function messageHasLetters(message: string): boolean {
+  return /\p{L}/u.test(message.replace(HOLE, ""));
+}
+
 /**
  * Plural rule cache per intl tag to avoid recreating Intl.PluralRules instances.
  */

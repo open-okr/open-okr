@@ -59,7 +59,7 @@ export const LOCALES = [
     direction: "ltr",
     endonymKey: "appearance.simplifiedChinese",
     fontFamily: "Geist, then Noto Sans SC",
-    shipped: false,
+    shipped: true,
     languageName: "Simplified Chinese (简体中文)",
   },
   {

@@ -16,7 +16,7 @@ import {
   createAIProvider,
   MockAIProvider,
 } from "@openokr/adapters";
-import { findSeededModel } from "@openokr/core";
+import { findSeededModel, messageHasLetters } from "@openokr/core";
 import { translateCatalogue } from "../i18n-translate.ts";
 
 const { values } = parseArgs({
@@ -37,6 +37,7 @@ const repoRoot = resolve(
 );
 const uiI18nDir = join(repoRoot, "packages/ui/src/i18n");
 const messagesDir = join(uiI18nDir, "messages");
+const serverMessagesDir = join(repoRoot, "packages/core/src/i18n/messages");
 const pendingPath = join(uiI18nDir, "pending.json");
 const sameAsEnglishPath = join(uiI18nDir, "same-as-english.ts");
 const glossaryDir = join(uiI18nDir, "glossary");
@@ -67,59 +68,131 @@ if (
   process.exit(2);
 }
 
-// Load source catalogue
-const sourceCatalogue = JSON.parse(
-  await readFile(join(messagesDir, "en.json"), "utf8"),
-) as Record<string, string>;
-const sourceGlossary = JSON.parse(
-  await readFile(join(glossaryDir, "en.json"), "utf8"),
-) as Record<string, string>;
+type Messages = Record<string, string>;
+type EnglishExceptions = Record<string, Record<string, string>>;
+
+async function readMessages(path: string, optional = false): Promise<Messages> {
+  try {
+    return JSON.parse(await readFile(path, "utf8")) as Messages;
+  } catch (error) {
+    if (optional && (error as NodeJS.ErrnoException).code === "ENOENT")
+      return {};
+    throw error;
+  }
+}
+
+const [sourceCatalogue, sourceServerCatalogue, sourceGlossary] =
+  await Promise.all([
+    readMessages(join(messagesDir, "en.json")),
+    readMessages(join(serverMessagesDir, "en.json")),
+    readMessages(join(glossaryDir, "en.json")),
+  ]);
 
 async function glossaryFor(locale: string) {
   const path = join(glossaryDir, `${locale}.json`);
-  let glossary: Record<string, string> = {};
-  try {
-    glossary = JSON.parse(await readFile(path, "utf8")) as Record<
-      string,
-      string
-    >;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-  }
+  const glossary = await readMessages(path, true);
   const missing = Object.keys(sourceGlossary).filter((key) => !glossary[key]);
   return { path, glossary, missing };
 }
 
-function estimateTokens(
-  keys: readonly string[],
-  source: Record<string, string>,
-): number {
+function estimateTokens(keys: readonly string[], source: Messages): number {
   return keys.reduce(
     (total, key) => total + Math.ceil((source[key] ?? "").length / 3.5) + 15,
     0,
   );
 }
 
-// Load pending ledger
+async function writeMessages(
+  path: string,
+  source: Messages,
+  target: Messages,
+): Promise<void> {
+  const keys = new Set([...Object.keys(source), ...Object.keys(target).sort()]);
+  const sorted = Object.fromEntries(
+    [...keys].flatMap((key) =>
+      target[key] === undefined ? [] : [[key, target[key]]],
+    ),
+  );
+  await writeFile(path, `${JSON.stringify(sorted, null, 2)}\n`);
+}
+
 let pendingLedger: Record<string, string[]> = {};
 try {
   pendingLedger = JSON.parse(await readFile(pendingPath, "utf8")) as Record<
     string,
     string[]
   >;
-} catch {
-  pendingLedger = {};
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 }
 
-// Load same-as-english
-let sameAsEnglishAll: Record<string, Record<string, string>> = {};
-try {
-  const mod = (await import(sameAsEnglishPath)) as {
-    SAME_AS_ENGLISH?: Record<string, Record<string, string>>;
-  };
-  sameAsEnglishAll = mod.SAME_AS_ENGLISH ?? {};
-} catch {
-  sameAsEnglishAll = {};
+const { SAME_AS_ENGLISH, SERVER_SAME_AS_ENGLISH } = (await import(
+  sameAsEnglishPath
+)) as {
+  SAME_AS_ENGLISH: EnglishExceptions;
+  SERVER_SAME_AS_ENGLISH: EnglishExceptions;
+};
+
+const catalogues = [
+  {
+    dir: messagesDir,
+    kind: "UI",
+    source: sourceCatalogue,
+    exceptions: SAME_AS_ENGLISH,
+  },
+  {
+    dir: serverMessagesDir,
+    kind: "server",
+    source: sourceServerCatalogue,
+    exceptions: SERVER_SAME_AS_ENGLISH,
+  },
+] as const;
+
+async function prepareLocale(locale: string) {
+  const jobs = await Promise.all(
+    catalogues.map(async ({ dir, kind, source, exceptions }) => {
+      const path = join(dir, `${locale}.json`);
+      const stored = await readMessages(path, true);
+      const sameAsEnglish = exceptions[locale] ?? {};
+      const pending = new Set(
+        kind === "UI" ? (pendingLedger[locale] ?? []) : [],
+      );
+      const keys: string[] = [];
+      const target = { ...stored };
+      for (const [key, english] of Object.entries(source)) {
+        if (sameAsEnglish[key] || !messageHasLetters(english)) {
+          target[key] ??= english;
+          pending.delete(key);
+          continue;
+        }
+        const missing = target[key] === undefined || target[key] === english;
+        if (
+          values.keys ? key.includes(values.keys) : missing || pending.has(key)
+        ) {
+          keys.push(key);
+          if (kind === "UI" && missing) {
+            target[key] ??= english;
+            pending.add(key);
+          }
+        }
+      }
+      return {
+        path,
+        kind,
+        source,
+        stored,
+        target,
+        sameAsEnglish,
+        pending,
+        keys,
+      };
+    }),
+  );
+  const glossary = await glossaryFor(locale);
+  const tokens =
+    estimateTokens(glossary.missing, sourceGlossary) +
+    jobs.reduce((sum, job) => sum + estimateTokens(job.keys, job.source), 0);
+  return { jobs, glossary, tokens };
 }
 
 // Determine target locales
@@ -150,35 +223,27 @@ const rates = findSeededModel(providerKind, modelId);
 const costInPerMillion = rates?.costInPerMillion ?? 0.1;
 const costOutPerMillion = rates?.costOutPerMillion ?? 0.5;
 
+function logEstimate(
+  locale: string,
+  plan: Awaited<ReturnType<typeof prepareLocale>>,
+): number {
+  const selected = plan.jobs
+    .map((job) => `${job.keys.length} ${job.kind} keys`)
+    .join(", ");
+  const costUsd =
+    (plan.tokens * (costInPerMillion + costOutPerMillion)) / 1_000_000;
+  process.stdout.write(
+    `[${locale}] ${plan.glossary.missing.length} glossary terms selected.\n`,
+  );
+  process.stdout.write(
+    `[${locale}] ${selected} selected. Estimated ~${plan.tokens} input tokens, ~${plan.tokens} output tokens, ~$${costUsd.toFixed(4)} USD.\n`,
+  );
+  return costUsd;
+}
+
 if (isEstimate) {
-  for (const loc of targetLocales) {
-    let candidateKeys: string[] = [];
-    if (values.keys) {
-      const pattern = values.keys;
-      candidateKeys = Object.keys(sourceCatalogue).filter(
-        (k) => k.startsWith(pattern) || k.includes(pattern),
-      );
-    } else {
-      candidateKeys = pendingLedger[loc] ?? [];
-    }
-
-    const { missing } = await glossaryFor(loc);
-    process.stdout.write(
-      `[${loc}] ${missing.length} glossary terms selected.\n`,
-    );
-    const estimatedInputTokens =
-      estimateTokens(candidateKeys, sourceCatalogue) +
-      estimateTokens(missing, sourceGlossary);
-    const estimatedOutputTokens = estimatedInputTokens;
-    const estimatedCostUsd =
-      (estimatedInputTokens * costInPerMillion +
-        estimatedOutputTokens * costOutPerMillion) /
-      1_000_000;
-
-    process.stdout.write(
-      `[${loc}] ${candidateKeys.length} keys selected. Estimated ~${estimatedInputTokens} input tokens, ~${estimatedOutputTokens} output tokens, ~$${estimatedCostUsd.toFixed(4)} USD.\n`,
-    );
-  }
+  for (const locale of targetLocales)
+    logEstimate(locale, await prepareLocale(locale));
   process.exit(0);
 }
 
@@ -218,52 +283,21 @@ if (isMock) {
 }
 
 let totalSpendUsd = 0;
+const costOf = (input: number, output: number) =>
+  (input * costInPerMillion + output * costOutPerMillion) / 1_000_000;
 
 for (const loc of targetLocales) {
-  const targetPath = join(messagesDir, `${loc}.json`);
-  let targetCatalogue: Record<string, string> = {};
-  try {
-    targetCatalogue = JSON.parse(await readFile(targetPath, "utf8")) as Record<
-      string,
-      string
-    >;
-  } catch {
-    targetCatalogue = {};
-  }
-
-  const { path: glossaryPath, glossary, missing } = await glossaryFor(loc);
-
-  let candidateKeys: string[] = [];
-  if (values.keys) {
-    const pattern = values.keys;
-    candidateKeys = Object.keys(sourceCatalogue).filter(
-      (k) => k.startsWith(pattern) || k.includes(pattern),
-    );
-  } else {
-    candidateKeys = pendingLedger[loc] ?? [];
-  }
-
-  const estimatedInputTokens =
-    estimateTokens(candidateKeys, sourceCatalogue) +
-    estimateTokens(missing, sourceGlossary);
-  const estimatedOutputTokens = estimatedInputTokens;
-  const estimatedCostUsd =
-    (estimatedInputTokens * costInPerMillion +
-      estimatedOutputTokens * costOutPerMillion) /
-    1_000_000;
-
-  process.stdout.write(
-    `[${loc}] ${candidateKeys.length} keys selected. Estimated ~${estimatedInputTokens} input tokens, ~${estimatedOutputTokens} output tokens, ~$${estimatedCostUsd.toFixed(4)} USD.\n`,
-  );
-
-  if (wantsLive && estimatedCostUsd > 1.0) {
+  const plan = await prepareLocale(loc);
+  const estimatedCostUsd = logEstimate(loc, plan);
+  if (wantsLive && totalSpendUsd + estimatedCostUsd > 1.0) {
     process.stderr.write(
-      `Estimated cost ($${estimatedCostUsd.toFixed(4)}) exceeds 1.00 USD spending cap. Aborting.\n`,
+      "The estimated spend exceeds the command's USD 1 cap.\n",
     );
     await client.stop();
     process.exit(1);
   }
 
+  const { path: glossaryPath, glossary, missing } = plan.glossary;
   if (missing.length > 0) {
     const draft = await translateCatalogue({
       provider: client,
@@ -276,21 +310,9 @@ for (const loc of targetLocales) {
       sameAsEnglish: { kpi: "Method acronym" },
       onProgress: (message) => process.stdout.write(`  glossary: ${message}\n`),
     });
-    totalSpendUsd +=
-      (draft.inputTokens * costInPerMillion +
-        draft.outputTokens * costOutPerMillion) /
-      1_000_000;
-    if (draft.translatedCount > 0) {
-      const orderedGlossary = Object.fromEntries(
-        Object.keys(sourceGlossary).flatMap((key) =>
-          glossary[key] === undefined ? [] : [[key, glossary[key]]],
-        ),
-      );
-      await writeFile(
-        glossaryPath,
-        `${JSON.stringify(orderedGlossary, null, 2)}\n`,
-      );
-    }
+    totalSpendUsd += costOf(draft.inputTokens, draft.outputTokens);
+    if (draft.translatedCount > 0)
+      await writeMessages(glossaryPath, sourceGlossary, glossary);
     process.stdout.write(
       `  ${loc} glossary: ${draft.translatedCount} translated, ${draft.failedCount} failed (${draft.inputTokens} in, ${draft.outputTokens} out)\n`,
     );
@@ -304,57 +326,57 @@ for (const loc of targetLocales) {
     }
   }
 
-  if (candidateKeys.length === 0) {
-    process.stdout.write(`  ok  ${loc}: 0 keys to translate.\n`);
-    continue;
-  }
-
-  const result = await translateCatalogue({
-    provider: client,
-    model: modelId,
-    locale: loc,
-    keys: candidateKeys,
-    sourceCatalogue,
-    targetCatalogue,
-    pendingKeys: pendingLedger[loc] ?? [],
-    sameAsEnglish: sameAsEnglishAll[loc] ?? {},
-    glossary,
-    onProgress: (msg) => process.stdout.write(`  ${msg}\n`),
-  });
-
-  const costUsd =
-    (result.inputTokens * costInPerMillion +
-      result.outputTokens * costOutPerMillion) /
-    1_000_000;
-  totalSpendUsd += costUsd;
-
-  // Save target catalogue sorted matching source catalogue order
-  const sortedTarget: Record<string, string> = {};
-  for (const k of Object.keys(sourceCatalogue)) {
-    const val = targetCatalogue[k];
-    if (val !== undefined) {
-      sortedTarget[k] = val;
+  for (const job of plan.jobs) {
+    let translated = 0;
+    let input = 0;
+    let output = 0;
+    let failures: readonly { readonly key: string; readonly error: string }[] =
+      [];
+    let remaining = [...job.pending];
+    if (job.keys.length > 0) {
+      const result = await translateCatalogue({
+        provider: client,
+        model: modelId,
+        locale: loc,
+        keys: job.keys,
+        sourceCatalogue: job.source,
+        targetCatalogue: job.target,
+        pendingKeys: remaining,
+        sameAsEnglish: job.sameAsEnglish,
+        glossary,
+        requireTranslation: true,
+        onProgress: (message) =>
+          process.stdout.write(`  ${job.kind}: ${message}\n`),
+      });
+      translated = result.translatedCount;
+      input = result.inputTokens;
+      output = result.outputTokens;
+      failures = result.failures;
+      remaining = [...result.remainingPending];
     }
-  }
-  for (const k of Object.keys(targetCatalogue).sort()) {
-    const val = targetCatalogue[k];
-    if (sortedTarget[k] === undefined && val !== undefined) {
-      sortedTarget[k] = val;
+
+    if (
+      Object.keys(job.target).length !== Object.keys(job.stored).length ||
+      translated > 0
+    ) {
+      await writeMessages(job.path, job.source, job.target);
     }
-  }
-  await writeFile(targetPath, `${JSON.stringify(sortedTarget, null, 2)}\n`);
-
-  // Update pending ledger
-  pendingLedger[loc] = [...result.remainingPending];
-  await writeFile(pendingPath, `${JSON.stringify(pendingLedger, null, 2)}\n`);
-
-  process.stdout.write(
-    `  ok  ${loc}: ${result.translatedCount} translated, ${result.failedCount} failed (${result.inputTokens} in, ${result.outputTokens} out, cost: $${costUsd.toFixed(4)} USD)\n`,
-  );
-
-  if (result.failedCount > 0) {
-    for (const failure of result.failures) {
-      process.stdout.write(`      FAIL ${failure.key}: ${failure.error}\n`);
+    if (job.kind === "UI") {
+      if (remaining.length > 0) pendingLedger[loc] = remaining;
+      else delete pendingLedger[loc];
+      await writeFile(
+        pendingPath,
+        `${JSON.stringify(pendingLedger, null, 2)}\n`,
+      );
+    }
+    totalSpendUsd += costOf(input, output);
+    process.stdout.write(
+      `  ${loc} ${job.kind}: ${translated} translated, ${failures.length} failed (${input} in, ${output} out)\n`,
+    );
+    for (const failure of failures) {
+      process.stdout.write(
+        `      FAIL ${job.kind}:${failure.key}: ${failure.error}\n`,
+      );
     }
   }
 }

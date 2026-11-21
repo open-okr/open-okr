@@ -2,7 +2,11 @@
  * Pure check functions and sync engine for catalogue coverage, holes, plurals,
  * and English-match ledgers (docs/design/languages.md §6.1, §6.2).
  */
-import { type Catalogue, messageHoles } from "@openokr/formats";
+import {
+  type Catalogue,
+  messageHasLetters,
+  messageHoles,
+} from "@openokr/formats";
 import { isTermHole } from "./terms.ts";
 
 export interface CheckIssue {
@@ -26,7 +30,6 @@ export interface CheckOptions {
 
 const HAN_REGEX = /[\u4e00-\u9fff\u3400-\u4dbf]/;
 const ARABIC_REGEX = /[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]/;
-const LETTER_REGEX = /[A-Za-z]/;
 
 function comparableHoles(
   message: string,
@@ -160,7 +163,7 @@ export function checkEnglishCopies(
     if (targetValue === undefined) {
       continue;
     }
-    if (targetValue === sourceValue) {
+    if (targetValue === sourceValue && messageHasLetters(sourceValue)) {
       if (!sameAsEnglish[key] && !pendingSet.has(key)) {
         issues.push({
           locale,
@@ -260,7 +263,7 @@ export function checkScripts(
       if (sameAsEnglish[key]) {
         continue;
       }
-      if (LETTER_REGEX.test(value) && !HAN_REGEX.test(value)) {
+      if (messageHasLetters(value) && !HAN_REGEX.test(value)) {
         issues.push({
           locale,
           key,
@@ -274,7 +277,7 @@ export function checkScripts(
       if (sameAsEnglish[key]) {
         continue;
       }
-      if (LETTER_REGEX.test(value) && !ARABIC_REGEX.test(value)) {
+      if (messageHasLetters(value) && !ARABIC_REGEX.test(value)) {
         issues.push({
           locale,
           key,

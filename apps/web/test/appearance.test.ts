@@ -170,7 +170,7 @@ describe("the appearance control", () => {
     expect(layout).toContain("lang={locale}");
     // With the workspace's own words for the method's terms beside it (M-14).
     expect(layout).toContain(
-      "<TranslationsProvider locale={locale} renamed={renamed}>",
+      "<LocaleProvider locale={locale} renamed={renamed}>",
     );
   });
 });

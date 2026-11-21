@@ -1,8 +1,8 @@
 import type { AIProvider } from "@openokr/adapters";
+import { messageHasLetters } from "@openokr/core";
 
 const HOLE_REGEX = /\{([a-zA-Z][a-zA-Z0-9]*)\}/g;
 const TOKEN_REGEX = /⟦\d+⟧/g;
-const LETTER_REGEX = /\p{Letter}/u;
 const HAN_REGEX = /\p{Script=Han}/u;
 const ARABIC_REGEX = /\p{Script=Arabic}/u;
 
@@ -103,7 +103,7 @@ export function validateTranslation(
 
   // 3. Script checks
   if (locale === "zh-Hans" && !sameAsEnglish[key]) {
-    if (LETTER_REGEX.test(english) && !HAN_REGEX.test(translated)) {
+    if (messageHasLetters(english) && !HAN_REGEX.test(translated)) {
       return {
         valid: false,
         error: "Chinese translation contains no Han characters",
@@ -112,7 +112,7 @@ export function validateTranslation(
   }
 
   if (locale === "ar" && !sameAsEnglish[key]) {
-    if (LETTER_REGEX.test(english) && !ARABIC_REGEX.test(translated)) {
+    if (messageHasLetters(english) && !ARABIC_REGEX.test(translated)) {
       return {
         valid: false,
         error: "Arabic translation contains no Arabic characters",
@@ -149,6 +149,7 @@ export interface TranslateCatalogueOptions {
   readonly pendingKeys: readonly string[];
   readonly sameAsEnglish?: Record<string, string>;
   readonly glossary?: Record<string, string>;
+  readonly requireTranslation?: boolean;
   readonly onProgress?: (message: string) => void;
 }
 
@@ -174,6 +175,7 @@ export async function translateCatalogue(
     pendingKeys,
     sameAsEnglish = {},
     glossary = {},
+    requireTranslation = false,
     onProgress,
   } = options;
 
@@ -208,12 +210,22 @@ export async function translateCatalogue(
       Object.keys(glossary).length > 0
         ? `\nGlossary (use these exact terms when translating method concepts):\n${JSON.stringify(glossary, null, 2)}`
         : "";
+    const script =
+      locale === "zh-Hans" ? "Han" : locale === "ar" ? "Arabic" : undefined;
+    const scriptRule =
+      requireTranslation && script
+        ? `\n4. Include at least one ${script} letter in each value with written words. Keep URLs, code, email addresses, acronyms, and keyboard shortcuts intact and add a short translated label where needed.`
+        : "";
+    const shortChineseLabels =
+      requireTranslation && locale === "zh-Hans"
+        ? "\n5. Use 人工智能 for a bare AI label and 目标与关键结果 for a bare OKR label. For a file size in KB, add 大小 before the quantity and keep KB. Preserve all placeholder tokens."
+        : "";
 
     const systemPrompt = `You are an expert translator translating user interface text for OpenOKR into locale '${locale}'.
 Rules:
 1. Preserve placeholder tokens like ⟦1⟧, ⟦2⟧ exactly. Do not translate, alter, duplicate, or delete them.
 2. Return ONLY a valid JSON object mapping each key to its translated string. Do not include markdown code fences or other prose.
-3. Keep the translation concise, accurate, and natural for software UI.${glossarySection}`;
+3. Keep the translation concise, accurate, and natural for software UI. The translation must fit within three times the length of the English value.${scriptRule}${shortChineseLabels}${glossarySection}`;
 
     const userPrompt = JSON.stringify(maskedBatch, null, 2);
 
@@ -224,6 +236,7 @@ Rules:
         { role: "user", content: userPrompt },
       ],
       temperature: 0.1,
+      maxTokens: 8192,
       feature: "i18n:translate",
     });
 
@@ -257,6 +270,10 @@ Rules:
         failures.push({ key, error: "key missing from translation response" });
         continue;
       }
+      if (typeof rawTranslation !== "string") {
+        failures.push({ key, error: "translation is not a string" });
+        continue;
+      }
 
       const unmasked = unmaskHoles(rawTranslation, tokens);
       if (!unmasked.success || unmasked.text === undefined) {
@@ -273,6 +290,15 @@ Rules:
       );
       if (!validation.valid) {
         failures.push({ key, error: validation.error ?? "validation failed" });
+        continue;
+      }
+      if (
+        requireTranslation &&
+        !sameAsEnglish[key] &&
+        messageHasLetters(english) &&
+        (unmasked.text.trim() === "" || unmasked.text === english)
+      ) {
+        failures.push({ key, error: "the value needs a translation" });
         continue;
       }
 

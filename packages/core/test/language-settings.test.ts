@@ -63,7 +63,7 @@ it("clears the workspace language to follow the instance", async () => {
   expect(await resolveMemberLanguage(call, call.actor.memberId)).toBe("ms");
 });
 
-it.each(["xx", "zh-Hans"])(
+it.each(["xx", "id"])(
   "refuses the unshipped workspace locale %s",
   async (language) => {
     const call = await context();
@@ -73,7 +73,7 @@ it.each(["xx", "zh-Hans"])(
   },
 );
 
-it.each(["xx", "zh-Hans"])(
+it.each(["xx", "id"])(
   "refuses the unshipped instance locale %s",
   async (language) => {
     const { appPool } = await workerDb();

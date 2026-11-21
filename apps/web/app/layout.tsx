@@ -9,6 +9,7 @@ import {
   themeInitScript,
   translate,
 } from "@openokr/ui";
+import { ZhHansTranslationsProvider } from "@openokr/ui/providers/zh-Hans";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { headers } from "next/headers";
@@ -115,6 +116,8 @@ export default async function RootLayout({
   const renamed = await workspaceTerms();
   const brandStyle = await workspaceBrandStyleSheet();
   const catalogue = getCatalogue(locale);
+  const LocaleProvider =
+    locale === "zh-Hans" ? ZhHansTranslationsProvider : TranslationsProvider;
 
   return (
     <html
@@ -160,7 +163,7 @@ export default async function RootLayout({
         <ClientErrorReporter />
         <DirectionProvider direction={direction}>
           <ThemeProvider>
-            <TranslationsProvider locale={locale} renamed={renamed}>
+            <LocaleProvider locale={locale} renamed={renamed}>
               {/*
                * Here rather than in the shell (M-13). Each top-level screen
                * renders the shell afresh, so a provider inside it was replaced
@@ -177,7 +180,7 @@ export default async function RootLayout({
                   </InstanceNameProvider>
                 </QueryProvider>
               </ToastProvider>
-            </TranslationsProvider>
+            </LocaleProvider>
           </ThemeProvider>
         </DirectionProvider>
       </body>

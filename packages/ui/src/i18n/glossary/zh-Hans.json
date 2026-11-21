@@ -1,0 +1,18 @@
+{
+  "objective": "目标",
+  "keyResult": "关键结果",
+  "checkIn": "进展更新",
+  "confidence": "信心度",
+  "champion": "推动者",
+  "reviewer": "审核人",
+  "space": "空间",
+  "cycle": "周期",
+  "initiative": "举措",
+  "kpi": "KPI 指标",
+  "health.onTrack": "进展顺利",
+  "health.caution": "需谨慎",
+  "health.offTrack": "进展偏离计划",
+  "health.healthy": "健康",
+  "health.watch": "需关注",
+  "health.unhealthy": "不健康"
+}

@@ -48,7 +48,7 @@ export async function getTranslations(): Promise<{
   // entries a translator cannot reassemble.
   return {
     t: (key: string, values?: MessageValues) =>
-      translate(catalogue, key, values, renamed),
+      translate(catalogue, key, values, renamed, locale),
     locale,
   };
 }

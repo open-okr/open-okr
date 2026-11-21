@@ -7,6 +7,7 @@
 import type { Catalogue, Locale } from "./catalogue.ts";
 import en from "./messages/en.json";
 import ms from "./messages/ms.json";
+import zhHans from "./messages/zh-Hans.json";
 
 /** Preview fixture for the layout before the Arabic catalogue ships (§9). */
 export const PSEUDO_RTL = {
@@ -19,7 +20,7 @@ export const PSEUDO_RTL = {
 export const CATALOGUES: Readonly<
   Record<"en" | "ms" | "pseudo-rtl", Catalogue> &
     Partial<Record<Locale, Catalogue>>
-> = { en, ms, "pseudo-rtl": PSEUDO_RTL.catalogue };
+> = { en, ms, "zh-Hans": zhHans, "pseudo-rtl": PSEUDO_RTL.catalogue };
 
 /** Keys present in the source but missing from another locale's catalogue.
  * Empty means every locale is at least "stubbed": present, not necessarily
