@@ -175,97 +175,101 @@ export default async function ScorecardPage() {
               {t("scorecard.aCycleJoinsThis")}
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <caption className="sr-only">
-                {t("scorecard.everyArchivedCycleWith")}
-              </caption>
-              <thead>
-                <tr className="border-line border-b text-xs text-ink-3">
-                  <th className="px-3 py-1.5 text-start font-semibold">
-                    {t("scorecard.cycle")}
-                  </th>
-                  <th className="px-3 py-1.5 text-start font-semibold">
-                    {t("scorecard.result")}
-                  </th>
-                  <th className="px-3 py-1.5 text-start font-semibold">
-                    {t("scorecard.verdict")}
-                  </th>
-                  <th className="px-3 py-1.5 text-end font-semibold">1.0</th>
-                  <th className="px-3 py-1.5 text-end font-semibold">
-                    {t("scorecard.strong")}
-                  </th>
-                  <th className="px-3 py-1.5 text-end font-semibold">
-                    {t("scorecard.partial")}
-                  </th>
-                  <th className="px-3 py-1.5 text-end font-semibold">
-                    {t("scorecard.little")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {scorecard.rows.map((row) => (
-                  <tr
-                    key={row.cycleId}
-                    className="border-line border-b last:border-b-0"
-                  >
-                    <td className="px-3 py-2">
-                      <span className="text-ink">{row.cycleName}</span>
-                      <span className="ms-1.5 text-xs text-ink-4">
-                        {row.startsOn}
-                      </span>
-                      {/* §12 (P9-T14c): the bands this cycle was graded
-                       * under, which a band moved since does not change. */}
-                      <span
-                        className="block text-xs text-ink-4"
-                        data-testid="scorecard-bands"
-                      >
-                        {t("scorecard.gradedOn", {
-                          strong: row.bands.strong.toFixed(1),
-                          partial: row.bands.partial.toFixed(1),
-                        })}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        {row.resultValue === null ? (
-                          <span className="w-10 text-ink tabular-nums">—</span>
-                        ) : (
-                          // Coloured by its own cycle's bands (§12).
-                          <Chip
-                            tone={BAND_TONE[row.resultBand ?? "little"]}
-                            data-testid="scorecard-result"
-                            data-band={row.resultBand ?? undefined}
-                          >
-                            {row.resultValue.toFixed(2)}
-                          </Chip>
-                        )}
-                        <Bar
-                          value={(row.resultValue ?? 0) * 100}
-                          className="w-20"
-                        />
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Chip tone={verdictTone(row.verdict)} dot>
-                        {verdictLabel(row.verdict, t)}
-                      </Chip>
-                    </td>
-                    <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
-                      {row.fullyAchieved}
-                    </td>
-                    <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
-                      {row.strong}
-                    </td>
-                    <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
-                      {row.partial}
-                    </td>
-                    <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
-                      {row.little}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-max text-sm">
+                <caption className="sr-only">
+                  {t("scorecard.everyArchivedCycleWith")}
+                </caption>
+                <thead>
+                  <tr className="border-line border-b text-xs text-ink-3">
+                    <th className="px-3 py-1.5 text-start font-semibold">
+                      {t("scorecard.cycle")}
+                    </th>
+                    <th className="px-3 py-1.5 text-start font-semibold">
+                      {t("scorecard.result")}
+                    </th>
+                    <th className="px-3 py-1.5 text-start font-semibold">
+                      {t("scorecard.verdict")}
+                    </th>
+                    <th className="px-3 py-1.5 text-end font-semibold">1.0</th>
+                    <th className="px-3 py-1.5 text-end font-semibold">
+                      {t("scorecard.strong")}
+                    </th>
+                    <th className="px-3 py-1.5 text-end font-semibold">
+                      {t("scorecard.partial")}
+                    </th>
+                    <th className="px-3 py-1.5 text-end font-semibold">
+                      {t("scorecard.little")}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {scorecard.rows.map((row) => (
+                    <tr
+                      key={row.cycleId}
+                      className="border-line border-b last:border-b-0"
+                    >
+                      <td className="px-3 py-2">
+                        <span className="text-ink">{row.cycleName}</span>
+                        <span className="ms-1.5 text-xs text-ink-4">
+                          {row.startsOn}
+                        </span>
+                        {/* §12 (P9-T14c): the bands this cycle was graded
+                         * under, which a band moved since does not change. */}
+                        <span
+                          className="block text-xs text-ink-4"
+                          data-testid="scorecard-bands"
+                        >
+                          {t("scorecard.gradedOn", {
+                            strong: row.bands.strong.toFixed(1),
+                            partial: row.bands.partial.toFixed(1),
+                          })}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          {row.resultValue === null ? (
+                            <span className="w-10 text-ink tabular-nums">
+                              —
+                            </span>
+                          ) : (
+                            // Coloured by its own cycle's bands (§12).
+                            <Chip
+                              tone={BAND_TONE[row.resultBand ?? "little"]}
+                              data-testid="scorecard-result"
+                              data-band={row.resultBand ?? undefined}
+                            >
+                              {row.resultValue.toFixed(2)}
+                            </Chip>
+                          )}
+                          <Bar
+                            value={(row.resultValue ?? 0) * 100}
+                            className="w-20"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Chip tone={verdictTone(row.verdict)} dot>
+                          {verdictLabel(row.verdict, t)}
+                        </Chip>
+                      </td>
+                      <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
+                        {row.fullyAchieved}
+                      </td>
+                      <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
+                        {row.strong}
+                      </td>
+                      <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
+                        {row.partial}
+                      </td>
+                      <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
+                        {row.little}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardBody>
       </Card>
