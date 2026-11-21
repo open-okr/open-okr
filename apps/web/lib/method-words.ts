@@ -42,6 +42,38 @@ export function methodConditionLabel(
   return keys ? t(keys.label) : condition;
 }
 
+export function methodConditionPrompt(
+  t: (key: string) => string,
+  id: string,
+  condition: string,
+  fallback: string,
+): string {
+  const keys = keysForCondition(id, condition);
+  return keys ? t(keys.prompt) : fallback;
+}
+
+/**
+ * A prompt that arrives as English text only (a chip that holds the rule's
+ * key and sentence, not its condition). Found again by its text, so the
+ * catalogue value shows. An unknown sentence stays as given.
+ */
+export function methodPromptText(
+  t: (key: string) => string,
+  id: string,
+  prompt: string,
+): string {
+  const rule = qualityChecks.get(id);
+  const keys = METHOD_MESSAGE_KEYS[id];
+  if (!rule || !keys) return prompt;
+  if (prompt === WORD_CHECKS_SKIPPED_NOTICE) {
+    return t("method.wordChecksSkipped");
+  }
+  const index = rule.conditions.findIndex((row) => row.prompt === prompt);
+  const found = keys.conditions[index];
+  if (index >= 0 && found) return t(found.prompt);
+  return prompt === rule.title ? t(keys.title) : prompt;
+}
+
 export function methodVerdictWords(
   t: (key: string) => string,
   verdict: Pick<

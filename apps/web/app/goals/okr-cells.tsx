@@ -31,6 +31,7 @@ import { dayLabel } from "../../lib/day-label.ts";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { focusOnMount } from "../../lib/focus-on-mount.ts";
 import { searchMembers } from "../../lib/member-search.ts";
+import { methodPromptText, methodTitle } from "../../lib/method-words.ts";
 import { RulePreview } from "../../lib/rule-preview";
 
 /**
@@ -890,7 +891,9 @@ export function AdditionDraftMark({
   const needs = [
     ...draft.missing.map((field) => t(ADDITION_FIELD_KEYS[field])),
     ...draft.failing.map((id) =>
-      t("additionDraft.check", { title: CHECK_TITLES.get(id) ?? id }),
+      t("additionDraft.check", {
+        title: methodTitle(t, id, CHECK_TITLES.get(id) ?? id),
+      }),
     ),
   ];
   return (
@@ -1121,7 +1124,9 @@ export function VerdictChips({
           >
             {verdict.id}
           </span>
-          <span className="min-w-0 flex-1 text-ink-2">{verdict.prompt}</span>
+          <span className="min-w-0 flex-1 text-ink-2">
+            {methodPromptText(t, verdict.id, verdict.prompt)}
+          </span>
           <RulePreview
             ruleKey={verdict.id}
             className="flex-none font-semibold text-brand-text no-underline hover:underline"
