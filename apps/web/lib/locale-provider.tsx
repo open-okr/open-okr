@@ -24,6 +24,11 @@ const LOCALE_PROVIDERS: Partial<Record<Locale, ComponentType<ProviderProps>>> =
         default: module.DeTranslationsProvider,
       })),
     ),
+    fr: lazy(() =>
+      import("@openokr/ui/providers/fr").then((module) => ({
+        default: module.FrTranslationsProvider,
+      })),
+    ),
     es: lazy(() =>
       import("@openokr/ui/providers/es").then((module) => ({
         default: module.EsTranslationsProvider,

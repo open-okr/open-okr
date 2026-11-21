@@ -14,6 +14,7 @@ import ar from "./messages/ar.json" with { type: "json" };
 import de from "./messages/de.json" with { type: "json" };
 import en from "./messages/en.json" with { type: "json" };
 import es from "./messages/es.json" with { type: "json" };
+import fr from "./messages/fr.json" with { type: "json" };
 import ms from "./messages/ms.json" with { type: "json" };
 import pt from "./messages/pt.json" with { type: "json" };
 import zhHans from "./messages/zh-Hans.json" with { type: "json" };
@@ -26,6 +27,7 @@ const SERVER_CATALOGUES: Readonly<Record<string, Catalogue>> = {
   ar,
   de,
   pt,
+  fr,
 };
 
 export function getServerCatalogue(locale: string): Catalogue {
