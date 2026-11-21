@@ -6,6 +6,7 @@ const LOCALES = [
   { code: "zh-Hans", home: "首页" },
   { code: "es", home: "Inicio" },
   { code: "pt", home: "Início" },
+  { code: "ar", home: "الرئيسية" },
 ] as const;
 
 test("an English sign-in loads only its own catalogue", async ({ page }) => {
@@ -27,6 +28,10 @@ test("an English sign-in loads only its own catalogue", async ({ page }) => {
 
 for (const { code, home } of LOCALES) {
   test(`the member opens Home in ${code}`, async ({ page }, testInfo) => {
+    if (code === "ar") {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+    }
     await signIn(page);
     await goTo(page, "/account");
     const language = page.getByTestId("member-language");
@@ -40,6 +45,46 @@ for (const { code, home } of LOCALES) {
       await expect(
         page.getByRole("link", { name: home, exact: true }).first(),
       ).toBeVisible();
+
+      if (code === "ar") {
+        await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+        const sidebar = page.getByRole("navigation", { name: "Primary" });
+        const sidebarBox = await sidebar.boundingBox();
+        const mainBox = await page.getByRole("main").boundingBox();
+        expect(
+          sidebarBox &&
+            mainBox &&
+            sidebarBox.x >= mainBox.x + mainBox.width - 1,
+        ).toBe(true);
+
+        const collapseIcon = sidebar
+          .getByTestId("sidebar-toggle")
+          .locator("svg");
+        await expect(collapseIcon).toBeVisible();
+        await expect(collapseIcon).toHaveCSS("scale", "-1 1");
+
+        // The claim project records this KPI at 60%, so both ends of its
+        // partially filled track are visible.
+        await goTo(page, "/kpis");
+        await page
+          .getByRole("link", { name: "Operating margin", exact: true })
+          .click();
+        const bar = page.getByRole("progressbar");
+        await expect(bar).toHaveAttribute("aria-valuenow", "60");
+        const fill = await bar.evaluate((track) => {
+          const width = track.getBoundingClientRect();
+          const segment = track.firstElementChild?.getBoundingClientRect();
+          return (
+            segment && {
+              part: segment.width / width.width,
+              distanceFromRight: Math.abs(width.right - segment.right),
+            }
+          );
+        });
+        expect(fill?.part).toBeGreaterThan(0);
+        expect(fill?.part).toBeLessThan(1);
+        expect(fill?.distanceFromRight).toBeLessThan(1);
+      }
 
       if (code === "zh-Hans") {
         // Interception disables the HTTP cache so each page's downloads count.

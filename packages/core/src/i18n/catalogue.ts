@@ -10,6 +10,7 @@ import {
   type MessageValues,
   translate,
 } from "@openokr/formats";
+import ar from "./messages/ar.json" with { type: "json" };
 import en from "./messages/en.json" with { type: "json" };
 import es from "./messages/es.json" with { type: "json" };
 import ms from "./messages/ms.json" with { type: "json" };
@@ -21,6 +22,7 @@ const SERVER_CATALOGUES: Readonly<Record<string, Catalogue>> = {
   ms,
   "zh-Hans": zhHans,
   es,
+  ar,
   pt,
 };
 

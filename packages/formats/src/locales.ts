@@ -77,7 +77,7 @@ export const LOCALES = [
     direction: "rtl",
     endonymKey: "appearance.arabic",
     fontFamily: "Noto Sans Arabic, then Geist",
-    shipped: false,
+    shipped: true,
     languageName: "Arabic (العربية)",
   },
   {

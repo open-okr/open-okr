@@ -62,13 +62,14 @@ describe("locales registry", () => {
   });
 
   it("shipped is true for en and ms only", () => {
-    expect(SHIPPED_LOCALES).toEqual(["en", "ms", "zh-Hans", "es", "pt"]);
+    expect(SHIPPED_LOCALES).toEqual(["en", "ms", "zh-Hans", "es", "ar", "pt"]);
     for (const loc of LOCALES) {
       if (
         loc.code === "en" ||
         loc.code === "ms" ||
         loc.code === "zh-Hans" ||
         loc.code === "es" ||
+        loc.code === "ar" ||
         loc.code === "pt"
       ) {
         expect(loc.shipped, `${loc.code} should be shipped`).toBe(true);

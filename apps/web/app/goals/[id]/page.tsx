@@ -614,12 +614,10 @@ export default async function GoalPage({
                           tasks that name it and its initiatives' tasks. */}
                       <Link
                         href={`/board?keyResult=${keyResult.id}`}
-                        aria-label={t("goals.detail.workBoardFor", {
-                          title: keyResult.title,
-                        })}
                         className="text-xs font-semibold text-brand-text hover:underline"
                       >
                         {t("goals.detail.workBoard")}
+                        <span className="sr-only"> — {keyResult.title}</span>
                       </Link>
                       {open && keyResult.kpiId === null ? (
                         <KeyResultUpdate

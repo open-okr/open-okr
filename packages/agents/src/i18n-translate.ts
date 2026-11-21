@@ -11,6 +11,7 @@ const SHORT_LABEL_INSTRUCTIONS: Readonly<Record<string, string>> = {
     "Use 人工智能 for a bare AI label and 目标与关键结果 for a bare OKR label. For a file size in KB, add 大小 before the quantity and keep KB. Preserve all placeholder tokens.",
   es: 'Use "Activo" for On, "Inactivo" for Off, "Vence" for Due, "Para" for By, "Fijar" for Set, and "Bandeja" for Inbox. Use "Correo" for Email and "Tecla Esc" for Esc. For unchanged cognates choose a natural Spanish alternative, such as "Ajustes" for General and "Plan actual" for Plan. Keep technical examples intact with a short label such as "Ej.:". Use "NO" for a bare No option.',
   pt: 'Write Brazilian Portuguese. Use "Início" for Home, "Ativo" or "Inativo" for On or Off, "Vence" for Due, "Definir" for Set, "E-mail" for Email, and "Tecla Esc" for Esc. For shared terms, name the purpose, such as "Plano atual", "Funções de acesso", "Webhooks de saída", or "Via OIDC". Preserve literal examples with an "Ex.:" prefix, file sizes with "Tamanho:", and command text inside quotation marks. Use "Em CSV" for CSV and "API REST" for REST.',
+  ar: 'Use concise Modern Standard Arabic. For the glossary entry kpi, use exactly "مؤشر". Every requested value with written words needs an Arabic letter even when it contains a literal URL, email, code, acronym, certification, or keyboard shortcut. Keep the technical text intact and add a short Arabic label such as "مثال:" or "ملف". Use "الرئيسية" for Home, "ذكاء" for AI, "أهداف" for OKR, "مؤشر" for KPI, "يعمل" for On, "متوقف" for Off, "ضبط" for Set, "بريد" for Email, and "مفتاح Esc" for Esc. Use 0–9 for digits. Leave every placeholder token intact, including count tokens in plural categories.',
 };
 
 export function maskHoles(text: string): {
@@ -223,9 +224,7 @@ export async function translateCatalogue(
       requireTranslation && script
         ? `\n4. Include at least one ${script} letter in each value with written words. Keep URLs, code, email addresses, acronyms, and keyboard shortcuts intact and add a short translated label where needed.`
         : "";
-    const shortLabels = requireTranslation
-      ? SHORT_LABEL_INSTRUCTIONS[locale]
-      : undefined;
+    const shortLabels = SHORT_LABEL_INSTRUCTIONS[locale];
 
     const systemPrompt = `You are an expert translator translating user interface text for OpenOKR into locale '${locale}'.
 Rules:
