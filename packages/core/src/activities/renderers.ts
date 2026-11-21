@@ -17,14 +17,14 @@ import { getServerCatalogue, serverTranslate } from "../i18n/catalogue.ts";
 import type { ActivityKind } from "./catalogue.ts";
 
 /** Resolves one catalogue key in the reader's language. */
-export type ActivityTranslate = (key: string, values?: MessageValues) => string;
+type ActivityTranslate = (key: string, values?: MessageValues) => string;
 
 /**
  * Names a payload token (a level, a role, a status) in the reader's language
  * when the catalogue has a word for it, and leaves the token as it is when
  * it does not.
  */
-export type ActivityWord = (
+type ActivityWord = (
   prefix: string,
   value: string,
   fallback?: string,

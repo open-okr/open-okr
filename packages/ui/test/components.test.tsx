@@ -6,8 +6,8 @@ import { Bar } from "../src/components/bar.tsx";
 import { Button } from "../src/components/button.tsx";
 import { Chip } from "../src/components/chip.tsx";
 import { Kbd } from "../src/components/kbd.tsx";
-import { TranslationsProvider } from "../src/i18n/use-translations.tsx";
 import { VerdictDot } from "../src/components/verdict-dot.tsx";
+import { TranslationsProvider } from "../src/i18n/use-translations.tsx";
 
 describe("Button", () => {
   test("renders a native, keyboard-operable button by default", () => {
