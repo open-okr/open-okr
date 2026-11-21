@@ -795,6 +795,7 @@
   "reviewInbox.word.blockerType.clarity": "缺乏明确性",
   "reviewInbox.word.blockerType.dependency": "依赖事项",
   "reviewInbox.word.blockerType.external": "外部因素",
+  "reviewInbox.word.blockerType.one": "其他",
   "reviewInbox.word.blockerType.other": "其他",
   "reviewInbox.word.blockerType.priority_conflict": "优先级冲突",
   "reviewInbox.word.blockerType.resource": "资源",

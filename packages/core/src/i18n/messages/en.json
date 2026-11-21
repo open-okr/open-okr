@@ -795,6 +795,7 @@
   "reviewInbox.word.blockerType.clarity": "clarity",
   "reviewInbox.word.blockerType.dependency": "dependency",
   "reviewInbox.word.blockerType.external": "external",
+  "reviewInbox.word.blockerType.one": "other",
   "reviewInbox.word.blockerType.other": "other",
   "reviewInbox.word.blockerType.priority_conflict": "priority conflict",
   "reviewInbox.word.blockerType.resource": "resource",

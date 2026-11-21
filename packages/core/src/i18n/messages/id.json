@@ -795,6 +795,7 @@
   "reviewInbox.word.blockerType.clarity": "kejelasan",
   "reviewInbox.word.blockerType.dependency": "dependensi",
   "reviewInbox.word.blockerType.external": "eksternal",
+  "reviewInbox.word.blockerType.one": "lainnya",
   "reviewInbox.word.blockerType.other": "lainnya",
   "reviewInbox.word.blockerType.priority_conflict": "konflik prioritas",
   "reviewInbox.word.blockerType.resource": "sumber daya",
