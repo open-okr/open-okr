@@ -8,7 +8,9 @@
     "admin.nudges.reason.leave",
     "admin.nudges.reason.quietHours",
     "admin.nudges.reason.snooze",
-    "kbd.command"
+    "kbd.command",
+    "scorecard.fullyAchieved",
+    "scorecard.startsOn"
   ],
   "de": [
     "admin.nudges.inAppOnly",
@@ -19,7 +21,9 @@
     "admin.nudges.reason.leave",
     "admin.nudges.reason.quietHours",
     "admin.nudges.reason.snooze",
-    "kbd.command"
+    "kbd.command",
+    "scorecard.fullyAchieved",
+    "scorecard.startsOn"
   ],
   "es": [
     "admin.nudges.inAppOnly",
@@ -30,7 +34,9 @@
     "admin.nudges.reason.leave",
     "admin.nudges.reason.quietHours",
     "admin.nudges.reason.snooze",
-    "kbd.command"
+    "kbd.command",
+    "scorecard.fullyAchieved",
+    "scorecard.startsOn"
   ],
   "fr": [
     "admin.nudges.inAppOnly",
@@ -41,7 +47,9 @@
     "admin.nudges.reason.leave",
     "admin.nudges.reason.quietHours",
     "admin.nudges.reason.snooze",
-    "kbd.command"
+    "kbd.command",
+    "scorecard.fullyAchieved",
+    "scorecard.startsOn"
   ],
   "id": [
     "admin.nudges.inAppOnly",
@@ -52,7 +60,9 @@
     "admin.nudges.reason.leave",
     "admin.nudges.reason.quietHours",
     "admin.nudges.reason.snooze",
-    "kbd.command"
+    "kbd.command",
+    "scorecard.fullyAchieved",
+    "scorecard.startsOn"
   ],
   "it": [
     "admin.nudges.inAppOnly",
@@ -63,7 +73,9 @@
     "admin.nudges.reason.leave",
     "admin.nudges.reason.quietHours",
     "admin.nudges.reason.snooze",
-    "kbd.command"
+    "kbd.command",
+    "scorecard.fullyAchieved",
+    "scorecard.startsOn"
   ],
   "ms": [
     "admin.nudges.inAppOnly",
@@ -74,7 +86,9 @@
     "admin.nudges.reason.leave",
     "admin.nudges.reason.quietHours",
     "admin.nudges.reason.snooze",
-    "kbd.command"
+    "kbd.command",
+    "scorecard.fullyAchieved",
+    "scorecard.startsOn"
   ],
   "pt": [
     "admin.nudges.inAppOnly",
@@ -85,7 +99,9 @@
     "admin.nudges.reason.leave",
     "admin.nudges.reason.quietHours",
     "admin.nudges.reason.snooze",
-    "kbd.command"
+    "kbd.command",
+    "scorecard.fullyAchieved",
+    "scorecard.startsOn"
   ],
   "zh-Hans": [
     "admin.nudges.inAppOnly",
@@ -96,6 +112,8 @@
     "admin.nudges.reason.leave",
     "admin.nudges.reason.quietHours",
     "admin.nudges.reason.snooze",
-    "kbd.command"
+    "kbd.command",
+    "scorecard.fullyAchieved",
+    "scorecard.startsOn"
   ]
 }

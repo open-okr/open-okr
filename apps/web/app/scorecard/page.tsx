@@ -92,7 +92,20 @@ export default async function ScorecardPage() {
   // The export is a data URL rather than a route, so it needs no endpoint and
   // no second read that could disagree with the table above it.
   const csv = [
-    "cycle,starts_on,result,verdict,fully_achieved,strong,partial,little",
+    // Headers are read by people in a spreadsheet, so they are in the
+    // requester's locale; the values below stay machine values (§13).
+    [
+      t("scorecard.cycle"),
+      t("scorecard.startsOn"),
+      t("scorecard.result"),
+      t("scorecard.verdict"),
+      t("scorecard.fullyAchieved"),
+      t("scorecard.strong"),
+      t("scorecard.partial"),
+      t("scorecard.little"),
+    ]
+      .map((header) => `"${header.replace(/"/g, '""')}"`)
+      .join(","),
     ...scorecard.rows.map((row) =>
       [
         `"${row.cycleName.replace(/"/g, '""')}"`,
