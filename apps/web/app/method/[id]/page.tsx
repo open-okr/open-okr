@@ -16,7 +16,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { faceForTrigger } from "../../../lib/agent-moods.ts";
 import { methodDocumentUrl } from "../../../lib/app-version";
-import { nameOf, TRIGGER_NAME_KEYS } from "../../../lib/identifier-names.ts";
+import {
+  nameOf,
+  QUALITY_STATUS_NAME_KEYS,
+  TRIGGER_NAME_KEYS,
+} from "../../../lib/identifier-names.ts";
 import {
   methodConditionLabel,
   methodConditionPrompt,
@@ -140,7 +144,7 @@ export default async function RulePage({
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <Chip tone={TONE[row.status]} dot>
-                    {row.status}
+                    {nameOf(QUALITY_STATUS_NAME_KEYS, row.status, t)}
                   </Chip>
                   <span className="text-sm font-semibold text-ink">
                     {methodConditionLabel(t, check.id, row.condition)}

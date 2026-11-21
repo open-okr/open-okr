@@ -310,7 +310,7 @@ export async function ReviewAndLearn({
               </p>
             </div>
             <Chip tone={verdictTone(closure.verdict)} dot>
-              {verdictLabel(closure.verdict)}
+              {verdictLabel(closure.verdict, t)}
             </Chip>
           </CardHeader>
           <CardBody className="flex flex-col gap-3">

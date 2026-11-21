@@ -488,7 +488,7 @@ export function Scoring({
               ) : null}
               {status.verdict === null ? null : (
                 <Chip tone={verdictTone(status.verdict)}>
-                  {verdictLabel(status.verdict)}
+                  {verdictLabel(status.verdict, t)}
                 </Chip>
               )}
               {status.committed === null ? null : (

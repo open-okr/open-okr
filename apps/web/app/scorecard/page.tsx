@@ -247,7 +247,7 @@ export default async function ScorecardPage() {
                     </td>
                     <td className="px-3 py-2">
                       <Chip tone={verdictTone(row.verdict)} dot>
-                        {verdictLabel(row.verdict)}
+                        {verdictLabel(row.verdict, t)}
                       </Chip>
                     </td>
                     <td className="px-3 py-2 text-end text-ink-2 tabular-nums">

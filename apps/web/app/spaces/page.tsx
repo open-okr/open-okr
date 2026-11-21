@@ -13,6 +13,7 @@ import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { memberOption } from "../../lib/entity-options.ts";
+import { nameOf, SPACE_ROLE_NAME_KEYS } from "../../lib/identifier-names.ts";
 import { searchAnyone } from "../../lib/member-search.ts";
 import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
@@ -100,7 +101,9 @@ export default async function SpacesPage() {
                         })}
                       </span>
                       {space.ownRole ? (
-                        <Chip tone="brand">{space.ownRole}</Chip>
+                        <Chip tone="brand">
+                          {nameOf(SPACE_ROLE_NAME_KEYS, space.ownRole, t)}
+                        </Chip>
                       ) : (
                         <Chip tone="neutral">{t("spaces.notAMember")}</Chip>
                       )}

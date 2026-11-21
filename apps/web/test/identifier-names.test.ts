@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
   ASSIST_FEATURE_KEYS,
   REVIEW_ASSIST_KEYS,
@@ -11,16 +13,25 @@ import {
 import { CATALOGUES } from "@openokr/ui/catalogues";
 import { describe, expect, test } from "vitest";
 import {
+  AGENT_LOG_KIND_NAME_KEYS,
+  AGENT_RUN_STATUS_NAME_KEYS,
   ASSIST_NAME_KEYS,
+  AUTONOMY_NAME_KEYS,
+  CHANNEL_STATE_NAME_KEYS,
+  GOAL_LEVEL_NAME_KEYS,
   INDICATOR_NAME_KEYS,
   KPI_FREQUENCY_NAME_KEYS,
   KPI_STATE_NAME_KEYS,
   KPI_TIER_NAME_KEYS,
+  MESSAGE_STATUS_NAME_KEYS,
   PROMPT_NAME_KEYS,
+  QUALITY_STATUS_NAME_KEYS,
   SCHEDULE_NAME_KEYS,
   SESSION_KIND_NAME_KEYS,
   SPACE_ROLE_NAME_KEYS,
+  THRESHOLD_PART_NAME_KEYS,
   TRIGGER_NAME_KEYS,
+  VERDICT_NAME_KEYS,
 } from "../lib/identifier-names.ts";
 
 /**
@@ -79,6 +90,15 @@ describe("every identifier on an admin screen has a name", () => {
       ...Object.values(INDICATOR_NAME_KEYS),
       ...Object.values(KPI_TIER_NAME_KEYS),
       ...Object.values(SPACE_ROLE_NAME_KEYS),
+      ...Object.values(GOAL_LEVEL_NAME_KEYS),
+      ...Object.values(VERDICT_NAME_KEYS),
+      ...Object.values(AGENT_RUN_STATUS_NAME_KEYS),
+      ...Object.values(AGENT_LOG_KIND_NAME_KEYS),
+      ...Object.values(AUTONOMY_NAME_KEYS),
+      ...Object.values(CHANNEL_STATE_NAME_KEYS),
+      ...Object.values(MESSAGE_STATUS_NAME_KEYS),
+      ...Object.values(QUALITY_STATUS_NAME_KEYS),
+      ...Object.values(THRESHOLD_PART_NAME_KEYS),
     ];
     const unresolved = all.filter((key) => en[key] === undefined);
     expect(unresolved).toEqual([]);
@@ -131,5 +151,111 @@ describe("a trigger's name is the same in the method and the catalogue", () => {
       (entry) => english[TRIGGER_NAME_KEYS[entry.key] ?? ""] !== entry.title,
     ).map((entry) => entry.key);
     expect(drift).toEqual([]);
+  });
+});
+
+/**
+ * R1 D8: stored codes were printed as the badge text. Each screen below now
+ * names the value through a map. Read raw, because `readScreen` would resolve
+ * a `t("key")` back to English and hide a code printed as it is stored.
+ */
+const source = (path: string) =>
+  readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+
+describe("stored codes are named on the screens that printed them", () => {
+  const sites: ReadonlyArray<
+    readonly [string, readonly string[], readonly string[]]
+  > = [
+    ["../app/spaces/page.tsx", ["SPACE_ROLE_NAME_KEYS"], ["{space.ownRole}"]],
+    [
+      "../app/kpis/[id]/page.tsx",
+      [
+        "KPI_STATE_NAME_KEYS",
+        "KPI_FREQUENCY_NAME_KEYS",
+        "INDICATOR_NAME_KEYS",
+        "KPI_TIER_NAME_KEYS",
+      ],
+      [
+        "{kpi.state}",
+        "\n                kpi.frequency,\n",
+        "{child.indicatorType}",
+      ],
+    ],
+    [
+      "../app/people/[id]/page.tsx",
+      ["healthWord"],
+      ['goal.health.replace(/_/g, " ")'],
+    ],
+    [
+      "../app/method/[id]/page.tsx",
+      ["QUALITY_STATUS_NAME_KEYS"],
+      ["{row.status}"],
+    ],
+    [
+      "../app/admin/agents/page.tsx",
+      [
+        "AUTONOMY_NAME_KEYS",
+        "AGENT_RUN_STATUS_NAME_KEYS",
+        "AGENT_LOG_KIND_NAME_KEYS",
+      ],
+      [
+        ">{agent.autonomy}<",
+        "\n                        {run.status}\n",
+        "\n                            {entry.kind}\n",
+      ],
+    ],
+    [
+      "../app/admin/channels/page.tsx",
+      [
+        "CHANNEL_STATE_NAME_KEYS",
+        "MESSAGE_STATUS_NAME_KEYS",
+        "CHANNEL_NAME_KEYS",
+      ],
+      ["{connection.state}", "{message.status}", ">{message.provider}<"],
+    ],
+    [
+      "../app/admin/rhythm/rhythm-form.tsx",
+      ["THRESHOLD_PART_NAME_KEYS"],
+      ["label={part}"],
+    ],
+    [
+      "../app/goals/[id]/page.tsx",
+      ["GOAL_LEVEL_NAME_KEYS"],
+      ["level: goal.level,"],
+    ],
+    [
+      "../app/goals/[id]/rail.tsx",
+      ["GOAL_LEVEL_NAME_KEYS"],
+      ["{relations.parent.level}", "{child.level} "],
+    ],
+    [
+      "../app/goals/okr-diagram-cards.tsx",
+      ["GOAL_LEVEL_NAME_KEYS"],
+      ["{goal.level}"],
+    ],
+    ["../app/goals/okr-drawer.tsx", ["GOAL_LEVEL_NAME_KEYS"], ["{goal.level}"]],
+    [
+      "../app/check-in/page.tsx",
+      ["GOAL_LEVEL_NAME_KEYS"],
+      ["level: goal.level,"],
+    ],
+  ];
+
+  for (const [path, names, raw] of sites) {
+    test(path, () => {
+      const text = source(path);
+      for (const name of names) {
+        expect(text, `${name} is used`).toContain(name);
+      }
+      for (const code of raw) {
+        expect(text, `${code} is printed raw`).not.toContain(code);
+      }
+    });
+  }
+
+  test("the verdict label is named, not printed", () => {
+    const text = source("../lib/verdict.ts");
+    expect(text).toContain("VERDICT_NAME_KEYS");
+    expect(text).not.toContain('"not scored"');
   });
 });

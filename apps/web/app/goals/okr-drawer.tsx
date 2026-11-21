@@ -25,6 +25,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { dayLabel } from "../../lib/day-label.ts";
+import { GOAL_LEVEL_NAME_KEYS, nameOf } from "../../lib/identifier-names.ts";
 import type { OkrDetail } from "../../lib/okr-tree/actions.ts";
 import {
   OKR_DETAIL_ALL,
@@ -418,7 +419,9 @@ function DrawerBody({
               </dd>
             ) : null}
             <dt className="text-ink-3">{t("okrDrawer.level")}</dt>
-            <dd className="px-1 text-ink-2">{goal.level}</dd>
+            <dd className="px-1 text-ink-2">
+              {nameOf(GOAL_LEVEL_NAME_KEYS, goal.level, t)}
+            </dd>
             {/* §2.9: a team that merges or splits takes its OKRs with it. */}
             <dt className="text-ink-3">{t("okrDrawer.space")}</dt>
             <dd>

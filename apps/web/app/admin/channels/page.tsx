@@ -16,6 +16,12 @@ import {
   Chip,
 } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import {
+  CHANNEL_NAME_KEYS,
+  CHANNEL_STATE_NAME_KEYS,
+  MESSAGE_STATUS_NAME_KEYS,
+  nameOf,
+} from "../../../lib/identifier-names.ts";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
@@ -226,7 +232,7 @@ export default async function ChannelsPage() {
                 <h2>{provider.label}</h2>
                 {connection ? (
                   <Chip tone={STATE_TONE[connection.state] ?? "neutral"}>
-                    {connection.state}
+                    {nameOf(CHANNEL_STATE_NAME_KEYS, connection.state, t)}
                   </Chip>
                 ) : (
                   <Chip tone="neutral">{t("admin.channels.notConnected")}</Chip>
@@ -519,7 +525,9 @@ export default async function ChannelsPage() {
                   key={`${index}-${message.createdAt}-${message.provider}`}
                   className="flex flex-wrap items-center gap-2 text-xs"
                 >
-                  <Chip tone="neutral">{message.provider}</Chip>
+                  <Chip tone="neutral">
+                    {nameOf(CHANNEL_NAME_KEYS, message.provider, t)}
+                  </Chip>
                   <Chip
                     tone={
                       message.status === "sent"
@@ -529,7 +537,7 @@ export default async function ChannelsPage() {
                           : "neutral"
                     }
                   >
-                    {message.status}
+                    {nameOf(MESSAGE_STATUS_NAME_KEYS, message.status, t)}
                   </Chip>
                   <span className="text-ink-3">{when(message.createdAt)}</span>
                   {message.error ? (

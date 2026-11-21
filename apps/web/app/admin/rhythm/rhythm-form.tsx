@@ -32,6 +32,10 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  nameOf,
+  THRESHOLD_PART_NAME_KEYS,
+} from "../../../lib/identifier-names.ts";
 import { checkInFrequencyOptions } from "./check-in-options.ts";
 import { saveRhythm } from "./rhythm-actions.ts";
 import {
@@ -520,7 +524,7 @@ function Parameter({
                 className={`col-span-12 min-w-0 ${partSpans(parts.length)[index]}`}
               >
                 <NumberInput
-                  label={part}
+                  label={nameOf(THRESHOLD_PART_NAME_KEYS, part, t)}
                   name={field}
                   step={Number.isInteger(inForce) ? 1 : 0.01}
                   disabled={!canManage}

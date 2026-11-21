@@ -14,6 +14,7 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
+import { healthWord } from "../../../lib/health-words.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
@@ -311,7 +312,7 @@ export default async function MemberProfilePage({
                             : "neutral"
                       }
                     >
-                      {goal.health.replace(/_/g, " ")}
+                      {healthWord(t, goal.health)}
                     </Chip>
                   </Link>
                 </li>

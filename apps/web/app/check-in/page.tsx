@@ -13,6 +13,7 @@ import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
 import { healthWord } from "../../lib/health-words.ts";
+import { GOAL_LEVEL_NAME_KEYS, nameOf } from "../../lib/identifier-names.ts";
 import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -177,7 +178,7 @@ export default async function CheckInPage({
                           ? "checkIn.walkerLineDraftOpen"
                           : "checkIn.walkerLine",
                         {
-                          level: goal.level,
+                          level: nameOf(GOAL_LEVEL_NAME_KEYS, goal.level, t),
                           keyResults: t("common.count.keyResult", {
                             count: goal.keyResultCount,
                           }),

@@ -22,6 +22,13 @@ import { assistOffered } from "../../../lib/assists";
 import { getPool } from "../../../lib/auth";
 import { KPI_ACHIEVEMENT_MAX } from "../../../lib/ceilings.ts";
 import { memberOption } from "../../../lib/entity-options.ts";
+import {
+  INDICATOR_NAME_KEYS,
+  KPI_FREQUENCY_NAME_KEYS,
+  KPI_STATE_NAME_KEYS,
+  KPI_TIER_NAME_KEYS,
+  nameOf,
+} from "../../../lib/identifier-names.ts";
 import { searchHumans } from "../../../lib/member-search.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
 import { timeAxisX } from "../../../lib/reading-direction.ts";
@@ -215,7 +222,7 @@ export default async function KpiDetailPage({
                 {kpi.title}
               </h1>
               <Chip tone={stateTone(kpi.state)} dot>
-                {kpi.state}
+                {nameOf(KPI_STATE_NAME_KEYS, kpi.state, t)}
               </Chip>
               {/* Beside the band, never instead of it (§6.4, P9-T17b-a). */}
               {kpi.recovering ? (
@@ -227,10 +234,10 @@ export default async function KpiDetailPage({
                 kpi.categoryName ?? t("kpis.detail.uncategorised"),
                 kpi.treeName ?? t("kpis.detail.noTree"),
                 kpi.ownerName ?? t("kpis.detail.workspaceOwned"),
-                kpi.frequency,
+                nameOf(KPI_FREQUENCY_NAME_KEYS, kpi.frequency, t),
                 kpi.tier
-                  ? `${kpi.indicatorType} · ${kpi.tier}`
-                  : kpi.indicatorType,
+                  ? `${nameOf(INDICATOR_NAME_KEYS, kpi.indicatorType, t)} · ${nameOf(KPI_TIER_NAME_KEYS, kpi.tier, t)}`
+                  : nameOf(INDICATOR_NAME_KEYS, kpi.indicatorType, t),
               ].join(" · ")}
             </p>
             {/* What the kpi-records template's "kpi" column asks for, which
@@ -582,7 +589,7 @@ export default async function KpiDetailPage({
                         {child.title}
                       </Link>
                       <span className="text-xs text-ink-4">
-                        {child.indicatorType}
+                        {nameOf(INDICATOR_NAME_KEYS, child.indicatorType, t)}
                       </span>
                       <Chip tone={stateTone(child.state)} dot>
                         {child.achievementPct === null

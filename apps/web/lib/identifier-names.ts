@@ -196,6 +196,101 @@ export const SPACE_ROLE_NAME_KEYS: Readonly<Record<string, string>> = {
   manager: "spaces.role.manager",
 };
 
+/** A goal's level in the organisation (R1 D8). */
+export const GOAL_LEVEL_NAME_KEYS: Readonly<Record<string, string>> = {
+  company: "goals.level.company",
+  department: "goals.level.department",
+  team: "goals.level.team",
+  individual: "goals.level.individual",
+};
+
+/** §3.4's portfolio verdict (R1 D8). */
+export const VERDICT_NAME_KEYS: Readonly<Record<string, string>> = {
+  healthy: "verdict.healthy",
+  too_safe: "verdict.tooSafe",
+  partial: "verdict.partial",
+  outran_capacity: "verdict.outranCapacity",
+};
+
+/** An agent run's status. */
+export const AGENT_RUN_STATUS_NAME_KEYS: Readonly<Record<string, string>> = {
+  planning: "admin.agents.runStatus.planning",
+  running: "admin.agents.runStatus.running",
+  completed: "admin.agents.runStatus.completed",
+  cancelled: "admin.agents.runStatus.cancelled",
+  failed: "admin.agents.runStatus.failed",
+};
+
+/** What one line of an agent run's log records. */
+export const AGENT_LOG_KIND_NAME_KEYS: Readonly<Record<string, string>> = {
+  denied: "admin.agents.logKind.denied",
+  simulated: "admin.agents.logKind.simulated",
+  proposed: "admin.agents.logKind.proposed",
+  applied: "admin.agents.logKind.applied",
+  error: "admin.agents.logKind.error",
+};
+
+/** An agent's autonomy policy, as its chip names it. */
+export const AUTONOMY_NAME_KEYS: Readonly<Record<string, string>> = {
+  sandbox: "admin.agents.agentPolicy.sandbox",
+  propose: "admin.agents.agentPolicy.propose",
+  scoped_direct: "admin.agents.agentPolicy.scopedDirect",
+};
+
+/** The state of a workspace's channel connection. */
+export const CHANNEL_STATE_NAME_KEYS: Readonly<Record<string, string>> = {
+  connected: "admin.channels.state.connected",
+  error: "admin.channels.state.error",
+  disabled: "admin.channels.state.disabled",
+};
+
+/** The status of one outbound channel message. */
+export const MESSAGE_STATUS_NAME_KEYS: Readonly<Record<string, string>> = {
+  queued: "admin.channels.messageStatus.queued",
+  sent: "admin.channels.messageStatus.sent",
+  failed: "admin.channels.messageStatus.failed",
+  suppressed: "admin.channels.messageStatus.suppressed",
+};
+
+/** The result of one quality-check condition (METHOD.md §4). */
+export const QUALITY_STATUS_NAME_KEYS: Readonly<Record<string, string>> = {
+  pass: "cycle.ruleVerdict.statusPass",
+  info: "cycle.ruleVerdict.statusNote",
+  warn: "cycle.ruleVerdict.statusWarn",
+  fail: "cycle.ruleVerdict.statusFail",
+  todo: "cycle.ruleVerdict.statusTodo",
+};
+
+/**
+ * The parts of a composite §11 parameter on the rhythm screen, by the name
+ * the registry stores them under.
+ */
+export const THRESHOLD_PART_NAME_KEYS: Readonly<Record<string, string>> = {
+  championRepeat: "admin.nudges.ruleCards.rung.championRepeat",
+  coordinator: "admin.nudges.ruleCards.rung.coordinator",
+  sponsor: "admin.nudges.ruleCards.rung.sponsor",
+  nudge: "admin.nudges.ruleCards.rung.nudge",
+  escalate: "admin.nudges.ruleCards.rung.escalate",
+  reminder: "admin.nudges.ruleCards.rung.reminder",
+  daily: "common.daily",
+  weekly: "common.weekly",
+  monthly: "common.monthly",
+  quarterly: "sessions.kindQuarterly",
+  annual: "sessions.kindAnnual",
+  achieved: "health.achieved",
+  strong: "admin.rhythm.part.strong",
+  partial: "cycle.reviewAndLearn.band.partial",
+  tooSafe: "admin.rhythm.part.tooSafe",
+  healthy: "kpis.recovery.stateHealthy",
+  aspirational: "okrKind.aspirational",
+  committed: "okrKind.committed",
+  green: "cycle.ruleVerdict.green",
+  amber: "cycle.ruleVerdict.amber",
+  red: "cycle.ruleVerdict.red",
+  low: "admin.rhythm.part.low",
+  high: "admin.rhythm.part.high",
+};
+
 /** The value's name, or the value itself when the map has none. */
 export function nameOf(
   names: Readonly<Record<string, string>>,

@@ -11,6 +11,7 @@ import {
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import Link from "next/link";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { GOAL_LEVEL_NAME_KEYS, nameOf } from "../../lib/identifier-names.ts";
 import type { OkrGoal, OkrTree } from "../../lib/okr-tree/cache.ts";
 import { HealthChip } from "./health-chip.tsx";
 import {
@@ -149,7 +150,7 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
         <span
           className={`flex items-center gap-1.5 pe-10 text-xs font-semibold capitalize text-ink-3 ${shared.canEdit ? "ps-4" : ""}`}
         >
-          {goal.level}
+          {nameOf(GOAL_LEVEL_NAME_KEYS, goal.level, t)}
           <span className="truncate font-normal normal-case tracking-normal">
             {goal.champion.name}
           </span>

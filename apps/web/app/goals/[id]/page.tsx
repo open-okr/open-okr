@@ -45,6 +45,7 @@ import { DecisionText } from "../../../lib/decision-text.tsx";
 import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { healthWord } from "../../../lib/health-words.ts";
+import { GOAL_LEVEL_NAME_KEYS, nameOf } from "../../../lib/identifier-names.ts";
 import { readKpiOptions } from "../../../lib/kpi-options.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
 import { PreviousNext } from "../../../lib/previous-next.tsx";
@@ -415,13 +416,13 @@ export default async function GoalPage({
               <p className="text-xs text-ink-3">
                 {goal.reviewer
                   ? t("common.championsItReviewsItWeight", {
-                      level: goal.level,
+                      level: nameOf(GOAL_LEVEL_NAME_KEYS, goal.level, t),
                       name: goal.champion.name,
                       name2: goal.reviewer.name,
                       weight: goal.weight,
                     })
                   : t("common.championsItNoReviewerWeight", {
-                      level: goal.level,
+                      level: nameOf(GOAL_LEVEL_NAME_KEYS, goal.level, t),
                       name: goal.champion.name,
                       weight: goal.weight,
                     })}
