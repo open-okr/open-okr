@@ -1,7 +1,7 @@
 import { Command } from "lucide-react";
 import type { HTMLAttributes, ReactNode } from "react";
-import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
+import { CommandKeyName } from "./command-key-name.tsx";
 
 /** The character the shortcut registry and every call site write for the
  * modifier. Kept as the authored form, because UIUX-PLAN.md §4 and the
@@ -25,10 +25,9 @@ const COMMAND = "⌘";
  * part of the badge's own reading order.
  */
 function CommandGlyph() {
-  const { t } = useTranslations();
   return (
     <>
-      <span className="sr-only">{t("kbd.command")} </span>
+      <CommandKeyName />
       <Command
         aria-hidden="true"
         className="inline-block size-[1.05em] align-[-0.15em] stroke-[2.5]"
