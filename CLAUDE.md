@@ -277,7 +277,7 @@ Keep this list current. A command that is written down and absent, or present an
 - `pnpm i18n:check [--release]`: the message catalogue gate. Verifies key parity, named holes, plural categories, English copies against `same-as-english.ts` and `pending.json`, and script rules across all shipped languages. `--release` fails when any translation remains pending. Runs as part of `pnpm check:fast`
 - `pnpm check:direction`: checks web and shared UI sources for physical CSS properties and utilities. The debt list may only shrink. Mark intentional physical positioning with a `direction-neutral:` comment that explains why. Runs as part of `pnpm check:fast`
 - `pnpm i18n:sync`: copies new English keys to non-English catalogue files, records them in `pending.json`, and cleans deleted keys across all languages
-- `pnpm i18n:translate [--locale <code>] [--keys <prefix>]`: translates catalogue keys via configured AI provider (`--provider` and `--model`), preserving hole tokens and validating results
+- `pnpm i18n:translate [--locale <code>] [--keys <prefix>] [--concurrency <n>]`: translates catalogue keys via configured AI provider (`--provider` and `--model`), preserving hole tokens and validating results; batches run in parallel, 4 at a time by default
 
 ## Definition of done for every change
 

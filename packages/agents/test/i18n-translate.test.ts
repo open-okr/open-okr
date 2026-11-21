@@ -219,4 +219,93 @@ describe("i18n translate", () => {
       );
     });
   });
+
+  describe("parallel batches", () => {
+    function build(batchCount: number) {
+      const keys = Array.from(
+        { length: batchCount * 100 },
+        (_, i) => `k.${String(i).padStart(4, "0")}`,
+      );
+      const source: Record<string, string> = {};
+      for (const key of keys) source[key] = `Text ${key}`;
+      return { keys, source };
+    }
+
+    function makeProvider() {
+      let inFlight = 0;
+      let peak = 0;
+      const provider = {
+        async chat(req: {
+          messages: readonly { role: string; content: string }[];
+        }) {
+          inFlight++;
+          peak = Math.max(peak, inFlight);
+          const user = req.messages.find((m) => m.role === "user")?.content;
+          const batch = JSON.parse(user ?? "{}") as Record<string, string>;
+          const first = Object.keys(batch)[0] ?? "";
+          const batchNo = Number(first.slice(2)) / 100;
+          // Later batches finish sooner, so completion order differs from batch order.
+          await new Promise((r) => setTimeout(r, 30 - batchNo * 3));
+          inFlight--;
+          if (batchNo === 2) {
+            return {
+              content: "not json",
+              usage: { inputTokens: 7, outputTokens: 3 },
+            };
+          }
+          const out: Record<string, string> = {};
+          for (const key of Object.keys(batch)) out[key] = `Tr ${key}`;
+          return {
+            content: JSON.stringify(out),
+            usage: { inputTokens: 10 + batchNo, outputTokens: 5 },
+          };
+        },
+      };
+      return {
+        provider: provider as unknown as MockAIProvider,
+        peak: () => peak,
+      };
+    }
+
+    async function run(batchCount: number, concurrency?: number) {
+      const { keys, source } = build(batchCount);
+      const target = { ...source };
+      const { provider, peak } = makeProvider();
+      const progress: string[] = [];
+      const result = await translateCatalogue({
+        provider,
+        model: "m",
+        locale: "de",
+        keys,
+        sourceCatalogue: source,
+        targetCatalogue: target,
+        pendingKeys: keys,
+        ...(concurrency === undefined ? {} : { concurrency }),
+        onProgress: (m) => progress.push(m),
+      });
+      return { result, target, peak: peak(), progress };
+    }
+
+    it("runs at most `concurrency` batches at once", async () => {
+      const { peak } = await run(7, 3);
+      expect(peak).toBe(3);
+    });
+
+    it("gives the same result as concurrency 1", async () => {
+      const serial = await run(7, 1);
+      const parallel = await run(7, 3);
+      expect(serial.peak).toBe(1);
+      expect(parallel.result).toEqual(serial.result);
+      expect(parallel.target).toEqual(serial.target);
+      expect(parallel.result.failures.length).toBe(100);
+      expect(parallel.progress.some((m) => m.includes("batch 3 of 7"))).toBe(
+        true,
+      );
+    });
+
+    it("defaults to a concurrency of 4", async () => {
+      const { peak } = await run(8);
+      expect(peak).toBe(4);
+    });
+  });
 });

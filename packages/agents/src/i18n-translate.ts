@@ -162,6 +162,8 @@ export interface TranslateCatalogueOptions {
   readonly sameAsEnglish?: Record<string, string>;
   readonly glossary?: Record<string, string>;
   readonly requireTranslation?: boolean;
+  /** Batches in flight at once. Default 4, at least 1. */
+  readonly concurrency?: number;
   readonly onProgress?: (message: string) => void;
 }
 
@@ -188,6 +190,7 @@ export async function translateCatalogue(
     sameAsEnglish = {},
     glossary = {},
     requireTranslation = false,
+    concurrency,
     onProgress,
   } = options;
 
@@ -199,10 +202,23 @@ export async function translateCatalogue(
 
   const batches = chunkKeys(keys, 100);
 
-  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+  interface BatchOutcome {
+    inputTokens: number;
+    outputTokens: number;
+    failures: TranslateItemFailure[];
+    translated: Record<string, string>;
+  }
+
+  const runBatch = async (batchIndex: number): Promise<BatchOutcome> => {
+    const outcome: BatchOutcome = {
+      inputTokens: 0,
+      outputTokens: 0,
+      failures: [],
+      translated: {},
+    };
     const batch = batches[batchIndex];
     if (!batch) {
-      continue;
+      return outcome;
     }
     onProgress?.(
       `Translating batch ${batchIndex + 1} of ${batches.length} (${batch.length} keys)...`,
@@ -249,8 +265,8 @@ Rules:
       feature: "i18n:translate",
     });
 
-    totalInputTokens += response.usage.inputTokens;
-    totalOutputTokens += response.usage.outputTokens;
+    outcome.inputTokens = response.usage.inputTokens;
+    outcome.outputTokens = response.usage.outputTokens;
 
     let parsedReply: Record<string, string> = {};
     try {
@@ -265,9 +281,9 @@ Rules:
       const parseError =
         err instanceof Error ? err.message : "Failed to parse JSON response";
       for (const key of batch) {
-        failures.push({ key, error: parseError });
+        outcome.failures.push({ key, error: parseError });
       }
-      continue;
+      return outcome;
     }
 
     for (const key of batch) {
@@ -276,17 +292,23 @@ Rules:
       const rawTranslation = parsedReply[key];
 
       if (rawTranslation === undefined) {
-        failures.push({ key, error: "key missing from translation response" });
+        outcome.failures.push({
+          key,
+          error: "key missing from translation response",
+        });
         continue;
       }
       if (typeof rawTranslation !== "string") {
-        failures.push({ key, error: "translation is not a string" });
+        outcome.failures.push({ key, error: "translation is not a string" });
         continue;
       }
 
       const unmasked = unmaskHoles(rawTranslation, tokens);
       if (!unmasked.success || unmasked.text === undefined) {
-        failures.push({ key, error: unmasked.error ?? "unmask failed" });
+        outcome.failures.push({
+          key,
+          error: unmasked.error ?? "unmask failed",
+        });
         continue;
       }
 
@@ -298,7 +320,10 @@ Rules:
         sameAsEnglish,
       );
       if (!validation.valid) {
-        failures.push({ key, error: validation.error ?? "validation failed" });
+        outcome.failures.push({
+          key,
+          error: validation.error ?? "validation failed",
+        });
         continue;
       }
       if (
@@ -307,12 +332,39 @@ Rules:
         messageHasLetters(english) &&
         (unmasked.text.trim() === "" || unmasked.text === english)
       ) {
-        failures.push({ key, error: "the value needs a translation" });
+        outcome.failures.push({ key, error: "the value needs a translation" });
         continue;
       }
 
-      // Successful translation
-      targetCatalogue[key] = unmasked.text;
+      outcome.translated[key] = unmasked.text;
+    }
+    return outcome;
+  };
+
+  // Small inline worker pool. Results are merged in batch order below so the
+  // failures list and the catalogue writes do not depend on completion order.
+  const limit = Math.max(1, Math.floor(concurrency ?? 4) || 1);
+  const outcomes: BatchOutcome[] = new Array(batches.length);
+  let nextBatch = 0;
+  const worker = async () => {
+    while (nextBatch < batches.length) {
+      const index = nextBatch++;
+      outcomes[index] = await runBatch(index);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(limit, batches.length) }, () => worker()),
+  );
+
+  for (const outcome of outcomes) {
+    if (!outcome) {
+      continue;
+    }
+    totalInputTokens += outcome.inputTokens;
+    totalOutputTokens += outcome.outputTokens;
+    failures.push(...outcome.failures);
+    for (const [key, text] of Object.entries(outcome.translated)) {
+      targetCatalogue[key] = text;
       pendingSet.delete(key);
       translatedCount++;
     }

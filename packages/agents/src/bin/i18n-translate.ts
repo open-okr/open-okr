@@ -5,6 +5,7 @@
  *
  *   pnpm i18n:translate --mock --locale de
  *   pnpm i18n:translate --estimate --locale ms --keys account.security.sessions
+ *   OPENOKR_AI_API_KEY=... pnpm i18n:translate --provider openrouter --model <id> --locale ms --concurrency 6
  *   OPENOKR_AI_API_KEY=... pnpm i18n:translate --provider openrouter --model openai/gpt-6-luna --locale ms --keys account.security.sessions
  */
 import { readFile, writeFile } from "node:fs/promises";
@@ -31,9 +32,19 @@ const { values } = parseArgs({
     model: { type: "string" },
     mock: { type: "boolean" },
     estimate: { type: "boolean" },
+    concurrency: { type: "string" },
   },
   allowPositionals: true,
 });
+
+let concurrency: number | undefined;
+if (values.concurrency !== undefined) {
+  if (!/^[1-9][0-9]*$/.test(values.concurrency)) {
+    process.stderr.write("--concurrency must be a positive integer.\n");
+    process.exit(2);
+  }
+  concurrency = Number(values.concurrency);
+}
 
 const repoRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -67,7 +78,7 @@ if (
   process.stderr.write(
     "Usage: pnpm i18n:translate --mock [--locale <code>] [--keys <prefix>]\n" +
       "       pnpm i18n:translate --estimate [--locale <code>] [--keys <prefix>]\n" +
-      "       OPENOKR_AI_API_KEY=... pnpm i18n:translate --provider anthropic|openai|google|openrouter --model <id> [--locale <code>] [--keys <prefix>]\n",
+      "       OPENOKR_AI_API_KEY=... pnpm i18n:translate --provider anthropic|openai|google|openrouter --model <id> [--locale <code>] [--keys <prefix>] [--concurrency <n>]\n",
   );
   process.exit(2);
 }
@@ -282,7 +293,7 @@ if (isMock) {
   process.stderr.write(
     "Usage: pnpm i18n:translate --mock [--locale <code>] [--keys <prefix>]\n" +
       "       pnpm i18n:translate --estimate [--locale <code>] [--keys <prefix>]\n" +
-      "       OPENOKR_AI_API_KEY=... pnpm i18n:translate --provider anthropic|openai|google|openrouter --model <id> [--locale <code>] [--keys <prefix>]\n",
+      "       OPENOKR_AI_API_KEY=... pnpm i18n:translate --provider anthropic|openai|google|openrouter --model <id> [--locale <code>] [--keys <prefix>] [--concurrency <n>]\n",
   );
   process.exit(2);
 }
@@ -312,6 +323,7 @@ for (const loc of targetLocales) {
       sourceCatalogue: sourceGlossary,
       targetCatalogue: glossary,
       pendingKeys: missing,
+      concurrency,
       sameAsEnglish: { kpi: "Method acronym" },
       onProgress: (message) => process.stdout.write(`  glossary: ${message}\n`),
     });
@@ -350,6 +362,7 @@ for (const loc of targetLocales) {
         sameAsEnglish: job.sameAsEnglish,
         glossary,
         requireTranslation: true,
+        concurrency,
         onProgress: (message) =>
           process.stdout.write(`  ${job.kind}: ${message}\n`),
       });
