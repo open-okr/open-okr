@@ -6,6 +6,12 @@ const TOKEN_REGEX = /⟦\d+⟧/g;
 const HAN_REGEX = /\p{Script=Han}/u;
 const ARABIC_REGEX = /\p{Script=Arabic}/u;
 
+const SHORT_LABEL_INSTRUCTIONS: Readonly<Record<string, string>> = {
+  "zh-Hans":
+    "Use 人工智能 for a bare AI label and 目标与关键结果 for a bare OKR label. For a file size in KB, add 大小 before the quantity and keep KB. Preserve all placeholder tokens.",
+  es: 'Use "Activo" for On, "Inactivo" for Off, "Vence" for Due, "Para" for By, "Fijar" for Set, and "Bandeja" for Inbox. Use "Correo" for Email and "Tecla Esc" for Esc. For unchanged cognates choose a natural Spanish alternative, such as "Ajustes" for General and "Plan actual" for Plan. Keep technical examples intact with a short label such as "Ej.:". Use "NO" for a bare No option.',
+};
+
 export function maskHoles(text: string): {
   readonly masked: string;
   readonly tokens: Map<string, string>;
@@ -216,16 +222,15 @@ export async function translateCatalogue(
       requireTranslation && script
         ? `\n4. Include at least one ${script} letter in each value with written words. Keep URLs, code, email addresses, acronyms, and keyboard shortcuts intact and add a short translated label where needed.`
         : "";
-    const shortChineseLabels =
-      requireTranslation && locale === "zh-Hans"
-        ? "\n5. Use 人工智能 for a bare AI label and 目标与关键结果 for a bare OKR label. For a file size in KB, add 大小 before the quantity and keep KB. Preserve all placeholder tokens."
-        : "";
+    const shortLabels = requireTranslation
+      ? SHORT_LABEL_INSTRUCTIONS[locale]
+      : undefined;
 
     const systemPrompt = `You are an expert translator translating user interface text for OpenOKR into locale '${locale}'.
 Rules:
 1. Preserve placeholder tokens like ⟦1⟧, ⟦2⟧ exactly. Do not translate, alter, duplicate, or delete them.
 2. Return ONLY a valid JSON object mapping each key to its translated string. Do not include markdown code fences or other prose.
-3. Keep the translation concise, accurate, and natural for software UI. The translation must fit within three times the length of the English value.${scriptRule}${shortChineseLabels}${glossarySection}`;
+3. Keep the translation concise, accurate, and natural for software UI. For catalogue entries that require translation, do not repeat the English value. Localize cognates with a natural regional label and keep any literal command, protocol, or example readable inside the translated value. The translation must fit within three times the length of the English value. Use short localized labels for standalone abbreviations, technical examples, and units.${scriptRule}${shortLabels ? `\n5. ${shortLabels}` : ""}${glossarySection}`;
 
     const userPrompt = JSON.stringify(maskedBatch, null, 2);
 

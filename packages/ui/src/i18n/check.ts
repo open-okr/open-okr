@@ -4,6 +4,7 @@
  */
 import {
   type Catalogue,
+  catalogueWithLocalePlurals,
   messageHasLetters,
   messageHoles,
 } from "@openokr/formats";
@@ -326,26 +327,32 @@ export function checkCatalogues(
   options?: CheckOptions,
 ): readonly CheckIssue[] {
   const issues: CheckIssue[] = [];
-  const sourceKeys = Object.keys(source);
 
   if (options?.release) {
     issues.push(...checkRelease(pending));
   }
 
   for (const [locale, target] of Object.entries(catalogues)) {
+    const localeSource = catalogueWithLocalePlurals(source, locale);
     const localeSame = sameAsEnglish[locale] ?? {};
     const localePending = pending[locale] ?? [];
     const targetKeys = Object.keys(target);
 
-    issues.push(...checkKeys(locale, sourceKeys, targetKeys));
-    issues.push(...checkHoles(locale, source, target));
+    issues.push(...checkKeys(locale, Object.keys(localeSource), targetKeys));
+    issues.push(...checkHoles(locale, localeSource, target));
     // Plural check with intlTag if known
     issues.push(...checkPlurals(locale, locale, source, target));
     issues.push(
-      ...checkEnglishCopies(locale, source, target, localeSame, localePending),
+      ...checkEnglishCopies(
+        locale,
+        localeSource,
+        target,
+        localeSame,
+        localePending,
+      ),
     );
-    issues.push(...checkLedger(locale, source, target, localePending));
-    issues.push(...checkReasons(locale, source, target, localeSame));
+    issues.push(...checkLedger(locale, localeSource, target, localePending));
+    issues.push(...checkReasons(locale, localeSource, target, localeSame));
     issues.push(...checkScripts(locale, target, localeSame));
   }
 
@@ -359,7 +366,7 @@ export function checkCatalogues(
  * Removes keys deleted from English from target and pending.
  */
 export function syncCatalogue(
-  _locale: string,
+  locale: string,
   source: Catalogue,
   target: Catalogue,
   pending: readonly string[],
@@ -369,13 +376,14 @@ export function syncCatalogue(
   readonly added: string[];
   readonly removed: string[];
 } {
+  const localeSource = catalogueWithLocalePlurals(source, locale);
   const updatedTarget: Record<string, string> = { ...target };
   const pendingSet = new Set(pending);
   const added: string[] = [];
   const removed: string[] = [];
 
   // Add missing keys from source
-  for (const [key, sourceValue] of Object.entries(source)) {
+  for (const [key, sourceValue] of Object.entries(localeSource)) {
     if (updatedTarget[key] === undefined) {
       updatedTarget[key] = sourceValue;
       pendingSet.add(key);
@@ -385,7 +393,7 @@ export function syncCatalogue(
 
   // Remove keys deleted from source
   for (const key of Object.keys(updatedTarget)) {
-    if (source[key] === undefined) {
+    if (localeSource[key] === undefined) {
       delete updatedTarget[key];
       pendingSet.delete(key);
       removed.push(key);

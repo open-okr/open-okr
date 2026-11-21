@@ -56,6 +56,7 @@ export {
 } from "./locales.ts";
 export {
   type Catalogue,
+  catalogueWithLocalePlurals,
   type MessageValues,
   messageHasLetters,
   messageHoles,

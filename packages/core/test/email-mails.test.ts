@@ -1,3 +1,4 @@
+import { catalogueWithLocalePlurals } from "@openokr/formats";
 import { describe, expect, it } from "vitest";
 import {
   changeEmailMail,
@@ -71,7 +72,9 @@ describe("the word tables", () => {
       [...value.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
     const en = MAIL_WORD_TABLES.en;
     for (const [locale, table] of Object.entries(MAIL_WORD_TABLES)) {
-      expect(Object.keys(table).sort(), locale).toEqual(Object.keys(en).sort());
+      expect(Object.keys(table).sort(), locale).toEqual(
+        Object.keys(catalogueWithLocalePlurals(en, locale)).sort(),
+      );
       for (const key of Object.keys(en) as (keyof typeof en)[]) {
         expect(holes(table[key]), `${locale} ${key}`).toEqual(holes(en[key]));
       }

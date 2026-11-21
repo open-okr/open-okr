@@ -29,8 +29,14 @@ const VENDOR_NAMES = {
  */
 export const SAME_AS_ENGLISH: Record<string, Record<string, string>> = {
   "zh-Hans": { ...ENDONYMS, ...VENDOR_NAMES },
+  es: {
+    ...ENDONYMS,
+    ...VENDOR_NAMES,
+    "search.exportButton.excel": "Product name",
+  },
   ms: {
     "appearance.simplifiedChinese": "Language endonym",
+    "appearance.spanish": "Language endonym",
     "admin.branding.images.faviconTitle":
       'Product, vendor and language names. "Logo" and "Favicon" are the words Malay uses, and the file summary is two placeholders and a unit (docs/design/workspace-logo-favicon.md).',
     "admin.branding.images.fileSummary":

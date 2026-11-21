@@ -4,7 +4,25 @@ import { goTo, signIn } from "./instance-account.ts";
 const LOCALES = [
   { code: "ms", home: "Utama" },
   { code: "zh-Hans", home: "首页" },
+  { code: "es", home: "Inicio" },
 ] as const;
+
+test("an English sign-in loads only its own catalogue", async ({ page }) => {
+  const chunks: Promise<string>[] = [];
+  page.on("response", (response) => {
+    if (response.ok() && response.request().resourceType() === "script") {
+      chunks.push(response.text());
+    }
+  });
+  await page.setExtraHTTPHeaders({ "Accept-Language": "en" });
+  await page.goto("/sign-in");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+
+  const scripts = (await Promise.all(chunks)).join("\n");
+  expect(scripts).toContain("Add role");
+  expect(scripts.includes("Añadir rol"), "Spanish catalogue").toBe(false);
+  expect(scripts.includes("添加角色"), "Chinese catalogue").toBe(false);
+});
 
 for (const { code, home } of LOCALES) {
   test(`the member opens Home in ${code}`, async ({ page }, testInfo) => {

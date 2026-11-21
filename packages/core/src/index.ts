@@ -1,7 +1,10 @@
 import { PACKAGE_NAME as DB } from "@openokr/db";
 import { PACKAGE_NAME as FORMATS } from "@openokr/formats";
 
-export { messageHasLetters } from "@openokr/formats";
+export {
+  catalogueWithLocalePlurals,
+  messageHasLetters,
+} from "@openokr/formats";
 
 import { PACKAGE_NAME as METHOD } from "@openokr/method";
 

@@ -45,6 +45,28 @@ function getPluralRules(locale?: string): Intl.PluralRules {
   return rules;
 }
 
+/** English source templates for the plural categories a locale renders. */
+export function catalogueWithLocalePlurals(
+  source: Catalogue,
+  locale: string,
+): Catalogue {
+  let categories: readonly string[];
+  try {
+    categories = getPluralRules(locale).resolvedOptions().pluralCategories;
+  } catch {
+    return source;
+  }
+  const expanded = { ...source };
+  for (const [key, value] of Object.entries(source)) {
+    if (!key.endsWith(".other")) continue;
+    const base = key.slice(0, -".other".length);
+    for (const category of categories) {
+      expanded[`${base}.${category}`] ??= value;
+    }
+  }
+  return expanded;
+}
+
 /**
  * Resolves a message template and fills its named holes.
  *

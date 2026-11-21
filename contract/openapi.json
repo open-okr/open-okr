@@ -2062,7 +2062,8 @@
                         "enum": [
                           "en",
                           "ms",
-                          "zh-Hans"
+                          "zh-Hans",
+                          "es"
                         ]
                       },
                       {

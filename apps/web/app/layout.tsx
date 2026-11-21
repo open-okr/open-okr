@@ -5,11 +5,9 @@ import {
   QueryProvider,
   ThemeProvider,
   ToastProvider,
-  TranslationsProvider,
   themeInitScript,
   translate,
 } from "@openokr/ui";
-import { ZhHansTranslationsProvider } from "@openokr/ui/providers/zh-Hans";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { headers } from "next/headers";
@@ -20,6 +18,7 @@ import { ClientErrorReporter } from "../lib/client-error-reporter";
 import { getInstanceName } from "../lib/instance-name";
 import { InstanceNameProvider } from "../lib/instance-name-context";
 import { resolveLocale } from "../lib/locale";
+import { LocaleProvider } from "../lib/locale-provider";
 import { getCatalogue } from "../lib/translations";
 import {
   workspaceBrandImages,
@@ -116,8 +115,6 @@ export default async function RootLayout({
   const renamed = await workspaceTerms();
   const brandStyle = await workspaceBrandStyleSheet();
   const catalogue = getCatalogue(locale);
-  const LocaleProvider =
-    locale === "zh-Hans" ? ZhHansTranslationsProvider : TranslationsProvider;
 
   return (
     <html

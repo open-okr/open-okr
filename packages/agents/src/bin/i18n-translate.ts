@@ -16,7 +16,11 @@ import {
   createAIProvider,
   MockAIProvider,
 } from "@openokr/adapters";
-import { findSeededModel, messageHasLetters } from "@openokr/core";
+import {
+  catalogueWithLocalePlurals,
+  findSeededModel,
+  messageHasLetters,
+} from "@openokr/core";
 import { translateCatalogue } from "../i18n-translate.ts";
 
 const { values } = parseArgs({
@@ -154,12 +158,13 @@ async function prepareLocale(locale: string) {
       const path = join(dir, `${locale}.json`);
       const stored = await readMessages(path, true);
       const sameAsEnglish = exceptions[locale] ?? {};
+      const translatedSource = catalogueWithLocalePlurals(source, locale);
       const pending = new Set(
         kind === "UI" ? (pendingLedger[locale] ?? []) : [],
       );
       const keys: string[] = [];
       const target = { ...stored };
-      for (const [key, english] of Object.entries(source)) {
+      for (const [key, english] of Object.entries(translatedSource)) {
         if (sameAsEnglish[key] || !messageHasLetters(english)) {
           target[key] ??= english;
           pending.delete(key);
@@ -179,7 +184,7 @@ async function prepareLocale(locale: string) {
       return {
         path,
         kind,
-        source,
+        source: translatedSource,
         stored,
         target,
         sameAsEnglish,
