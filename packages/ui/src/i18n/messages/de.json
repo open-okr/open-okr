@@ -2864,6 +2864,7 @@
   "goals.editor.objectivePlaceholder": "Welches Ergebnis bringt dieses Ziel?",
   "goals.editor.objectiveTitle": "Zieltitel",
   "goals.editor.openKeyResult": "Dieses Schlüsselergebnis öffnen",
+  "kbd.command": "Command",
   "method.coach.quality.committed_floor": "Ein Bekenntnis, an das niemand glaubt, ist ein Risiko. Eskaliere es jetzt oder formuliere es als ambitioniertes Ziel.",
   "method.nothingToJudge": "Noch nichts zu bewerten",
   "method.rule.AL-1.condition.1.label": "Kein übergeordnetes Ziel, kein erklärter Beitrag und kein eigenständiger Grund",

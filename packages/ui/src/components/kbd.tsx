@@ -1,5 +1,6 @@
 import { Command } from "lucide-react";
 import type { HTMLAttributes, ReactNode } from "react";
+import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
 
 /** The character the shortcut registry and every call site write for the
@@ -24,9 +25,10 @@ const COMMAND = "⌘";
  * part of the badge's own reading order.
  */
 function CommandGlyph() {
+  const { t } = useTranslations();
   return (
     <>
-      <span className="sr-only">Command </span>
+      <span className="sr-only">{t("kbd.command")} </span>
       <Command
         aria-hidden="true"
         className="inline-block size-[1.05em] align-[-0.15em] stroke-[2.5]"

@@ -1,10 +1,12 @@
 import { render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, test } from "vitest";
 import { Avatar, avatarToneFor } from "../src/components/avatar.tsx";
 import { Bar } from "../src/components/bar.tsx";
 import { Button } from "../src/components/button.tsx";
 import { Chip } from "../src/components/chip.tsx";
 import { Kbd } from "../src/components/kbd.tsx";
+import { TranslationsProvider } from "../src/i18n/use-translations.tsx";
 import { VerdictDot } from "../src/components/verdict-dot.tsx";
 
 describe("Button", () => {
@@ -147,6 +149,10 @@ describe("Avatar", () => {
   });
 });
 
+function Provided({ children }: { children: ReactNode }) {
+  return <TranslationsProvider locale="en">{children}</TranslationsProvider>;
+}
+
 describe("Kbd", () => {
   /**
    * The topbar's "⌘K" hint rendered in Consolas while every label beside it
@@ -172,7 +178,7 @@ describe("Kbd", () => {
    * system controls, and §2 says that is Lucide.
    */
   test("draws the command modifier as an icon rather than a font glyph", () => {
-    const { container } = render(<Kbd>⌘K</Kbd>);
+    const { container } = render(<Kbd>⌘K</Kbd>, { wrapper: Provided });
     const kbd = container.querySelector("kbd");
     expect(kbd).not.toBeNull();
     expect(kbd?.querySelector("svg")).not.toBeNull();
@@ -183,8 +189,21 @@ describe("Kbd", () => {
   });
 
   test("the modifier is still announced, so the shortcut is not icon-only", () => {
-    render(<Kbd>⌘K</Kbd>);
+    render(<Kbd>⌘K</Kbd>, { wrapper: Provided });
     expect(screen.getByText("Command")).toBeTruthy();
+  });
+
+  test("the modifier's spoken name comes from the catalogue, not the component", () => {
+    render(
+      <TranslationsProvider
+        locale="en"
+        catalogueOverride={{ "kbd.command": "Perintah" }}
+      >
+        <Kbd>⌘K</Kbd>
+      </TranslationsProvider>,
+    );
+    expect(screen.getByText("Perintah")).toBeTruthy();
+    expect(screen.queryByText("Command")).toBeNull();
   });
 
   test("a key with no modifier gets no icon", () => {

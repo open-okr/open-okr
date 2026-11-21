@@ -2864,6 +2864,7 @@
   "goals.editor.objectivePlaceholder": "Quel résultat cela permettra-t-il d’obtenir ?",
   "goals.editor.objectiveTitle": "Titre de l’objectif",
   "goals.editor.openKeyResult": "Ouvrir ce résultat clé",
+  "kbd.command": "Command",
   "method.coach.quality.committed_floor": "Un engagement auquel personne ne croit est un risque. Faites remonter le problème ou rendez-le ambitieux.",
   "method.nothingToJudge": "Rien à évaluer pour l’instant",
   "method.rule.AL-1.condition.1.label": "Sans parent, contribution déclarée ni raison d’exister seul",

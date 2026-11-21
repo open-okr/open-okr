@@ -2864,6 +2864,7 @@
   "goals.editor.objectivePlaceholder": "What outcome does this buy?",
   "goals.editor.objectiveTitle": "Objective title",
   "goals.editor.openKeyResult": "Open this key result",
+  "kbd.command": "Command",
   "method.coach.quality.committed_floor": "A commitment nobody believes in is a risk. Escalate now, or make it aspirational",
   "method.nothingToJudge": "Nothing to judge yet",
   "method.rule.AL-1.condition.1.label": "No parent, no stated contribution and no standalone reason",

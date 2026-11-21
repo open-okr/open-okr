@@ -2864,6 +2864,7 @@
   "goals.editor.objectivePlaceholder": "¿Qué resultado permitirá lograr?",
   "goals.editor.objectiveTitle": "Título del objetivo",
   "goals.editor.openKeyResult": "Abrir este resultado clave",
+  "kbd.command": "Command",
   "method.coach.quality.committed_floor": "Un compromiso en el que nadie cree es un riesgo. Escálalo ahora o conviértelo en aspiracional",
   "method.nothingToJudge": "Aún no hay nada que evaluar",
   "method.rule.AL-1.condition.1.label": "Sin objetivo superior, contribución declarada ni motivo independiente",
