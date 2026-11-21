@@ -13,6 +13,7 @@ import {
 import en from "./messages/en.json" with { type: "json" };
 import es from "./messages/es.json" with { type: "json" };
 import ms from "./messages/ms.json" with { type: "json" };
+import pt from "./messages/pt.json" with { type: "json" };
 import zhHans from "./messages/zh-Hans.json" with { type: "json" };
 
 const SERVER_CATALOGUES: Readonly<Record<string, Catalogue>> = {
@@ -20,6 +21,7 @@ const SERVER_CATALOGUES: Readonly<Record<string, Catalogue>> = {
   ms,
   "zh-Hans": zhHans,
   es,
+  pt,
 };
 
 export function getServerCatalogue(locale: string): Catalogue {

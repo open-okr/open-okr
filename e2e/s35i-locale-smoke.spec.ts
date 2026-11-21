@@ -5,6 +5,7 @@ const LOCALES = [
   { code: "ms", home: "Utama" },
   { code: "zh-Hans", home: "首页" },
   { code: "es", home: "Inicio" },
+  { code: "pt", home: "Início" },
 ] as const;
 
 test("an English sign-in loads only its own catalogue", async ({ page }) => {

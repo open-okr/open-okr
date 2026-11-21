@@ -10,6 +10,7 @@ const SHORT_LABEL_INSTRUCTIONS: Readonly<Record<string, string>> = {
   "zh-Hans":
     "Use 人工智能 for a bare AI label and 目标与关键结果 for a bare OKR label. For a file size in KB, add 大小 before the quantity and keep KB. Preserve all placeholder tokens.",
   es: 'Use "Activo" for On, "Inactivo" for Off, "Vence" for Due, "Para" for By, "Fijar" for Set, and "Bandeja" for Inbox. Use "Correo" for Email and "Tecla Esc" for Esc. For unchanged cognates choose a natural Spanish alternative, such as "Ajustes" for General and "Plan actual" for Plan. Keep technical examples intact with a short label such as "Ej.:". Use "NO" for a bare No option.',
+  pt: 'Write Brazilian Portuguese. Use "Início" for Home, "Ativo" or "Inativo" for On or Off, "Vence" for Due, "Definir" for Set, "E-mail" for Email, and "Tecla Esc" for Esc. For shared terms, name the purpose, such as "Plano atual", "Funções de acesso", "Webhooks de saída", or "Via OIDC". Preserve literal examples with an "Ex.:" prefix, file sizes with "Tamanho:", and command text inside quotation marks. Use "Em CSV" for CSV and "API REST" for REST.',
 };
 
 export function maskHoles(text: string): {
