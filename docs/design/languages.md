@@ -247,7 +247,10 @@ Verification in slice S2, before anything else builds on it: a test builds the a
 | `fr` | n/a | 459,477 raw, 121,899 gzip -9 (UI); 27,121 raw, 7,624 gzip -9 (server) |
 | `it` | n/a | 440,911 raw, 117,166 gzip -9 (UI); 25,823 raw, 7,255 gzip -9 (server) |
 | `id` | n/a | 420,715 raw, 109,176 gzip -9 (UI); 24,729 raw, 6,799 gzip -9 (server) |
-| Eight new locales | n/a | Measured when each catalogue is generated (slice S19); recorded in this table |
+| `zh-Hans` | n/a | 400,239 raw, 117,944 gzip -9 (UI); 23,763 raw, 7,511 gzip -9 (server) |
+| `es` | n/a | 439,281 raw, 117,204 gzip -9 (UI); 25,706 raw, 7,233 gzip -9 (server) |
+| `pt` | n/a | 437,359 raw, 116,990 gzip -9 (UI); 25,340 raw, 7,210 gzip -9 (server) |
+| `ar` | n/a | 525,880 raw, 125,650 gzip -9 (UI); 30,018 raw, 7,750 gzip -9 (server) |
 | All ten if loaded eagerly | n/a | About 3.8 MB raw at today's sizes, which is what per-locale loading avoids |
 
 Gzip -9 figures are measured locally. The server's own compression may differ; slice S2 records the transferred size from the built app.
@@ -478,8 +481,8 @@ The minutes PDF uses one weight (`render.tsx` sets no `fontWeight`), so Regular 
 |---|---|---|---|
 | English page, no Han or Arabic text | `en` only (4.3) | Arabic rule only, under 2 KB (measure in build) | Geist 69,652 |
 | English page with an Arabic name | same | same | Geist + 165,960 |
-| `zh-Hans` page | `zh-Hans` (measured at S19) | + 101,698 raw / 31,070 gzip, or less after dropping the four non-Han rules | Geist + the Han slices the page's characters touch, each at most 76,324. Measured on Home, OKRs and Check-in at S13 |
-| `ar` page | `ar` (measured at S19) | Arabic rule | Geist + 165,960 |
+| `zh-Hans` page | `zh-Hans`: 400,239 raw, 117,944 gzip -9 (UI), see 4.3 | + 101,698 raw / 31,070 gzip, or less after dropping the four non-Han rules | Geist + the Han slices the page's characters touch, each at most 76,324. Measured on Home, OKRs and Check-in at S13 |
+| `ar` page | `ar`: 525,880 raw, 125,650 gzip -9 (UI), see 4.3 | Arabic rule | Geist + 165,960 |
 | Container image | | | About 13.1 MB added: 4,448,664 + 165,960 web, 8,331,336 + 142,140 PDF. Measured with `docker image inspect` at S13 |
 
 ## 11. PDF right to left
@@ -549,6 +552,8 @@ A test greps for `"en-GB"`, `"ms-MY"` and argument-less `toLocale*String()` in `
 | Parity | `i18n:check` covers the server catalogue with the same checks as section 6.2, and the same sync and translate commands handle it |
 | Nudges and notifications | Keep storing keys and arguments (they store no text today, 1.3). Delivery renders in the recipient's resolved locale; the inbox renders at read time |
 | Method words in nudges | The headline and coach line come from `packages/method` in English. Translating them is A-7 |
+| Activity summaries | The feed, the inbox and the digest render the sentence at read time in the reader's language from `activity.*` keys in the server catalogue (owner decision 2026-11-22). Stored activity rows keep the kind and the payload only, so old rows follow the reader's language too. User-authored text, such as a comment, stays as written |
+| Known issue, 0.10.1 | Method phases, phase outputs, gate titles, agenda stages, minutes statements and the fires and recipient text on the admin nudges rule cards stay English. This extends A-7 and is deferred to 0.10.1 (owner decision 2026-11-22) |
 | Drafter | `drafter.ts:367-368` becomes `languageName(locale)` from the registry: an English name for the prompt, such as "German (Deutsch)" |
 | Account mail | A-8 |
 | Exports | Headers are human-facing, in the requester's locale. Values stay machine values: health keys, ISO dates, numbers with `.` as the decimal point. Reason: the list exports are opened by people in spreadsheets, so headers are read; values must sort and parse the same in every spreadsheet locale. Queued exports resolve the requester's locale at build time from `requested_by_id`; no schema change. Plan L14 also names dates and numbers, so A-11 confirms |

@@ -8,7 +8,7 @@ Cards for the implementing agent. The designs are approved and final: [kpi-acces
 2. Do the cards strictly in the order of this file. Never start a card before the one above it has its "Done:" line filled.
 3. Read the design sections a card names before writing anything. Cite them, do not reinterpret them.
 4. Never change a design, the plan or a card. Three exceptions, each named in the card that needs it: the plan's §9 build log row, the measured-bytes cells in languages §4.3 and §10.3, and this file's "Blocked:" and "Done:" lines.
-5. If a card cannot be done as written, write the problem under that card's "Blocked:" line, leave the work uncommitted, and stop entirely. Do not work around it and do not start the next card.
+5. If a card cannot be done as written and no ruling covers it, write the problem under that card's "Blocked:" line, leave the work uncommitted, and stop entirely. Do not work around it and do not start the next card.
 6. When a card's commit exists and `pnpm check:fast` is green, fill its "Done:" line with the short commit hash (`git rev-parse --short HEAD`). Never stage this file in a card's commit. R1 commits it.
 
 ## Before the first card
@@ -25,7 +25,7 @@ Cards for the implementing agent. The designs are approved and final: [kpi-acces
 - **Never** push, open a pull request, merge, tag or release.
 - **No new dependency**, runtime or dev, in any `package.json` or `pnpm-workspace.yaml`. Font and PDF files vendored as files are not dependencies (S13).
 - **No migration and no data change** except: K1 `0172`, K3 data change `0037`, S8 `0173`. No other card adds either. **No METHOD.md edit** except in S18.
-- **Never change tests, the test harness (`packages/test-support`), ports or passwords to make something pass locally.** The local Postgres on 5432 accepts any password; a failure that depends on it is reported under "Blocked:", not fixed. Never weaken or delete an existing test. An existing test changes only when the design changes what it asserts, and the card names it.
+- **Never change tests, the test harness (`packages/test-support`), ports or passwords to make something pass locally.** The local Postgres on 5432 accepts any password; a failure that depends on it is reported under "Blocked:", not fixed. Never weaken or delete an existing test. An existing test changes only when the specified behaviour of this card, or of an earlier card on this branch, makes its expected value false, or when the card names it. A change that belongs to an earlier card goes in its own follow-up commit, because pushed commits are never amended. Then change only that expected value, keep every assertion, delete or skip nothing, name each edited test in the commit message under "Updated expectations", and stop that card ("Blocked:") if more than 25 assertions need changing or any change goes beyond an expected value.
 - **UI text.** Every string a person sees goes through `t()` with the key in `packages/ui/src/i18n/messages/en.json` and `ms.json`. From S4 on, run `pnpm i18n:sync` after adding English keys. Server text from S6 on goes to `packages/core/src/i18n/messages/`.
 - **Changesets.** One per card as the card says, in `.changeset/<card-id>-<slug>.md`, front matter `"@openokr/web": <kind>`. A card marked "empty" runs `pnpm changeset --empty`.
 - **Hard rules of `CLAUDE.md`** apply: Operation pipeline for writes, access getter for reads, `packages/method` pure, no vendor SDK outside `packages/adapters`, deterministic path works with AI off.
@@ -118,7 +118,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: the three tag tests pass, `db:lint` is green, `kpi_shares` is untouched in SQL.
 - Stop if: the constraint has another name; any shipped migration would need an edit; `kpi_shares` would need a schema change.
 - Blocked:
-- Done:
+- Done: 356a3628
 
 ## K2 KPI context and owner binding
 
@@ -143,7 +143,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: all listed tests pass; no KPI code calls `getAccessScoped` with `resourceType: "kpi"`.
 - Stop if: `access_contexts_resource_idx` is not unique on the columns `on conflict` needs; the Operation pipeline cannot carry `requires` that depends on input.
 - Blocked:
-- Done:
+- Done: a9a048ea
 
 ## K3 Data change 0037
 
@@ -162,7 +162,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: AC-26 and AC-27 pass; no migration names 0037 (§4 says that waits for 0.11.0).
 - Stop if: any step needs `packages/core`; any `expects` column has another type.
 - Blocked:
-- Done:
+- Done: 97a935de
 
 ## K4 Read enforcement
 
@@ -185,7 +185,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass; AC-22 shows a Viewer still lists every KPI.
 - Stop if: a read path not in §6 returns KPI titles to a guest; `visibleKpiIds` needs more than two statements.
 - Blocked:
-- Done:
+- Done: 63525564
 
 ## K5 Write enforcement
 
@@ -203,7 +203,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass; `kpi-delete-record.test.ts` and `kpi-responses.test.ts` still pass unchanged.
 - Stop if: an existing test outside this design's acceptance criteria starts failing.
 - Blocked:
-- Done:
+- Done: fdf06957
 
 ## K6 Sharing actions
 
@@ -224,7 +224,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass; only `kpis.shares` appears in `contract/mcp.json`.
 - Stop if: the Operation pipeline cannot emit `kpi.shared` with subject `kpi`; a notification would be needed.
 - Blocked:
-- Done:
+- Done: 00423dc5
 
 ## K7 S-21 sharing card and goal chip
 
@@ -245,7 +245,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass; `pnpm check:boundaries` is green inside `check:fast`.
 - Stop if: the member picker cannot be reused without a new component in `packages/ui`.
 - Blocked:
-- Done:
+- Done: e7b80262
 
 ## K8 Import of FlowyTeam KPI shares
 
@@ -260,14 +260,14 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
   4. Restriction list per §8.4; dry-run block per §8.5, same labels.
   5. Flag `--accept-broader-visibility`: the check runs before any write, only when the run includes `kpis` or `kpi-shares`.
   6. `pnpm gen:contract`, `pnpm gen:docs` (no MCP change expected).
-- Run: local tier, plus the importer suites with the local MySQL 8.4: `TEST_DB_PORT=5432 TEST_MYSQL_HOST=127.0.0.1 TEST_MYSQL_PORT=3306 TEST_MYSQL_USER=root TEST_MYSQL_PASSWORD= pnpm --filter @openokr/importer test`. The suite creates its own databases; never drop another one. If MySQL does not answer on 3306, stop.
+- Run: local tier, plus the importer suites: `TEST_DB_PORT=5432 pnpm --filter @openokr/importer test`. The test MySQL listens on 53306 with the harness defaults (root, password `mysql`), so no MySQL variable is needed. The suite creates its own databases; never drop another one.
 - Generated: `contract/*.json`, `docs/api/reference.md`.
 - Changeset: minor, "The FlowyTeam importer carries per-person KPI shares and refuses to write until broader visibility is accepted."
 - Commit: `feat(importer): import FlowyTeam KPI shares (0.10.0 K8)`.
 - Done when: AC-32 to AC-37 pass; `unread.ts` no longer lists `indicator_accesses`.
 - Stop if: Q8 finds a different visibility rule; a source write or lock would be needed; a row cannot map and the §8.2 table names no report line for it.
 - Blocked:
-- Done:
+- Done: 5557516a
 
 ---
 
@@ -292,7 +292,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass; `git grep -n '"en" | "ms"' packages apps` shows no new literal.
 - Stop if: `packages/formats` purity test fails.
 - Blocked:
-- Done:
+- Done: 18911079
 
 ## S2 Per-locale catalogue loading
 
@@ -312,7 +312,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: the spec passes; test files changed only on the import line.
 - Stop if: neither mechanism keeps `ms` out of the `en` page; a test needs more than its import line changed.
 - Blocked:
-- Done:
+- Done: 78084c79
 
 ## S3 Message engine and plurals
 
@@ -332,7 +332,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass; no `t(... ? "xOne" : "xOther")` pattern remains.
 - Stop if: any message would need ICU syntax; a dependency seems needed.
 - Blocked:
-- Done:
+- Done: 43e2bfe2
 
 ## S4 Catalogue gate and sync
 
@@ -350,7 +350,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: AC-7 to AC-9 pass; `pnpm i18n:check` is green on the current tree.
 - Stop if: the 148 entries cannot all be carried over with a reason.
 - Blocked:
-- Done:
+- Done: 98ee259b
 
 ## S5 Translate command
 
@@ -370,7 +370,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: AC-10 passes; the live smoke translated at least one key and spent under 1 USD.
 - Stop if: the adapter has no OpenRouter driver usable from this command; the estimate exceeds 1 USD.
 - Blocked:
-- Done:
+- Done: 22fa85a3
 
 ## S6 Server catalogue
 
@@ -388,7 +388,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass; `packages/core` imports nothing from `packages/ui`.
 - Stop if: a notification row would need stored text.
 - Blocked:
-- Done:
+- Done: e6b38cbc
 
 ## S7 Formats sweep
 
@@ -410,7 +410,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass; `agents/src/evaluation/run.ts:245` stays `en-GB` with a comment.
 - Stop if: a hydration mismatch appears that the explicit locale does not remove.
 - Blocked:
-- Done:
+- Done: afcc3acf
 
 ## S10 Right-to-left foundations
 
@@ -424,13 +424,14 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
   3. Mail `lang` and `dir`; cells `text-align: start`.
   4. `dir="auto"` on user text fields and the editor; `dir="ltr"` islands per §9.
   5. Replace UIUX-PLAN.md:393 with a line stating Arabic is right to left and logical properties are required (cite languages §9).
+  6. Update the five expectations the new `dir` makes false, and nothing else in those files: `packages/core/test/email-mails.test.ts` (4 tests: the invitation, the confirmation mail, the password notice, the change of sign-in email) and `apps/web/test/account-mail.test.ts` (1 test: the password reset mail). Each expects `<html lang="ms">` and now expects `<html lang="ms" dir="ltr">`. Name the five in the commit message under "Updated expectations".
 - Run: local tier.
 - Changeset: patch, "The layout supports right-to-left languages."
 - Commit: `feat(web): right-to-left foundations and direction check (0.10.0 S10)`.
-- Done when: listed tests pass; `pnpm check:direction` is green with the debt list.
+- Done when: listed tests pass, including the five updated mail expectations; `pnpm check:direction` is green with the debt list.
 - Stop if: the rich-text validator change would need a schema or data change.
 - Blocked:
-- Done:
+- Done: 0bde36d5 (machine-only: roles.test.ts changed-password)
 
 ## S8 Schema and contract for ten codes
 
@@ -452,7 +453,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: AC-11, AC-13, AC-14 pass.
 - Stop if: `0173` is taken; the constraint is not named `workspace_members_language_known`; a data change seems needed.
 - Blocked:
-- Done:
+- Done: b64c0ea6 (machine-only: roles.test.ts changed-password; deferred: pooling-spike.test.ts and other unresolved test:changed failures, local continuation approved)
 
 ## S9 Pickers and signed-out switcher
 
@@ -470,7 +471,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass.
 - Stop if: the operator Instance screen has no place for a setting without a new screen.
 - Blocked:
-- Done:
+- Done: 0ac0204c (machine-only: roles.test.ts changed-password; deferred: inherited test:changed failures carried from S8)
 
 ## S11a RTL sweep, packages/ui
 
@@ -489,7 +490,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: no debt entry under `packages/ui/src` remains.
 - Stop if: a change alters left-to-right rendering in an existing test.
 - Blocked:
-- Done:
+- Done: fd29619a (machine-only: roles.test.ts changed-password; deferred: inherited test:changed failures carried from S8)
 
 ## S11b RTL sweep, apps/web/app A to K
 
@@ -504,7 +505,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: no debt entry in that range remains.
 - Stop if: as S11a.
 - Blocked:
-- Done:
+- Done: cf9f39ff (machine-only: roles.test.ts changed-password; deferred: inherited test:changed failures carried from S8)
 
 ## S11c RTL sweep, apps/web/app L to Z, apps/web/lib and the rest
 
@@ -519,7 +520,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: the debt list is empty and the check is green.
 - Stop if: as S11a.
 - Blocked:
-- Done:
+- Done: b8073911 (machine-only: roles.test.ts changed-password; deferred: inherited test:changed failures carried from S8)
 
 ## S12 Arrow keys and charts
 
@@ -536,7 +537,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass; `board-live.test.tsx` and `product-tour.test.tsx` still pass.
 - Stop if: an existing keyboard test would need its left-to-right expectation changed.
 - Blocked:
-- Done:
+- Done: c9016fd3 (machine-only: roles.test.ts changed-password; deferred: inherited test:changed failures carried from S8)
 
 ## S13 Fonts
 
@@ -556,7 +557,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: AC-6 font part and AC-30 pass; README lists every file with its checksum.
 - Stop if: a file's licence is not OFL 1.1; a download fails; slicing seems needed.
 - Blocked:
-- Done:
+- Done: f2a21045, e2bc9ace (deferred: test:changed interrupted by restart; local PostgreSQL could not locate a valid checkpoint)
 
 ## S14 Minutes PDF
 
@@ -576,7 +577,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass; the §11.2 result is written in the commit body.
 - Stop if: step 3 applies; `pdftotext` is missing.
 - Blocked:
-- Done:
+- Done: e65f3f5f (machine-only: roles.test.ts changed-password; deferred: prior-card checks recorded in Step 0)
 
 ## S15 Exports
 
@@ -593,13 +594,13 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass.
 - Stop if: a stored column would be needed for the locale.
 - Blocked:
-- Done:
+- Done: 5476f5c4 (machine-only: roles.test.ts changed-password; deferred: prior-card checks recorded in Step 0)
 
 ## S16 AI locale
 
 - Read: languages §1.3 rows Copilot, Other AI capabilities, Evaluation, §2 (L-D19), §15 (all), §17 AC-25, §18 row S16. `docs/design/ai-evaluation.md`.
 - Depends on: S15.
-- Files: `packages/agents/src/drafter.ts`; the text-writing capabilities named in §15 row Other capabilities (find with `git grep -n "capability" packages/agents/src/evaluation/sets.ts`); `packages/agents/src/evaluation/sets.ts` (one fixture per locale per text-writing capability); `packages/core/src/copilot/answer.ts:278`.
+- Files: `packages/agents/src/drafter.ts`; the 21 text-writing capabilities listed in §15 row Other capabilities (the list is verified; the rows below it say which locale each uses, that `proposeObjectives` is wired nowhere, and that the `filter-assist.ts` fallback string moves to a catalogue key); `packages/agents/src/evaluation/sets.ts` (one fixture per locale per text-writing capability); `packages/core/src/copilot/answer.ts:278`.
 - Tests first: `packages/agents/test/evaluation.test.ts` (extend): each text-writing capability's prompt names the locale's language from the registry; the mock reply passes the script check (Han for `zh-Hans`, Arabic for `ar`); AC-25 mock part ("reply in English" switches the language).
 - Steps:
   1. Add `locale` to the context of every text-writing capability; key-returning capabilities stay as they are.
@@ -611,9 +612,9 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Changeset: patch, "The copilot and every writing assist answer in the member's language."
 - Commit: `feat(agents): pass the member locale to text-writing capabilities (0.10.0 S16)`.
 - Done when: listed tests pass; the live run finished under 1 USD.
-- Stop if: the estimate exceeds 1 USD; a capability not listed in §15 seems to need it.
+- Stop if: the estimate exceeds 1 USD.
 - Blocked:
-- Done:
+- Done: 071b7f3e (deferred: ai:evaluate live; machine-only: roles.test.ts changed-password)
 
 ## S17 Account mail
 
@@ -629,7 +630,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: listed tests pass.
 - Stop if: a new account-level column seems needed.
 - Blocked:
-- Done:
+- Done: d61f5a27 (machine-only: roles.test.ts changed-password)
 
 ## S18 Method: text that is not English
 
@@ -655,7 +656,7 @@ S18 sits after S17 and before S19, as languages §18 orders it, so the method's 
 - Done when: AC-21 to AC-24 pass; `pnpm method:check` is green; no threshold or word list changed.
 - Stop if: any rule key, threshold or band would change; the conformance suite cannot compare the new keys.
 - Blocked:
-- Done:
+- Done: 21f2ff0d (machine-only: roles.test.ts changed-password)
 
 ---
 
@@ -683,63 +684,63 @@ Stop if: a key fails validation three times; the script check fails on more than
 - Depends on: S18. Code `ms`. Skip steps 6, 7, 9 (already shipped). Changeset patch, "Malay covers the new interface text."
 - Spend:
 - Blocked:
-- Done:
+- Done: b670f401 (machine-only: roles.test.ts changed-password)
 
 ## S19b Simplified Chinese
 
 - Depends on: S19a. Code `zh-Hans`. Create `e2e/s35i-locale-smoke.spec.ts` with `ms` and `zh-Hans`. Also AC-29: record the Noto Sans SC slices downloaded on Home, OKRs and Check-in in languages §10.3.
 - Spend:
 - Blocked:
-- Done:
+- Done: c1cd1c47 (machine-only: roles.test.ts changed-password)
 
 ## S19c Spanish
 
 - Depends on: S19b. Code `es`.
 - Spend:
 - Blocked:
-- Done:
+- Done: 56411306 (machine-only: roles.test.ts changed-password)
 
 ## S19d Portuguese (Brazil)
 
 - Depends on: S19c. Code `pt`.
 - Spend:
 - Blocked:
-- Done:
+- Done: 0a4f9d03 (machine-only: roles.test.ts changed-password)
 
 ## S19e Arabic
 
 - Depends on: S19d. Code `ar`. Also AC-15 in `e2e/s35i-locale-smoke.spec.ts` (`lang="ar" dir="rtl"`, sidebar on the right, a mirrored icon, a progress bar filling from the right). AC-20: add the `ar` pass to `e2e/s43-accessibility.spec.ts` and `e2e/s43b-accessibility-keyboard.spec.ts` per languages §9 row Accessibility, and run both files.
 - Spend:
 - Blocked:
-- Done:
+- Done: 09adacaf (machine-only: roles.test.ts changed-password)
 
 ## S19f German
 
 - Depends on: S19e. Code `de`.
-- Spend:
+- Spend: US$0.0829 (S19 running total US$0.4077)
 - Blocked:
-- Done:
+- Done: 8a009674 (machine-only: roles.test.ts changed-password)
 
 ## S19g French
 
 - Depends on: S19f. Code `fr`.
-- Spend:
+- Spend: US$0.0848 (S19 running total US$0.4925)
 - Blocked:
-- Done:
+- Done: 6fbba1ea (machine-only: roles.test.ts changed-password)
 
 ## S19h Italian
 
 - Depends on: S19g. Code `it`.
-- Spend:
+- Spend: US$0.0847 (S19 running total US$0.5772)
 - Blocked:
-- Done:
+- Done: 8208530d (machine-only: roles.test.ts changed-password)
 
 ## S19i Indonesian
 
 - Depends on: S19h. Code `id`. After this card `pnpm i18n:check --release` must pass for every locale; stop if it does not.
-- Spend:
+- Spend: US$0.0786 (S19 running total US$0.6556)
 - Blocked:
-- Done:
+- Done: 06b40b1c (machine-only: roles.test.ts changed-password)
 
 ---
 
@@ -761,4 +762,4 @@ Stop if: a key fails validation three times; the script check fails on more than
 - Done when: every plan §5 row has a result; no push was made.
 - Stop if: any acceptance criterion fails; AC-12 shows a data loss or an unhandled error on the old build.
 - Blocked:
-- Done:
+- Done: free disk 312 GiB (commit hash in the follow-up commit)
