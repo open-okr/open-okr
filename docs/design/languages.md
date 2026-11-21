@@ -245,7 +245,8 @@ Verification in slice S2, before anything else builds on it: a test builds the a
 | `ms` | same as `en` | 400,255 raw, 103,960 gzip -9 |
 | `de` | n/a | 446,535 raw, 121,902 gzip -9 (UI); 26,374 raw, 7,639 gzip -9 (server) |
 | `fr` | n/a | 459,477 raw, 121,899 gzip -9 (UI); 27,121 raw, 7,624 gzip -9 (server) |
-| `it` | n/a | 440,864 raw, 117,149 gzip -9 (UI); 25,823 raw, 7,255 gzip -9 (server) |
+| `it` | n/a | 440,911 raw, 117,166 gzip -9 (UI); 25,823 raw, 7,255 gzip -9 (server) |
+| `id` | n/a | 420,715 raw, 109,176 gzip -9 (UI); 24,729 raw, 6,799 gzip -9 (server) |
 | Eight new locales | n/a | Measured when each catalogue is generated (slice S19); recorded in this table |
 | All ten if loaded eagerly | n/a | About 3.8 MB raw at today's sizes, which is what per-locale loading avoids |
 

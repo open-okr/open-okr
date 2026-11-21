@@ -1,0 +1,18 @@
+{
+  "objective": "Sasaran",
+  "keyResult": "Hasil utama",
+  "checkIn": "Check-in",
+  "confidence": "Keyakinan",
+  "champion": "Penggerak",
+  "reviewer": "Peninjau",
+  "space": "Ruang",
+  "cycle": "Siklus",
+  "initiative": "Inisiatif",
+  "kpi": "KPI",
+  "health.onTrack": "Sesuai rencana",
+  "health.caution": "Perlu perhatian",
+  "health.offTrack": "Tidak sesuai rencana",
+  "health.healthy": "Sehat",
+  "health.watch": "Perlu dipantau",
+  "health.unhealthy": "Tidak sehat"
+}

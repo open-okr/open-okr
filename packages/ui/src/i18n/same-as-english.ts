@@ -59,7 +59,13 @@ export const SAME_AS_ENGLISH: Record<string, Record<string, string>> = {
     ...VENDOR_NAMES,
     "search.exportButton.excel": "Product name",
   },
+  id: {
+    ...ENDONYMS,
+    ...VENDOR_NAMES,
+    "search.exportButton.excel": "Product name",
+  },
   ms: {
+    "appearance.indonesian": "Language endonym",
     "appearance.german": "Language endonym",
     "appearance.french": "Language endonym",
     "appearance.italian": "Language endonym",

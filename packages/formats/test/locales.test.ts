@@ -72,6 +72,7 @@ describe("locales registry", () => {
       "pt",
       "fr",
       "it",
+      "id",
     ]);
     for (const loc of LOCALES) {
       if (
@@ -83,13 +84,19 @@ describe("locales registry", () => {
         loc.code === "de" ||
         loc.code === "pt" ||
         loc.code === "fr" ||
-        loc.code === "it"
+        loc.code === "it" ||
+        loc.code === "id"
       ) {
         expect(loc.shipped, `${loc.code} should be shipped`).toBe(true);
         expect(isShippedLocale(loc.code)).toBe(true);
       } else {
-        expect(loc.shipped, `${loc.code} should not be shipped`).toBe(false);
-        expect(isShippedLocale(loc.code)).toBe(false);
+        // Every registry locale ships since 0.10.0 S19i, so TypeScript narrows
+        // this branch to never. Kept for the next registry addition.
+        const other = loc as { code: string; shipped: boolean };
+        expect(other.shipped, `${other.code} should not be shipped`).toBe(
+          false,
+        );
+        expect(isShippedLocale(other.code)).toBe(false);
       }
     }
   });

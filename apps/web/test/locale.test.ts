@@ -18,10 +18,14 @@ const state = vi.hoisted(() => ({
 
 vi.mock("@openokr/formats", async (importOriginal) => {
   const formats = await importOriginal<typeof import("@openokr/formats")>();
+  // Indonesian ships since 0.10.0 S19i and is the last registry locale, so the
+  // tests that need an unshipped code keep "id" unshipped inside this file only.
   return {
     ...formats,
+    SHIPPED_LOCALES: formats.SHIPPED_LOCALES.filter((code) => code !== "id"),
     isShippedLocale: (value: unknown) =>
-      (state.deShipped && value === "de") || formats.isShippedLocale(value),
+      value !== "id" &&
+      ((state.deShipped && value === "de") || formats.isShippedLocale(value)),
   };
 });
 vi.mock("../lib/pool", () => ({ getPool: () => ({}) }));

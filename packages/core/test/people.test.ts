@@ -1,7 +1,7 @@
 import { type WorkspaceTx, withWorkspace } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { bindGroup, ensureMemberGroup } from "../src/access/contexts.ts";
 import { ACCESS_LEVELS } from "../src/access/levels.ts";
 import {
@@ -12,6 +12,19 @@ import { updateOwnProfile } from "../src/actions/people.ts";
 import { callAction } from "../src/actions/registry.ts";
 import { runOperation } from "../src/operations/operation.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+
+// Indonesian is the last registry locale to ship (0.10.0 S19i). The refusal
+// test below needs a code with no catalogue, so this file alone treats "id" as
+// unshipped.
+vi.mock("@openokr/formats", async (importOriginal) => {
+  const formats = await importOriginal<typeof import("@openokr/formats")>();
+  return {
+    ...formats,
+    SHIPPED_LOCALES: formats.SHIPPED_LOCALES.filter((code) => code !== "id"),
+    isShippedLocale: (value: unknown) =>
+      value !== "id" && formats.isShippedLocale(value),
+  };
+});
 
 /**
  * The people lifecycle (P2-T03 test plan, TECHNICAL-PLAN §4.1, screen S-33).

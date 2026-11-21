@@ -1,10 +1,23 @@
 import { workerDb } from "@openokr/test-support/db";
-import { beforeEach, expect, it } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { writeSettings } from "../src/secrets/instance-settings.ts";
 import { parseKeyRing } from "../src/secrets/key-ring.ts";
 import { resolveMemberLanguage } from "../src/settings/member-language.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+
+// Indonesian is the last registry locale to ship (0.10.0 S19i). The refusal
+// tests below need a registry code that is not shipped, so this file alone
+// treats "id" as unshipped.
+vi.mock("@openokr/formats", async (importOriginal) => {
+  const formats = await importOriginal<typeof import("@openokr/formats")>();
+  return {
+    ...formats,
+    SHIPPED_LOCALES: formats.SHIPPED_LOCALES.filter((code) => code !== "id"),
+    isShippedLocale: (value: unknown) =>
+      value !== "id" && formats.isShippedLocale(value),
+  };
+});
 
 const owner = { id: "language-owner", name: "Language Owner" };
 

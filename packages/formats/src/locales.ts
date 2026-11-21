@@ -122,7 +122,7 @@ export const LOCALES = [
     direction: "ltr",
     endonymKey: "appearance.indonesian",
     fontFamily: "Geist",
-    shipped: false,
+    shipped: true,
     languageName: "Indonesian (Bahasa Indonesia)",
   },
 ] as const satisfies readonly LocaleDefinition[];
