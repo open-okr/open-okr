@@ -762,4 +762,4 @@ Stop if: a key fails validation three times; the script check fails on more than
 - Done when: every plan §5 row has a result; no push was made.
 - Stop if: any acceptance criterion fails; AC-12 shows a data loss or an unhandled error on the old build.
 - Blocked:
-- Done: free disk 312 GiB (commit hash in the follow-up commit)
+- Done: 397dda39, free disk 312 GiB
