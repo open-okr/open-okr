@@ -923,12 +923,14 @@ const sendDigest: OutboxHandler = async (delivery, deps) => {
   }
 
   const db = drizzle(deps.pool);
+  const digestMail = await workspaceMail(deps.pool, workspaceId, memberId);
   const contents = await withWorkspace(db, workspaceId, (tx) =>
     digestItemsFor(tx, {
       workspaceId: workspaceId,
       memberId,
       batchId,
       baseUrl: withoutTrailingSlashes(deps.baseUrl as string),
+      locale: digestMail.locale,
     }),
   );
 
@@ -942,7 +944,7 @@ const sendDigest: OutboxHandler = async (delivery, deps) => {
   // the cap from hiding them. Both parts say it now: the line used to be in
   // the text part only.
   const built = notificationDigestMail({
-    mail: await workspaceMail(deps.pool, workspaceId, memberId),
+    mail: digestMail,
     baseUrl: deps.baseUrl,
     items: contents.items,
     omitted: contents.omitted,
