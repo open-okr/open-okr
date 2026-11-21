@@ -140,7 +140,7 @@ describe("a signed-out page", () => {
 
   test("an instance language the product does not ship falls to English", async () => {
     state.acceptLanguage = "fr";
-    state.instanceLanguage = "de";
+    state.instanceLanguage = "id";
     expect(await resolveLocale()).toBe("en");
   });
 

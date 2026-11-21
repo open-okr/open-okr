@@ -243,6 +243,7 @@ Verification in slice S2, before anything else builds on it: a test builds the a
 |---|---|---|
 | `en` | 772,680 raw, 203,290 gzip -9 (both catalogues) | 374,889 raw, 100,030 gzip -9 |
 | `ms` | same as `en` | 400,255 raw, 103,960 gzip -9 |
+| `de` | n/a | 446,535 raw, 121,902 gzip -9 (UI); 26,374 raw, 7,639 gzip -9 (server) |
 | Eight new locales | n/a | Measured when each catalogue is generated (slice S19); recorded in this table |
 | All ten if loaded eagerly | n/a | About 3.8 MB raw at today's sizes, which is what per-locale loading avoids |
 

@@ -1,0 +1,18 @@
+{
+  "objective": "Ziel",
+  "keyResult": "Schlüsselergebnis",
+  "checkIn": "Check-in",
+  "confidence": "Zuversicht",
+  "champion": "Fürsprecher",
+  "reviewer": "Prüfer",
+  "space": "Bereich",
+  "cycle": "Zyklus",
+  "initiative": "Initiative",
+  "kpi": "KPI",
+  "health.onTrack": "Im Plan",
+  "health.caution": "Vorsicht",
+  "health.offTrack": "Nicht im Plan",
+  "health.healthy": "Gesund",
+  "health.watch": "Achtung",
+  "health.unhealthy": "Ungesund"
+}

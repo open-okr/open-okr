@@ -86,7 +86,7 @@ export const LOCALES = [
     direction: "ltr",
     endonymKey: "appearance.german",
     fontFamily: "Geist",
-    shipped: false,
+    shipped: true,
     languageName: "German (Deutsch)",
   },
   {

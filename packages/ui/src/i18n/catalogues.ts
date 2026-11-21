@@ -6,6 +6,7 @@
  */
 import type { Catalogue, Locale } from "./catalogue.ts";
 import ar from "./messages/ar.json";
+import de from "./messages/de.json";
 import en from "./messages/en.json";
 import es from "./messages/es.json";
 import ms from "./messages/ms.json";
@@ -29,6 +30,7 @@ export const CATALOGUES: Readonly<
   "zh-Hans": zhHans,
   es,
   ar,
+  de,
   pt,
   "pseudo-rtl": PSEUDO_RTL.catalogue,
 };
