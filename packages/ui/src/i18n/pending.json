@@ -1,29 +1,101 @@
 {
   "ar": [
+    "admin.nudges.inAppOnly",
+    "admin.nudges.reason.ceiling",
+    "admin.nudges.reason.dedup",
+    "admin.nudges.reason.disabled",
+    "admin.nudges.reason.holiday",
+    "admin.nudges.reason.leave",
+    "admin.nudges.reason.quietHours",
+    "admin.nudges.reason.snooze",
     "kbd.command"
   ],
   "de": [
+    "admin.nudges.inAppOnly",
+    "admin.nudges.reason.ceiling",
+    "admin.nudges.reason.dedup",
+    "admin.nudges.reason.disabled",
+    "admin.nudges.reason.holiday",
+    "admin.nudges.reason.leave",
+    "admin.nudges.reason.quietHours",
+    "admin.nudges.reason.snooze",
     "kbd.command"
   ],
   "es": [
+    "admin.nudges.inAppOnly",
+    "admin.nudges.reason.ceiling",
+    "admin.nudges.reason.dedup",
+    "admin.nudges.reason.disabled",
+    "admin.nudges.reason.holiday",
+    "admin.nudges.reason.leave",
+    "admin.nudges.reason.quietHours",
+    "admin.nudges.reason.snooze",
     "kbd.command"
   ],
   "fr": [
+    "admin.nudges.inAppOnly",
+    "admin.nudges.reason.ceiling",
+    "admin.nudges.reason.dedup",
+    "admin.nudges.reason.disabled",
+    "admin.nudges.reason.holiday",
+    "admin.nudges.reason.leave",
+    "admin.nudges.reason.quietHours",
+    "admin.nudges.reason.snooze",
     "kbd.command"
   ],
   "id": [
+    "admin.nudges.inAppOnly",
+    "admin.nudges.reason.ceiling",
+    "admin.nudges.reason.dedup",
+    "admin.nudges.reason.disabled",
+    "admin.nudges.reason.holiday",
+    "admin.nudges.reason.leave",
+    "admin.nudges.reason.quietHours",
+    "admin.nudges.reason.snooze",
     "kbd.command"
   ],
   "it": [
+    "admin.nudges.inAppOnly",
+    "admin.nudges.reason.ceiling",
+    "admin.nudges.reason.dedup",
+    "admin.nudges.reason.disabled",
+    "admin.nudges.reason.holiday",
+    "admin.nudges.reason.leave",
+    "admin.nudges.reason.quietHours",
+    "admin.nudges.reason.snooze",
     "kbd.command"
   ],
   "ms": [
+    "admin.nudges.inAppOnly",
+    "admin.nudges.reason.ceiling",
+    "admin.nudges.reason.dedup",
+    "admin.nudges.reason.disabled",
+    "admin.nudges.reason.holiday",
+    "admin.nudges.reason.leave",
+    "admin.nudges.reason.quietHours",
+    "admin.nudges.reason.snooze",
     "kbd.command"
   ],
   "pt": [
+    "admin.nudges.inAppOnly",
+    "admin.nudges.reason.ceiling",
+    "admin.nudges.reason.dedup",
+    "admin.nudges.reason.disabled",
+    "admin.nudges.reason.holiday",
+    "admin.nudges.reason.leave",
+    "admin.nudges.reason.quietHours",
+    "admin.nudges.reason.snooze",
     "kbd.command"
   ],
   "zh-Hans": [
+    "admin.nudges.inAppOnly",
+    "admin.nudges.reason.ceiling",
+    "admin.nudges.reason.dedup",
+    "admin.nudges.reason.disabled",
+    "admin.nudges.reason.holiday",
+    "admin.nudges.reason.leave",
+    "admin.nudges.reason.quietHours",
+    "admin.nudges.reason.snooze",
     "kbd.command"
   ]
 }
