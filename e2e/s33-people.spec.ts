@@ -637,7 +637,7 @@ test("a member's language reaches the document", async () => {
 
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 
-  await page.getByTestId("language-ms").click();
+  await page.getByTestId("member-language").selectOption("ms");
   await expect(page.locator("html")).toHaveAttribute("lang", "ms", {
     timeout: 15_000,
   });
@@ -650,7 +650,7 @@ test("a member's language reaches the document", async () => {
   // And back, so the instance is as it was for whatever spec runs next. Left
   // in Malay, every later spec that finds a field by its English label fails.
   await goTo(page, "/account");
-  await page.getByTestId("language-en").click();
+  await page.getByTestId("member-language").selectOption("en");
   await expect(page.locator("html")).toHaveAttribute("lang", "en", {
     timeout: 15_000,
   });
