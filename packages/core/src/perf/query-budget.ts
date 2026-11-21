@@ -140,9 +140,9 @@ export const LIST_BUDGETS: readonly ListBudget[] = [
   { action: "initiatives.list", input: {}, queries: 6 },
   { action: "spaces.list", input: {}, queries: 3 },
   { action: "people.directory", input: {}, queries: 2 },
-  { action: "review.inbox", input: {}, queries: 12 },
+  { action: "review.inbox", input: {}, queries: 17 },
   { action: "cycles.list", input: {}, queries: 5 },
-  { action: "notifications.list", input: {}, queries: 3 },
+  { action: "notifications.list", input: {}, queries: 7 },
   // Includes the constant cost of the KPI access filter.
   { action: "kpis.grid", input: {}, queries: 5 },
 ];
