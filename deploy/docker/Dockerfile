@@ -136,19 +136,26 @@ COPY --from=build --chown=openokr:openokr /repo/packages/db/src ./migrator/packa
 # pnpm links workspace packages through a store that does not survive a COPY,
 # so those specifiers did not resolve inside the image and `openokr rotate-key`
 # failed on a missing module. It had never worked. The links are rebuilt here
-# against the copied sources, which is the same shape a checkout has, so the
+# against the copied sources (`@openokr/formats` and `@openokr/method` too, because
+# core's settings registry imports them and `openokr erase` loads it), which is the same shape a checkout has, so the
 # command runs the same code the tests exercise.
 COPY --from=build --chown=openokr:openokr /repo/packages/db/package.json ./migrator/packages/db/package.json
 COPY --from=build --chown=openokr:openokr /repo/packages/config/src ./migrator/packages/config/src
 COPY --from=build --chown=openokr:openokr /repo/packages/config/package.json ./migrator/packages/config/package.json
 COPY --from=build --chown=openokr:openokr /repo/packages/core/src ./migrator/packages/core/src
 COPY --from=build --chown=openokr:openokr /repo/packages/core/package.json ./migrator/packages/core/package.json
+COPY --from=build --chown=openokr:openokr /repo/packages/formats/src ./migrator/packages/formats/src
+COPY --from=build --chown=openokr:openokr /repo/packages/formats/package.json ./migrator/packages/formats/package.json
+COPY --from=build --chown=openokr:openokr /repo/packages/method/src ./migrator/packages/method/src
+COPY --from=build --chown=openokr:openokr /repo/packages/method/package.json ./migrator/packages/method/package.json
 COPY --from=build --chown=openokr:openokr /deps/drizzle-orm ./migrator/node_modules/drizzle-orm
 COPY --from=build --chown=openokr:openokr /deps/zod ./migrator/node_modules/zod
 RUN mkdir -p /app/migrator/node_modules/@openokr \
   && ln -s ../../packages/db /app/migrator/node_modules/@openokr/db \
   && ln -s ../../packages/config /app/migrator/node_modules/@openokr/config \
   && ln -s ../../packages/core /app/migrator/node_modules/@openokr/core \
+  && ln -s ../../packages/formats /app/migrator/node_modules/@openokr/formats \
+  && ln -s ../../packages/method /app/migrator/node_modules/@openokr/method \
   && chown -R openokr:openokr /app/migrator/node_modules
 
 COPY --chown=openokr:openokr deploy/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
