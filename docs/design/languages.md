@@ -421,7 +421,9 @@ AC-2 uses a `de` instance so the instance step and the English step give differe
 | Set by | A server action behind the signed-out switcher on S-35, with `cookies().set`, as `apps/web/app/workspace-switcher.tsx:46` does |
 | Lifetime | One year, the same as `openokr_tz` |
 | Attributes | `Path=/`, `SameSite=Lax`, `HttpOnly` (only the server reads it), `Secure` on https |
-| Signed in | Not consulted. The member, workspace and instance decide |
+| Set also by | `setAppearance` when a member changes their language (topbar or account page); "Follow workspace" deletes it, so the next sign-in page matches the app |
+| Signed in | Not consulted for rendering. The member, workspace and instance decide |
+| Carried into the member | An Apply on the sign-in picker also sets the session cookie `openokr_locale_chosen`. The next successful sign-in (password, code, passkey, backup code, or SSO through `/sign-in/continue`) saves the language on the member and deletes that cookie (owner decision 2026-11-23) |
 | Notice | The product has no cookie notice. The cookie stores a choice the person made, carries nothing about them and is not shared. Recommendation: list the three cookies in `docs/admin/security.md`, no banner (A-9) |
 
 ## 9. Right to left

@@ -2,6 +2,7 @@
 
 import { deletionJustCancelled } from "@openokr/core";
 import { headers } from "next/headers";
+import { applyChosenLanguage } from "../../../lib/apply-chosen-language";
 import { getAuth, getPool } from "../../../lib/auth";
 
 /**
@@ -19,6 +20,7 @@ export async function pathAfterSignIn(): Promise<string> {
   if (!session) {
     return "/";
   }
+  await applyChosenLanguage();
   const kept = await deletionJustCancelled(getPool(), session.user.id).catch(
     () => false,
   );

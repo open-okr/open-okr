@@ -17,6 +17,10 @@ import { callAction, OperationError } from "@openokr/core";
 import type { ShippedLocaleCode } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { getPool } from "./pool";
+import {
+  clearVisitorLanguageCookie,
+  setVisitorLanguageCookie,
+} from "./visitor-language-cookie";
 import { requireWorkspace } from "./workspace";
 
 export async function setAppearance(input: {
@@ -51,6 +55,12 @@ export async function setAppearance(input: {
   // rendered on the server, so the screen does not change until the server
   // renders it again (P6-G22a).
   if (input.language !== undefined) {
+    // Keep the signed-out picker in step so the next sign-in page matches.
+    if (input.language === null) {
+      await clearVisitorLanguageCookie();
+    } else {
+      await setVisitorLanguageCookie(input.language);
+    }
     revalidatePath("/", "layout");
   }
   return { error: null };

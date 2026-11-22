@@ -10,6 +10,8 @@ import { getPool } from "./pool";
 import { requireWorkspace } from "./workspace";
 
 export const VISITOR_LANGUAGE_COOKIE = "openokr_locale";
+/** Session cookie: set when the visitor picked a language on the sign-in page. */
+export const VISITOR_LANGUAGE_CHOSEN_COOKIE = "openokr_locale_chosen";
 
 /**
  * Which catalogue this request renders in (UIUX-PLAN §8, P6-G22a).

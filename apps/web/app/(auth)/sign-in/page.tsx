@@ -10,7 +10,6 @@ import {
   useTranslations,
 } from "@openokr/ui";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { DemoPill } from "../../../lib/demo-pill";
@@ -56,7 +55,6 @@ export default function SignInPage() {
   // The instance this is, not the software it runs (M-33).
   const instanceName = useInstanceName();
 
-  const router = useRouter();
   const [error, setError] = useState("");
   // A sign-in hold, in whole minutes, kept apart from `error` because its
   // message carries a link to the reset page (account-lockout.md D12).
@@ -233,7 +231,9 @@ export default function SignInPage() {
       setChallenge(true);
       return;
     }
-    router.push(await pathAfterSignIn());
+    // A full load, not router.push: the root layout holds <html lang dir> and
+    // the catalogue, and a soft navigation keeps the signed-out one.
+    window.location.assign(await pathAfterSignIn());
   };
 
   // Called by the code field once its sixth digit is in, and by Verify.
@@ -255,7 +255,9 @@ export default function SignInPage() {
       );
       return;
     }
-    router.push(await pathAfterSignIn());
+    // A full load, not router.push: the root layout holds <html lang dir> and
+    // the catalogue, and a soft navigation keeps the signed-out one.
+    window.location.assign(await pathAfterSignIn());
   };
 
   const signInWithPasskey = async () => {
@@ -272,7 +274,9 @@ export default function SignInPage() {
       );
       return;
     }
-    router.push(await pathAfterSignIn());
+    // A full load, not router.push: the root layout holds <html lang dir> and
+    // the catalogue, and a soft navigation keeps the signed-out one.
+    window.location.assign(await pathAfterSignIn());
   };
 
   if (challenge) {
@@ -462,11 +466,11 @@ export default function SignInPage() {
                     provider.kind === "saml"
                       ? await authClient.signIn.sso({
                           providerId: provider.id,
-                          callbackURL: "/",
+                          callbackURL: "/sign-in/continue",
                         })
                       : await authClient.signIn.social({
                           provider: provider.id as "github",
-                          callbackURL: "/",
+                          callbackURL: "/sign-in/continue",
                         });
                 } finally {
                   setActing(null);
