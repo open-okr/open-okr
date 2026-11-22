@@ -79,7 +79,7 @@ describe("the space home's own work", () => {
 
   test("says what an empty card means without claiming more than the reader can see", () => {
     expect(workText).toContain("This space has no open goals you can see yet.");
-    expect(workText).toContain("No KPIs belong to this space yet.");
+    expect(workText).toContain("No KPIs here that you can see.");
     expect(workText).toContain("Open in the Work Map");
     expect(work).toContain("href={`/?scope=");
   });
@@ -90,7 +90,6 @@ describe("the space home's own work", () => {
     ) as Record<string, string>;
     for (const key of [
       "spaces.detail.noGoalsYouCanSee",
-      "spaces.detail.noKpisYet",
       "spaces.detail.goalsFailed",
       "spaces.detail.kpiTreesFailed",
     ]) {

@@ -4780,7 +4780,6 @@
   "spaces.detail.noCoordinatorIsNamed": "尚未指定协调人，因此由管理者代行其职责。",
   "spaces.detail.noGoalsYouCanSee": "此{termSpaceLower}目前没有您可查看的开放目标。",
   "spaces.detail.noKpisYouCanSee": "这里没有你能看到的 KPI。",
-  "spaces.detail.noKpisYet": "此{termSpaceLower}目前没有{termKpisLower}。",
   "spaces.detail.noOwnerBlocks": "未指定负责人 · 阻碍{title}",
   "spaces.detail.noOwnerNamed": "未指定负责人",
   "spaces.detail.noWeekHasClosed": "此空间还没有结束过一周。首次周报将在每周会议结束时生成。",

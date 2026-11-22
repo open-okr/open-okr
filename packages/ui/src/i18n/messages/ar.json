@@ -4780,7 +4780,6 @@
   "spaces.detail.noCoordinatorIsNamed": "لم يُعيّن منسق، لذا يتولى المدير هذه المهام.",
   "spaces.detail.noGoalsYouCanSee": "لا توجد أهداف مفتوحة يمكنك رؤيتها في {termSpaceLower} هذه بعد.",
   "spaces.detail.noKpisYouCanSee": "لا توجد هنا مؤشرات KPI يمكنك الاطلاع عليها.",
-  "spaces.detail.noKpisYet": "لا يتبع {termKpisLower} أيٌّ من {termSpaceLower} هذه بعد.",
   "spaces.detail.noOwnerBlocks": "لم يُعيّن مالك · تعيق {title}",
   "spaces.detail.noOwnerNamed": "لم يُعيّن مالك",
   "spaces.detail.noWeekHasClosed": "لم تنتهِ أي أسبوع في هذه المساحة بعد. يُكتب الملخص الأول\n              عند انتهاء جلسة أسبوعية.",

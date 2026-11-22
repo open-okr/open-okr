@@ -4780,7 +4780,6 @@
   "spaces.detail.noCoordinatorIsNamed": "No coordinator is named, so a manager covers those duties.",
   "spaces.detail.noGoalsYouCanSee": "This {termSpaceLower} has no open goals you can see yet.",
   "spaces.detail.noKpisYouCanSee": "No KPIs here that you can see.",
-  "spaces.detail.noKpisYet": "No {termKpisLower} belong to this {termSpaceLower} yet.",
   "spaces.detail.noOwnerBlocks": "No owner named · blocks {title}",
   "spaces.detail.noOwnerNamed": "No owner named",
   "spaces.detail.noWeekHasClosed": "No week has closed in this space yet. The first digest is written\n              when a weekly session closes.",

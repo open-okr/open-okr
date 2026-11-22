@@ -4780,7 +4780,6 @@
   "spaces.detail.noCoordinatorIsNamed": "Es ist keine koordinierende Person benannt, daher übernimmt die Leitung diese Aufgaben.",
   "spaces.detail.noGoalsYouCanSee": "Dieses {termSpaceLower} hat noch keine offenen Ziele, die du sehen kannst.",
   "spaces.detail.noKpisYouCanSee": "Hier gibt es keine KPIs, die du sehen kannst.",
-  "spaces.detail.noKpisYet": "Zu diesem {termSpaceLower} gehören noch keine {termKpisLower}.",
   "spaces.detail.noOwnerBlocks": "Keine verantwortliche Person benannt · blockiert {title}",
   "spaces.detail.noOwnerNamed": "Keine verantwortliche Person benannt",
   "spaces.detail.noWeekHasClosed": "In diesem Bereich ist noch keine Woche abgeschlossen. Die erste Zusammenfassung wird erstellt,\n              sobald eine wöchentliche Sitzung abgeschlossen ist.",
