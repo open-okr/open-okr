@@ -4779,6 +4779,7 @@
   "spaces.detail.members": "Participantes ({memberCount})",
   "spaces.detail.noCoordinatorIsNamed": "Nenhum coordenador foi nomeado, então um gerente assume essas funções.",
   "spaces.detail.noGoalsYouCanSee": "Este {termSpaceLower} ainda não tem objetivos em aberto visíveis para você.",
+  "spaces.detail.noKpisYouCanSee": "Nenhum KPI aqui que vocÃª possa ver.",
   "spaces.detail.noKpisYet": "Ainda não há {termKpisLower} neste {termSpaceLower}.",
   "spaces.detail.noOwnerBlocks": "Sem responsável · impede {title}",
   "spaces.detail.noOwnerNamed": "Nenhum responsável nomeado",

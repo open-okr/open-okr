@@ -4779,6 +4779,7 @@
   "spaces.detail.members": "Anggota ({memberCount})",
   "spaces.detail.noCoordinatorIsNamed": "Belum ada koordinator yang ditunjuk, jadi manajer menjalankan tugasnya.",
   "spaces.detail.noGoalsYouCanSee": "Belum ada sasaran terbuka yang dapat Anda lihat di {termSpaceLower} ini.",
+  "spaces.detail.noKpisYouCanSee": "Tidak ada KPI di sini yang dapat Anda lihat.",
   "spaces.detail.noKpisYet": "Belum ada {termKpisLower} yang menjadi bagian dari {termSpaceLower} ini.",
   "spaces.detail.noOwnerBlocks": "Belum ada pemilik · menghambat {title}",
   "spaces.detail.noOwnerNamed": "Belum ada pemilik",

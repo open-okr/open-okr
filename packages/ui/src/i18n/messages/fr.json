@@ -4779,6 +4779,7 @@
   "spaces.detail.members": "Membres ({memberCount})",
   "spaces.detail.noCoordinatorIsNamed": "Aucun coordinateur n’a été nommé : le gestionnaire assume donc ces tâches.",
   "spaces.detail.noGoalsYouCanSee": "Cet {termSpaceLower} n’a pas encore d’objectifs ouverts que vous puissiez consulter.",
+  "spaces.detail.noKpisYouCanSee": "Aucun KPI ici que vous puissiez voir.",
   "spaces.detail.noKpisYet": "Aucun {termKpisLower} n’est encore associé à cet {termSpaceLower}.",
   "spaces.detail.noOwnerBlocks": "Aucun responsable désigné · bloque {title}",
   "spaces.detail.noOwnerNamed": "Aucun responsable désigné",

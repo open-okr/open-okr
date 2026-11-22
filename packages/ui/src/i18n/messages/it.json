@@ -4779,6 +4779,7 @@
   "spaces.detail.members": "Membri ({memberCount})",
   "spaces.detail.noCoordinatorIsNamed": "Non è stato nominato un coordinatore, quindi il responsabile ne assume i compiti.",
   "spaces.detail.noGoalsYouCanSee": "Questo {termSpaceLower} non ha ancora obiettivi aperti visibili.",
+  "spaces.detail.noKpisYouCanSee": "Nessun KPI qui che tu possa vedere.",
   "spaces.detail.noKpisYet": "Nessun {termKpisLower} appartiene ancora a questo {termSpaceLower}.",
   "spaces.detail.noOwnerBlocks": "Nessun responsabile indicato · impedisce {title}",
   "spaces.detail.noOwnerNamed": "Nessun responsabile indicato",

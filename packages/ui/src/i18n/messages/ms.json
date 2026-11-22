@@ -4779,6 +4779,7 @@
   "spaces.detail.members": "Ahli ({memberCount})",
   "spaces.detail.noCoordinatorIsNamed": "Tiada penyelaras dinamakan, jadi pengurus melaksanakan tugas tersebut.",
   "spaces.detail.noGoalsYouCanSee": "{termSpace} ini belum ada matlamat terbuka yang boleh anda lihat.",
+  "spaces.detail.noKpisYouCanSee": "Tiada KPI di sini yang boleh anda lihat.",
   "spaces.detail.noKpisYet": "Belum ada {termKpisLower} milik {termSpaceLower} ini.",
   "spaces.detail.noOwnerBlocks": "Tiada pemilik dinamakan · menghalang {title}",
   "spaces.detail.noOwnerNamed": "Tiada pemilik dinamakan",
