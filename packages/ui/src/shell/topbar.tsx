@@ -29,6 +29,8 @@ export interface TopbarProps {
   readonly newAction?: ReactNode;
   readonly askAi?: ReactNode;
   readonly notifications?: ReactNode;
+  /** The language switcher, drawn just before the avatar menu. */
+  readonly language?: ReactNode;
   readonly avatarMenu?: ReactNode;
   readonly className?: string;
 }
@@ -40,6 +42,7 @@ export function Topbar({
   newAction,
   askAi,
   notifications,
+  language,
   avatarMenu,
   className,
 }: TopbarProps) {
@@ -57,6 +60,7 @@ export function Topbar({
         {newAction}
         {askAi}
         {notifications}
+        {language}
         {avatarMenu}
       </div>
     </header>
