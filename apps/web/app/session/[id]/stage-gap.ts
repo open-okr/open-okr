@@ -32,11 +32,22 @@ const GAP_MESSAGES: Readonly<Record<StageGapReason, string>> = {
   owners: "session.detail.stageGap.owners",
 };
 
+// One sentence each, with no hole for a count: the catalogue refuses a value
+// its message has no hole for.
+const PLAIN_REASONS: ReadonlySet<StageGapReason> = new Set([
+  "noKeyResults",
+  "noObjectives",
+  "recognition",
+  "notScored",
+  "learning",
+]);
+
 export function stageGapText(
   gap: { readonly reason: StageGapReason; readonly count: number },
   t: (key: string, values?: Record<string, string | number>) => string,
 ): string {
   const key = GAP_MESSAGES[gap.reason];
+  if (PLAIN_REASONS.has(gap.reason)) return t(key);
   return gap.reason === "answers"
     ? // Stage six's four questions are canon, so the number comes from the
       // method package rather than from the sentence.
