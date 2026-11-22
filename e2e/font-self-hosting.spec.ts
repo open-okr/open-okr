@@ -64,7 +64,12 @@ test("Arabic text on an English page loads the local Arabic slice", async ({
   const fonts: string[] = [];
   page.on("response", (response) => {
     const { pathname } = new URL(response.url());
-    if (response.ok() && pathname.startsWith("/fonts/noto-sans-arabic/")) {
+    // Font files only: the slice's stylesheet arrives with the page as well.
+    if (
+      response.ok() &&
+      pathname.startsWith("/fonts/noto-sans-arabic/") &&
+      pathname.endsWith(".woff2")
+    ) {
       fonts.push(pathname);
     }
   });
