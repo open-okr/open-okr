@@ -211,14 +211,14 @@ test("hydrates, so a write happens without loading a new document", async () => 
   // page still standing afterwards without the browser fetching a document.
   // A picker since completeness review M-15, which offers the languages the
   // catalogue has rather than taking any text.
-  await page.getByLabel("Language").selectOption("en");
+  await page.getByTestId("general-defaults-card").getByLabel("Language").selectOption("en");
   // The defaults card's own save bar: every card on the page has one.
   await page
     .getByTestId("general-defaults-card")
     .getByRole("button", { name: "Save changes" })
     .click();
 
-  await expect(page.getByLabel("Language")).toBeVisible();
+  await expect(page.getByTestId("general-defaults-card").getByLabel("Language")).toBeVisible();
   expect(documentLoads).toBe(0);
 });
 
