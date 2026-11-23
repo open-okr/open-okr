@@ -1,5 +1,39 @@
 # @openokr/web
 
+## 0.9.1
+
+### Patch Changes
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`4c2a632`](https://github.com/open-okr/open-okr/commit/4c2a6321355cf50d8f39557ca2174290e4d179ac) Thanks [@agungksidik](https://github.com/agungksidik)! - Add per-card move capabilities to task boards and compute them with one batched edit check.
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`1043950`](https://github.com/open-okr/open-okr/commit/104395002fefbf98c413bfbffc804ab710ff12cb) Thanks [@agungksidik](https://github.com/agungksidik)! - The copilot answers in the chosen English or Malay interface language, presents readable health labels, and separates adjacent citations.
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`7bc38a6`](https://github.com/open-okr/open-okr/commit/7bc38a68974c5171b971ea389bcedeb6787b0933) Thanks [@agungksidik](https://github.com/agungksidik)! - The copilot can find the objective for a named key result and ask for missing overall confidence before offering a check-in for review.
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`d6800b8`](https://github.com/open-okr/open-okr/commit/d6800b848d08930eea529b1da72c38495b1b9985) Thanks [@agungksidik](https://github.com/agungksidik)! - Time copilot answer stages and add narrow fast path for single-record questions on anchored records.
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`a484140`](https://github.com/open-okr/open-okr/commit/a484140a6d5d41b4250afd5c6032f87e7535a089) Thanks [@agungksidik](https://github.com/agungksidik)! - Admin AI shows proposal outcomes as proposal activity. Copilot read totals count only reads in Admin AI and in the conversation.
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`c9d464e`](https://github.com/open-okr/open-okr/commit/c9d464e1184590afde6afe376812792042b4f3eb) Thanks [@agungksidik](https://github.com/agungksidik)! - The copilot's reading status names the record opened by a successful single-record read. List and refused reads use the generic status.
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`5029059`](https://github.com/open-okr/open-okr/commit/502905985e8196c1fd019282384af4e0ac46df85) Thanks [@agungksidik](https://github.com/agungksidik)! - The copilot can propose standalone tasks. It uses the named or sole eligible space and asks which key result you mean when a requested link is ambiguous.
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`132b776`](https://github.com/open-okr/open-okr/commit/132b77662d5f78f4f3a6e5b33429b2292e97e559) Thanks [@agungksidik](https://github.com/agungksidik)! - Self-hosted HTTP instances can load assets and sign in on Safari. The Content Security Policy follows the configured public origin, including when a reverse proxy terminates HTTPS.
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`2d6523d`](https://github.com/open-okr/open-okr/commit/2d6523de5333a6571b39a56a19656c1dc8ec82b6) Thanks [@agungksidik](https://github.com/agungksidik)! - Demo preparation assigns the built-in Member role to attached demo personas while preserving existing roles.
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`ad0e836`](https://github.com/open-okr/open-okr/commit/ad0e836fe71d239c4c4f4d908ebd11a03116b454) Thanks [@agungksidik](https://github.com/agungksidik)! - Keep unrelated objectives and key results idle while a row saves on the Goals page.
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`31d33af`](https://github.com/open-okr/open-okr/commit/31d33afe594e2c63d5db2b02a74d3bf02134d31f) Thanks [@agungksidik](https://github.com/agungksidik)! - Task creation and session scheduling now check the workspace role and the destination space. The role matrix adds a Sessions permission. Viewers who hold edit access to an objective can still add key results to that objective. Creation controls use the same access requirements as the actions behind them.
+- Updated dependencies [[`4c2a632`](https://github.com/open-okr/open-okr/commit/4c2a6321355cf50d8f39557ca2174290e4d179ac), [`d6800b8`](https://github.com/open-okr/open-okr/commit/d6800b848d08930eea529b1da72c38495b1b9985)]:
+  - @openokr/core@0.9.1
+  - @openokr/agents@0.9.1
+  - @openokr/adapters@0.9.1
+  - @openokr/config@0.9.1
+  - @openokr/formats@0.9.1
+  - @openokr/method@0.9.1
+  - @openokr/ui@0.9.1
+
 ## 0.9.0
 
 ### Minor Changes

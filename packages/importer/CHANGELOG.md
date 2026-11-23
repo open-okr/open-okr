@@ -1,5 +1,15 @@
 # @openokr/importer
 
+## 0.9.1
+
+### Patch Changes
+
+- Updated dependencies [[`4c2a632`](https://github.com/open-okr/open-okr/commit/4c2a6321355cf50d8f39557ca2174290e4d179ac), [`d6800b8`](https://github.com/open-okr/open-okr/commit/d6800b848d08930eea529b1da72c38495b1b9985)]:
+  - @openokr/core@0.9.1
+  - @openokr/adapters@0.9.1
+  - @openokr/config@0.9.1
+  - @openokr/method@0.9.1
+
 ## 0.9.0
 
 ### Patch Changes
