@@ -1,19 +1,19 @@
 "use client";
 
-import { LOCALES } from "@openokr/formats";
+import { isShippedLocale } from "@openokr/formats";
 import {
   Button,
   CodeInput,
   EmailInput,
   SecretInput,
-  SelectInput,
   useTranslations,
 } from "@openokr/ui";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { DemoPill } from "../../../lib/demo-pill";
 import { useInstanceName } from "../../../lib/instance-name-context";
+import { LanguageMenu } from "../../../lib/language-menu";
 import { AuthCard, FormError } from "../auth-card";
 import { ResendLink, useLinkHours } from "../resend-link";
 import { pathAfterSignIn } from "./deletion-actions";
@@ -55,7 +55,7 @@ export default function SignInPage() {
   // The instance this is, not the software it runs (M-33).
   const instanceName = useInstanceName();
 
-  const languageForm = useRef<HTMLFormElement>(null);
+  const [languagePending, startLanguage] = useTransition();
   const [error, setError] = useState("");
   // A sign-in hold, in whole minutes, kept apart from `error` because its
   // message carries a link to the reset page (account-lockout.md D12).
@@ -340,23 +340,22 @@ export default function SignInPage() {
           >
             {t("common.createAnAccount")}
           </Link>
-          <form ref={languageForm} action={setVisitorLanguage}>
-            <SelectInput
-              label={t("admin.general.generalSettingsForm.language")}
-              hideLabel
-              name="language"
-              data-testid="visitor-language"
-              defaultValue={locale}
-              className="w-auto"
-              onChange={() => languageForm.current?.requestSubmit()}
-            >
-              {LOCALES.filter((entry) => entry.shipped).map((entry) => (
-                <option key={entry.code} value={entry.code} lang={entry.code}>
-                  {t(entry.endonymKey)}
-                </option>
-              ))}
-            </SelectInput>
-          </form>
+          <LanguageMenu
+            value={isShippedLocale(locale) ? locale : null}
+            current={locale}
+            testId="visitor-language"
+            pending={languagePending}
+            onChoose={(code) => {
+              if (!code) {
+                return;
+              }
+              const data = new FormData();
+              data.set("language", code);
+              startLanguage(async () => {
+                await setVisitorLanguage(data);
+              });
+            }}
+          />
         </div>
       }
     >
