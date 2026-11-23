@@ -1,5 +1,13 @@
 # @openokr/db
 
+## 0.10.0
+
+### Patch Changes
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`97a935d`](https://github.com/open-okr/open-okr/commit/97a935dec5b970c66b94afd6804c4d9993b83c17) Thanks [@agungksidik](https://github.com/agungksidik)! - Existing KPIs receive their access contexts and owner bindings.
+- Updated dependencies []:
+  - @openokr/config@0.10.0
+
 ## 0.9.1
 
 ### Patch Changes
