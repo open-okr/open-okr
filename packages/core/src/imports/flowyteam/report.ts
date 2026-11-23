@@ -29,6 +29,11 @@ const NOT_IMPORTED = [
 
 export interface FlowyteamReport {
   readonly source: "flowyteam";
+  /**
+   * How the source was reached: `export` is FlowyTeam's HTTP export from the
+   * browser import. Absent on a command-line run, which reads MySQL.
+   */
+  readonly via?: "export" | "mysql";
   /** The address with the password removed. */
   readonly connectedTo: string;
   readonly database: string;
@@ -77,6 +82,7 @@ export function buildReport(input: {
   readonly addedForDependencies?: readonly string[];
   /** The unread tables that hold rows, from `countUnread`. */
   readonly unread?: readonly UnreadCount[];
+  readonly via?: "export" | "mysql";
 }): FlowyteamReport {
   const missing = Object.entries(input.introspection.domains).filter(
     ([, tables]) => tables.length > 0,
@@ -98,6 +104,7 @@ export function buildReport(input: {
 
   return {
     source: "flowyteam",
+    ...(input.via ? { via: input.via } : {}),
     connectedTo: input.connectedTo,
     database: input.introspection.database,
     mode: input.mode,

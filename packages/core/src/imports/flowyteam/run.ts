@@ -68,11 +68,43 @@ export interface FlowyteamEngineOptions {
    * to all workspace members in OpenOKR.
    */
   readonly acceptBroaderVisibility?: boolean;
+  /**
+   * The run row a caller already recorded, so the engine does not start a
+   * second one. The browser import records it before the first read, so a
+   * run FlowyTeam refuses still has a row saying why (flowyteam-connect C4).
+   */
+  readonly runId?: string;
+  /** How the source was reached, kept on the report: `export` over HTTP. */
+  readonly via?: "export" | "mysql";
+  /**
+   * Resume a real run at this domain, with what the earlier part reported.
+   * Every domain is idempotent, so a domain repeated after an expiry
+   * writes nothing twice.
+   */
+  readonly startAt?: string;
+  readonly carried?: FlowyteamCarried;
+  /**
+   * Epoch milliseconds after which a real run stops between two domains and
+   * returns `paused`, so a follow-up job continues before the job expires.
+   * Ignored for a dry run, whose planned rows live only in this process.
+   */
+  readonly deadline?: number;
+  /** Told before each domain runs, for progress. */
+  readonly onDomain?: (key: string, index: number, total: number) => void;
+  readonly now?: () => number;
+}
+
+/** What the domains already run reported, handed to the next part of a run. */
+export interface FlowyteamCarried {
+  readonly reconciliation: readonly DomainReconciliation[];
+  readonly notes: readonly string[];
 }
 
 export interface FlowyteamRunResult {
   readonly report: FlowyteamReport;
   readonly runId: string;
+  /** Set when the run stopped at its deadline: where to continue. */
+  readonly paused?: { readonly next: string } & FlowyteamCarried;
 }
 
 export async function runFlowyteamEngine(
@@ -106,11 +138,15 @@ export async function runFlowyteamEngine(
   const write = options.write ?? false;
   // Recorded before the first row, so a run that dies halfway leaves a row
   // saying it was running rather than no row at all.
-  const { id: runId } = await callAction(context, "imports.startRun", {
-    source: "flowyteam",
-    mode: write ? "real" : "dry_run",
-    filename: source.describe,
-  });
+  const runId =
+    options.runId ??
+    (
+      await callAction(context, "imports.startRun", {
+        source: "flowyteam",
+        mode: write ? "real" : "dry_run",
+        filename: source.describe,
+      })
+    ).id;
 
   const mapper = {
     source,
@@ -157,9 +193,47 @@ export async function runFlowyteamEngine(
     }
   }
 
-  const reconciliation: DomainReconciliation[] = [];
-  const notes: string[] = [];
-  for (const domain of selection.domains) {
+  const reconciliation: DomainReconciliation[] = [
+    ...(options.carried?.reconciliation ?? []),
+  ];
+  const notes: string[] = [...(options.carried?.notes ?? [])];
+  const start =
+    options.startAt === undefined
+      ? 0
+      : selection.domains.findIndex((d) => d.key === options.startAt);
+  if (start < 0) {
+    throw new SourceError(`"${options.startAt}" is not a domain of this run.`);
+  }
+  const now = options.now ?? Date.now;
+  for (let index = start; index < selection.domains.length; index += 1) {
+    const domain = selection.domains[index];
+    if (!domain) {
+      break;
+    }
+    if (
+      write &&
+      index > start &&
+      options.deadline !== undefined &&
+      now() >= options.deadline
+    ) {
+      return {
+        runId,
+        report: buildReport({
+          connectedTo: source.describe,
+          introspection,
+          company,
+          counts,
+          mode: "real",
+          reconciliation,
+          selected: selection.domains.map((d) => d.key),
+          addedForDependencies: selection.added,
+          unread,
+          extraNotes: notes,
+        }),
+        paused: { next: domain.key, reconciliation, notes },
+      };
+    }
+    options.onDomain?.(domain.key, index, selection.domains.length);
     const outcome = await domain.run(mapper);
     reconciliation.push(...outcome.domains);
     notes.push(...outcome.notes);
@@ -176,6 +250,7 @@ export async function runFlowyteamEngine(
     addedForDependencies: selection.added,
     unread,
     extraNotes: notes,
+    ...(options.via ? { via: options.via } : {}),
   });
 
   await callAction(context, "imports.finishRun", {

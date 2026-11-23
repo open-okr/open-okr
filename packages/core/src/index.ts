@@ -1019,6 +1019,16 @@ export {
   introspect,
 } from "./imports/flowyteam/introspect.ts";
 export {
+  backgroundJobsRun,
+  FLOWYTEAM_IMPORT_TOPIC,
+  type FlowyteamImportJob,
+  type FlowyteamImportJobDeps,
+  type FlowyteamImportJobOutcome,
+  flowyteamImportChannel,
+  parseFlowyteamImportJob,
+  runFlowyteamImportJob,
+} from "./imports/flowyteam/job.ts";
+export {
   LEGACY_TABLES,
   LEGACY_TYPE,
   legacyIdFor,

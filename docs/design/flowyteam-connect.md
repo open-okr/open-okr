@@ -59,6 +59,15 @@ Prototype of both sides, clickable: [flowyteam-connect-prototype.html](flowyteam
 | Q8 | Keeping both catalogues equal | **The catalogue is generated into `contract/flowyteam-queries.json` with a version hash, checked by a drift gate like `check:contract`.** FlowyTeam vendors that file. Each request carries the version; FlowyTeam answers 409 with its own version on a mismatch, and the card says "FlowyTeam needs an update before this import" | A changed query on one side only would import something different from what was reviewed | Version-free requests |
 | Q9 | Who may connect | **A workspace member with `full` on imports here, and a company admin in FlowyTeam.** Both conditions are checked on their own side | The token reads a whole company | Any FlowyTeam user |
 
+**As built (C4).**
+
+| Decision | Built |
+|---|---|
+| Q4 | The outbox topic `imports.flowyteamImport` is handed by the relay to the jobs port under the same name, and the scheduler's worker runs it (`packages/core/src/imports/flowyteam/job.ts`). A relay with the scheduler elsewhere queues through a send-only pg-boss client (2 connections, no maintenance, cron or migration). With `OPENOKR_SCHEDULER=off` nothing would run the job, so preview and run are refused with reason `background_off` before anything is queued, and `imports.flowyteamConnection` returns `backgroundWork: false` |
+| Q4, resume | A real run hands over between domains after 10 minutes, under the 15-minute expiry; the follow-up job carries the reconciliation so far and starts at the next domain. A preview is never split, because the rows it plans live in memory: a preview past the expiry restarts from the start |
+| Q4, run row | The action writes the run row (source `flowyteam`, report `via: "export"`) in its own transaction and returns `runId`, so a run FlowyTeam refuses still has a row saying why. A second preview or run is refused (`already_running`) while an export run started in the last two hours is running |
+| Engine | `requireCompany` reads `companies.count` only to word a refusal, because `mysql-only` entries are not offered over HTTP. A source with `acrossCompanies: false` (the HTTP source) skips the unread-table counts that need every company; those count rows tied to no company, so nothing of this company goes unreported |
+
 ### 2.1 The catalogue format (C1)
 
 | Rule | Detail |
@@ -105,7 +114,7 @@ Admin (OKRGoal)        OKRGoal server                  FlowyTeam
 | `imports.flowyteamPreview` | `full` | Enqueues a dry run; refuses when the workspace already holds another company (today's rule) |
 | `imports.flowyteamRun` | `full` | Enqueues the write. Requires `acceptBroaderVisibility` when the preview named restricted KPIs (today's `--accept-broader-visibility`) |
 | `imports.flowyteamDisconnect` | `full` | Marks the connection revoked and disconnected (soft delete), keeps imported data and the company link. An outbox row (`imports.flowyteamRevoke`) revokes the token at FlowyTeam (RFC 7009, `POST <baseUrl>/oauth/revoke`) through the outbound guard and then clears it from the row; no answer is retried, a refusal or 404 is not |
-| `imports.listRuns` | existing | Gains the source `flowyteam-api` |
+| `imports.listRuns` | existing | Returns `via`: `export` for a browser run. As built, the source stays `flowyteam` (no migration of the `import_runs.source` check); the report and the filename carry `via` |
 
 All writes go through the Operation pipeline. The audit rows name the acting member and the FlowyTeam company id.
 
@@ -129,7 +138,7 @@ One live connection per workspace and source (partial unique index on `deleted_a
 
 ### 4.3 The HTTP source (`packages/adapters`)
 
-A driver behind the existing outbound HTTP port: `query(name, values)` posts to FlowyTeam, follows the cursor until the result is complete and returns the rows in the shape MySQL returns today. Retries a 429 or 5xx with backoff three times, then fails the domain with the FlowyTeam answer in the report. Air gap: the request goes through the port, so `check:air-gap` sees it.
+As built: `createHttpFlowyteamSource` and `createHttpFlowyteamFiles` in `packages/adapters/src/drivers/flowyteam/export.ts`. Values are coerced by `columns[].native_type` to what the MySQL source returns (a `LONGLONG` and a decimal as text, `JSON` parsed). A 409 is `version_mismatch`, a 401 or a 403 other than `mysql_only` is `unauthorised`, which marks the connection revoked. Every statement FlowyTeam pages has a total order, enforced by a test. A driver behind the existing outbound HTTP port: `query(name, values)` posts to FlowyTeam, follows the cursor until the result is complete and returns the rows in the shape MySQL returns today. Retries a 429 or 5xx with backoff three times, then fails the domain with the FlowyTeam answer in the report. Air gap: the request goes through the port, so `check:air-gap` sees it.
 
 ### 4.4 Settings (TECHNICAL-PLAN §4.14)
 

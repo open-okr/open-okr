@@ -6639,6 +6639,33 @@
       "pages": false
     },
     {
+      "name": "imports flowyteamPreview",
+      "action": "imports.flowyteamPreview",
+      "method": "POST",
+      "path": "/imports/flowyteamPreview",
+      "scope": "write",
+      "summary": "Starts a dry run of the FlowyTeam import in the background. Writes nothing but the run's own row.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "imports flowyteamRun",
+      "action": "imports.flowyteamRun",
+      "method": "POST",
+      "path": "/imports/flowyteamRun",
+      "scope": "write",
+      "summary": "Starts the FlowyTeam import in the background. Adds what is new and changes nothing already imported.",
+      "flags": [
+        {
+          "name": "accept-broader-visibility",
+          "field": "acceptBroaderVisibility",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "tasks board",
       "action": "tasks.board",
       "method": "GET",

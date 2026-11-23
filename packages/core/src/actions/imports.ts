@@ -215,6 +215,11 @@ export const listImportRuns = defineReadAction({
         mode: z.enum(IMPORT_MODES),
         status: z.enum(IMPORT_STATUSES),
         filename: z.string().nullable(),
+        /**
+         * How a FlowyTeam run reached its source: `export` is the browser
+         * import over FlowyTeam's HTTP export, `mysql` or null the command line.
+         */
+        via: z.enum(["export", "mysql"]).nullable(),
         rowsRead: z.number().int(),
         rowsWritten: z.number().int(),
         rowsSkipped: z.number().int(),
@@ -258,6 +263,10 @@ export const listImportRuns = defineReadAction({
       return {
         runs: rows.map((row) => ({
           ...row,
+          via:
+            row.report?.via === "export" || row.report?.via === "mysql"
+              ? row.report.via
+              : null,
           startedAt: row.startedAt.toISOString(),
           finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
         })),

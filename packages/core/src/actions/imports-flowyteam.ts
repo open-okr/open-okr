@@ -1,10 +1,12 @@
 /**
  * The FlowyTeam connection: connect, finish, disconnect and the card's read
- * (docs/design/flowyteam-connect.md §4.1, plan card C3). Preview and run are
- * C4's.
+ * (docs/design/flowyteam-connect.md §4.1, plan cards C3 and C4).
  *
  * **`full`, like every import action.** The token reads a whole company, and
  * connecting is the administrative act that lets this workspace load it (Q9).
+ *
+ * Preview and run (C4) record the run row and an outbox row in one
+ * transaction; the job in `imports/flowyteam/job.ts` does the reading.
  * FlowyTeam checks its own half: only a company admin may approve.
  *
  * **No action returns the token or anything sealed around it**, except the
@@ -16,6 +18,7 @@ import {
   activeOnly,
   type ImportConnection,
   importConnections,
+  importRuns,
   withWorkspace,
 } from "@openokr/db";
 import { and, desc, eq } from "drizzle-orm";
@@ -40,7 +43,13 @@ import {
   sameState,
   sealConnectState,
 } from "../imports/flowyteam/connection.ts";
+import {
+  backgroundJobsRun,
+  FLOWYTEAM_IMPORT_TOPIC,
+  restrictedKpisIn,
+} from "../imports/flowyteam/job.ts";
 import { flowyteamQueryCatalogue } from "../imports/flowyteam/queries.ts";
+import { companyAlreadyImported } from "../imports/flowyteam/run.ts";
 import { OperationError } from "../operations/errors.ts";
 import { type OperationTx, runOperation } from "../operations/operation.ts";
 import { encryptSecret, type KeyRing } from "../secrets/key-ring.ts";
@@ -441,6 +450,201 @@ export const flowyteamDisconnect = defineWriteAction({
 });
 
 // ---------------------------------------------------------------------------
+// Preview and run (C4)
+// ---------------------------------------------------------------------------
+
+/** Refusal sentences. The card says them in its own words by `reason`. */
+const FLOWYTEAM_IMPORT_MESSAGES = {
+  background_off:
+    "Background work is off on this instance, so a FlowyTeam import cannot run. Ask the operator to turn the scheduler on.",
+  not_connected: "FlowyTeam is not connected.",
+  revoked:
+    "FlowyTeam no longer accepts this connection's access. Connect again from the import page.",
+  other_company:
+    "This workspace already holds another FlowyTeam company. A workspace holds one company.",
+  already_running: "A FlowyTeam import is already running in this workspace.",
+  visibility_not_accepted:
+    "The preview named KPIs that will become visible to every member. Confirm that before importing.",
+} as const;
+
+type ImportRefusal = keyof typeof FLOWYTEAM_IMPORT_MESSAGES;
+
+function importRefusal(
+  code: "forbidden" | "not_found" | "conflict",
+  reason: ImportRefusal,
+): OperationError {
+  return new OperationError(code, FLOWYTEAM_IMPORT_MESSAGES[reason], {
+    reason,
+  });
+}
+
+/** A run left `running` longer than this is not counted as one in progress. */
+const RUNNING_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+function enqueueImport(write: boolean) {
+  return (
+    context: ActionCallContext,
+    input: { readonly acceptBroaderVisibility?: boolean },
+  ) => ({
+    async execute({
+      tx,
+      workspaceId,
+    }: {
+      tx: OperationTx;
+      workspaceId: string;
+    }) {
+      if (!backgroundJobsRun()) {
+        throw importRefusal("forbidden", "background_off");
+      }
+      const connection = await liveConnection(tx, workspaceId);
+      if (!connection) {
+        throw importRefusal("not_found", "not_connected");
+      }
+      if (connection.revokedAt || !connection.tokenCiphertext) {
+        throw importRefusal("forbidden", "revoked");
+      }
+      const companyId = Number(connection.companyId);
+
+      const runs = await tx
+        .select({
+          source: importRuns.source,
+          status: importRuns.status,
+          mode: importRuns.mode,
+          report: importRuns.report,
+          startedAt: importRuns.startedAt,
+        })
+        .from(importRuns)
+        .where(
+          activeOnly(
+            importRuns,
+            eq(importRuns.workspaceId, workspaceId),
+            eq(importRuns.source, FLOWYTEAM_SOURCE),
+          ),
+        )
+        .orderBy(desc(importRuns.startedAt))
+        .limit(100);
+      const prior = runs.map((run) => ({
+        source: run.source,
+        status: run.status,
+        report: (run.report ?? {}) as Record<string, unknown>,
+      }));
+      if (companyAlreadyImported(prior, companyId) !== null) {
+        throw importRefusal("conflict", "other_company");
+      }
+      const since = Date.now() - RUNNING_WINDOW_MS;
+      if (
+        runs.some(
+          (run) =>
+            run.status === "running" &&
+            (run.report as Record<string, unknown> | null)?.via === "export" &&
+            run.startedAt.getTime() > since,
+        )
+      ) {
+        throw importRefusal("conflict", "already_running");
+      }
+      if (write && input.acceptBroaderVisibility !== true) {
+        const preview = runs.find(
+          (run) =>
+            run.mode === "dry_run" &&
+            run.status === "completed" &&
+            (run.report as Record<string, unknown> | null)?.companyId ===
+              companyId,
+        );
+        if (
+          preview &&
+          restrictedKpisIn((preview.report ?? {}) as Record<string, unknown>) >
+            0
+        ) {
+          throw importRefusal("forbidden", "visibility_not_accepted");
+        }
+      }
+
+      const userId = context.actor.userId;
+      const memberId = await actingMemberId(tx, workspaceId, userId);
+      // openokr:allow-mutation: inside this operation's own transaction.
+      const [run] = await tx
+        .insert(importRuns)
+        .values({
+          workspaceId,
+          source: FLOWYTEAM_SOURCE,
+          entity: null,
+          mode: write ? "real" : "dry_run",
+          status: "running",
+          filename: `FlowyTeam export: ${connection.companyName}`.slice(0, 400),
+          report: { source: FLOWYTEAM_SOURCE, via: "export", companyId },
+          requestedById: memberId,
+        })
+        .returning({ id: importRuns.id });
+      if (!run || !userId) {
+        throw new Error("The import run insert returned no row.");
+      }
+      const action = write
+        ? "imports.flowyteamRun"
+        : "imports.flowyteamPreview";
+      return {
+        result: { runId: run.id },
+        audit: {
+          action,
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: {
+            source: FLOWYTEAM_SOURCE,
+            companyId: connection.companyId,
+            runId: run.id,
+            ...(write
+              ? {
+                  acceptBroaderVisibility:
+                    input.acceptBroaderVisibility === true,
+                }
+              : {}),
+          },
+        },
+        outbox: [
+          {
+            topic: FLOWYTEAM_IMPORT_TOPIC,
+            // Identifiers only: the job opens the token from the row.
+            payload: {
+              workspaceId,
+              connectionId: connection.id,
+              runId: run.id,
+              userId,
+              write,
+              acceptBroaderVisibility: input.acceptBroaderVisibility === true,
+            },
+            idempotencyKey: `${FLOWYTEAM_IMPORT_TOPIC}:${run.id}`,
+          },
+        ],
+      };
+    },
+  });
+}
+
+export const flowyteamPreview = defineWriteAction({
+  name: "imports.flowyteamPreview",
+  agentSurface: false,
+  summary:
+    "Starts a dry run of the FlowyTeam import in the background. Writes nothing but the run's own row.",
+  input: z.object({}),
+  output: z.object({ runId: z.uuid() }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => enqueueImport(false)(context, input),
+});
+
+export const flowyteamRun = defineWriteAction({
+  name: "imports.flowyteamRun",
+  agentSurface: false,
+  summary:
+    "Starts the FlowyTeam import in the background. Adds what is new and changes nothing already imported.",
+  input: z.object({
+    /** Required when the latest preview named KPIs that will become more visible. */
+    acceptBroaderVisibility: z.boolean().default(false),
+  }),
+  output: z.object({ runId: z.uuid() }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => enqueueImport(true)(context, input),
+});
+
+// ---------------------------------------------------------------------------
 // The card's read
 // ---------------------------------------------------------------------------
 
@@ -453,6 +657,11 @@ export const flowyteamConnection = defineReadAction({
   output: z.object({
     /** False when this instance has no FlowyTeam address: the card points at the command line. */
     available: z.boolean(),
+    /**
+     * False when nothing on this instance runs background jobs, so preview
+     * and import are refused (`background_off`).
+     */
+    backgroundWork: z.boolean(),
     connection: connectionView.nullable(),
   }),
   access: ACCESS_LEVELS.full,
@@ -491,6 +700,7 @@ export const flowyteamConnection = defineReadAction({
     );
     return {
       available: settings.baseUrl !== null,
+      backgroundWork: backgroundJobsRun(),
       connection: row
         ? {
             companyId: row.companyId,

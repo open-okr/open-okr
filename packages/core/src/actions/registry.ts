@@ -324,6 +324,8 @@ import {
   flowyteamConnection,
   flowyteamDisconnect,
   flowyteamFinishConnect,
+  flowyteamPreview,
+  flowyteamRun,
 } from "./imports-flowyteam.ts";
 import {
   createInitiative,
@@ -875,6 +877,8 @@ export const ACTION_MAP = {
   "imports.flowyteamConnect": flowyteamConnect,
   "imports.flowyteamFinishConnect": flowyteamFinishConnect,
   "imports.flowyteamDisconnect": flowyteamDisconnect,
+  "imports.flowyteamPreview": flowyteamPreview,
+  "imports.flowyteamRun": flowyteamRun,
   "tasks.board": readBoard,
   "tasks.list": listTasks,
   "tasks.read": readTask,

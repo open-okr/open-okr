@@ -221,7 +221,11 @@ describe("connect", () => {
     );
     expect(refusal.details?.reason).toBe("not_configured");
     const read = await call(OWNER, "imports.flowyteamConnection", {});
-    expect(read).toEqual({ available: false, connection: null });
+    expect(read).toEqual({
+      available: false,
+      backgroundWork: true,
+      connection: null,
+    });
   });
 });
 
@@ -403,6 +407,7 @@ describe("disconnect", () => {
     expect(result).toEqual({ companyId: "42" });
     expect(await call(OWNER, "imports.flowyteamConnection", {})).toEqual({
       available: true,
+      backgroundWork: true,
       connection: null,
     });
 

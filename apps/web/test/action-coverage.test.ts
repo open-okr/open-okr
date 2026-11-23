@@ -62,6 +62,14 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     apiOnly: true,
     why: "the FlowyTeam card on Import (plan card C5) is its browser caller; until it ships disconnecting is REST and the command line only",
   },
+  "imports.flowyteamPreview": {
+    apiOnly: true,
+    why: "the FlowyTeam card on Import (plan card C5) is its browser caller; until it ships the preview is REST and the command line only",
+  },
+  "imports.flowyteamRun": {
+    apiOnly: true,
+    why: "the FlowyTeam card on Import (plan card C5) is its browser caller; until it ships the import is REST and the command line only",
+  },
   "kpis.deleteRecord": {
     apiOnly: true,
     why: "used only by the copilot's undo, which calls it through the server; no screen removes a KPI value",

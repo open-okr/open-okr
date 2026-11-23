@@ -47,6 +47,7 @@ import {
   callAction,
   chainWorkspace,
   defaultMetrics,
+  FLOWYTEAM_IMPORT_TOPIC,
   fillAlignmentScores,
   isCloudEnabled,
   listLiveWorkspaces,
@@ -68,6 +69,7 @@ import {
 import { schedulerMode } from "./background-work";
 import { getDns } from "./dns";
 import { drafterForAgent } from "./drafter";
+import { runFlowyteamImportFromJob } from "./flowyteam";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
@@ -970,6 +972,18 @@ export function startScheduler(): PgBossJobQueue | null {
           );
         });
       }
+      // FlowyTeam imports the relay queued (flowyteam-connect.md Q4). One
+      // job at a time per process: an import is minutes of database writes.
+      await queue.work(FLOWYTEAM_IMPORT_TOPIC, async (payload) => {
+        const outcome = await runFlowyteamImportFromJob(
+          payload as Record<string, unknown>,
+          (name, next, options) =>
+            // openokr:allow-side-effect: a job queuing its own next part
+            // between two domains, with no transaction open. Not a write path.
+            queue.enqueue(name, next, { ...options, retryLimit: 1 }),
+        );
+        log(`${FLOWYTEAM_IMPORT_TOPIC} ${outcome?.kind ?? "unreadable"}`);
+      });
       await registerAgentSchedules(queue);
       // The runs this host declares itself, which is everything that is not an
       // agent cadence. Registered after the agents so one failure to register

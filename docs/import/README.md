@@ -222,6 +222,28 @@ watchers.
 An image sitting inline in comment markup needs no directory: those bytes are
 in MySQL.
 
+### From FlowyTeam in the browser
+
+An instance with a FlowyTeam address (`OPENOKR_FLOWYTEAM_URL`) can do the same
+import without a MySQL address. A workspace admin connects FlowyTeam from
+Admin > Import, and a FlowyTeam company admin approves it.
+
+| Step | What happens |
+|---|---|
+| Preview | A dry run in the background, over FlowyTeam's read-only export. Its report is the one `pnpm import:flowyteam` prints without `--write` |
+| Import | The real run. When the preview named KPIs that may become more visible, the admin has to accept that first, as `--accept-broader-visibility` does |
+| Import new data | The same run again. It adds what is new and changes nothing already imported |
+
+Both run as background jobs, so the scheduler has to run somewhere: with
+`OPENOKR_SCHEDULER=off` on every process they are refused. The run appears in
+the recent runs list with `via` set to `export`. Files are fetched one at a
+time from FlowyTeam and a file over the 25 MB storage limit is reported by
+name. A command-line run and a browser run of the same company share the
+legacy ids, so either one after the other writes nothing twice.
+
+FlowyTeam answers with its own catalogue version. If it differs from this
+instance's, the run stops before writing and says FlowyTeam needs an update.
+
 ### KPIs and their values
 
 | Source shape | What the import does | In the report |
