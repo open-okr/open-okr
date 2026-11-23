@@ -42,9 +42,12 @@ export interface MobileTabBarProps {
     readonly icon: ReactNode;
     readonly groups: readonly MobileTabBarGroup[];
   };
+  /** The landmark's accessible name. Server-safe, so the caller translates it. */
+  readonly label?: string;
   readonly linkComponent?: (props: {
     href: string;
     className: string;
+    "aria-current"?: "page";
     children: ReactNode;
   }) => ReactNode;
 }
@@ -52,16 +55,18 @@ export interface MobileTabBarProps {
 function DefaultLink({
   href,
   className,
+  "aria-current": ariaCurrent,
   children,
 }: {
   href: string;
   className: string;
+  "aria-current"?: "page";
   children: ReactNode;
 }) {
   // Overridden with a router's own link component in every real caller;
   // see sidebar.tsx's identical note.
   return (
-    <a href={href} className={className}>
+    <a href={href} className={className} aria-current={ariaCurrent}>
       {children}
     </a>
   );
@@ -73,18 +78,20 @@ const TAB =
 export function MobileTabBar({
   items,
   more,
+  label = "Primary",
   linkComponent,
 }: MobileTabBarProps) {
   const Link = linkComponent ?? DefaultLink;
   return (
     <nav
-      aria-label="Primary"
+      aria-label={label}
       className="fixed start-0 end-0 bottom-0 z-10 flex h-14 flex-none items-center justify-around border-t border-line bg-surface md:hidden"
     >
       {items.map((item) => (
         <Link
           key={item.id}
           href={item.href}
+          aria-current={item.active ? "page" : undefined}
           className={cn(TAB, item.active && "text-brand-text")}
         >
           <span className="size-5" aria-hidden="true">
@@ -114,6 +121,7 @@ export function MobileTabBar({
                   <li key={item.id}>
                     <Link
                       href={item.href}
+                      aria-current={item.active ? "page" : undefined}
                       className={cn(
                         "flex min-h-11 items-center gap-3 rounded-md px-2 text-sm font-medium text-ink-2",
                         item.active && "bg-brand-weak text-brand-text",

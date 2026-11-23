@@ -27,6 +27,11 @@ function registerKeyboardFlows(arabic: boolean) {
   let context: BrowserContext;
   let page: Page;
   let skipContentLabel: string | undefined;
+  // The navigation is named from the catalogue, so its name follows the
+  // member's language.
+  const primaryNav = arabic
+    ? (readArabicLabels()["shell.navigation.primary"] ?? "Primary")
+    : "Primary";
 
   test.beforeAll(async ({ browser }) => {
     context = await browser.newContext();
@@ -122,7 +127,7 @@ function registerKeyboardFlows(arabic: boolean) {
 
   test("the primary navigation is reachable and every item is named", async () => {
     await goTo(page, "/");
-    const nav = page.getByRole("navigation", { name: "Primary" });
+    const nav = page.getByRole("navigation", { name: primaryNav });
     await expect(nav).toBeVisible();
 
     // Every link in it has an accessible name. An icon-only link with none is
@@ -186,7 +191,7 @@ function registerKeyboardFlows(arabic: boolean) {
   test("the board can be reached and its columns read without a mouse", async () => {
     await goTo(page, "/board");
     await expect(
-      page.getByRole("navigation", { name: "Primary" }).first(),
+      page.getByRole("navigation", { name: primaryNav }).first(),
     ).toBeVisible({ timeout: 15_000 });
 
     // Something on the board takes focus by tabbing, and it is named. A board
@@ -201,7 +206,7 @@ function registerKeyboardFlows(arabic: boolean) {
   test("every form control on the check-in composer has a label", async () => {
     await goTo(page, "/inbox");
     await expect(
-      page.getByRole("navigation", { name: "Primary" }).first(),
+      page.getByRole("navigation", { name: primaryNav }).first(),
     ).toBeVisible({ timeout: 15_000 });
 
     // Read from the page rather than asserted per field, so a field added later

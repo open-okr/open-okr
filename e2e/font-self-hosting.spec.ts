@@ -37,12 +37,21 @@ test("no request leaves this origin, and the font is ours", async ({
   await expect(
     page.locator('link[rel="stylesheet"][href="/fonts/noto-sans-sc/fonts.css"]'),
   ).toHaveCount(0);
-  // The signed-out language list shows the Arabic endonym, so the Arabic slice
-  // downloads on this English page (languages.md 10.2 and 10.3). The SC slices
-  // never do, because the SC stylesheet is linked on zh-Hans pages only.
-  expect(fonts.filter((font) => font.startsWith("/fonts/noto-"))).toEqual([
-    "/fonts/noto-sans-arabic/noto-sans-arabic-arabic-wght-normal.woff2",
-  ]);
+  // The signed-out language menu draws its list only when opened, so no Noto
+  // slice downloads on this English page until somebody opens it. The SC
+  // slices never do, because the SC stylesheet is linked on zh-Hans pages only.
+  expect(fonts.filter((font) => font.startsWith("/fonts/noto-"))).toEqual([]);
+
+  // Opening the menu shows the Arabic endonym, and only then does the Arabic
+  // slice arrive (languages.md 10.2 and 10.3), still from this origin.
+  await page.getByTestId("visitor-language").click();
+  await expect(page.getByTestId("visitor-language-ar")).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  await expect
+    .poll(() => fonts.filter((font) => font.startsWith("/fonts/noto-")))
+    .toEqual([
+      "/fonts/noto-sans-arabic/noto-sans-arabic-arabic-wght-normal.woff2",
+    ]);
 
   // Not "no font CDN" — no third-party request of any kind.
   expect(external).toEqual([]);
@@ -73,8 +82,7 @@ test("Arabic text on an English page loads the local Arabic slice", async ({
       fonts.push(pathname);
     }
   });
-  // Listener first: the sign-in page's own language list already shows the
-  // Arabic endonym, so the slice can arrive during navigation.
+  // Listener first, so a slice that arrives during navigation is counted.
   await page.goto("/sign-in");
   const loaded = await page.evaluate(async () => {
     const name = document.createElement("span");

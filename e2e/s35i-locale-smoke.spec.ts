@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { readArabicLabels } from "./s19e-arabic.ts";
 
 const LOCALES = [
   { code: "ms", home: "Utama" },
@@ -52,7 +53,9 @@ for (const { code, home } of LOCALES) {
 
       if (code === "ar") {
         await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-        const sidebar = page.getByRole("navigation", { name: "Primary" });
+        const sidebar = page.getByRole("navigation", {
+          name: readArabicLabels()["shell.navigation.primary"],
+        });
         const sidebarBox = await sidebar.boundingBox();
         const mainBox = await page.getByRole("main").boundingBox();
         expect(

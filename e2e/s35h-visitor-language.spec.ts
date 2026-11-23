@@ -37,8 +37,8 @@ test.describe("a Malay browser", () => {
 
   test("remembers an English choice on later visits", async ({ page, context }) => {
     await page.goto("/sign-in");
-    await page.getByTestId("visitor-language").selectOption("en");
-    await page.getByRole("button", { name: "Guna", exact: true }).click();
+    await page.getByTestId("visitor-language").click();
+    await page.getByTestId("visitor-language-en").click();
 
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     const cookie = (await context.cookies()).find(
@@ -55,8 +55,8 @@ test.describe("a Malay browser", () => {
     );
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await page.getByTestId("visitor-language").selectOption("ms");
-    await page.getByRole("button", { name: "Apply", exact: true }).click();
+    await page.getByTestId("visitor-language").click();
+    await page.getByTestId("visitor-language-ms").click();
     await expect(page.locator("html")).toHaveAttribute("lang", "ms");
   });
 });

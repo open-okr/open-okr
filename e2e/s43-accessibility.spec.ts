@@ -524,7 +524,11 @@ function registerSignedInScans(arabic: boolean) {
         );
       } else {
         await expect(
-          page.getByRole("navigation", { name: "Primary" }).first(),
+          page
+            .getByRole("navigation", {
+              name: label("shell.navigation.primary", "Primary"),
+            })
+            .first(),
         ).toBeVisible({ timeout: 15_000 });
       }
 
@@ -563,7 +567,11 @@ function registerSignedInScans(arabic: boolean) {
   test("the copilot panel has no serious accessibility findings", async () => {
     await goTo(page, "/");
     await expect(
-      page.getByRole("navigation", { name: "Primary" }).first(),
+      page
+            .getByRole("navigation", {
+              name: label("shell.navigation.primary", "Primary"),
+            })
+            .first(),
     ).toBeVisible({ timeout: 15_000 });
     await page
       .getByRole("button", {

@@ -24,6 +24,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "./auth";
+import { operationMessage } from "./refusal";
 import { getTranslations } from "./translations";
 import { requireWorkspace } from "./workspace";
 
@@ -74,7 +75,9 @@ async function run(
     );
   } catch (error) {
     if (error instanceof OperationError) {
-      return { error: error.message };
+      return {
+        error: operationMessage(error, (await getTranslations()).t),
+      };
     }
     throw error;
   }

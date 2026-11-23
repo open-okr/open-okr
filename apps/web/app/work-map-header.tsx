@@ -181,10 +181,13 @@ export async function WorkMapHeader({
   workspaceName,
   scopeLabel,
   stats,
+  titleIsHeading = true,
 }: {
   readonly workspaceName: string;
   readonly scopeLabel: string;
   readonly stats: WorkMapStats;
+  /** False where the page already has its own h1 (Home), so there is one. */
+  readonly titleIsHeading?: boolean;
 }) {
   const { t } = await getTranslations();
 
@@ -201,9 +204,15 @@ export async function WorkMapHeader({
             10px. P7-T05's scan reported it as a serious contrast finding on
             every screen in the product, which is one defect wearing thirty
             hats. */}
-        <h1 className="text-[10px] font-bold tracking-wider text-ink-3 uppercase">
-          {t("workMapHeader.workMap")}
-        </h1>
+        {titleIsHeading ? (
+          <h1 className="text-[10px] font-bold tracking-wider text-ink-3 uppercase">
+            {t("workMapHeader.workMap")}
+          </h1>
+        ) : (
+          <p className="text-[10px] font-bold tracking-wider text-ink-3 uppercase">
+            {t("workMapHeader.workMap")}
+          </p>
+        )}
         <p className="truncate text-xl font-bold text-ink">{workspaceName}</p>
         <p className="text-xs text-ink-3">
           {t("workMapHeader.scopeSummary", {

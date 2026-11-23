@@ -1,19 +1,11 @@
 "use client";
 
-import { Menu } from "@base-ui-components/react/menu";
-import {
-  isShippedLocale,
-  LOCALES,
-  type ShippedLocaleCode,
-} from "@openokr/formats";
-import { useTranslations } from "@openokr/ui";
-import { Check, Languages } from "lucide-react";
+import type { ShippedLocaleCode } from "@openokr/formats";
+import { useToast, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { menuRowClass } from "../app/menu-row-class.ts";
+import { useTransition } from "react";
 import { setAppearance } from "./appearance-action.ts";
-
-const SHIPPED = LOCALES.filter((l) => l.shipped);
+import { LanguageMenu } from "./language-menu.tsx";
 
 /**
  * The topbar's language switcher. It saves the choice on the member, so the
@@ -25,10 +17,12 @@ export function LanguageSwitcher({
 }: {
   readonly language: ShippedLocaleCode | null;
 }) {
-  const { t, locale } = useTranslations();
+  const { locale } = useTranslations();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [problem, setProblem] = useState<string | null>(null);
+  // A refusal is shown as a toast: the menu has closed by the time the
+  // server answers, so text inside it would never be seen.
+  const { show } = useToast();
 
   function choose(next: ShippedLocaleCode | null) {
     if (next === language) {
@@ -36,74 +30,23 @@ export function LanguageSwitcher({
     }
     startTransition(async () => {
       const { error } = await setAppearance({ language: next });
-      setProblem(error);
-      if (!error) {
-        router.refresh();
+      if (error) {
+        show({ tone: "bad", message: error, source: "topbar-language" });
+        return;
       }
+      router.refresh();
     });
   }
 
   return (
-    <Menu.Root>
-      {/* The name comes from the content, not aria-label, so the visible code
-       * is part of it (WCAG 2.5.3, axe label-content-name-mismatch). */}
-      <Menu.Trigger
-        data-testid="topbar-language"
-        className="inline-flex h-7.5 cursor-pointer items-center gap-1.5 rounded-control border border-line bg-surface px-2 text-sm text-ink-2 transition-colors duration-fast ease-out hover:border-line-2 outline-offset-2 focus-visible:outline-2 focus-visible:outline-brand"
-      >
-        <Languages className="size-4" aria-hidden="true" />
-        <span className="sr-only">
-          {t("admin.general.generalSettingsForm.language")}{" "}
-        </span>
-        <span className="hidden uppercase sm:inline">{locale}</span>
-      </Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Positioner sideOffset={6} align="end">
-          <Menu.Popup className="min-w-45 max-w-72 rounded-lg border border-line bg-surface p-1 shadow-(--shadow-popover)">
-            <Menu.RadioGroup
-              value={language ?? ""}
-              onValueChange={(value) => {
-                const next = String(value);
-                if (next === "") {
-                  choose(null);
-                } else if (isShippedLocale(next)) {
-                  choose(next);
-                }
-              }}
-            >
-              <Menu.RadioItem
-                value=""
-                disabled={pending}
-                className={`${menuRowClass} flex items-center justify-between gap-2`}
-              >
-                {t("appearance.followWorkspace")}
-                <Menu.RadioItemIndicator>
-                  <Check className="size-4" aria-hidden="true" />
-                </Menu.RadioItemIndicator>
-              </Menu.RadioItem>
-              {SHIPPED.map((l) => (
-                <Menu.RadioItem
-                  key={l.code}
-                  value={l.code}
-                  lang={l.code}
-                  disabled={pending}
-                  className={`${menuRowClass} flex items-center justify-between gap-2`}
-                >
-                  {t(l.endonymKey)}
-                  <Menu.RadioItemIndicator>
-                    <Check className="size-4" aria-hidden="true" />
-                  </Menu.RadioItemIndicator>
-                </Menu.RadioItem>
-              ))}
-            </Menu.RadioGroup>
-            {problem ? (
-              <p role="alert" className="px-2.5 py-1.5 text-xs text-danger">
-                {problem}
-              </p>
-            ) : null}
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
+    <LanguageMenu
+      value={language}
+      current={locale}
+      includeFollowWorkspace
+      onChoose={choose}
+      testId="topbar-language"
+      pending={pending}
+      hideNameBelowSm
+    />
   );
 }

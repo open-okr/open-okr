@@ -228,12 +228,17 @@ test("acceptance: what was opened is listed first, and a tab narrows to one kind
   await paletteInput().fill(word);
   // The palette renders `palette-results` only when it has rows and a status
   // note otherwise, so wait for either answer before asserting the goal is
-  // absent. The footer "looking" status (class ms-auto) is excluded.
+  // absent. The note is a plain paragraph; the palette's one live region is
+  // visually hidden and is not what is waited on.
   const dialog = page.getByTestId("palette");
   await expect(
     dialog
       .getByTestId("palette-results")
-      .or(dialog.locator('[role="status"]:not(.ms-auto)')),
+      .or(
+        dialog.locator("p:not([role=status])", {
+          hasText: /^Nothing matches\./,
+        }),
+      ),
   ).toBeVisible({ timeout: 15_000 });
   await expect(
     page.getByTestId("palette-results").filter({ hasText: goalTitle }),
