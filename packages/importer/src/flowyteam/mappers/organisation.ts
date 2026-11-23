@@ -12,7 +12,12 @@
  * skipped by name. A person with no address becomes no member at all, because a
  * placeholder that cannot ever be claimed is a row nobody can act on.
  */
-import { type ActionCallContext, callAction } from "@openokr/core";
+import {
+  type ActionCallContext,
+  callAction,
+  cyclePeriodFor,
+  parseLocalDate,
+} from "@openokr/core";
 import { legacyKeyFor } from "../legacy.ts";
 import type { Source } from "../source.ts";
 import { type DomainReconciliation, DomainTally } from "./reconcile.ts";
@@ -348,6 +353,19 @@ async function importCycles(
     [options.companyId],
   );
 
+  // **The periods a dry run has to refuse the way the write does.** The
+  // product holds one cycle per period, so a source cycle falling in a period
+  // the workspace already has (the current quarter a new workspace makes for
+  // itself, most often) or one an earlier row of this run took is refused by
+  // `cycles.create`. Read once, so the preview names the same rows.
+  const taken = new Set<string>();
+  if (!options.write) {
+    const existing = await callAction(options.context, "cycles.list", {});
+    for (const cycle of existing) {
+      taken.add(`${cycle.mode}|${cycle.startsOn}`);
+    }
+  }
+
   for (const row of rows) {
     tally.sawRow();
     const source = `performance_cycles:${row.id}`;
@@ -382,10 +400,23 @@ async function importCycles(
         "performance_cycles",
         row.id,
       );
-      if (already === undefined) {
-        options.resolver.plan("performance_cycles", row.id);
+      if (already !== undefined) {
+        tally.wrote(false);
+        continue;
       }
-      tally.wrote(already === undefined);
+      const period = cyclePeriodFor(
+        cadence as "annual" | "semiannual" | "quarterly" | "monthly",
+        parseLocalDate(String(row.started_at).slice(0, 10)),
+      );
+      const key = `${period.mode}|${period.startsOn}`;
+      if (taken.has(key)) {
+        // The sentence `cycles.create` refuses with, so both runs read alike.
+        tally.skip(source, `${period.name} already exists in this workspace.`);
+        continue;
+      }
+      taken.add(key);
+      options.resolver.plan("performance_cycles", row.id);
+      tally.wrote(true);
       continue;
     }
     if (await options.resolver.resolve("performance_cycles", row.id)) {

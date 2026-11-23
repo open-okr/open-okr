@@ -548,6 +548,11 @@ export const recordKpiValue = defineWriteAction({
     actualValue: z.number().nullable().optional(),
     targetValue: z.number().nullable().optional(),
     remark: z.string().trim().max(500).nullable().optional(),
+    /**
+     * The source system's identity for this value, when an import records it.
+     * Filled on an existing period only where that period carries none.
+     */
+    legacy: legacyKey.optional(),
   }),
   output: z.object({
     id: z.uuid(),
@@ -602,6 +607,37 @@ export const recordKpiValue = defineWriteAction({
         );
       }
 
+      if (input.legacy) {
+        // The key belongs to one period of one KPI. Carried by any other row,
+        // writing it here would be a second identity for the same source value.
+        const [holder] = await tx
+          .select({
+            kpiId: kpiRecords.kpiId,
+            periodStart: kpiRecords.periodStart,
+          })
+          .from(kpiRecords)
+          .where(
+            activeOnly(
+              kpiRecords,
+              eq(kpiRecords.workspaceId, workspaceId),
+              eq(kpiRecords.legacyType, input.legacy.type),
+              eq(kpiRecords.legacyId, input.legacy.id),
+            ),
+          )
+          .limit(1);
+        if (
+          holder &&
+          (holder.kpiId !== input.kpiId ||
+            String(holder.periodStart) !==
+              normalisePeriod(kpi.frequency as KpiFrequency, input.on))
+        ) {
+          throw new OperationError(
+            "forbidden",
+            `Another KPI value in this workspace already carries the ${input.legacy.type} identifier "${input.legacy.id}". Update that one instead.`,
+          );
+        }
+      }
+
       const record = await upsertKpiRecord(tx, kpi.frequency, {
         workspaceId,
         kpiId: input.kpiId,
@@ -610,6 +646,7 @@ export const recordKpiValue = defineWriteAction({
         targetValue: input.targetValue,
         remark: input.remark,
         authorMemberId: memberId,
+        ...(input.legacy ? { legacy: input.legacy } : {}),
       });
 
       // Everything downstream, in topological order, then each one's corridor

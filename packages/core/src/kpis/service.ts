@@ -35,6 +35,7 @@ import {
   isNull,
   or,
   type SQL,
+  sql,
 } from "drizzle-orm";
 import { visibleResourceIds } from "../access/reads.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
@@ -373,6 +374,13 @@ export interface UpsertRecordInput {
   readonly targetValue?: number | null;
   readonly remark?: string | null;
   readonly authorMemberId: string;
+  /**
+   * The source system's identity for this period's value, when an import wrote
+   * it. On an existing row it is filled only where the row has none, so a
+   * workspace imported before records carried a key gains one on the next run
+   * instead of a second row, and a key already there is never replaced.
+   */
+  readonly legacy?: { readonly type: string; readonly id: string };
 }
 
 export interface UpsertRecordResult {
@@ -418,6 +426,10 @@ export async function upsertKpiRecord(
   // A soft-deleted row for this period is revived rather than duplicated: the
   // unique index is not partial on `deleted_at` precisely so this path exists.
   set.deletedAt = null;
+  if (input.legacy) {
+    set.legacyType = sql`coalesce(${kpiRecords.legacyType}, ${input.legacy.type})`;
+    set.legacyId = sql`coalesce(${kpiRecords.legacyId}, ${input.legacy.id})`;
+  }
 
   const id = newId();
   // openokr:allow-mutation: the calling Operation's own transaction.
@@ -438,6 +450,9 @@ export async function upsertKpiRecord(
           : String(input.targetValue),
       remark: input.remark ?? null,
       authorMemberId: input.authorMemberId,
+      ...(input.legacy
+        ? { legacyType: input.legacy.type, legacyId: input.legacy.id }
+        : {}),
     })
     .onConflictDoUpdate({
       target: [

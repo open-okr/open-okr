@@ -95,6 +95,21 @@ export function aggregateForPeriod(
   );
 }
 
+/**
+ * Several values of one period folded into one, by a KPI's own aggregate.
+ *
+ * The fold `aggregateForPeriod` applies to a finer source, exported for the
+ * one other caller that meets several values in one period: an importer whose
+ * source held two records on one day, or four days of one week. `values` must
+ * already be in period order, so `last` and `first` mean what they say.
+ */
+export function foldAggregate(
+  aggregate: KpiAggregate,
+  values: readonly number[],
+): number | null {
+  return fold(aggregate, values);
+}
+
 function fold(
   aggregate: KpiAggregate,
   values: readonly number[],

@@ -134,6 +134,7 @@ export {
   type CascadeResult as KpiCascadeResult,
   cascadeOrder,
   type DependencyEdge,
+  foldAggregate,
   KPI_AGGREGATES,
   type KpiAggregate,
   type SourceRecord,

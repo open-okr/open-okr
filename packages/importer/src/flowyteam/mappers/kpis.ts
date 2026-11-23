@@ -20,11 +20,24 @@
  * and building one from the parent chain would name something nobody chose.
  */
 import { type ActionCallContext, callAction } from "@openokr/core";
-import { legacyKeyFor } from "../legacy.ts";
+import {
+  cascadeOrder,
+  type DependencyEdge,
+  foldAggregate,
+  type KpiAggregate,
+  type KpiFrequency,
+  normalisePeriod,
+} from "@openokr/method";
+import { legacyIdFor, legacyKeyFor } from "../legacy.ts";
 import type { Source } from "../source.ts";
-import { parseFormulaTokens, resolveFormulaReferences } from "./formula.ts";
+import {
+  type ParsedFormula,
+  parseFormulaTokens,
+  resolveFormulaReferences,
+} from "./formula.ts";
 import { type DomainReconciliation, DomainTally } from "./reconcile.ts";
 import type { Resolver } from "./resolve.ts";
+import { withWorkspaceQuery } from "./workspace-query.ts";
 
 export interface KpiResult {
   readonly domains: readonly DomainReconciliation[];
@@ -42,8 +55,15 @@ interface MapperOptions {
 export async function importKpis(options: MapperOptions): Promise<KpiResult> {
   const categories = await importCategories(options);
   const indicators = await importIndicators(options);
-  const records = await importRecords(options);
-  const formulas = await importFormulas(options);
+  // **The formulas are decided before the records are written.** A calculated
+  // KPI's values are derived, so its typed source values are never written:
+  // `kpis.record` refuses them once the formula is on, and writing them first
+  // made the first run store values the second run then refused. Deciding
+  // which KPIs will be calculated up front lets both runs, and the dry run,
+  // say the same thing about the same rows.
+  const plan = await planFormulas(options);
+  const records = await importRecords(options, plan);
+  const formulas = await importFormulas(options, plan);
 
   return { domains: [categories, indicators, records, formulas] };
 }
@@ -168,18 +188,31 @@ async function importIndicators(
         : kind === "member"
           ? await memberOf(options, row.model_id)
           : undefined;
+    // **An owner the source no longer holds is not an owner that failed.**
+    // FlowyTeam hard-deletes teams and employee rows and leaves their KPIs
+    // pointing at nothing, so there is nobody to give them to. They import at
+    // workspace level, each one named in the report. An owner that is still
+    // there and did not import for another reason keeps the skip.
+    let orphaned = false;
     if (kind && kind !== "workspace" && !ownerId) {
-      tally.skip(
-        source,
-        `The ${kind} that owns this indicator did not import.`,
-      );
-      continue;
+      if (!(await ownerGone(options, kind, row.model_id))) {
+        tally.skip(
+          source,
+          `The ${kind} that owns this indicator did not import.`,
+        );
+        continue;
+      }
+      orphaned = true;
     }
+    const orphanNote = `The ${kind === "space" ? "team" : "employee"} that owned this indicator no longer exists in FlowyTeam, so it is imported at workspace level.`;
 
     if (!options.write) {
       const already = await options.resolver.resolve("indicators", row.id);
       if (already === undefined) {
         options.resolver.plan("indicators", row.id);
+        if (orphaned) {
+          tally.flag(source, orphanNote);
+        }
       }
       tally.wrote(already === undefined);
       continue;
@@ -235,7 +268,10 @@ async function importIndicators(
               | "min"
               | "count")
           : "sum",
-        ownerKind: (kind ?? "workspace") as "workspace" | "space" | "member",
+        ownerKind: (orphaned ? "workspace" : (kind ?? "workspace")) as
+          | "workspace"
+          | "space"
+          | "member",
         ...(kind === "space" && ownerId ? { spaceId: ownerId } : {}),
         ...(kind === "member" && ownerId ? { memberId: ownerId } : {}),
         ...(categoryId ? { categoryId } : {}),
@@ -248,6 +284,9 @@ async function importIndicators(
       });
       options.resolver.remember("indicators", row.id, created.id);
       tally.wrote(true);
+      if (orphaned) {
+        tally.flag(source, orphanNote);
+      }
       tally.flag(
         source,
         "Imported as a lagging output measure. FlowyTeam records neither the leading-versus-lagging distinction nor a tier, so both are defaults rather than decisions.",
@@ -280,28 +319,172 @@ function depthOf(
   return depth;
 }
 
+/** What a dry run resolves to, as `resolve.ts` plans it. */
+const PLANNED = "planned-by-a-dry-run";
+
+/** One calculated indicator, and whether its formula will be stored. */
+interface FormulaPlanEntry {
+  readonly id: number;
+  readonly text: string;
+  readonly kpiId: string | undefined;
+  /** Set when the formula will be stored; otherwise `reason` says why not. */
+  readonly tree?: ParsedFormula;
+  readonly references: readonly number[];
+  readonly reason?: string;
+}
+
+interface FormulaPlan {
+  /** Every calculated indicator the source holds, in id order. */
+  readonly entries: readonly FormulaPlanEntry[];
+  /** The indicators whose formula will be stored: their values are derived. */
+  readonly calculated: ReadonlySet<number>;
+  /** How many typed source values each calculated indicator held. */
+  readonly recomputed: Map<number, number>;
+}
+
+/**
+ * Which formulas will be stored, decided before anything is written.
+ *
+ * **A cycle is refused here the way `kpis.setFormula` refuses it**, by the
+ * same `cascadeOrder` over the edges as they would stand, in id order. Doing
+ * it here rather than waiting for the action to throw is what lets the dry run
+ * name the same formulas, and lets the record step know which KPIs will be
+ * calculated before it writes their values.
+ */
+async function planFormulas(options: MapperOptions): Promise<FormulaPlan> {
+  const rows = await options.source.query<{
+    id: number;
+    calculated_value: string | null;
+  }>(
+    `select id, calculated_value from indicators
+      where company_id = ? and deleted_at is null and calculated = 1
+        and calculated_value is not null and calculated_value <> ''
+      order by id`,
+    [options.companyId],
+  );
+
+  const entries: FormulaPlanEntry[] = [];
+  const edges: DependencyEdge[] = [];
+  for (const row of rows) {
+    const text = row.calculated_value ?? "";
+    const kpiId = await options.resolver.resolve("indicators", row.id);
+    if (!kpiId) {
+      entries.push({
+        id: row.id,
+        text,
+        kpiId,
+        references: [],
+        reason: "This indicator did not import, so nor did its formula.",
+      });
+      continue;
+    }
+
+    const parsed = parseFormulaTokens(text);
+    if (!parsed.ok) {
+      entries.push({
+        id: row.id,
+        text,
+        kpiId,
+        references: [],
+        reason: `The formula "${text.slice(0, 120)}" was dropped: ${parsed.reason}. The KPI imported with its recorded values and no calculation.`,
+      });
+      continue;
+    }
+
+    const targets = new Map<number, string>();
+    for (const reference of parsed.references) {
+      const target = await options.resolver.resolve("indicators", reference);
+      if (target) {
+        targets.set(reference, target);
+      }
+    }
+    const resolved = resolveFormulaReferences(parsed.tree, targets);
+    if (!resolved.ok) {
+      entries.push({
+        id: row.id,
+        text,
+        kpiId,
+        references: parsed.references,
+        reason: `The formula was dropped: it references indicator ${resolved.missing.join(", ")}, which did not import. The KPI imported with its recorded values and no calculation.`,
+      });
+      continue;
+    }
+
+    const proposed = [
+      ...edges,
+      ...parsed.references.map((reference) => ({
+        dependent: String(row.id),
+        dependsOn: String(reference),
+      })),
+    ];
+    if (cascadeOrder(proposed, String(row.id)).rejected) {
+      entries.push({
+        id: row.id,
+        text,
+        kpiId,
+        references: parsed.references,
+        reason:
+          "The formula was dropped: it would make a cycle, this KPI ending up calculated from itself through another one. The KPI imported with its recorded values and no calculation.",
+      });
+      continue;
+    }
+    edges.splice(0, edges.length, ...proposed);
+    entries.push({
+      id: row.id,
+      text,
+      kpiId,
+      tree: resolved.tree,
+      references: parsed.references,
+    });
+  }
+
+  return {
+    entries,
+    calculated: new Set(
+      entries.filter((entry) => entry.tree).map((entry) => entry.id),
+    ),
+    recomputed: new Map(),
+  };
+}
+
+interface SourceRecord {
+  id: number;
+  indicator_id: number;
+  period_key: string | null;
+  current_value: number | null;
+  target_value: number | null;
+  remark: string | null;
+  occurance: string | null;
+  aggregate: string | null;
+}
+
 /**
  * The recorded values, one per KPI per period.
  *
- * `kpis.record` is an upsert on the period, which is why `indicator_records`
- * carries no legacy key: re-running writes each period once whatever identifier
- * the source used, and a second identity could only disagree with the first
- * (P6-T01a settled that for the spreadsheet importer and it holds here).
+ * **Each record carries `indicator_records:<id>` as its legacy key**, so a
+ * second run finds it and writes nothing. A workspace imported before records
+ * carried a key is matched on the KPI and the period instead, and `kpis.record`
+ * fills the key in on that row rather than adding a second one.
+ *
+ * **Several source records in one period are one value.** FlowyTeam keeps a
+ * record per date, so a weekly KPI can hold four in one week and a daily one
+ * two on one day. The product holds one value per period, so they are folded
+ * by the KPI's own aggregate (the fold the formula engine uses for a finer
+ * source), written once under the lowest source id, and each combination is
+ * named in the report with every id, the period and the value.
+ *
+ * **A calculated KPI's typed values are not written.** Its value is derived,
+ * so it is recomputed from the formula; the report names each KPI once with
+ * how many source values that was.
  */
 async function importRecords(
   options: MapperOptions,
+  plan: FormulaPlan,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("KPI records");
-  const rows = await options.source.query<{
-    id: number;
-    indicator_id: number;
-    period_key: string | null;
-    current_value: number | null;
-    target_value: number | null;
-    remark: string | null;
-  }>(
+  const rows = await options.source.query<SourceRecord>(
     `select r.id, r.indicator_id, r.period_key, r.current_value, r.target_value,
-            r.remark
+            r.remark, i.occurance, i.aggregate
        from indicator_records r
        join indicators i on i.id = r.indicator_id
       where r.company_id = ? and r.deleted_at is null and i.deleted_at is null
@@ -309,6 +492,34 @@ async function importRecords(
     [options.companyId],
   );
 
+  // What earlier runs wrote, read once. By key, and by KPI and period for a
+  // workspace imported before records carried one.
+  const existing = await withWorkspaceQuery<{
+    kpi_id: string;
+    period: string;
+    legacy_id: string | null;
+  }>(
+    options.context.pool,
+    options.context.workspaceId,
+    `select r.kpi_id, to_char(r.period_start, 'YYYY-MM-DD') as period,
+            r.legacy_id
+       from kpi_records r
+       join kpis k on k.id = r.kpi_id
+      where r.workspace_id = $1 and r.deleted_at is null
+        and k.legacy_type = 'flowyteam'`,
+    [options.context.workspaceId],
+  );
+  const byKey = new Set(
+    existing.flatMap((row) => (row.legacy_id ? [row.legacy_id] : [])),
+  );
+  const byPeriod = new Set(
+    existing.map((row) => `${row.kpi_id}|${row.period}`),
+  );
+
+  const groups = new Map<
+    string,
+    { kpiId: string; period: string; rows: SourceRecord[] }
+  >();
   for (const row of rows) {
     tally.sawRow();
     const source = `indicator_records:${row.id}`;
@@ -327,110 +538,198 @@ async function importRecords(
       tally.skip(source, "This record has no period in the source.");
       continue;
     }
+    if (plan.calculated.has(row.indicator_id)) {
+      tally.recomputedHere();
+      plan.recomputed.set(
+        row.indicator_id,
+        (plan.recomputed.get(row.indicator_id) ?? 0) + 1,
+      );
+      continue;
+    }
+
+    // The action normalises the date too; doing it here is what finds two
+    // records that land in one period before either is written.
+    const period = normalisePeriod(
+      (row.occurance ?? "").toLowerCase() as KpiFrequency,
+      String(row.period_key).slice(0, 10),
+    );
+    const key = `${row.indicator_id}|${period}`;
+    const group = groups.get(key);
+    if (group) {
+      group.rows.push(row);
+    } else {
+      groups.set(key, { kpiId, period, rows: [row] });
+    }
+  }
+
+  for (const [indicatorId, count] of plan.recomputed) {
+    tally.flag(
+      `indicators:${indicatorId}`,
+      `Calculated KPI: its ${count} recorded value(s) in FlowyTeam were not imported, because the value is recomputed from the formula.`,
+    );
+  }
+
+  for (const group of groups.values()) {
+    const first = group.rows.reduce((low, row) =>
+      row.id < low.id ? row : low,
+    );
+    const others = group.rows.filter((row) => row !== first);
+    const aggregate = aggregateOf(first.aggregate);
+    const value = combine(
+      aggregate,
+      group.rows.map((row) => numberOr(row.current_value)),
+    );
+    const target = combineTargets(
+      aggregate,
+      group.rows.map((row) => numberOr(row.target_value)),
+    );
+    const remark = [
+      ...new Set(
+        group.rows.flatMap((row) =>
+          row.remark?.trim() ? [row.remark.trim()] : [],
+        ),
+      ),
+    ]
+      .join(" / ")
+      .slice(0, 500);
+    const legacyId = legacyIdFor("indicator_records", first.id);
+    const source = `indicator_records:${first.id}`;
+    const combination =
+      others.length > 0
+        ? `Combined with ${others.map((row) => `indicator_records:${row.id}`).join(", ")} into one ${(first.occurance ?? "").toLowerCase()} record for the period starting ${group.period}, by ${aggregate}: ${value ?? "no value"}.`
+        : null;
 
     if (!options.write) {
-      tally.wrote(true);
+      const already =
+        group.kpiId !== PLANNED &&
+        (byKey.has(legacyId) || byPeriod.has(`${group.kpiId}|${group.period}`));
+      tally.wrote(!already);
+      tally.combinedInto(others.length);
+      if (combination) {
+        tally.flag(source, combination);
+      }
+      continue;
+    }
+
+    if (byKey.has(legacyId)) {
+      // Already stored is a match, not a write: recording it again would
+      // overwrite a value somebody corrected in the product since.
+      tally.wrote(false);
+      tally.combinedInto(others.length);
+      if (combination) {
+        tally.flag(source, combination);
+      }
       continue;
     }
     try {
       const written = await callAction(options.context, "kpis.record", {
-        kpiId,
-        // The period key is a date in the source and the action normalises it
-        // to the KPI's own period, so a monthly KPI recorded on the 14th lands
-        // in that month rather than on that day.
-        on: String(row.period_key).slice(0, 10),
-        actualValue: numberOr(row.current_value),
-        targetValue: numberOr(row.target_value),
-        ...(row.remark?.trim()
-          ? { remark: row.remark.trim().slice(0, 500) }
-          : {}),
+        kpiId: group.kpiId,
+        on: group.period,
+        actualValue: value,
+        targetValue: target,
+        ...(remark ? { remark } : {}),
+        legacy: legacyKeyFor("indicator_records", first.id),
       });
       tally.wrote(written.created);
+      tally.combinedInto(others.length);
+      if (combination) {
+        tally.flag(source, combination);
+      }
     } catch (error) {
-      tally.skip(source, messageOf(error));
+      for (const row of group.rows) {
+        tally.skip(`indicator_records:${row.id}`, messageOf(error));
+      }
     }
   }
 
   return tally.finish();
 }
 
+/** The aggregate the KPI was created with, as `importIndicators` maps it. */
+function aggregateOf(value: string | null): KpiAggregate {
+  const lower = (value ?? "").toLowerCase();
+  return AGGREGATE.has(lower) ? (lower as KpiAggregate) : "sum";
+}
+
+/** Values of one period in period order, folded; null when none has a value. */
+function combine(
+  aggregate: KpiAggregate,
+  values: readonly (number | null)[],
+): number | null {
+  const present = values.filter((value): value is number => value !== null);
+  if (present.length === 0) {
+    return null;
+  }
+  return present.length === 1 && values.length === 1
+    ? (present[0] ?? null)
+    : foldAggregate(aggregate, present);
+}
+
+/**
+ * The target of one period. One target shared by every record is that target;
+ * only records that disagree are folded, by the same aggregate as the value.
+ */
+function combineTargets(
+  aggregate: KpiAggregate,
+  values: readonly (number | null)[],
+): number | null {
+  const present = values.filter((value): value is number => value !== null);
+  if (present.length === 0) {
+    return null;
+  }
+  return present.every((value) => value === present[0])
+    ? (present[0] ?? null)
+    : foldAggregate(aggregate, present);
+}
+
 /**
  * The calculated indicators, translated into the expression tree.
  *
- * Runs last, because a formula references other KPIs and every one of them has
- * to exist first. An unparseable formula is dropped with its reason and the KPI
- * keeps whatever values it recorded.
+ * Runs last, because a formula references other KPIs and their records have
+ * to be there first. Stored in dependency order, so a formula over another
+ * calculated KPI is evaluated after that one has values.
  */
 async function importFormulas(
   options: MapperOptions,
+  plan: FormulaPlan,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("KPI formulas");
-  const rows = await options.source.query<{
-    id: number;
-    calculated_value: string | null;
-  }>(
-    `select id, calculated_value from indicators
-      where company_id = ? and deleted_at is null and calculated = 1
-        and calculated_value is not null and calculated_value <> ''
-      order by id`,
-    [options.companyId],
-  );
 
-  for (const row of rows) {
+  for (const entry of plan.entries) {
     tally.sawRow();
-    const source = `indicators:${row.id}`;
-    const kpiId = await options.resolver.resolve("indicators", row.id);
-    if (!kpiId) {
+    if (!entry.tree) {
       tally.skip(
-        source,
-        "This indicator did not import, so nor did its formula.",
+        `indicators:${entry.id}`,
+        entry.reason ?? "The formula was dropped.",
       );
-      continue;
     }
+  }
 
-    const parsed = parseFormulaTokens(row.calculated_value ?? "");
-    if (!parsed.ok) {
-      tally.skip(
-        source,
-        `The formula "${(row.calculated_value ?? "").slice(0, 120)}" was dropped: ${parsed.reason}. The KPI imported with its recorded values and no calculation.`,
-      );
-      continue;
-    }
-
-    const targets = new Map<number, string>();
-    for (const reference of parsed.references) {
-      const target = await options.resolver.resolve("indicators", reference);
-      if (target) {
-        targets.set(reference, target);
-      }
-    }
-    const resolved = resolveFormulaReferences(parsed.tree, targets);
-    if (!resolved.ok) {
-      tally.skip(
-        source,
-        `The formula was dropped: it references indicator ${resolved.missing.join(", ")}, which did not import.`,
-      );
-      continue;
-    }
-
-    if (!options.write) {
-      tally.wrote(true);
-      continue;
-    }
+  for (const entry of dependencyOrder(plan)) {
+    const source = `indicators:${entry.id}`;
+    const kpiId = entry.kpiId as string;
+    const tree = entry.tree as ParsedFormula;
 
     // **Already stored is a match, not a write.** `kpis.setFormula` replaces
     // the edges and re-evaluates whether or not anything changed, so calling it
     // blind would make every re-run report writes it did not make and would
-    // overwrite a formula somebody corrected in the product afterwards.
-    const detail = await callAction(options.context, "kpis.detail", {
-      kpiId,
-      periods: 1,
-    });
-    if (
-      detail.kpi.formula &&
-      canonical(detail.kpi.formula) === canonical(resolved.tree)
-    ) {
-      tally.wrote(false);
+    // overwrite a formula somebody corrected in the product afterwards. The dry
+    // run asks the same question, so it counts what the write would.
+    if (kpiId !== PLANNED) {
+      const detail = await callAction(options.context, "kpis.detail", {
+        kpiId,
+        periods: 1,
+      });
+      if (
+        detail.kpi.formula &&
+        canonical(detail.kpi.formula) === canonical(tree)
+      ) {
+        tally.wrote(false);
+        continue;
+      }
+    }
+    if (!options.write) {
+      tally.wrote(true);
       continue;
     }
 
@@ -440,23 +739,54 @@ async function importFormulas(
     // calculated from are last year's. Evaluating only today would store the
     // formula and leave every historical period empty, which is exactly the
     // history somebody migrates to keep.
-    const periods = await periodsOf(options, parsed.references);
+    const periods = await periodsOf(options, entry.references);
     try {
       for (const on of periods) {
         await callAction(options.context, "kpis.setFormula", {
           kpiId,
-          formula: resolved.tree,
+          formula: tree,
           on,
         });
       }
       tally.wrote(true);
     } catch (error) {
-      // A cycle the source allowed and this product does not, most often.
-      tally.skip(source, `The formula was dropped: ${messageOf(error)}`);
+      const lost = plan.recomputed.get(entry.id) ?? 0;
+      tally.skip(
+        source,
+        `The formula was dropped: ${messageOf(error)}${lost > 0 ? ` Its ${lost} recorded value(s) were not imported either, because they were set aside for the calculation.` : ""}`,
+      );
     }
   }
 
   return tally.finish();
+}
+
+/** The formulas to store, each after every calculated KPI it reads. */
+function dependencyOrder(plan: FormulaPlan): FormulaPlanEntry[] {
+  const stored = new Map(
+    plan.entries
+      .filter((entry) => entry.tree)
+      .map((entry) => [entry.id, entry]),
+  );
+  const ordered: FormulaPlanEntry[] = [];
+  const done = new Set<number>();
+  const visit = (entry: FormulaPlanEntry): void => {
+    if (done.has(entry.id)) {
+      return;
+    }
+    done.add(entry.id);
+    for (const reference of entry.references) {
+      const inner = stored.get(reference);
+      if (inner) {
+        visit(inner);
+      }
+    }
+    ordered.push(entry);
+  };
+  for (const entry of stored.values()) {
+    visit(entry);
+  }
+  return ordered;
 }
 
 /**
@@ -504,6 +834,30 @@ function canonical(value: unknown): string {
     return `{${entries.join(",")}}`;
   }
   return JSON.stringify(value) ?? "null";
+}
+
+/**
+ * Whether the row that owned an indicator is gone from the source altogether.
+ *
+ * Gone means no row at all, deleted or not. A soft-deleted owner is still
+ * there, and so is one that belongs to another company: both keep the skip,
+ * because somebody can still say who they were.
+ */
+async function ownerGone(
+  options: MapperOptions,
+  kind: "space" | "member",
+  modelId: number | null,
+): Promise<boolean> {
+  if (!modelId) {
+    return true;
+  }
+  const rows = await options.source.query<{ id: number }>(
+    kind === "space"
+      ? "select id from teams where id = ?"
+      : "select id from employee_details where id = ?",
+    [modelId],
+  );
+  return rows.length === 0;
 }
 
 /** An `employee_details` id into a member, through the user it belongs to. */

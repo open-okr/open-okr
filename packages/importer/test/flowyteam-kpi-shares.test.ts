@@ -290,6 +290,44 @@ describe("importing FlowyTeam KPI shares", () => {
     expect(secondShares?.matched).toBe(2);
   });
 
+  it("Given the same person twice on one KPI and a share with the KPI's owner, when dry run and write run, then they count them the same", async () => {
+    await seeded.run(
+      "insert into users (id, company_id, name, email) values (30, 7, 'U30', 'u30@example.com'), (31, 7, 'U31', 'u31@example.com')",
+    );
+    await seeded.run(
+      "insert into employee_details (id, company_id, user_id) values (30, 7, 30), (31, 7, 31)",
+    );
+    await seeded.run(
+      "insert into indicators (id, company_id, title, occurance, aggregate, model_id, model_type) values (130, 7, 'Owned by U31', 'monthly', 'sum', 31, 'App\\\\Models\\\\EmployeeDetails')",
+    );
+    await seeded.run("delete from indicator_accesses where company_id = 7");
+    // Read, then edit, then read again for U30 on KPI 1: one share, raised
+    // once and then unchanged. U31 on the KPI U31 owns: unchanged.
+    await seeded.run(
+      "insert into indicator_accesses (id, company_id, indicator_id, user_id, permissions, view_options) values " +
+        "(30, 7, 1, 30, 'read', 'everyone'), (31, 7, 1, 30, 'update', 'everyone'), " +
+        "(32, 7, 1, 30, 'read', 'everyone'), (33, 7, 130, 31, 'update', 'everyone')",
+    );
+
+    const only = ["organisation", "kpis", "kpi-shares"];
+    const dry = await run({ write: false, only });
+    const real = await run({
+      write: true,
+      only,
+      acceptBroaderVisibility: true,
+    });
+    const pick = (report: typeof dry.report) => {
+      const shares = domain(report, "kpi-shares");
+      return {
+        created: shares?.created,
+        matched: shares?.matched,
+        skipped: shares?.skipped.length,
+      };
+    };
+    expect(pick(real.report)).toEqual({ created: 2, matched: 2, skipped: 0 });
+    expect(pick(dry.report)).toEqual(pick(real.report));
+  });
+
   it("AC-34: imported share revoked by kpis.unshare is not rewritten and reported as revoked", async () => {
     await seeded.run(
       "insert into users (id, company_id, name, email) values (20, 7, 'U20', 'u20@example.com')",

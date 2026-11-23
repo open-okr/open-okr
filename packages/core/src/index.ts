@@ -881,6 +881,7 @@ export {
   reasonSentence,
 } from "./copilot/reasons.ts";
 export { sweepEndedCycles } from "./cycles/closing.ts";
+export { cyclePeriodFor, parseLocalDate } from "./cycles/generation.ts";
 export { cyclesOpenForWork, openForWork } from "./cycles/open-for-work.ts";
 export {
   type BuildDemoResult,
