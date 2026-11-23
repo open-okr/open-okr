@@ -32,6 +32,27 @@ export const RUN_LOG_SENTENCE_KEYS: ReadonlyMap<string, string> = new Map([
   ],
 ]);
 
+/**
+ * One literal key per code. Written out rather than built from the code so
+ * the catalogue coverage test sees every key in use; typed against the code
+ * list, so a new code without a key fails to compile.
+ */
+const RUN_LOG_KEYS: Readonly<Record<AgentRunLogCode, string>> = {
+  agentDisabled: "agents.runLog.agentDisabled",
+  aiUnavailable: "agents.runLog.aiUnavailable",
+  costCap: "agents.runLog.costCap",
+  workspaceBudget: "agents.runLog.workspaceBudget",
+  agentBudget: "agents.runLog.agentBudget",
+  noTask: "agents.runLog.noTask",
+  unknownAction: "agents.runLog.unknownAction",
+  denied: "agents.runLog.denied",
+  simulated: "agents.runLog.simulated",
+  proposed: "agents.runLog.proposed",
+  read: "agents.runLog.read",
+  applied: "agents.runLog.applied",
+  failed: "agents.runLog.failed",
+};
+
 /** A code a newer release wrote is shown by its stored sentence, not a key. */
 const isKnownCode = (code: string): code is AgentRunLogCode =>
   (AGENT_RUN_LOG_CODES as readonly string[]).includes(code);
@@ -70,5 +91,5 @@ export function runLogText(entry: RunLogLine, t: Translate): string {
         ? sentence(value, t)
         : value;
   }
-  return t(`agents.runLog.${entry.code}`, values);
+  return t(RUN_LOG_KEYS[entry.code], values);
 }
