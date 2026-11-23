@@ -1224,7 +1224,6 @@ export async function runRead(
         query,
         limit: Number(prepared.input.limit),
       });
-      names = { members: new Map(), spaces: new Map(), cycles: new Map() };
       groups = [];
       for (const hit of hits) {
         const label = clip(citationLabel(hit.content), 160);

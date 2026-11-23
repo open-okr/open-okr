@@ -777,7 +777,6 @@ export async function runOperation<TResult, TLoaded = undefined>(
         //    catalogue cannot be persisted" true of every write path at once
         //    instead of every call site having to remember its own check.
         let insertedActivityId: string | undefined;
-        let activityAt = new Date();
         if (outcome.activity) {
           const activityPayload = outcome.activity.payload ?? {};
           validateActivityPayload(outcome.activity.kind, activityPayload);
@@ -789,7 +788,7 @@ export async function runOperation<TResult, TLoaded = undefined>(
               outcome.activity.subjectType,
               outcome.activity.subjectId,
             ));
-          activityAt = new Date();
+          const activityAt = new Date();
           const [insertedActivity] = await tx
             .insert(activities)
             .values({
