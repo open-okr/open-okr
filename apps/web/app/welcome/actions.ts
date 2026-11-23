@@ -30,6 +30,8 @@ import {
 import type { CheckInFrequency } from "@openokr/method";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { operationMessage } from "../../lib/refusal";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 
 export interface StepResult {
@@ -46,9 +48,9 @@ async function context() {
   };
 }
 
-const refusal = (error: unknown): StepResult => {
+const refusal = async (error: unknown): Promise<StepResult> => {
   if (error instanceof OperationError) {
-    return { error: error.message };
+    return { error: operationMessage(error, (await getTranslations()).t) };
   }
   throw error;
 };

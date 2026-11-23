@@ -24,6 +24,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { NO_ERROR, type WriteState } from "../app/cycle/write-state.ts";
 import { getPool } from "./auth";
+import { operationMessage } from "./refusal";
 import { getTranslations } from "./translations";
 import { requireWorkspace } from "./workspace";
 
@@ -55,7 +56,10 @@ async function run(
   } catch (error) {
     const { t } = await getTranslations();
     return {
-      error: error instanceof OperationError ? error.message : t(failedKey),
+      error:
+        error instanceof OperationError
+          ? operationMessage(error, t)
+          : t(failedKey),
     };
   }
   revalidatePath("/", "layout");

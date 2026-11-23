@@ -31,6 +31,7 @@ import {
 } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "./auth";
+import { operationMessage } from "./refusal";
 import { getStorage } from "./storage";
 import { getTranslations } from "./translations";
 import { getImageProcessor } from "./upload-ports";
@@ -55,9 +56,9 @@ async function context() {
   };
 }
 
-const refused = (error: unknown): AttachResult => {
+const refused = async (error: unknown): Promise<AttachResult> => {
   if (error instanceof OperationError) {
-    return { error: error.message };
+    return { error: operationMessage(error, (await getTranslations()).t) };
   }
   throw error;
 };

@@ -148,7 +148,7 @@ describe("resumable from admin (L-08)", () => {
     expect(cardActions).toContain('redirect("/welcome")');
     // A refusal is shown on the card rather than swallowed. A frozen
     // workspace is the case that meets it.
-    expect(cardActions).toContain("return { error: error.message };");
+    expect(cardActions).toContain("return { error: operationMessage(error,");
     expect(card).toContain("<ActionForm action={reopenSetup}");
     expect(card).toContain('data-testid="reopen-onboarding"');
   });

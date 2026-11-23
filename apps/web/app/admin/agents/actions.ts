@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterForAgent } from "../../../lib/drafter";
 import { getInstanceName } from "../../../lib/instance-name";
+import { operationMessage } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
@@ -202,7 +203,7 @@ export async function setAgentAutonomyAction(
     );
   } catch (error) {
     if (error instanceof OperationError) {
-      return { error: error.message };
+      return { error: operationMessage(error, (await getTranslations()).t) };
     }
     throw error;
   }
@@ -250,7 +251,7 @@ export async function bindAgentScopeAction(input: {
     );
   } catch (error) {
     if (error instanceof OperationError) {
-      return { error: error.message };
+      return { error: operationMessage(error, (await getTranslations()).t) };
     }
     throw error;
   }

@@ -1,5 +1,6 @@
 import { OperationError } from "@openokr/core";
 import type { MessageValues } from "@openokr/ui";
+import { ERROR_MESSAGE_KEYS } from "./error-messages";
 
 /**
  * The sentence a refused save is shown with, or null when it was not refused
@@ -14,9 +15,9 @@ import type { MessageValues } from "@openokr/ui";
  * Anything else, a database that went away, is not the person's to fix, and
  * the caller throws it on to the error page that says so.
  */
-export function refusalOf(error: unknown): string | null {
+export function refusalOf(error: unknown, t?: Translate): string | null {
   if (error instanceof OperationError) {
-    return error.message;
+    return operationMessage(error, t);
   }
   if (
     error instanceof Error &&
@@ -41,14 +42,23 @@ type Translate = (key: string, values?: MessageValues) => string;
  */
 const ACCESS_REFUSAL = /\bneeds a higher access level than you hold\.$/;
 
-/** An `OperationError`'s sentence for the screen, in the reader's language. */
+/**
+ * An `OperationError`'s sentence for the screen, in the reader's language.
+ * The access refusal and the sentences listed in `error-messages.ts` come from
+ * the catalogue; any other message is shown as the domain wrote it.
+ */
 export function operationMessage(
   error: OperationError,
   t: Translate | undefined,
 ): string {
-  return t && error.code === "forbidden" && ACCESS_REFUSAL.test(error.message)
-    ? t("refusal.forbidden")
-    : error.message;
+  if (!t) {
+    return error.message;
+  }
+  if (error.code === "forbidden" && ACCESS_REFUSAL.test(error.message)) {
+    return t("refusal.forbidden");
+  }
+  const key = ERROR_MESSAGE_KEYS.get(error.message);
+  return key === undefined ? error.message : t(key);
 }
 
 /** One refused field, as a Zod issue carries it. Read by shape, as above. */

@@ -8,7 +8,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { requireOperator } from "../../lib/operator";
 import { getPool } from "../../lib/pool";
-import { refusedState } from "../../lib/refusal";
+import { operationMessage, refusedState } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 
 /**
@@ -79,7 +79,7 @@ export async function adoptWaitingWorkspaces(): Promise<AdoptState> {
     };
   } catch (error) {
     if (error instanceof OperationError) {
-      return { error: error.message };
+      return { error: operationMessage(error, (await getTranslations()).t) };
     }
     throw error;
   }
