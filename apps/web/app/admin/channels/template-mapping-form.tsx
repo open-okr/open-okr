@@ -7,6 +7,7 @@ import {
   useTranslations,
 } from "@openokr/ui";
 import { useActionState, useEffect, useRef, useState } from "react";
+import { triggerFires } from "../../../lib/method-texts.ts";
 import { saveTemplateMapping } from "./actions.ts";
 import { NOTHING_YET } from "./form-state.ts";
 
@@ -148,7 +149,7 @@ export function TemplateMappingForm({
           </option>
           {rules.map((rule) => (
             <option key={rule.key} value={rule.key}>
-              {rule.key} ({rule.fires})
+              {rule.key} ({triggerFires(t, rule.key, rule.fires)})
             </option>
           ))}
         </SelectInput>

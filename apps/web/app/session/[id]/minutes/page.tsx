@@ -18,6 +18,7 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../../lib/access";
 import { assistOffered } from "../../../../lib/assists";
 import { getPool } from "../../../../lib/auth";
+import { processHealthStatementText } from "../../../../lib/method-texts.ts";
 import { itemTitle } from "../../../../lib/page-title.ts";
 import { getTranslations } from "../../../../lib/translations";
 import { requireWorkspace } from "../../../../lib/workspace";
@@ -367,7 +368,9 @@ export default async function MinutesPage({
                   <span className="w-8 font-bold tabular-nums text-ink">
                     {row.average.toFixed(1)}
                   </span>
-                  <span className="flex-1 text-ink-2">{row.statement}</span>
+                  <span className="flex-1 text-ink-2">
+                    {processHealthStatementText(t, row.statement)}
+                  </span>
                 </li>
               ))}
             </ul>

@@ -29,6 +29,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { peopleOptions } from "../../../lib/entity-options.ts";
+import { processHealthStatement } from "../../../lib/method-texts.ts";
 import { addActionAction, submitProcessHealthAction } from "./actions";
 
 const SCORES = [1, 2, 3, 4, 5] as const;
@@ -132,7 +133,7 @@ export function ProcessHealthPanel({
                   {entry.statementKey}
                 </span>
                 <span className="flex-1 text-sm text-ink">
-                  {entry.statement}
+                  {processHealthStatement(t, entry.statementKey)}
                 </span>
                 {entry.average === null ? null : (
                   <Chip tone="neutral">{entry.average.toFixed(1)}</Chip>
@@ -254,7 +255,10 @@ export function ProcessHealthPanel({
                         await addActionAction(
                           sessionId,
                           t("session.detail.processHealth.improve", {
-                            statement: lowest.statement,
+                            statement: processHealthStatement(
+                              t,
+                              lowest.statementKey,
+                            ),
                           }),
                           actionOwner,
                           actionDue,

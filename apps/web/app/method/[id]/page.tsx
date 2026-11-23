@@ -21,6 +21,7 @@ import {
   QUALITY_STATUS_NAME_KEYS,
   TRIGGER_NAME_KEYS,
 } from "../../../lib/identifier-names.ts";
+import { triggerFires, triggerRecipient } from "../../../lib/method-texts.ts";
 import {
   methodConditionLabel,
   methodConditionPrompt,
@@ -285,13 +286,13 @@ async function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
             <span className="font-semibold text-ink-2">
               {t("method.detail.fires")}{" "}
             </span>
-            {trigger.fires}
+            {triggerFires(t, trigger.key, trigger.fires)}
           </p>
           <p className="text-sm text-ink">
             <span className="font-semibold text-ink-2">
               {t("method.detail.goesTo")}{" "}
             </span>
-            {trigger.recipient}
+            {triggerRecipient(t, trigger.key, trigger.recipient)}
           </p>
           <p className="text-xs text-ink-3">
             {trigger.deterministic

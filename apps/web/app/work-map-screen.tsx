@@ -3,6 +3,7 @@ import { canonThresholds, onTrackShareBand } from "@openokr/method";
 import Link from "next/link";
 import { workspaceReaderLevel } from "../lib/access";
 import { getPool } from "../lib/auth";
+import { gateTitle, phaseTitle } from "../lib/method-texts.ts";
 import { getTranslations } from "../lib/translations";
 import { requireWorkspace } from "../lib/workspace";
 import { goalTreeNodes } from "./goal-nodes.ts";
@@ -145,12 +146,10 @@ export async function WorkMapScreen({
   const workMapContext: WorkMapContext | null = workflow
     ? {
         phase: workflow.phase,
-        phaseTitle:
-          workflow.phases.find((phase) => phase.phase === workflow.phase)
-            ?.title ?? "",
+        phaseTitle: phaseTitle(t, workflow.phase),
         unmetGates: workflow.gates
           .filter((gate) => !gate.passed)
-          .map((gate) => gate.title),
+          .map((gate) => gateTitle(t, gate.gateKey)),
         daysToDeadline: workflow.daysToDeadline,
         published: workflow.publishedAt !== null,
       }

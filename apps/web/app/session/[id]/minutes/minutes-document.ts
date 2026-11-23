@@ -1,6 +1,7 @@
 import { serverTranslate } from "@openokr/core";
 import { intlTagFor, type MessageValues } from "@openokr/formats";
 import { dayLabel } from "../../../../lib/day-label";
+import { processHealthStatementText } from "../../../../lib/method-texts.ts";
 
 /**
  * The minutes as one plain-text document (METHOD.md §8.10, P4-T12-a).
@@ -217,7 +218,11 @@ export function minutesToMarkdown(minutes: Minutes, locale?: string): string {
     ...section(
       t("processHealth"),
       minutes.processHealth.map(
-        (row) => `- ${number(row.average, 1)} · ${row.statement}`,
+        (row) =>
+          `- ${number(row.average, 1)} · ${processHealthStatementText(
+            (key) => serverTranslate(locale ?? "en", key),
+            row.statement,
+          )}`,
       ),
     ),
     ...section(

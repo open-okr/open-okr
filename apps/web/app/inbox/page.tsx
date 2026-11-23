@@ -14,6 +14,7 @@ import { faceForTrigger } from "../../lib/agent-moods.ts";
 import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { TRIGGER_NAME_KEYS } from "../../lib/identifier-names.ts";
+import { triggerFires } from "../../lib/method-texts.ts";
 import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -338,7 +339,7 @@ async function NotificationRow({
     (row.rendered && row.actorName
       ? `${row.actorName} · ${row.rendered}`
       : row.rendered) ??
-    (rule ? rule.fires : null) ??
+    (rule ? triggerFires(t, rule.key, rule.fires) : null) ??
     (ruleName === null
       ? t(REASON_FALLBACK_KEYS[row.reason] ?? "inbox.somethingHappenedHere")
       : t("inbox.reminder", { rule: ruleName }));

@@ -9,6 +9,7 @@ import {
   VerdictDot,
 } from "@openokr/ui";
 import Link from "next/link";
+import { gateTitle } from "../../lib/method-texts.ts";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { publishCycle } from "./actions.ts";
@@ -156,7 +157,7 @@ export async function Gates({
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex flex-wrap items-center gap-2 text-sm text-ink">
                   <span>
-                    {gate.gateKey}. {gate.title}
+                    {gate.gateKey}. {gateTitle(t, gate.gateKey)}
                   </span>
                   <Chip tone="neutral">
                     {gate.level === "block"
