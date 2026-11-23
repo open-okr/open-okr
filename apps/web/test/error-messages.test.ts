@@ -33,9 +33,9 @@ describe("operationMessage", () => {
   });
 
   it("translates a plain Error's sentence by exact match", () => {
-    expect(translateErrorMessage("This goal is already closed.", tIn("de"))).toBe(
-      "Dieses Ziel ist bereits abgeschlossen.",
-    );
+    expect(
+      translateErrorMessage("This goal is already closed.", tIn("de")),
+    ).toBe("Dieses Ziel ist bereits abgeschlossen.");
     expect(translateErrorMessage("12 seats are in use.", tIn("de"))).toBe(
       "12 seats are in use.",
     );
