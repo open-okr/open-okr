@@ -22163,6 +22163,36 @@
                               },
                               "message": {
                                 "type": "string"
+                              },
+                              "code": {
+                                "type": "string",
+                                "enum": [
+                                  "agentDisabled",
+                                  "aiUnavailable",
+                                  "costCap",
+                                  "workspaceBudget",
+                                  "agentBudget",
+                                  "noTask",
+                                  "unknownAction",
+                                  "denied",
+                                  "simulated",
+                                  "proposed",
+                                  "read",
+                                  "applied",
+                                  "failed"
+                                ]
+                              },
+                              "values": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": [
+                                    "string",
+                                    "number"
+                                  ]
+                                }
                               }
                             },
                             "required": [
@@ -22376,6 +22406,36 @@
                               },
                               "message": {
                                 "type": "string"
+                              },
+                              "code": {
+                                "type": "string",
+                                "enum": [
+                                  "agentDisabled",
+                                  "aiUnavailable",
+                                  "costCap",
+                                  "workspaceBudget",
+                                  "agentBudget",
+                                  "noTask",
+                                  "unknownAction",
+                                  "denied",
+                                  "simulated",
+                                  "proposed",
+                                  "read",
+                                  "applied",
+                                  "failed"
+                                ]
+                              },
+                              "values": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "type": [
+                                    "string",
+                                    "number"
+                                  ]
+                                }
                               }
                             },
                             "required": [
@@ -23093,6 +23153,36 @@
                                 },
                                 "message": {
                                   "type": "string"
+                                },
+                                "code": {
+                                  "type": "string",
+                                  "enum": [
+                                    "agentDisabled",
+                                    "aiUnavailable",
+                                    "costCap",
+                                    "workspaceBudget",
+                                    "agentBudget",
+                                    "noTask",
+                                    "unknownAction",
+                                    "denied",
+                                    "simulated",
+                                    "proposed",
+                                    "read",
+                                    "applied",
+                                    "failed"
+                                  ]
+                                },
+                                "values": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": [
+                                      "string",
+                                      "number"
+                                    ]
+                                  }
                                 }
                               },
                               "required": [
