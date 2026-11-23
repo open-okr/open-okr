@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { OperationError } from "@openokr/core";
 import { translate } from "@openokr/ui";
@@ -36,13 +36,15 @@ describe("operationMessage", () => {
   });
 });
 
+// The entry type comes from the directory listing itself, so there is no
+// separate stat before the read (CodeQL js/file-system-race).
 function sources(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) {
-      return name === "node_modules" ? [] : sources(path);
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      return entry.name === "node_modules" ? [] : sources(path);
     }
-    return path.endsWith(".ts") && !path.endsWith(".test.ts")
+    return entry.isFile() && path.endsWith(".ts") && !path.endsWith(".test.ts")
       ? [readFileSync(path, "utf8")]
       : [];
   });
