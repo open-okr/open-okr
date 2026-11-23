@@ -8,6 +8,7 @@ import {
   storeUpload,
 } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { translateErrorMessage } from "../../lib/error-messages";
 import { getPool } from "../../lib/pool";
 import { quietHoursFromForm } from "../../lib/quiet-hours";
 import { refusedByField } from "../../lib/refusal";
@@ -129,7 +130,7 @@ export async function updateProfile(
       ok: false,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("people.actions.updateFailed"),
     };
   }
@@ -195,7 +196,7 @@ export async function uploadAvatar(
       ok: false,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("people.actions.updateFailed"),
     };
   }
@@ -224,7 +225,7 @@ export async function removeAvatar(): Promise<ProfileResult> {
       ok: false,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("people.actions.updateFailed"),
     };
   }
@@ -341,7 +342,7 @@ export async function setLeaveAction(
       ok: false,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("people.actions.updateFailed"),
     };
   }

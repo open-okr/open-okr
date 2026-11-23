@@ -16,6 +16,7 @@ import { callAction, richTextFromPlainText } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
 import { drafterFor } from "../../lib/drafter";
+import { translateErrorMessage } from "../../lib/error-messages";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 
@@ -133,7 +134,7 @@ export async function applyDraftedObjectiveAction(input: {
         error instanceof Error
           ? t("cycle.actions.measureRefusedBecause", {
               title: measure.title,
-              reason: error.message,
+              reason: translateErrorMessage(error.message, t),
             })
           : t("cycle.actions.measureRefused", { title: measure.title }),
       );

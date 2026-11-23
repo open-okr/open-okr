@@ -1,6 +1,7 @@
 "use server";
 
 import { callAction } from "@openokr/core";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -54,7 +55,7 @@ export async function decide(
       approved: false,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("account.device.actions.codeCouldNotBeAnswered"),
     };
   }

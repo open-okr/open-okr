@@ -13,6 +13,7 @@ import type { ModelTier } from "@openokr/db";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { refusalOf, refusedState } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -113,7 +114,11 @@ export async function planRunAction(
       : { kind: "refused", reason: answer.reason };
   } catch (error) {
     if (error instanceof OperationError) {
-      return { kind: "refused", reason: error.message };
+      const { t } = await getTranslations();
+      return {
+        kind: "refused",
+        reason: translateErrorMessage(error.message, t),
+      };
     }
     throw error;
   }

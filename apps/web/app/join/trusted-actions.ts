@@ -19,6 +19,7 @@ import {
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requestBrowserTimezone } from "../../lib/browser-timezone";
+import { translateErrorMessage } from "../../lib/error-messages";
 import { getPool } from "../../lib/pool";
 import { requireSession } from "../../lib/session";
 import { getTranslations } from "../../lib/translations";
@@ -67,7 +68,8 @@ export async function joinTrustedWorkspace(
     // A full workspace, or one frozen between the page and the press. Worth
     // reading, and specific to now.
     if (error instanceof OperationError) {
-      return { error: error.message };
+      const { t } = await getTranslations();
+      return { error: translateErrorMessage(error.message, t) };
     }
     throw error;
   }

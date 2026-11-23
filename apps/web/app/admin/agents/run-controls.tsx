@@ -23,6 +23,7 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { runChampionAction, runCoachAction } from "./actions";
 
 type Cadence = "hourly" | "daily" | "weekly" | "cycle";
@@ -56,7 +57,7 @@ export function RunControls({ drafting }: { drafting: boolean }) {
           // leave an administrator watching a list that never changes.
           setProblem(
             error instanceof Error
-              ? error.message
+              ? translateErrorMessage(error.message, t)
               : t("admin.agents.runControls.runDidNotFinish"),
           );
         }

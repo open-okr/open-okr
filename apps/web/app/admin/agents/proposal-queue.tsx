@@ -11,6 +11,7 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { applyProposalsAction, dismissProposalsAction } from "./actions";
 
 /**
@@ -121,7 +122,7 @@ export function ProposalQueue({
         } catch (error) {
           setOutcome(
             error instanceof Error
-              ? error.message
+              ? translateErrorMessage(error.message, t)
               : t("admin.agents.proposalQueue.somethingWentWrong"),
           );
         }

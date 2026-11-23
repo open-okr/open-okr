@@ -32,6 +32,7 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { passMicAction, setNarrativeAction } from "./actions";
 
 interface NarrativeObjective {
@@ -88,7 +89,7 @@ function ObjectiveRow({
         } catch (error) {
           onProblem(
             error instanceof Error
-              ? error.message
+              ? translateErrorMessage(error.message, t)
               : t("session.detail.thatDidNotSave"),
           );
         }

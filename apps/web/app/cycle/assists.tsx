@@ -27,6 +27,7 @@ import {
 } from "@openokr/ui";
 import { Sparkles } from "lucide-react";
 import { useCallback, useState } from "react";
+import { translateErrorMessage } from "../../lib/error-messages";
 import {
   alignToParentAction,
   applyDraftedObjectiveAction,
@@ -169,7 +170,7 @@ export function DraftFromAmbition({
     } catch (error) {
       setNotice(
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("cycle.assists.couldNotApply"),
       );
     } finally {
@@ -421,7 +422,7 @@ export function SuggestParent({ goalId }: { readonly goalId: string }) {
     } catch (error) {
       setNotice(
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("cycle.assists.couldNotAlign"),
       );
     } finally {
