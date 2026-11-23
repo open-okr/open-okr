@@ -213,6 +213,7 @@ export async function WorkMapScreen({
         workspaceName={workspace.name}
         scopeLabel={scopeLabel}
         stats={stats}
+        titleIsHeading={basePath === "/map"}
       />
 
       <WorkMapScopeTabs

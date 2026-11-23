@@ -482,6 +482,7 @@ export async function AppShellLayout({
           sidebar={
             <Sidebar
               groups={groups}
+              label={t("shell.navigation.primary")}
               linkComponent={NavLink}
               footer={<SidebarToggle />}
               workspaceSwitcher={
@@ -639,6 +640,7 @@ export async function AppShellLayout({
           }
           mobileTabBar={
             <MobileTabBar
+              label={t("shell.navigation.primary")}
               linkComponent={NavLink}
               items={tabItems}
               // Every other destination the sidebar holds, in its own

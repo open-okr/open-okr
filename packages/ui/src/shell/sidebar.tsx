@@ -46,10 +46,13 @@ export interface SidebarProps {
   readonly groups: readonly SidebarGroup[];
   readonly workspaceSwitcher: ReactNode;
   readonly footer?: ReactNode;
+  /** The landmark's accessible name. Server-safe, so the caller translates it. */
+  readonly label?: string;
   readonly linkComponent?: (props: {
     href: string;
     className: string;
     title?: string;
+    "aria-current"?: "page";
     children: ReactNode;
   }) => ReactNode;
 }
@@ -58,18 +61,25 @@ function DefaultLink({
   href,
   className,
   title,
+  "aria-current": ariaCurrent,
   children,
 }: {
   href: string;
   className: string;
   title?: string;
+  "aria-current"?: "page";
   children: ReactNode;
 }) {
   // A caller wiring this into a router (Next's <Link>, via linkComponent)
   // is the normal path; this plain <a> only serves the preview page and
   // non-router consumers.
   return (
-    <a href={href} className={className} title={title}>
+    <a
+      href={href}
+      className={className}
+      title={title}
+      aria-current={ariaCurrent}
+    >
       {children}
     </a>
   );
@@ -79,12 +89,13 @@ export function Sidebar({
   groups,
   workspaceSwitcher,
   footer,
+  label = "Primary",
   linkComponent,
 }: SidebarProps) {
   const Link = linkComponent ?? DefaultLink;
   return (
     <nav
-      aria-label="Primary"
+      aria-label={label}
       className={cn(
         "side hidden flex-col gap-0.5 overflow-y-auto border-e border-line md:flex",
         // The mockup's `.side`: a vertical gradient from the card surface to
@@ -109,6 +120,7 @@ export function Sidebar({
             <Link
               key={item.id}
               href={item.href}
+              aria-current={item.active ? "page" : undefined}
               // The label on hover where the rail is icons only, 768 to 1279
               // px (navigation-five-areas.md, OKRGoal UX review N1).
               title={item.label}
