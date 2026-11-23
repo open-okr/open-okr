@@ -270,18 +270,11 @@ export async function syncTemplates(
     ok: true,
     message:
       outcome.withdrawn > 0
-        ? t(
-            outcome.recorded === 1
-              ? "admin.channels.actions.templatesWithdrawnOne"
-              : "admin.channels.actions.templatesWithdrawnOther",
-            { count: outcome.recorded, withdrawn: outcome.withdrawn },
-          )
-        : t(
-            outcome.recorded === 1
-              ? "admin.channels.actions.templatesOne"
-              : "admin.channels.actions.templatesOther",
-            { count: outcome.recorded },
-          ),
+        ? t("admin.channels.actions.templatesWithdrawn", {
+            count: outcome.recorded,
+            withdrawn: outcome.withdrawn,
+          })
+        : t("admin.channels.actions.templates", { count: outcome.recorded }),
   };
 }
 

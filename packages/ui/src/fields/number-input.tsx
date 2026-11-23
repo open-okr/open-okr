@@ -2,6 +2,7 @@
 
 import { Field } from "@base-ui-components/react/field";
 import { NumberField } from "@base-ui-components/react/number-field";
+import { intlTagFor } from "@openokr/formats";
 import type { FocusEvent, KeyboardEvent, ReactNode, Ref } from "react";
 import { useRef, useState } from "react";
 import { useRefusedField } from "../forms/refused-fields.tsx";
@@ -10,6 +11,60 @@ import { cn } from "../lib/cn.ts";
 import { formatMeasure } from "../lib/format-measure.ts";
 import { useFormReset } from "./form-reset.ts";
 import { FIELD_CONTROL_CLASS } from "./text-input.tsx";
+
+/**
+ * Normalises Arabic-Indic (U+0660 to U+0669) and Extended Arabic-Indic
+ * (U+06F0 to U+06F9) digits to ASCII, U+066B to '.' and U+066C to nothing
+ * (languages §3).
+ */
+export function normaliseNumberDigits(input: string): string {
+  return input
+    .replace(/[٠۰]/g, "0")
+    .replace(/[١۱]/g, "1")
+    .replace(/[٢۲]/g, "2")
+    .replace(/[٣۳]/g, "3")
+    .replace(/[٤۴]/g, "4")
+    .replace(/[٥۵]/g, "5")
+    .replace(/[٦۶]/g, "6")
+    .replace(/[٧۷]/g, "7")
+    .replace(/[٨۸]/g, "8")
+    .replace(/[٩۹]/g, "9")
+    .replace(/٫/g, ".")
+    .replace(/٬/g, "");
+}
+
+/**
+ * Checks whether a locale uses comma as its decimal separator.
+ */
+function hasCommaDecimalSeparator(locale: string): boolean {
+  const tag = intlTagFor(locale);
+  const parts = new Intl.NumberFormat(tag).formatToParts(1.1);
+  return parts.find((p) => p.type === "decimal")?.value === ",";
+}
+
+/**
+ * In a locale whose decimal separator is ',', a value with one '.'
+ * followed by exactly three digits and no ',' is ambiguous (languages §3).
+ */
+export function isAmbiguousNumberInput(raw: string, locale: string): boolean {
+  if (!hasCommaDecimalSeparator(locale)) {
+    return false;
+  }
+  const normalised = normaliseNumberDigits(raw).trim();
+  if (normalised.includes(",")) {
+    return false;
+  }
+  const parts = normalised.split(".");
+  if (parts.length !== 2) {
+    return false;
+  }
+  const integerPart = parts[0];
+  const decimalPart = parts[1];
+  if (!integerPart || !decimalPart || !/^[+-]?\d+$/.test(integerPart)) {
+    return false;
+  }
+  return /^\d{3}$/.test(decimalPart);
+}
 
 export interface NumberInputProps {
   readonly label: string;
@@ -87,8 +142,9 @@ export function NumberInput({
   // A message passed in wins; otherwise the nearest `RefusedFields`
   // says what the server refused about this field (guided-inputs §4.2).
   const refused = useRefusedField(name);
-  const error = givenError ?? refused ?? null;
   const { t, locale } = useTranslations();
+  const [ambiguityError, setAmbiguityError] = useState<string | null>(null);
+  const error = givenError ?? refused ?? ambiguityError ?? null;
   const suffix = unit?.trim() || null;
   // Base UI holds the number itself, so a reset starts it again from its
   // default rather than leaving the last row's number in the next one.
@@ -150,7 +206,15 @@ export function NumberInput({
                 }
               });
             }}
-            onBlur={onBlur}
+            onBlur={(event) => {
+              const raw = event.currentTarget.value;
+              if (isAmbiguousNumberInput(raw, locale)) {
+                setAmbiguityError(t("fields.number.ambiguous"));
+              } else {
+                setAmbiguityError(null);
+              }
+              onBlur?.(event);
+            }}
             onKeyDown={onKeyDown}
             {...(describedBy ? { "aria-describedby": describedBy } : {})}
             className={cn(FIELD_CONTROL_CLASS, "tabular-nums", inputClassName)}
@@ -201,15 +265,15 @@ export function MetricInput({
   description,
   ...input
 }: MetricInputProps) {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
   const range =
     baseline !== undefined &&
     baseline !== null &&
     target !== undefined &&
     target !== null
       ? t("fields.metric.range", {
-          from: formatMeasure(baseline),
-          to: formatMeasure(target, unit),
+          from: formatMeasure(baseline, null, locale),
+          to: formatMeasure(target, unit, locale),
         })
       : null;
   return (

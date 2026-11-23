@@ -80,6 +80,7 @@ import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { OperationError } from "../operations/errors.ts";
 import { practiceFromRow } from "../practice/settings.ts";
+import { resolveDraftLanguageInTx } from "../settings/member-language.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
 import { releaseHeldInTx } from "./held.ts";
 
@@ -622,6 +623,7 @@ async function draftFor(
     readonly id: string;
     readonly title: string;
     readonly health: string;
+    readonly championId: string | null;
   },
   daysOverdue: number,
 ): Promise<DraftedCheckIn | null> {
@@ -636,6 +638,11 @@ async function draftFor(
   try {
     return (
       (await input.drafter.draftCheckIn?.({
+        locale: await resolveDraftLanguageInTx(
+          tx,
+          input.workspaceId,
+          goal.championId,
+        ),
         goalTitle: goal.title,
         daysOverdue,
         // `pending` is not a previous status, it is the absence of one, and
@@ -1078,6 +1085,7 @@ async function snoozeHoursAway(
 
 /** The member's local hour and minute, for the quiet-hours check. */
 const localTimeIn = (now: Date, timeZone: string) => {
+  // machine use: extracting time parts
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone,
     hour: "2-digit",

@@ -16,7 +16,12 @@
  * registry back for a value would put this module inside that cycle. Both
  * callers already hold the function, so they pass it.
  */
+import { withContext } from "@openokr/db";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { callAction } from "../actions/registry.ts";
+import { serverTranslate } from "../i18n/catalogue.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
+import { actingMemberId } from "./collect.ts";
 import { type CsvTable, toCsv } from "./csv.ts";
 import type { Exportable, Format } from "./kinds.ts";
 import { toXlsx } from "./xlsx.ts";
@@ -46,25 +51,41 @@ export async function render(
 /** The registry's own caller, handed in rather than imported. */
 export type ActionCaller = typeof callAction;
 
+async function requesterLocale(context: Parameters<ActionCaller>[0]) {
+  const { workspaceId, actor } = context;
+  const memberId =
+    actor.memberId ??
+    (await withContext(
+      drizzle(context.pool),
+      { workspaceId, userId: actor.userId },
+      (tx) => actingMemberId(tx, context),
+    ));
+  return memberId ? resolveMemberLanguage(context, memberId) : "en";
+}
+
 export async function gather(
   call: ActionCaller,
   context: Parameters<ActionCaller>[0],
   input: { list: Exportable; cycleId?: string; spaceId?: string },
 ): Promise<CsvTable> {
+  const locale = await requesterLocale(context);
+  const headers = (columns: readonly string[]) =>
+    columns.map((key) => serverTranslate(locale, `exports.column.${key}`));
+
   switch (input.list) {
     case "goals": {
       const cycleId =
         input.cycleId ??
         (await call(context, "cycles.current", { mode: "quarterly" }))?.id;
       if (!cycleId) {
-        return { columns: GOAL_COLUMNS, rows: [] };
+        return { columns: headers(GOAL_COLUMNS), rows: [] };
       }
       const { goals } = await call(context, "goals.list", {
         cycleId,
         includeClosed: true,
       });
       return {
-        columns: GOAL_COLUMNS,
+        columns: headers(GOAL_COLUMNS),
         rows: goals.map((goal) => [
           goal.title,
           goal.level,
@@ -81,7 +102,7 @@ export async function gather(
         ...(input.spaceId ? { spaceId: input.spaceId } : {}),
       });
       return {
-        columns: INITIATIVE_COLUMNS,
+        columns: headers(INITIATIVE_COLUMNS),
         rows: rows.map((one) => [
           one.title,
           one.spaceName,
@@ -97,7 +118,7 @@ export async function gather(
     case "tasks": {
       const rows = await call(context, "tasks.list", {});
       return {
-        columns: TASK_COLUMNS,
+        columns: headers(TASK_COLUMNS),
         rows: rows.map((one) => [
           one.title,
           one.status,
@@ -111,7 +132,7 @@ export async function gather(
     case "kpis": {
       const grid = await call(context, "kpis.grid", { periods: 1 });
       return {
-        columns: KPI_COLUMNS,
+        columns: headers(KPI_COLUMNS),
         rows: grid.kpis.map((kpi) => [
           kpi.title,
           kpi.categoryId ?? "",
@@ -127,39 +148,39 @@ export async function gather(
 }
 
 const GOAL_COLUMNS = [
-  "Objective",
-  "Level",
-  "Health",
-  "Progress %",
-  "Owner",
-  "Reviewer",
-  "Key results",
+  "objective",
+  "level",
+  "health",
+  "progress",
+  "owner",
+  "reviewer",
+  "keyResults",
 ] as const;
 
 const INITIATIVE_COLUMNS = [
-  "Initiative",
-  "Space",
-  "Owner",
-  "Status",
-  "Capacity",
-  "Starts",
-  "Ends",
-  "Key results",
+  "initiative",
+  "space",
+  "owner",
+  "status",
+  "capacity",
+  "starts",
+  "ends",
+  "keyResults",
 ] as const;
 
 const TASK_COLUMNS = [
-  "Task",
-  "Status",
-  "Due",
-  "Key result",
-  "Assignees",
-  "Checklist",
+  "task",
+  "status",
+  "due",
+  "keyResult",
+  "assignees",
+  "checklist",
 ] as const;
 
 const KPI_COLUMNS = [
-  "KPI",
-  "Category id",
-  "Frequency",
-  "Direction",
-  "Unit",
+  "kpi",
+  "categoryId",
+  "frequency",
+  "direction",
+  "unit",
 ] as const;

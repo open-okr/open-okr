@@ -75,9 +75,7 @@ export async function adoptWaitingWorkspaces(): Promise<AdoptState> {
       done:
         adopted === 0
           ? t("operator.workspaces.adoptedNone")
-          : adopted === 1
-            ? t("operator.workspaces.adoptedOne")
-            : t("operator.workspaces.adoptedOther", { count: adopted }),
+          : t("operator.workspaces.adopted", { count: adopted }),
     };
   } catch (error) {
     if (error instanceof OperationError) {

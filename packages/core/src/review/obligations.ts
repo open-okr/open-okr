@@ -14,6 +14,7 @@
  * stale the moment somebody publishes. This is the same choice §2.3 makes for
  * phase completion.
  */
+import { serverTranslate } from "../i18n/catalogue.ts";
 import type { ProposalPreviewLine } from "./proposals.ts";
 
 /**
@@ -127,51 +128,44 @@ export function groupFor(daysPastDue: number): ObligationGroup {
   return -daysPastDue <= THIS_WEEK_DAYS ? "this_week" : "upcoming";
 }
 
-const WEEKDAYS = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-] as const;
-
 /**
- * The weekday a `YYYY-MM-DD` local date falls on.
+ * The weekday a `YYYY-MM-DD` local date falls on, in the requester's language.
  *
  * Parsed as UTC deliberately. The string is already the date in the workspace
  * timezone, so reading it back in any other zone would be converting a date
- * that has no time to convert.
+ * that has no time to convert. The name comes from `Intl`, which already
+ * knows every shipped language's weekdays.
  */
-function weekdayOf(localDate: string): string {
+function weekdayOf(localDate: string, locale: string): string {
   const [year, month, day] = localDate.split("-").map(Number);
   if (!year || !month || !day) {
     return "";
   }
-  return WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()] ?? "";
-}
-
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 /** "Overdue by 4 days", "Today", "Tomorrow", "Friday", or the date itself. */
 export function dueLabelFor(
   daysPastDue: number,
   localDate: string | null,
+  locale = "en",
 ): string {
   if (daysPastDue > 0) {
-    return `Overdue by ${plural(daysPastDue, "day")}`;
+    return serverTranslate(locale, "reviewInbox.due.overdue", {
+      count: daysPastDue,
+    });
   }
   if (daysPastDue === 0) {
-    return "Today";
+    return serverTranslate(locale, "reviewInbox.due.today");
   }
   if (daysPastDue === -1) {
-    return "Tomorrow";
+    return serverTranslate(locale, "reviewInbox.due.tomorrow");
   }
   if (-daysPastDue <= THIS_WEEK_DAYS && localDate) {
-    return weekdayOf(localDate);
+    return weekdayOf(localDate, locale);
   }
   return localDate ?? "";
 }
@@ -196,22 +190,30 @@ export function acknowledgementGroup(
 export function acknowledgementDueLabel(
   daysSincePublication: number,
   escalateAfterDays: number,
+  locale = "en",
 ): string {
   return acknowledgementGroup(daysSincePublication, escalateAfterDays) ===
     "overdue"
-    ? `Overdue by ${plural(daysSincePublication, "day")}`
-    : "Today";
+    ? serverTranslate(locale, "reviewInbox.due.overdue", {
+        count: daysSincePublication,
+      })
+    : serverTranslate(locale, "reviewInbox.due.today");
 }
 
 /** "published today", "published yesterday", "published 4 days ago". */
-export function publishedAgo(daysSincePublication: number): string {
+export function publishedAgo(
+  daysSincePublication: number,
+  locale = "en",
+): string {
   if (daysSincePublication <= 0) {
-    return "published today";
+    return serverTranslate(locale, "reviewInbox.published.today");
   }
   if (daysSincePublication === 1) {
-    return "published yesterday";
+    return serverTranslate(locale, "reviewInbox.published.yesterday");
   }
-  return `published ${plural(daysSincePublication, "day")} ago`;
+  return serverTranslate(locale, "reviewInbox.published.daysAgo", {
+    count: daysSincePublication,
+  });
 }
 
 const GROUP_ORDER: Readonly<Record<ObligationGroup, number>> = {

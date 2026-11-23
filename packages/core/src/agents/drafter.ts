@@ -20,7 +20,13 @@
  * the deterministic answer: a proposal a human still reviews is worth more than
  * a run that fell over.
  */
+import type { LocaleCode } from "@openokr/formats";
 import type { RichTextDocument } from "../rich-text/schema.ts";
+
+/** The language of the text a capability writes. Omitted means English. */
+export interface WritingLocale {
+  readonly locale?: LocaleCode;
+}
 
 /** What a drafted check-in offers, in the shape `goals.publishDraftedCheckIn` takes. */
 export interface DraftedCheckIn {
@@ -31,7 +37,7 @@ export interface DraftedCheckIn {
 }
 
 /** What the drafter is told about a goal whose check-in is overdue. */
-export interface CheckInDraftContext {
+export interface CheckInDraftContext extends WritingLocale {
   readonly goalTitle: string;
   readonly daysOverdue: number;
   /** The last published status, or null when this is the first check-in. */
@@ -75,7 +81,7 @@ export interface SemanticFinding {
 }
 
 /** What the assist is asked to fix, and what it is judged against afterwards. */
-export interface RewriteContext {
+export interface RewriteContext extends WritingLocale {
   /** The sentence as written today. */
   readonly text: string;
   /** The check it fails, by its §4 id, with the catalogue's own prompt. */
@@ -85,7 +91,7 @@ export interface RewriteContext {
   readonly goalTitle: string;
 }
 
-export interface RecoveryTitleContext {
+export interface RecoveryTitleContext extends WritingLocale {
   readonly kpiTitle: string;
   /** The template title §6.5 would produce, which is the fallback. */
   readonly templateTitle: string;
@@ -308,7 +314,7 @@ export interface ProposalDrop {
 }
 
 /** What the copilot is asked to turn into a proposal. */
-export interface ProposalRequestContext {
+export interface ProposalRequestContext extends WritingLocale {
   /** What the member asked for, in their words. */
   readonly request: string;
   readonly options: readonly ProposalOption[];
@@ -363,7 +369,7 @@ export interface DraftedObjective {
 }
 
 /** What the drafting assist is told about the ambition it is turning over. */
-export interface AmbitionContext {
+export interface AmbitionContext extends WritingLocale {
   /** What somebody typed, in their words. */
   readonly ambition: string;
   /** The space it would belong to, for tone. Null at workspace level. */
@@ -394,7 +400,7 @@ export interface SuggestedParent {
 }
 
 /** What the alignment assist is shown: one child and the possible parents. */
-export interface ParentContext {
+export interface ParentContext extends WritingLocale {
   readonly childTitle: string;
   readonly childDescription: string;
   /** Numbered from one in the order given. Never an identifier. */
@@ -412,7 +418,7 @@ export interface TrendPoint {
 }
 
 /** What the trend assist is shown. Numbers only, and only these numbers. */
-export interface TrendContext {
+export interface TrendContext extends WritingLocale {
   readonly title: string;
   readonly unit: string | null;
   readonly direction: string;
@@ -433,7 +439,7 @@ export interface NarratedTrend {
  * the product's own enums. Nothing here is an identifier, so a filter the model
  * produces can only describe goals this member is already allowed to list.
  */
-export interface FilterContext {
+export interface FilterContext extends WritingLocale {
   readonly sentence: string;
   readonly cycles: readonly string[];
   readonly levels: readonly string[];
@@ -469,7 +475,7 @@ export type ParsedFilter =
  * its answer cannot silently map a column that is not there. The caller checks
  * every field it names against the template anyway.
  */
-export interface ImportMappingContext {
+export interface ImportMappingContext extends WritingLocale {
   /** The entity being loaded, so the model knows what a row is. */
   readonly entity: string;
   readonly describe: string;
@@ -513,7 +519,7 @@ export interface SummarisableBlocker {
 
 /** What the KPI assist is asked to turn into a metric (P4-T15b-b). */
 /** What the planner is given (agent-instructions.md I1, I4, I5). */
-export interface PlanRunContext {
+export interface PlanRunContext extends WritingLocale {
   readonly agentName: string;
   readonly stage: "planning" | "execution";
   /** The stage's instructions, the newest version: the administrator's words. */
@@ -545,7 +551,7 @@ export interface PlannedRun {
   }[];
 }
 
-export interface KpiRequestContext {
+export interface KpiRequestContext extends WritingLocale {
   /** What somebody typed, in their words. */
   readonly description: string;
   /** Existing KPIs it could be built from, numbered. Names only. */
@@ -600,7 +606,7 @@ export interface NoteThemes {
 }
 
 /** What the diagnostic narration is told. §8.6's own answer, and the numbers. */
-export interface DiagnosticContext {
+export interface DiagnosticContext extends WritingLocale {
   readonly verdict: string;
   readonly diagnosis: string;
   readonly prescription: string;
@@ -656,7 +662,7 @@ export interface ThreadSummary {
  * the gap between them. The initiatives already behind it are named so a draft
  * does not repeat one the team is already running.
  */
-export interface DecompositionContext {
+export interface DecompositionContext extends WritingLocale {
   readonly goalTitle: string;
   readonly keyResultTitle: string;
   readonly unit: string | null;
@@ -710,6 +716,7 @@ export interface AgentDrafter {
    */
   reviewAlignment?(
     goals: readonly ReviewableGoal[],
+    context?: WritingLocale,
   ): Promise<readonly SemanticFinding[] | null>;
   /**
    * A corrected sentence for one failing check.
@@ -803,9 +810,11 @@ export interface AgentDrafter {
    * narration when one was invented, so this method cannot be the reason a
    * digest states a figure nobody measured.
    */
-  narrateDigest?(context: {
-    readonly lines: readonly string[];
-  }): Promise<string | null>;
+  narrateDigest?(
+    context: WritingLocale & {
+      readonly lines: readonly string[];
+    },
+  ): Promise<string | null>;
   /**
    * §2.2's KPI trend narration, with the anomalies called out.
    *
@@ -840,9 +849,11 @@ export interface AgentDrafter {
    * and asked for prose about it; the caller returns the board unchanged beside
    * the words, and refuses a summary that quotes a next action not on it.
    */
-  summariseBlockers?(context: {
-    readonly blockers: readonly SummarisableBlocker[];
-  }): Promise<string | null>;
+  summariseBlockers?(
+    context: WritingLocale & {
+      readonly blockers: readonly SummarisableBlocker[];
+    },
+  ): Promise<string | null>;
   /**
    * §2.2's KPI, threshold and formula suggestion from plain language.
    *
@@ -866,9 +877,11 @@ export interface AgentDrafter {
    * retro where four people said four unrelated things has four themes of one,
    * and pretending otherwise is worse than saying nothing.
    */
-  clusterNotes?(context: {
-    readonly notes: readonly ClusterableNote[];
-  }): Promise<NoteThemes | null>;
+  clusterNotes?(
+    context: WritingLocale & {
+      readonly notes: readonly ClusterableNote[];
+    },
+  ): Promise<NoteThemes | null>;
   /**
    * §2.3's diagnostic narrative, which is **additive and never a replacement**.
    *
@@ -879,17 +892,21 @@ export interface AgentDrafter {
    */
   narrateDiagnostic?(context: DiagnosticContext): Promise<string | null>;
   /** §2.3's minutes draft, over the record the session already holds. */
-  draftMinutes?(context: {
-    readonly sections: readonly {
-      readonly label: string;
-      readonly body: string;
-    }[];
-  }): Promise<string | null>;
+  draftMinutes?(
+    context: WritingLocale & {
+      readonly sections: readonly {
+        readonly label: string;
+        readonly body: string;
+      }[];
+    },
+  ): Promise<string | null>;
   /** §2.3's goal retrospective, from the published check-ins. */
-  draftRetrospective?(context: {
-    readonly goalTitle: string;
-    readonly checkIns: readonly RetrospectiveCheckIn[];
-  }): Promise<string | null>;
+  draftRetrospective?(
+    context: WritingLocale & {
+      readonly goalTitle: string;
+      readonly checkIns: readonly RetrospectiveCheckIn[];
+    },
+  ): Promise<string | null>;
   /**
    * §2.3's next-cycle objectives, each citing the learning it came from.
    *
@@ -897,9 +914,11 @@ export interface AgentDrafter {
    * forward so the next cycle answers them, and an objective with no learning
    * behind it is one somebody could have typed unaided.
    */
-  proposeObjectives?(context: {
-    readonly learnings: readonly string[];
-  }): Promise<readonly ProposedObjective[] | null>;
+  proposeObjectives?(
+    context: WritingLocale & {
+      readonly learnings: readonly string[];
+    },
+  ): Promise<readonly ProposedObjective[] | null>;
   /**
    * §2.4's thread summary (completeness review M-09).
    *
@@ -908,11 +927,13 @@ export interface AgentDrafter {
    * summary that attributes words to the thread nobody wrote is dropped rather
    * than shown.
    */
-  summariseThread?(context: {
-    /** What the discussion hangs on, for the model's own framing. */
-    readonly subject: string;
-    readonly comments: readonly ThreadComment[];
-  }): Promise<ThreadSummary | null>;
+  summariseThread?(
+    context: WritingLocale & {
+      /** What the discussion hangs on, for the model's own framing. */
+      readonly subject: string;
+      readonly comments: readonly ThreadComment[];
+    },
+  ): Promise<ThreadSummary | null>;
   /**
    * §2.4's decomposition of a key result into initiatives and tasks (M-09).
    *

@@ -62,6 +62,11 @@ export interface FlowyteamRunOptions {
    * and the reasons.
    */
   readonly only?: readonly string[];
+  /**
+   * Confirms that KPIs with restricted visibility in FlowyTeam may become visible
+   * to all workspace members in OpenOKR.
+   */
+  readonly acceptBroaderVisibility?: boolean;
 }
 
 export interface FlowyteamRunResult {
@@ -132,6 +137,32 @@ export async function runFlowyteamImport(
     // that lives in `domains.ts` now, so `--only` reads the same rules a full
     // run does rather than a second copy of them.
     const selection = selectDomains(options.only);
+
+    if (
+      write &&
+      selection.domains.some((d) => d.key === "kpis" || d.key === "kpi-shares")
+    ) {
+      const hasIndicatorAccesses =
+        !missingTables(introspection).has("indicator_accesses");
+      if (hasIndicatorAccesses) {
+        const flagged = await source.query<{ id: number }>(
+          `select distinct i.id
+             from indicators i
+             join indicator_accesses ia on ia.indicator_id = i.id
+            where i.company_id = ?
+              and i.deleted_at is null
+              and ia.user_id is not null
+            limit 1`,
+          [company.id],
+        );
+        if (flagged.length > 0 && !options.acceptBroaderVisibility) {
+          throw new Error(
+            "Refusing to write: flagged KPIs exist that may lead to broader visibility for all workspace members. Re-run with --accept-broader-visibility to proceed.",
+          );
+        }
+      }
+    }
+
     const reconciliation: DomainReconciliation[] = [];
     const notes: string[] = [];
     for (const domain of selection.domains) {

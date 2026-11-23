@@ -1,4 +1,5 @@
 import type { callAction } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 
 type Goal = Awaited<
   ReturnType<typeof callAction<"goals.list">>
@@ -57,6 +58,7 @@ export interface TeamRhythm {
 export function rhythmByTeam(
   goals: readonly Goal[],
   spaces: readonly { readonly id: string; readonly name: string }[],
+  locale?: string,
 ): readonly TeamRhythm[] {
   return spaces
     .map((space) => {
@@ -74,6 +76,6 @@ export function rhythmByTeam(
     .sort(
       (a, b) =>
         a.current / a.total - b.current / b.total ||
-        a.name.localeCompare(b.name),
+        a.name.localeCompare(b.name, intlTagFor(locale)),
     );
 }

@@ -168,7 +168,7 @@ export function CadenceForm({
             />
             <span>
               {t("account.channels.cadenceForm.tellMeTheMoment")}
-              <span className="ml-1.5 text-xs text-ink-3">
+              <span className="ms-1.5 text-xs text-ink-3">
                 {t("account.channels.cadenceForm.everythingElseWaitsFor")}
               </span>
             </span>

@@ -20,6 +20,7 @@ import { aggregateFeed, type FeedItem, queryFeed } from "../activities/feed.ts";
 import { renderActivity } from "../activities/renderers.ts";
 import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { defineReadAction } from "./define.ts";
 
 const feedItem = z.object({
@@ -52,6 +53,7 @@ export const workspaceFeed = defineReadAction({
   page: { cursorFrom: ["at", "id"] },
   async handler(context, input) {
     const db = drizzle(context.pool);
+    const locale = await resolveMemberLanguage(context);
     return withWorkspace(db, context.workspaceId, async (tx) => {
       const userId = context.actor.userId;
       if (!userId) {
@@ -88,7 +90,7 @@ export const workspaceFeed = defineReadAction({
       return aggregated.map((item) => ({
         id: item.id,
         kind: item.kind,
-        rendered: renderActivity(item.kind, item.payload),
+        rendered: renderActivity(item.kind, item.payload, locale),
         actorMemberId: item.actorMemberId,
         subjectType: item.subjectType,
         subjectId: item.subjectId,
@@ -189,11 +191,11 @@ async function feedReader(
 }
 
 /** One page of feed rows, rendered. Shared by every scope. */
-function renderFeed(items: readonly FeedItem[]) {
+function renderFeed(items: readonly FeedItem[], locale: string) {
   return aggregateFeed(items, AGGREGATABLE_KINDS).map((item) => ({
     id: item.id,
     kind: item.kind,
-    rendered: renderActivity(item.kind, item.payload),
+    rendered: renderActivity(item.kind, item.payload, locale),
     actorMemberId: item.actorMemberId,
     subjectType: item.subjectType,
     subjectId: item.subjectId,
@@ -222,6 +224,7 @@ export const spaceFeed = defineReadAction({
   page: { cursorFrom: ["at", "id"] },
   async handler(context, input) {
     const db = drizzle(context.pool);
+    const locale = await resolveMemberLanguage(context);
     return withWorkspace(db, context.workspaceId, async (rawTx) => {
       const tx = rawTx as OperationTx;
       const memberId = await feedReader(
@@ -249,7 +252,7 @@ export const spaceFeed = defineReadAction({
           ? { at: new Date(input.cursor.at), id: input.cursor.id }
           : undefined,
       });
-      return renderFeed(items);
+      return renderFeed(items, locale);
     });
   },
 });
@@ -274,6 +277,7 @@ export const goalFeed = defineReadAction({
   page: { cursorFrom: ["at", "id"] },
   async handler(context, input) {
     const db = drizzle(context.pool);
+    const locale = await resolveMemberLanguage(context);
     return withWorkspace(db, context.workspaceId, async (rawTx) => {
       const tx = rawTx as OperationTx;
       const memberId = await feedReader(
@@ -297,7 +301,7 @@ export const goalFeed = defineReadAction({
           ? { at: new Date(input.cursor.at), id: input.cursor.id }
           : undefined,
       });
-      return renderFeed(items);
+      return renderFeed(items, locale);
     });
   },
 });
@@ -322,6 +326,7 @@ export const profileFeed = defineReadAction({
   page: { cursorFrom: ["at", "id"] },
   async handler(context, input) {
     const db = drizzle(context.pool);
+    const locale = await resolveMemberLanguage(context);
     return withWorkspace(db, context.workspaceId, async (rawTx) => {
       const tx = rawTx as OperationTx;
       const reader = await feedReader(
@@ -355,7 +360,7 @@ export const profileFeed = defineReadAction({
           ? { at: new Date(input.cursor.at), id: input.cursor.id }
           : undefined,
       });
-      return renderFeed(items);
+      return renderFeed(items, locale);
     });
   },
 });

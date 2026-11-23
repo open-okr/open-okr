@@ -1,3 +1,4 @@
+import { intlTagFor } from "@openokr/formats";
 import {
   Button,
   Card,
@@ -77,10 +78,11 @@ function byline(
   t: (key: string, values?: MessageValues) => string,
   entry: TimelineCheckIn,
   display: ConfidenceDisplay,
+  locale?: string,
 ): string {
   const name = entry.author.name;
   const date = entry.publishedAt
-    ? new Date(entry.publishedAt).toLocaleDateString()
+    ? new Date(entry.publishedAt).toLocaleDateString(intlTagFor(locale))
     : null;
   // On the workspace's own scale (guided-inputs §4.8), "7 in 10" by default.
   const confidence =
@@ -113,7 +115,7 @@ export async function Timeline({
   /** The workspace's "Confidence shown as" (METHOD.md §12). */
   readonly display: ConfidenceDisplay;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const published = checkIns.filter((entry) => entry.state === "published");
 
@@ -149,7 +151,7 @@ export async function Timeline({
                           : ""}
                   </Chip>
                   <span className="text-xs text-ink-3">
-                    {byline(t, entry, display)}
+                    {byline(t, entry, display, locale)}
                   </span>
                 </span>
                 {entry.acknowledgedAt ? (

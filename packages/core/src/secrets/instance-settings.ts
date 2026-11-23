@@ -16,10 +16,19 @@
  * overriding it at the next restart. §4.2 calls the environment "bootstrap",
  * and that is what it is: a starting value, not an override.
  */
-import { systemSettings, withInstanceAdmin } from "@openokr/db";
+import {
+  systemSettings,
+  type WorkspaceTx,
+  withInstanceAdmin,
+} from "@openokr/db";
 import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import {
+  appendInstanceAuditInTx,
+  type RecordInstanceAuditEventInput,
+} from "../audit/instance-chain.ts";
+import { languageSchema } from "../settings/registry.ts";
 import {
   decryptSecret,
   encryptSecret,
@@ -90,10 +99,10 @@ export async function readSettingRows(
 
 /** One stored setting's plain value, or undefined when it is not set. */
 export async function readSetting(
-  pool: Pool,
+  source: Pool | WorkspaceTx,
   key: string,
 ): Promise<unknown | undefined> {
-  const db = drizzle(pool);
+  const db = "select" in source ? source : drizzle(source);
   const [row] = await db
     .select({ value: systemSettings.value })
     .from(systemSettings)
@@ -146,6 +155,7 @@ export async function writeSettings(
   pool: Pool,
   ring: KeyRing,
   writes: readonly SettingWrite[],
+  audit?: RecordInstanceAuditEventInput,
 ): Promise<void> {
   if (writes.length === 0) {
     return;
@@ -158,6 +168,10 @@ export async function writeSettings(
         write.secret === undefined
           ? undefined
           : encryptSecret(ring, write.secret);
+      const value =
+        write.key === "instance.language"
+          ? languageSchema.parse(write.value)
+          : write.value;
 
       const row = {
         key: write.key,
@@ -165,7 +179,7 @@ export async function writeSettings(
         // setting that exists with no plain part (a secret-only row such as
         // the mail password) is a different thing from a column with nothing
         // in it, and only one of the two is storable here.
-        value: write.value === undefined ? sql`'null'::jsonb` : write.value,
+        value: value === undefined ? sql`'null'::jsonb` : value,
         secretCiphertext: sealed?.ciphertext ?? null,
         secretDataKey: sealed?.dataKey ?? null,
         secretKeyId: sealed?.keyId ?? null,
@@ -183,6 +197,9 @@ export async function writeSettings(
         .insert(systemSettings)
         .values(row)
         .onConflictDoUpdate({ target: systemSettings.key, set: row });
+    }
+    if (audit) {
+      await appendInstanceAuditInTx(tx, audit);
     }
   });
 }

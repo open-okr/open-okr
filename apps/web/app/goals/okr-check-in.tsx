@@ -269,7 +269,7 @@ export function CheckInTab({
                     unit={keyResult.unit}
                     baseline={keyResult.baselineValue}
                     target={keyResult.targetValue}
-                    inputClassName="h-auto w-24 py-1 text-right text-xs"
+                    inputClassName="h-auto w-24 py-1 text-end text-xs"
                   />
                 </span>
               )}

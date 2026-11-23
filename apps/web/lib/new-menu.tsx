@@ -159,7 +159,7 @@ export function NewMenu({ items }: { readonly items: readonly NewMenuItem[] }) {
                 ) : null}
                 <Menu.Item
                   onClick={() => choose(item)}
-                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.75 text-left text-[13px] text-ink-2 outline-none data-[highlighted]:bg-brand-weak data-[highlighted]:text-brand-text"
+                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.75 text-start text-[13px] text-ink-2 outline-none data-[highlighted]:bg-brand-weak data-[highlighted]:text-brand-text"
                 >
                   <span aria-hidden="true" className="size-4 flex-none">
                     {item.icon}

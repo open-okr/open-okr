@@ -297,6 +297,7 @@ export async function addSuggestedKpiAction(
           "settings.readForMember",
           {},
         );
+        // machine use: ISO date for today
         const today = new Intl.DateTimeFormat("en-CA", {
           timeZone: String(settings.settings.timezone ?? "UTC"),
         }).format(new Date());
@@ -334,4 +335,30 @@ export async function addCategory(
     };
   }
   return run((context) => callAction(context, "kpis.createCategory", { name }));
+}
+
+export async function shareKpi(
+  kpiId: string,
+  memberId: string,
+  level: "view" | "edit",
+): Promise<WriteState> {
+  return run((context) =>
+    callAction(context, "kpis.share", {
+      kpiId,
+      memberId,
+      level,
+    }),
+  );
+}
+
+export async function unshareKpi(
+  kpiId: string,
+  memberId: string,
+): Promise<WriteState> {
+  return run((context) =>
+    callAction(context, "kpis.unshare", {
+      kpiId,
+      memberId,
+    }),
+  );
 }

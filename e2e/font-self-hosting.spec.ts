@@ -30,14 +30,66 @@ test("no request leaves this origin, and the font is ours", async ({
   await page.goto("/sign-in");
   await page.evaluate(() => document.fonts.ready);
 
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(
+    page.locator('link[rel="stylesheet"][href="/fonts/noto-sans-arabic/fonts.css"]'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('link[rel="stylesheet"][href="/fonts/noto-sans-sc/fonts.css"]'),
+  ).toHaveCount(0);
+  // The signed-out language list shows the Arabic endonym, so the Arabic slice
+  // downloads on this English page (languages.md 10.2 and 10.3). The SC slices
+  // never do, because the SC stylesheet is linked on zh-Hans pages only.
+  expect(fonts.filter((font) => font.startsWith("/fonts/noto-"))).toEqual([
+    "/fonts/noto-sans-arabic/noto-sans-arabic-arabic-wght-normal.woff2",
+  ]);
+
   // Not "no font CDN" — no third-party request of any kind.
   expect(external).toEqual([]);
 
   // One variable file covering 100 to 900, served by us. Nine static weights
   // would be nine requests, and a Google-hosted build would be none from here
   // and several from fonts.gstatic.com.
-  expect(fonts).toHaveLength(1);
-  expect(fonts[0]).toMatch(/^\/_next\/static\/media\/Geist_Variable/);
+  expect(fonts.filter((font) => !font.startsWith("/fonts/noto-"))).toHaveLength(
+    1,
+  );
+  expect(fonts.find((font) => !font.startsWith("/fonts/noto-"))).toMatch(
+    /^\/_next\/static\/media\/Geist_Variable/,
+  );
+});
+
+test("Arabic text on an English page loads the local Arabic slice", async ({
+  page,
+}) => {
+  const fonts: string[] = [];
+  page.on("response", (response) => {
+    const { pathname } = new URL(response.url());
+    // Font files only: the slice's stylesheet arrives with the page as well.
+    if (
+      response.ok() &&
+      pathname.startsWith("/fonts/noto-sans-arabic/") &&
+      pathname.endsWith(".woff2")
+    ) {
+      fonts.push(pathname);
+    }
+  });
+  // Listener first: the sign-in page's own language list already shows the
+  // Arabic endonym, so the slice can arrive during navigation.
+  await page.goto("/sign-in");
+  const loaded = await page.evaluate(async () => {
+    const name = document.createElement("span");
+    name.textContent = "مرحبا";
+    document.body.append(name);
+    name.getBoundingClientRect();
+    await document.fonts.ready;
+    return [...document.fonts].find(
+      (face) => face.family.replace(/["']/g, "") === "Noto Sans Arabic",
+    )?.status;
+  });
+  expect(loaded).toBe("loaded");
+  expect(fonts).toEqual([
+    "/fonts/noto-sans-arabic/noto-sans-arabic-arabic-wght-normal.woff2",
+  ]);
 });
 
 test("the face is really in use, not merely declared", async ({ page }) => {

@@ -46,7 +46,7 @@ export function KpiTabs({
             {t(tab.labelKey)}
             {count === undefined ? null : (
               <span
-                className={`ml-1 text-[11.5px] font-medium ${
+                className={`ms-1 text-[11.5px] font-medium ${
                   open ? "text-brand-text/70" : "text-ink-4"
                 }`}
               >

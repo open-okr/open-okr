@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import {
   Card,
   CardBody,
@@ -54,15 +55,6 @@ export const generateMetadata = pageTitle("pageTitle.adminInvitations");
  * the form says "copy this now" before the button rather than after.
  */
 
-const shortDate = (value: string | null): string =>
-  value
-    ? new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }).format(new Date(value))
-    : "";
-
 /**
  * What a link is doing right now, in the order the states actually matter.
  * The label is a catalogue key, so the page says it in the reader's language.
@@ -86,7 +78,16 @@ function stateOf(link: {
 }
 
 export default async function InvitationsPage() {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+
+  const shortDate = (value: string | null): string =>
+    value
+      ? new Intl.DateTimeFormat(intlTagFor(locale), {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        }).format(new Date(value))
+      : "";
 
   const header = (
     <header className="flex flex-col gap-1">
@@ -307,7 +308,7 @@ export default async function InvitationsPage() {
               // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
               tabIndex={0}
               aria-label={t("admin.invitations.listLabel")}
-              className="max-h-[296px] overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line"
+              className="max-h-[296px] overflow-y-auto pe-1.5 overscroll-contain rounded-lg border border-line"
             >
               {links.map((link, index) => {
                 const state = stateOf(link);
@@ -327,13 +328,9 @@ export default async function InvitationsPage() {
                       ? t("admin.invitations.modePersonal")
                       : t("workspaceSwitcher.workspace"),
                   link.maxUses === null
-                    ? link.useCount === 1
-                      ? t("admin.invitations.usesOne", {
-                          count: link.useCount,
-                        })
-                      : t("admin.invitations.usesOther", {
-                          count: link.useCount,
-                        })
+                    ? t("admin.invitations.uses", {
+                        count: link.useCount,
+                      })
                     : t("admin.invitations.usesOfMax", {
                         count: link.useCount,
                         max: link.maxUses,

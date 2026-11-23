@@ -40,6 +40,29 @@ export {
   SLUG_PATTERN,
 } from "./identifier.ts";
 export {
+  directionFor,
+  getLocaleDefinition,
+  intlTagFor,
+  isLocaleCode,
+  isShippedLocale,
+  LOCALE_CODES,
+  LOCALES,
+  type LocaleCode,
+  type LocaleDefinition,
+  type LocaleDirection,
+  languageName,
+  SHIPPED_LOCALES,
+  type ShippedLocaleCode,
+} from "./locales.ts";
+export {
+  type Catalogue,
+  catalogueWithLocalePlurals,
+  type MessageValues,
+  messageHasLetters,
+  messageHoles,
+  translate,
+} from "./messages.ts";
+export {
   type MentionName,
   richTextAsLine,
   richTextLength,

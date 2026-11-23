@@ -1,5 +1,5 @@
 import { NOTIFICATION_REASONS } from "@openokr/db";
-import { CATALOGUES } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 import { describe, expect, it } from "vitest";
 import {
   REASON_FALLBACK_KEYS,

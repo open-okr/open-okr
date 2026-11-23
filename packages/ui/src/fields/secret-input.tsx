@@ -27,6 +27,7 @@ export function SecretInput({
   return (
     <TextInput
       {...props}
+      dir="ltr"
       id={controlId}
       type={revealed ? "text" : "password"}
       spellCheck={false}
@@ -38,7 +39,7 @@ export function SecretInput({
           aria-pressed={revealed}
           aria-controls={controlId}
           aria-label={t("fields.secret.showWhatYouTyped")}
-          className="absolute inset-y-0 right-0 flex w-8 items-center justify-center rounded-r-control text-ink-3 outline-none hover:text-ink-2 focus-visible:ring-2 focus-visible:ring-brand-line"
+          className="absolute inset-y-0 end-0 flex w-8 items-center justify-center rounded-e-control text-ink-3 outline-none hover:text-ink-2 focus-visible:ring-2 focus-visible:ring-brand-line"
         >
           {revealed ? (
             <EyeOff className="size-4" aria-hidden="true" />

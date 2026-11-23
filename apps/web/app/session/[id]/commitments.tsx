@@ -102,7 +102,7 @@ function LastWeek({
           >
             <span className="min-w-0 text-ink">
               {one.text}
-              <span className="ml-1.5 text-xs text-ink-3">
+              <span className="ms-1.5 text-xs text-ink-3">
                 {t("session.detail.commitments.weekOf", {
                   ownerName: one.ownerName,
                   weekStart: one.weekStart,
@@ -204,7 +204,7 @@ function ThisWeek({
             >
               <span className="min-w-0 text-ink">
                 {one.text}
-                <span className="ml-1.5 text-xs text-ink-3">
+                <span className="ms-1.5 text-xs text-ink-3">
                   {one.ownerName}
                   {one.keyResultTitle ? ` · ${one.keyResultTitle}` : ""}
                 </span>
@@ -382,7 +382,7 @@ export function Commitments({
               {carried.map((one) => (
                 <li key={one.id}>
                   {one.text}
-                  <span className="ml-1.5 text-xs text-ink-3">
+                  <span className="ms-1.5 text-xs text-ink-3">
                     {one.ownerName}
                   </span>
                 </li>
@@ -426,7 +426,7 @@ export function Commitments({
                 already.map((one) => (
                   <li key={one.id}>
                     {one.text}
-                    <span className="ml-1.5 text-xs text-ink-3">
+                    <span className="ms-1.5 text-xs text-ink-3">
                       {one.ownerName}
                     </span>
                   </li>

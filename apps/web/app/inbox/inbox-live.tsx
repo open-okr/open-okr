@@ -45,9 +45,7 @@ export function InboxLive() {
 
   return (
     <p className="text-xs text-ink-3" role="status" data-testid="inbox-live">
-      {arrived === 1
-        ? t("inbox.inboxLive.rowsArrivedOne", { count: arrived })
-        : t("inbox.inboxLive.rowsArrivedOther", { count: arrived })}
+      {t("inbox.inboxLive.rowsArrived", { count: arrived })}
     </p>
   );
 }

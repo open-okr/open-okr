@@ -102,9 +102,7 @@ export function ReadCountLine({ count }: { readonly count: number }) {
   }
   return (
     <p className="text-xs text-ink-3">
-      {count === 1
-        ? t("copilot.copilotPanel.step.summaryReadOne", { count })
-        : t("copilot.copilotPanel.step.summaryReadOther", { count })}
+      {t("copilot.copilotPanel.step.summaryRead", { count })}
     </p>
   );
 }
@@ -130,24 +128,18 @@ export function StepSummary({ steps }: { readonly steps: readonly Step[] }) {
   const reads = steps.filter((step) => step.step === "reading").length;
   const summary =
     reads > 0
-      ? reads === 1
-        ? t("copilot.copilotPanel.step.summaryReadOne", { count: reads })
-        : t("copilot.copilotPanel.step.summaryReadOther", { count: reads })
+      ? t("copilot.copilotPanel.step.summaryRead", { count: reads })
       : found === undefined
         ? t("copilot.copilotPanel.step.summarySearched")
         : found.count === 0
           ? t("copilot.copilotPanel.step.summaryNone")
-          : found.count === 1
-            ? t("copilot.copilotPanel.step.summaryOne", { count: found.count })
-            : t("copilot.copilotPanel.step.summaryOther", {
-                count: found.count,
-              });
+          : t("copilot.copilotPanel.step.summary", { count: found.count });
   return (
     <details className="group text-xs text-ink-3">
       <summary className="w-fit cursor-pointer rounded-control hover:text-ink-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-strong">
         {summary}
       </summary>
-      <ul className="mt-1 flex flex-col gap-0.5 pl-1">
+      <ul className="mt-1 flex flex-col gap-0.5 ps-1">
         {steps.map((step, index) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: steps only grow, in order.
           <li key={index} className="flex items-center gap-1.5">

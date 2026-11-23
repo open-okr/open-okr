@@ -401,10 +401,22 @@
     transform: translateY(-6px);
   }
 }
+/* The chevron's background and the entrance's transform use physical
+ * coordinates, so choose the offset for each direction here. */
+:root,
+[dir="ltr"] {
+  --select-chevron-position: right 0.5rem center;
+  --slide-in-offset: -10px;
+}
+[dir="rtl"] {
+  --select-chevron-position: left 0.5rem center;
+  --slide-in-offset: 10px;
+}
 @keyframes slide-in {
   from {
     opacity: 0;
-    transform: translateX(-10px);
+    /* direction-neutral: the offset already reflects the reading direction. */
+    transform: translateX(var(--slide-in-offset));
   }
 }
 @keyframes grow-bar {

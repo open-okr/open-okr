@@ -30,6 +30,7 @@ import type { ActionCallContext } from "@openokr/core";
 import { importCheckIns } from "./mappers/check-ins.ts";
 import { importCollaboration } from "./mappers/collaboration.ts";
 import { importFiles } from "./mappers/files.ts";
+import { importKpiShares } from "./mappers/kpi-shares.ts";
 import { importKpis } from "./mappers/kpis.ts";
 import { importKeyResultValues, importOkrs } from "./mappers/okrs.ts";
 import { importOrganisation } from "./mappers/organisation.ts";
@@ -181,6 +182,18 @@ const DOMAINS: readonly ImportDomain[] = [
     async run(options) {
       const result = await importFiles(options);
       return { domains: result.domains, notes: result.unmodelled };
+    },
+  },
+  {
+    key: "kpi-shares",
+    summary: "KPI shares from indicator_accesses",
+    requires: ["kpis"],
+    async run(options) {
+      const result = await importKpiShares(options);
+      return {
+        domains: result.domains,
+        notes: result.notes,
+      };
     },
   },
 ];

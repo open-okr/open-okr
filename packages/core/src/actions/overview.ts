@@ -29,6 +29,7 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
 import { OperationError } from "../operations/operation.ts";
+import { resolveInstanceDefaultLanguage } from "../settings/workspace-defaults.ts";
 import { defineReadAction } from "./define.ts";
 
 const overviewOutput = z.object({
@@ -69,7 +70,7 @@ export const workspaceOverview = defineReadAction({
       );
     }
 
-    return withContext(
+    const overview = await withContext(
       db,
       { workspaceId: context.workspaceId, userId },
       async (tx) => {
@@ -143,7 +144,8 @@ export const workspaceOverview = defineReadAction({
             slug: workspace.slug,
             state: workspace.state,
             timezone: String(settings.timezone ?? "UTC"),
-            language: String(settings.language ?? "en"),
+            language:
+              typeof settings.language === "string" ? settings.language : null,
           },
           member: {
             id: member.id,
@@ -155,5 +157,16 @@ export const workspaceOverview = defineReadAction({
         };
       },
     );
+    return {
+      ...overview,
+      workspace: {
+        ...overview.workspace,
+        language:
+          overview.workspace.language ??
+          (await resolveInstanceDefaultLanguage(context.pool).catch(
+            () => "en",
+          )),
+      },
+    };
   },
 });

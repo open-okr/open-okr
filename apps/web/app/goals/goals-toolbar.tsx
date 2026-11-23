@@ -63,14 +63,14 @@ export function GoalsToolbar({
           {tabs}
         </div>
         {panel || display || exportControl || trailing ? (
-          <div className="ml-auto flex items-center gap-2 py-1.75 max-md:w-full max-md:pt-2.5 max-md:pb-1">
+          <div className="ms-auto flex items-center gap-2 py-1.75 max-md:w-full max-md:pt-2.5 max-md:pb-1">
             {panel ? (
               <button
                 type="button"
                 aria-expanded={open}
                 aria-controls="goals-filter-panel"
                 onClick={() => setOpen((now) => !now)}
-                className={`inline-flex h-7.5 items-center gap-1.5 rounded-control border px-2.75 text-[12.5px] font-semibold whitespace-nowrap max-md:mr-auto ${
+                className={`inline-flex h-7.5 items-center gap-1.5 rounded-control border px-2.75 text-[12.5px] font-semibold whitespace-nowrap max-md:me-auto ${
                   open
                     ? "border-brand-line bg-brand-weak text-brand-text"
                     : "border-line-2 bg-surface text-ink-2 hover:border-ink-4"

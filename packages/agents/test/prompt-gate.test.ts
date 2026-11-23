@@ -24,6 +24,8 @@ import { evaluatePrompt, workspacePrompts } from "../src/evaluation/index.ts";
 
 const OWNER = "prompt-gate-owner";
 const OBJECTIVE = PROMPT_KEYS.draftObjective;
+const ENGLISH =
+  " Write human-readable text in English. Keep schema keys, enum values, and identifiers unchanged.";
 
 let workspaceId: string;
 let pool: Pool;
@@ -97,14 +99,14 @@ describe("saving a version (design §7)", () => {
     expect(refused).toBeInstanceOf(OperationError);
     expect((refused as OperationError).field).toBe("systemPrompt");
     expect((refused as Error).message).toMatch(
-      /^Not saved\. This version fails 4 of the 4 examples in its evaluation set: personal-data on "an ambition with a team and two objectives already" \(an email address in the system prompt\)/,
+      /^Not saved\. This version fails 14 of the 14 examples in its evaluation set: personal-data on "an ambition with a team and two objectives already" \(an email address in the system prompt\)/,
     );
 
     const read = await callAction(gated(), "ai.readPrompt", {
       promptKey: OBJECTIVE,
     });
     expect(read).toMatchObject({ isDefault: true, history: [] });
-    expect(await sentSystemPrompt()).toBe(DEFAULT_PROMPTS[OBJECTIVE]);
+    expect(await sentSystemPrompt()).toBe(DEFAULT_PROMPTS[OBJECTIVE] + ENGLISH);
   });
 
   it("stores one that passes, and the next draft sends it", async () => {
@@ -115,10 +117,10 @@ describe("saving a version (design §7)", () => {
       systemPrompt: ours,
     });
     expect(saved).toMatchObject({ version: 1, isDefault: false });
-    expect(await sentSystemPrompt()).toBe(ours);
+    expect(await sentSystemPrompt()).toBe(ours + ENGLISH);
 
     await callAction(gated(), "ai.restorePrompt", { promptKey: OBJECTIVE });
-    expect(await sentSystemPrompt()).toBe(DEFAULT_PROMPTS[OBJECTIVE]);
+    expect(await sentSystemPrompt()).toBe(DEFAULT_PROMPTS[OBJECTIVE] + ENGLISH);
   });
 });
 
@@ -139,6 +141,6 @@ describe("a stored version the set fails (design §6)", () => {
     });
 
     expect(await workspacePrompts(pool, workspaceId)).toEqual({});
-    expect(await sentSystemPrompt()).toBe(DEFAULT_PROMPTS[OBJECTIVE]);
+    expect(await sentSystemPrompt()).toBe(DEFAULT_PROMPTS[OBJECTIVE] + ENGLISH);
   });
 });

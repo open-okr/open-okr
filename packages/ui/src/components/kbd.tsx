@@ -1,6 +1,7 @@
 import { Command } from "lucide-react";
 import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "../lib/cn.ts";
+import { CommandKeyName } from "./command-key-name.tsx";
 
 /** The character the shortcut registry and every call site write for the
  * modifier. Kept as the authored form, because UIUX-PLAN.md §4 and the
@@ -26,7 +27,7 @@ const COMMAND = "⌘";
 function CommandGlyph() {
   return (
     <>
-      <span className="sr-only">Command </span>
+      <CommandKeyName />
       <Command
         aria-hidden="true"
         className="inline-block size-[1.05em] align-[-0.15em] stroke-[2.5]"

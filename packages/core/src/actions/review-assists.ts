@@ -36,6 +36,7 @@ import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
 import { readGoal } from "./goals.ts";
 import { readDiagnostic, readMinutes } from "./sessions.ts";
@@ -181,6 +182,7 @@ export const clusterRetroNotes = defineReadAction({
     >;
     try {
       clustered = await drafter.clusterNotes({
+        locale: await resolveMemberLanguage(context),
         notes: notes.map((note) => ({
           text: note.text,
           column: note.columnKey,
@@ -271,6 +273,7 @@ export const narrateDiagnostic = defineReadAction({
     let narrative: string | null = null;
     try {
       narrative = await drafter.narrateDiagnostic({
+        locale: await resolveMemberLanguage(context),
         verdict: diagnostic.verdict,
         diagnosis: diagnostic.diagnosis ?? "",
         prescription: diagnostic.prescription ?? "",
@@ -314,6 +317,7 @@ export const draftMinutes = defineReadAction({
     let narrative: string | null = null;
     try {
       narrative = await drafter.draftMinutes({
+        locale: await resolveMemberLanguage(context),
         sections: minutesSections(minutes),
       });
     } catch {
@@ -423,6 +427,7 @@ export const draftRetrospective = defineReadAction({
     let narrative: string | null = null;
     try {
       narrative = await drafter.draftRetrospective({
+        locale: await resolveMemberLanguage(context),
         goalTitle: goal.title,
         checkIns: history.map((entry) => ({
           period:

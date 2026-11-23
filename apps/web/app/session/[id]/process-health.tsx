@@ -107,13 +107,9 @@ export function ProcessHealthPanel({
             {t("session.detail.processHealth.okrProcessHealth")}
           </h2>
           <Chip tone="neutral">
-            {health.responses === 1
-              ? t("session.detail.processHealth.responseCountOne", {
-                  count: health.responses,
-                })
-              : t("session.detail.processHealth.responseCountOther", {
-                  count: health.responses,
-                })}
+            {t("session.detail.processHealth.responseCount", {
+              count: health.responses,
+            })}
           </Chip>
           {health.submitted ? (
             <Chip tone="ok">{t("session.detail.processHealth.yoursIsIn")}</Chip>

@@ -1,4 +1,6 @@
+import { directionFor } from "@openokr/formats";
 import { type KeyResultDirection, trendForecast } from "@openokr/method";
+import { timeAxisX } from "../../../lib/reading-direction.ts";
 import { getTranslations } from "../../../lib/translations";
 
 /**
@@ -46,7 +48,8 @@ export async function Sparkline({
   /** §3.6's values to wait for before projecting (P9-T15a). */
   readonly minimumValues: number;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  const readingDirection = directionFor(locale);
 
   if (history.length < 2) {
     return (
@@ -63,11 +66,8 @@ export async function Sparkline({
       at: new Date(point.at).getTime(),
       value: point.value,
     }))
-    // Oldest first. `goals.keyResultHistory` answers newest first, which is
-    // right for a table and backwards for a chart: plotted in that order the
-    // line runs right to left, so a key result that climbed from 41 to 60
-    // draws as a falling line. The read is not changed, because the table
-    // wants what it returns; the chart sorts for itself.
+    // The chart leads with the oldest point in either reading direction.
+    // The table keeps the newest-first order from `goals.keyResultHistory`.
     .sort((a, b) => a.at - b.at);
   const forecast =
     horizonAt === null || target === null
@@ -98,7 +98,11 @@ export async function Sparkline({
 
   const path = points
     .map((point, index) => {
-      const x = ((point.at - firstAt) / width) * WIDTH;
+      const x = timeAxisX(
+        ((point.at - firstAt) / width) * WIDTH,
+        WIDTH,
+        readingDirection,
+      );
       // Inverted, because SVG's y grows downward and a rising value should rise.
       const y = HEIGHT - ((point.value - low) / span) * HEIGHT;
       return `${index === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;

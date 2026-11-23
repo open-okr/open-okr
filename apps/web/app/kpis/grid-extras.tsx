@@ -1,6 +1,8 @@
 "use client";
 
+import { useDirection } from "@base-ui-components/react/direction-provider";
 import { Chip, useTranslations } from "@openokr/ui";
+import { timeAxisX } from "../../lib/reading-direction.ts";
 
 /**
  * Two of the things S-20 asks for in the row and group headers (P6-G30): the
@@ -48,6 +50,7 @@ export function RowSparkline({
   /** False on the phone's copy, so a test id names one element. */
   readonly testId?: boolean;
 }) {
+  const direction = useDirection();
   const { t } = useTranslations();
   const values = [...records]
     .sort((left, right) => left.periodStart.localeCompare(right.periodStart))
@@ -74,7 +77,7 @@ export function RowSparkline({
   const points = values.map((value, index) => {
     // Inverted, because an SVG's y grows downward and a value does not.
     const y = 21 - ((value - lowest) / span) * 18;
-    return [2 + index * step, y] as const;
+    return [timeAxisX(2 + index * step, 100, direction), y] as const;
   });
   const last = points[points.length - 1] as readonly [number, number];
 
@@ -155,7 +158,7 @@ export function CategorySubtotal({
       className="flex flex-wrap items-center gap-1.5 text-xs"
       data-testid={testId}
     >
-      {count ? <span className="mr-0.5 text-ink-3">{count}</span> : null}
+      {count ? <span className="me-0.5 text-ink-3">{count}</span> : null}
       {healthy > 0 ? (
         <Chip tone="ok" dot>
           {t("kpi.state.healthy", { healthy })}

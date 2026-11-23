@@ -233,7 +233,8 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     table: "kpi_shares",
     column: "member_id",
     skip: "access",
-    because: "Who a KPI is shared with is authorisation.",
+    because:
+      "Retired in 0.10.0, never written. Shares live in access_bindings.",
   },
   {
     table: "kpis",

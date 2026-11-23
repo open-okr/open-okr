@@ -11,9 +11,23 @@ const state = vi.hoisted(() => ({
   workspaceLanguage: null as string | null,
   acceptLanguage: null as string | null,
   instanceLanguage: "en" as string | Error,
+  cookie: null as string | null,
+  deShipped: false,
   headersFail: false,
 }));
 
+vi.mock("@openokr/formats", async (importOriginal) => {
+  const formats = await importOriginal<typeof import("@openokr/formats")>();
+  // Indonesian ships since 0.10.0 S19i and is the last registry locale, so the
+  // tests that need an unshipped code keep "id" unshipped inside this file only.
+  return {
+    ...formats,
+    SHIPPED_LOCALES: formats.SHIPPED_LOCALES.filter((code) => code !== "id"),
+    isShippedLocale: (value: unknown) =>
+      value !== "id" &&
+      ((state.deShipped && value === "de") || formats.isShippedLocale(value)),
+  };
+});
 vi.mock("../lib/pool", () => ({ getPool: () => ({}) }));
 vi.mock("../lib/workspace", () => ({
   requireWorkspace: async () => {
@@ -27,6 +41,12 @@ vi.mock("../lib/workspace", () => ({
   },
 }));
 vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: (name: string) =>
+      name === "openokr_locale" && state.cookie !== null
+        ? { value: state.cookie }
+        : undefined,
+  }),
   headers: async () => {
     if (state.headersFail) {
       throw new Error("headers() outside a request");
@@ -39,8 +59,25 @@ vi.mock("next/headers", () => ({
   },
 }));
 vi.mock("@openokr/core", () => ({
-  resolveMemberLanguage: async () =>
-    state.memberLanguage ?? state.workspaceLanguage ?? "en",
+  resolveMemberLanguage: async () => {
+    // Member -> Workspace -> Instance -> English
+    const isShipped = (lang: string | null | undefined) =>
+      lang === "en" || lang === "ms";
+
+    if (state.memberLanguage && isShipped(state.memberLanguage)) {
+      return state.memberLanguage;
+    }
+    if (state.workspaceLanguage && isShipped(state.workspaceLanguage)) {
+      return state.workspaceLanguage;
+    }
+    if (
+      typeof state.instanceLanguage === "string" &&
+      isShipped(state.instanceLanguage)
+    ) {
+      return state.instanceLanguage;
+    }
+    return "en";
+  },
   resolveInstanceDefaultLanguage: async () => {
     if (state.instanceLanguage instanceof Error) {
       throw state.instanceLanguage;
@@ -57,10 +94,32 @@ beforeEach(() => {
   state.workspaceLanguage = null;
   state.acceptLanguage = null;
   state.instanceLanguage = "en";
+  state.cookie = null;
+  state.deShipped = false;
   state.headersFail = false;
 });
 
 describe("a signed-out page", () => {
+  test("a saved choice wins over the browser and instance", async () => {
+    state.cookie = "en";
+    state.acceptLanguage = "ms";
+    state.instanceLanguage = "ms";
+    expect(await resolveLocale()).toBe("en");
+  });
+
+  test("an unavailable cookie falls through to the browser", async () => {
+    state.cookie = "xx";
+    state.acceptLanguage = "ms";
+    expect(await resolveLocale()).toBe("ms");
+  });
+
+  test("AC-1: a German instance renders German when the visitor has no available choice", async () => {
+    state.deShipped = true;
+    state.acceptLanguage = "id";
+    state.instanceLanguage = "de";
+    expect(await resolveLocale()).toBe("de");
+  });
+
   test("a Malay browser on an English instance reads Malay", async () => {
     state.acceptLanguage = "ms-MY,ms;q=0.9,en;q=0.8";
     expect(await resolveLocale()).toBe("ms");
@@ -73,7 +132,7 @@ describe("a signed-out page", () => {
   });
 
   test("a browser language the product does not ship falls to the instance's", async () => {
-    state.acceptLanguage = "fr-FR,fr;q=0.9";
+    state.acceptLanguage = "id-ID,id;q=0.9";
     state.instanceLanguage = "ms";
     expect(await resolveLocale()).toBe("ms");
   });
@@ -84,8 +143,8 @@ describe("a signed-out page", () => {
   });
 
   test("an instance language the product does not ship falls to English", async () => {
-    state.acceptLanguage = "fr";
-    state.instanceLanguage = "de";
+    state.acceptLanguage = "id";
+    state.instanceLanguage = "id";
     expect(await resolveLocale()).toBe("en");
   });
 
@@ -97,6 +156,13 @@ describe("a signed-out page", () => {
 });
 
 describe("a signed-in page, unchanged", () => {
+  test("the visitor's cookie is ignored in a workspace", async () => {
+    state.signedIn = true;
+    state.cookie = "en";
+    state.workspaceLanguage = "ms";
+    expect(await resolveLocale()).toBe("ms");
+  });
+
   test("the member's own language wins over the browser's", async () => {
     state.signedIn = true;
     state.memberLanguage = "en";
@@ -111,10 +177,41 @@ describe("a signed-in page, unchanged", () => {
     expect(await resolveLocale()).toBe("ms");
   });
 
-  test("then English, whatever the browser says", async () => {
+  test("then the instance default before English", async () => {
+    state.signedIn = true;
+    state.acceptLanguage = "en";
+    state.instanceLanguage = "ms";
+    expect(await resolveLocale()).toBe("ms");
+  });
+
+  test("then English when instance setting is absent or unshipped", async () => {
     state.signedIn = true;
     state.acceptLanguage = "ms";
-    state.instanceLanguage = "ms";
+    state.instanceLanguage = "unknown";
     expect(await resolveLocale()).toBe("en");
+  });
+
+  test("AC-2: instance ms, workspace en, member fr skips fr and sees en; clearing workspace falls to ms", async () => {
+    state.signedIn = true;
+    state.instanceLanguage = "ms";
+    state.workspaceLanguage = "en";
+    state.memberLanguage = "id"; // id is not shipped, skipped
+    expect(await resolveLocale()).toBe("en");
+
+    // Member chooses "Follow workspace" (memberLanguage becomes null)
+    state.memberLanguage = null;
+    expect(await resolveLocale()).toBe("en");
+
+    // Administrator clears workspace language (workspaceLanguage becomes null)
+    state.workspaceLanguage = null;
+    expect(await resolveLocale()).toBe("ms");
+  });
+
+  test("unknown stored value is skipped at every step", async () => {
+    state.signedIn = true;
+    state.memberLanguage = "xyz-unknown";
+    state.workspaceLanguage = "bad-locale";
+    state.instanceLanguage = "ms";
+    expect(await resolveLocale()).toBe("ms");
   });
 });

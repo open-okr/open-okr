@@ -4,6 +4,7 @@ import {
   OperationError,
   RHYTHM_ASSIST_KEYS,
 } from "@openokr/core";
+import { directionFor } from "@openokr/formats";
 import {
   Bar,
   Card,
@@ -21,8 +22,16 @@ import { assistOffered } from "../../../lib/assists";
 import { getPool } from "../../../lib/auth";
 import { KPI_ACHIEVEMENT_MAX } from "../../../lib/ceilings.ts";
 import { memberOption } from "../../../lib/entity-options.ts";
+import {
+  INDICATOR_NAME_KEYS,
+  KPI_FREQUENCY_NAME_KEYS,
+  KPI_STATE_NAME_KEYS,
+  KPI_TIER_NAME_KEYS,
+  nameOf,
+} from "../../../lib/identifier-names.ts";
 import { searchHumans } from "../../../lib/member-search.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
+import { timeAxisX } from "../../../lib/reading-direction.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -30,6 +39,7 @@ import { ActionForm } from "../../cycle/action-form.tsx";
 import { updateKpiRule } from "../actions.ts";
 import { JudgedBy } from "../judged-by.tsx";
 import { FormulaBuilder } from "./formula-builder.tsx";
+import { SharedWithCard } from "./shared-with-card.tsx";
 import { TrendNarration } from "./trend-narration.tsx";
 
 /** The tab reads this item's own name (lib/page-title.ts). */
@@ -101,7 +111,8 @@ export default async function KpiDetailPage({
 }: {
   readonly params: Promise<{ readonly id: string }>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  const direction = directionFor(locale);
 
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
@@ -142,18 +153,33 @@ export default async function KpiDetailPage({
     throw error;
   }
   const settings = await callAction(context, "settings.readForMember", {});
+  // machine use: ISO date for today
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: String(settings.settings.timezone ?? "UTC"),
   }).format(new Date());
 
   const { kpi } = detail;
+  const canFull =
+    level >= ACCESS_LEVELS.full ||
+    (kpi.namedOwnerId !== null && kpi.namedOwnerId === workspace.memberId);
+
+  let sharesData: Awaited<ReturnType<typeof callAction<"kpis.shares">>> | null =
+    null;
+  let sharesError: string | null = null;
+  try {
+    sharesData = await callAction(context, "kpis.shares", { kpiId: id });
+  } catch {
+    sharesError = t("kpis.shares.loadFailed");
+  }
+
   // Who may own it: a person who is here (§6.2, P9-T17b-b). Read only for
   // somebody who may change it.
-  const people = canEdit
-    ? (await callAction(context, "people.directory", {})).filter(
-        (member) => member.kind === "human" && member.status === "active",
-      )
-    : [];
+  const people =
+    canEdit || canFull
+      ? (await callAction(context, "people.directory", {})).filter(
+          (member) => member.kind === "human" && member.status === "active",
+        )
+      : [];
   // Oldest first for the chart; the read returns newest first for the table.
   const series = [...detail.records].reverse();
   const target = kpi.targetDefault ?? 0;
@@ -169,7 +195,7 @@ export default async function KpiDetailPage({
     .map((record, index) =>
       record.actualValue === null
         ? null
-        : `${index * step},${y(record.actualValue)}`,
+        : `${timeAxisX(index * step, width, direction)},${y(record.actualValue)}`,
     )
     .filter((point): point is string => point !== null)
     .join(" ");
@@ -196,7 +222,7 @@ export default async function KpiDetailPage({
                 {kpi.title}
               </h1>
               <Chip tone={stateTone(kpi.state)} dot>
-                {kpi.state}
+                {nameOf(KPI_STATE_NAME_KEYS, kpi.state, t)}
               </Chip>
               {/* Beside the band, never instead of it (§6.4, P9-T17b-a). */}
               {kpi.recovering ? (
@@ -208,10 +234,10 @@ export default async function KpiDetailPage({
                 kpi.categoryName ?? t("kpis.detail.uncategorised"),
                 kpi.treeName ?? t("kpis.detail.noTree"),
                 kpi.ownerName ?? t("kpis.detail.workspaceOwned"),
-                kpi.frequency,
+                nameOf(KPI_FREQUENCY_NAME_KEYS, kpi.frequency, t),
                 kpi.tier
-                  ? `${kpi.indicatorType} · ${kpi.tier}`
-                  : kpi.indicatorType,
+                  ? `${nameOf(INDICATOR_NAME_KEYS, kpi.indicatorType, t)} · ${nameOf(KPI_TIER_NAME_KEYS, kpi.tier, t)}`
+                  : nameOf(INDICATOR_NAME_KEYS, kpi.indicatorType, t),
               ].join(" · ")}
             </p>
             {/* What the kpi-records template's "kpi" column asks for, which
@@ -320,19 +346,27 @@ export default async function KpiDetailPage({
                 }}
               />
               <div className="flex flex-wrap items-center gap-2.5">
-                <EntityPicker
-                  id="edit-ownerMemberId"
-                  label={t("kpis.rule.owner")}
-                  name="ownerMemberId"
-                  defaultValue={kpi.namedOwnerId}
-                  options={people.map((person) =>
-                    memberOption(person, t("common.agent")),
-                  )}
-                  noneLabel={t("kpis.rule.nobodyNamedOption")}
-                  search={searchHumans}
-                  className="w-56"
-                  inputClassName="text-xs"
-                />
+                <div className="flex flex-col gap-1">
+                  <EntityPicker
+                    id="edit-ownerMemberId"
+                    label={t("kpis.rule.owner")}
+                    name="ownerMemberId"
+                    defaultValue={kpi.namedOwnerId}
+                    options={people.map((person) =>
+                      memberOption(person, t("common.agent")),
+                    )}
+                    noneLabel={t("kpis.rule.nobodyNamedOption")}
+                    search={searchHumans}
+                    disabled={!canFull}
+                    className="w-56"
+                    inputClassName="text-xs"
+                  />
+                  {!canFull ? (
+                    <p className="text-[11px] text-ink-3">
+                      {t("kpis.rule.ownerNeedsFull")}
+                    </p>
+                  ) : null}
+                </div>
                 <SelectInput
                   id="edit-tier"
                   label={t("kpis.rule.tier")}
@@ -359,6 +393,21 @@ export default async function KpiDetailPage({
         ) : null}
       </Card>
 
+      {/* S-21 KPI detail "Shared with" card under "How it is judged" */}
+      <SharedWithCard
+        kpiId={kpi.id}
+        canFull={canFull}
+        owner={
+          sharesData?.owner ??
+          (kpi.namedOwnerId
+            ? { memberId: kpi.namedOwnerId, name: kpi.namedOwnerName ?? "" }
+            : null)
+        }
+        shares={sharesData?.shares ?? []}
+        error={sharesError}
+        availableMembers={people}
+      />
+
       <Card>
         <CardHeader>
           <h2 className="text-sm font-bold text-ink">
@@ -375,28 +424,16 @@ export default async function KpiDetailPage({
               viewBox={`0 0 ${width} ${height}`}
               className="h-36 w-full min-w-[32rem]"
               role="img"
-              aria-label={
-                series.length === 1
-                  ? t("kpis.detail.chartLabelOne", {
-                      title: kpi.title,
-                      count: series.length,
-                    })
-                  : t("kpis.detail.chartLabelOther", {
-                      title: kpi.title,
-                      count: series.length,
-                    })
-              }
+              aria-label={t("kpis.detail.chartLabel", {
+                title: kpi.title,
+                count: series.length,
+              })}
             >
               <title>
-                {series.length === 1
-                  ? t("kpis.detail.chartTitleOne", {
-                      title: kpi.title,
-                      count: series.length,
-                    })
-                  : t("kpis.detail.chartTitleOther", {
-                      title: kpi.title,
-                      count: series.length,
-                    })}
+                {t("kpis.detail.chartTitle", {
+                  title: kpi.title,
+                  count: series.length,
+                })}
               </title>
               {/* The two bands, drawn from the target rather than from the
                   achievement, because a reader compares the value they typed
@@ -463,13 +500,13 @@ export default async function KpiDetailPage({
               </caption>
               <thead>
                 <tr className="border-line border-b text-xs text-ink-3">
-                  <th className="px-3 py-1.5 text-left font-semibold">
+                  <th className="px-3 py-1.5 text-start font-semibold">
                     {t("common.period")}
                   </th>
-                  <th className="px-3 py-1.5 text-right font-semibold">
+                  <th className="px-3 py-1.5 text-end font-semibold">
                     {t("kpis.detail.actual")}
                   </th>
-                  <th className="px-3 py-1.5 text-right font-semibold">
+                  <th className="px-3 py-1.5 text-end font-semibold">
                     {t("common.target")}
                   </th>
                 </tr>
@@ -490,10 +527,10 @@ export default async function KpiDetailPage({
                     <td className="px-3 py-1.5 text-ink-2">
                       {record.periodStart}
                     </td>
-                    <td className="px-3 py-1.5 text-right text-ink tabular-nums">
+                    <td className="px-3 py-1.5 text-end text-ink tabular-nums">
                       {record.actualValue ?? "—"}
                     </td>
-                    <td className="px-3 py-1.5 text-right text-ink-3 tabular-nums">
+                    <td className="px-3 py-1.5 text-end text-ink-3 tabular-nums">
                       {record.targetValue ?? kpi.targetDefault ?? "—"}
                     </td>
                   </tr>
@@ -552,7 +589,7 @@ export default async function KpiDetailPage({
                         {child.title}
                       </Link>
                       <span className="text-xs text-ink-4">
-                        {child.indicatorType}
+                        {nameOf(INDICATOR_NAME_KEYS, child.indicatorType, t)}
                       </span>
                       <Chip tone={stateTone(child.state)} dot>
                         {child.achievementPct === null

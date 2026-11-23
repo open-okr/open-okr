@@ -292,7 +292,7 @@ export const updateWorkspaceGeneralSettings = defineWriteAction({
   input: z
     .object({
       timezone: timezoneSchema.optional(),
-      language: languageSchema.optional(),
+      language: languageSchema.nullable().optional(),
       trustedEmailDomains: trustedEmailDomainsSchema.optional(),
       /**
        * Everybody in this workspace holds a second factor (P8-T09). A member

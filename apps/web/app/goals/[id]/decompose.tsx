@@ -226,7 +226,7 @@ export function DecomposeKeyResult({
               />
             </div>
             {row.tasks.length > 0 ? (
-              <fieldset className="flex flex-col gap-1 pl-3">
+              <fieldset className="flex flex-col gap-1 ps-3">
                 <legend className="text-xs font-medium text-ink-3">
                   {t("goals.detail.decompose.firstTasks")}
                 </legend>
@@ -302,20 +302,10 @@ export function DecomposeKeyResult({
                 setRows(null);
                 setNotice(
                   t("goals.detail.decompose.created", {
-                    initiatives:
-                      created.initiatives === 1
-                        ? t("common.count.initiativeOne", {
-                            count: created.initiatives,
-                          })
-                        : t("common.count.initiativeOther", {
-                            count: created.initiatives,
-                          }),
-                    tasks:
-                      created.tasks === 1
-                        ? t("common.count.taskOne", { count: created.tasks })
-                        : t("common.count.taskOther", {
-                            count: created.tasks,
-                          }),
+                    initiatives: t("common.count.initiative", {
+                      count: created.initiatives,
+                    }),
+                    tasks: t("common.count.task", { count: created.tasks }),
                   }),
                 );
                 router.refresh();

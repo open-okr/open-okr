@@ -170,6 +170,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "kpis.tree",
     "kpis.spaceTrees",
     "kpis.update",
+    "kpis.shares",
     "comments.previewNotify",
     "reactions.list",
     "reactions.add",

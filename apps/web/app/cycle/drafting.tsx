@@ -21,7 +21,7 @@ import {
   TextInput,
   UnitInput,
 } from "@openokr/ui";
-import { ChevronDown } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import {
   type MemberLike,
@@ -233,7 +233,7 @@ export async function Drafting({
               {t("cycle.drafting.practiceHoldsNewObjectives")}
             </p>
             {draftingReasons.length === 0 ? null : (
-              <ul className="mt-1.5 flex list-disc flex-col gap-0.5 pl-4 text-xs text-ink-3">
+              <ul className="mt-1.5 flex list-disc flex-col gap-0.5 ps-4 text-xs text-ink-3">
                 {draftingReasons.map((reason) => (
                   <li key={reason}>{reason}</li>
                 ))}
@@ -303,9 +303,9 @@ export async function Drafting({
            * disclosure, so it needs no script and keeps the keyboard. */}
           <details open className="group">
             <summary className="flex min-h-8 cursor-pointer list-none items-center gap-1.5 border-line border-b px-3.5 text-xs font-medium text-ink-3 hover:text-ink [&::-webkit-details-marker]:hidden">
-              <ChevronDown
+              <ChevronRight
                 aria-hidden="true"
-                className="size-3.5 -rotate-90 transition-transform group-open:rotate-0 motion-reduce:transition-none"
+                className="size-3.5 transition-transform group-open:rotate-90 motion-reduce:transition-none rtl:-scale-x-100 rtl:group-open:-rotate-90"
               />
               <span className="group-open:hidden">
                 {t("cycle.drafting.showDraft")}

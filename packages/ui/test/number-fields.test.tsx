@@ -114,6 +114,61 @@ describe("a number field", () => {
       screen.getByLabelText("Nilai").getAttribute("aria-roledescription"),
     ).toBe("Medan nombor");
   });
+
+  test("refuses ambiguous 1.234 in German on blur with a German message, reads 1234,5 as 1234.5, and reads ١٢٣٤ as 1234 (AC-31, languages §3)", async () => {
+    const user = userEvent.setup();
+    const germanCatalogue = {
+      "fields.number.role": "Nummernfeld",
+      "fields.number.ambiguous":
+        "Diese Zahl ist mehrdeutig. Verwenden Sie ein Komma für Dezimalstellen.",
+    };
+    const { unmount } = render(
+      <TranslationsProvider locale="de" catalogue={germanCatalogue}>
+        <form>
+          <NumberInput label="Wert" name="value" />
+        </form>
+      </TranslationsProvider>,
+    );
+
+    const field = screen.getByLabelText("Wert");
+    await user.type(field, "1.234");
+    await user.tab();
+
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Diese Zahl ist mehrdeutig. Verwenden Sie ein Komma für Dezimalstellen.",
+    );
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+
+    unmount();
+
+    // "1234,5" reads 1234.5
+    const { container: c2, unmount: u2 } = render(
+      <TranslationsProvider locale="de" catalogue={germanCatalogue}>
+        <form>
+          <NumberInput label="Wert" name="value" />
+        </form>
+      </TranslationsProvider>,
+    );
+    const field2 = screen.getByLabelText("Wert");
+    await user.type(field2, "1234,5");
+    await user.tab();
+    expect(posted(c2, "value")).toBe("1234.5");
+
+    u2();
+
+    // "١٢٣٤" reads 1234
+    const { container: c3 } = render(
+      <TranslationsProvider locale="de" catalogue={germanCatalogue}>
+        <form>
+          <NumberInput label="Wert" name="value" />
+        </form>
+      </TranslationsProvider>,
+    );
+    const field3 = screen.getByLabelText("Wert");
+    await user.type(field3, "١٢٣٤");
+    await user.tab();
+    expect(posted(c3, "value")).toBe("1234");
+  });
 });
 
 describe("a metric value", () => {

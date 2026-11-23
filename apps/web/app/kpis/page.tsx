@@ -1,4 +1,8 @@
-import { ACCESS_LEVELS, callAction, RHYTHM_ASSIST_KEYS } from "@openokr/core";
+import {
+  callAction,
+  RHYTHM_ASSIST_KEYS,
+  resolveKpiGridAccess,
+} from "@openokr/core";
 import {
   buttonVariants,
   EntityPicker,
@@ -85,11 +89,15 @@ export default async function KpisPage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
 
-  const level = await workspaceReaderLevel(
+  const pool = getPool();
+  await workspaceReaderLevel(workspace.workspaceId, workspace.memberId);
+  const grid = await callAction(context, "kpis.grid", { periods: 12 });
+  const { canEdit, editableKpiIds } = await resolveKpiGridAccess(
+    pool,
     workspace.workspaceId,
     workspace.memberId,
+    grid.kpis.map((k) => k.id),
   );
-  const canEdit = level >= ACCESS_LEVELS.edit;
   // §2.2's suggestion beside the add form (M-09), for somebody who may add a
   // KPI and only where a provider may write one. The form is the same either
   // way.
@@ -102,7 +110,6 @@ export default async function KpisPage({
       session.user.id,
     ));
 
-  const grid = await callAction(context, "kpis.grid", { periods: 12 });
   // Who may own a KPI: a person who is here (§6.2, P9-T17b-b). Read only for
   // somebody who may add one.
   const people = canEdit
@@ -168,6 +175,7 @@ export default async function KpisPage({
   // Today in the workspace calendar, resolved on the server. The grid needs it to
   // draw a column for the current period, and the browser clock is the wrong one.
   const settings = await callAction(context, "settings.readForMember", {});
+  // machine use: ISO date for today
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: String(settings.settings.timezone ?? "UTC"),
   }).format(new Date());
@@ -316,7 +324,7 @@ export default async function KpisPage({
             key={one.key}
             href={href({ [one.key]: null })}
             aria-label={t("goals.filter.removeOne", { filter: one.label })}
-            className="inline-flex h-6.5 items-center gap-1.5 rounded-full bg-brand-weak pr-1 pl-2.5 text-xs font-semibold text-brand-text hover:bg-brand-line"
+            className="inline-flex h-6.5 items-center gap-1.5 rounded-full bg-brand-weak pe-1 ps-2.5 text-xs font-semibold text-brand-text hover:bg-brand-line"
           >
             {one.label}
             <svg viewBox="0 0 10 10" aria-hidden="true" className="size-2.5">
@@ -362,7 +370,7 @@ export default async function KpisPage({
               )}
             </div>
             {canEdit ? (
-              <div className="ml-auto flex items-center gap-2 max-md:ml-0 max-md:w-full">
+              <div className="ms-auto flex items-center gap-2 max-md:ms-0 max-md:w-full">
                 <Link
                   href={opening("category")}
                   className={buttonVariants({ size: "sm" })}
@@ -421,6 +429,7 @@ export default async function KpisPage({
           categories={grid.categories}
           kpis={shown}
           canEdit={canEdit}
+          editableKpiIds={editableKpiIds}
           today={today}
           addHref={opening("kpi")}
         />

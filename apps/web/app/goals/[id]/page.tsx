@@ -6,6 +6,7 @@ import {
   REVIEW_ASSIST_KEYS,
   THREAD_SUMMARY_MINIMUM,
 } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import {
   alignmentMapped,
   type ResolvedPractice,
@@ -44,6 +45,7 @@ import { DecisionText } from "../../../lib/decision-text.tsx";
 import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { healthWord } from "../../../lib/health-words.ts";
+import { GOAL_LEVEL_NAME_KEYS, nameOf } from "../../../lib/identifier-names.ts";
 import { readKpiOptions } from "../../../lib/kpi-options.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
 import { PreviousNext } from "../../../lib/previous-next.tsx";
@@ -63,6 +65,7 @@ import {
   readSubjectDocuments,
   SubjectDocuments,
 } from "../../documents/subject-documents.tsx";
+import { LinkedKpiChip } from "../linked-kpi-chip.tsx";
 import { closeGoal, editGoal, reassignRole, reopenGoal } from "./actions.ts";
 import { CoachStrip } from "./coach-strip";
 import { DecomposeKeyResult } from "./decompose.tsx";
@@ -273,6 +276,16 @@ export default async function GoalPage({
   const kpiOptions =
     unlinkedKeyResults.length > 0 ? await readKpiOptions(context) : [];
 
+  const hasLinkedKpis = goal.keyResults.some(
+    (keyResult) => keyResult.kpiId !== null,
+  );
+  const visibleKpis = hasLinkedKpis
+    ? kpiOptions && kpiOptions.length > 0
+      ? kpiOptions
+      : await readKpiOptions(context)
+    : [];
+  const visibleKpiMap = new Map((visibleKpis ?? []).map((k) => [k.id, k]));
+
   const retrospectiveHtml = goal.retrospective
     ? richTextHtml(goal.retrospective.body)
     : null;
@@ -403,13 +416,13 @@ export default async function GoalPage({
               <p className="text-xs text-ink-3">
                 {goal.reviewer
                   ? t("common.championsItReviewsItWeight", {
-                      level: goal.level,
+                      level: nameOf(GOAL_LEVEL_NAME_KEYS, goal.level, t),
                       name: goal.champion.name,
                       name2: goal.reviewer.name,
                       weight: goal.weight,
                     })
                   : t("common.championsItNoReviewerWeight", {
-                      level: goal.level,
+                      level: nameOf(GOAL_LEVEL_NAME_KEYS, goal.level, t),
                       name: goal.champion.name,
                       weight: goal.weight,
                     })}
@@ -461,14 +474,9 @@ export default async function GoalPage({
                 {goal.daysPastDue !== null && goal.daysPastDue > 0
                   ? t("goals.detail.nextCheckInDueOverdue", {
                       date: goal.nextCheckInOn,
-                      days:
-                        goal.daysPastDue === 1
-                          ? t("common.count.dayOne", {
-                              count: goal.daysPastDue,
-                            })
-                          : t("common.count.dayOther", {
-                              count: goal.daysPastDue,
-                            }),
+                      days: t("common.count.day", {
+                        count: goal.daysPastDue,
+                      }),
                     })
                   : t("goals.detail.nextCheckInDueOn", {
                       date:
@@ -607,12 +615,10 @@ export default async function GoalPage({
                           tasks that name it and its initiatives' tasks. */}
                       <Link
                         href={`/board?keyResult=${keyResult.id}`}
-                        aria-label={t("goals.detail.workBoardFor", {
-                          title: keyResult.title,
-                        })}
                         className="text-xs font-semibold text-brand-text hover:underline"
                       >
                         {t("goals.detail.workBoard")}
+                        <span className="sr-only"> — {keyResult.title}</span>
                       </Link>
                       {open && keyResult.kpiId === null ? (
                         <KeyResultUpdate
@@ -631,7 +637,10 @@ export default async function GoalPage({
                           thresholds={pageThresholds}
                         />
                       ) : keyResult.kpiId ? (
-                        <Chip tone="info">{t("common.fromAKpi")}</Chip>
+                        <LinkedKpiChip
+                          kpiId={keyResult.kpiId}
+                          kpi={visibleKpiMap.get(keyResult.kpiId)}
+                        />
                       ) : null}
                     </span>
                   </li>
@@ -690,7 +699,7 @@ export default async function GoalPage({
                     description={t("goals.detail.0MeansTrackedBut")}
                     inputClassName="w-24"
                   />
-                  <Button type="submit" className="ml-auto">
+                  <Button type="submit" className="ms-auto">
                     {t("common.save")}
                   </Button>
                 </div>
@@ -782,8 +791,10 @@ export default async function GoalPage({
                       {decision.keyResultTitle
                         ? `${decision.keyResultTitle} · `
                         : ""}
-                      {new Date(decision.at).toLocaleDateString()} ·{" "}
-                      {decision.authorName}
+                      {new Date(decision.at).toLocaleDateString(
+                        intlTagFor(locale),
+                      )}{" "}
+                      · {decision.authorName}
                     </span>
                   </li>
                 ))}

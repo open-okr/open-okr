@@ -1,3 +1,4 @@
+import { intlTagFor } from "@openokr/formats";
 import { SUGGESTED_TIMELINE } from "@openokr/method";
 import {
   Button,
@@ -60,7 +61,7 @@ export async function InputPack({
     readonly facilitatorName: string | null;
   };
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
   const canEdit = packAccess.canChange;
 
   const gathered = items.filter((item) => item.gathered).length;
@@ -244,7 +245,9 @@ export async function InputPack({
           {distributedAt ? (
             <p className="text-xs text-ink-3">
               {t("common.sent", {
-                distributedAt: new Date(distributedAt).toLocaleString(),
+                distributedAt: new Date(distributedAt).toLocaleString(
+                  intlTagFor(locale),
+                ),
               })}
             </p>
           ) : null}
@@ -307,10 +310,10 @@ export async function InputPack({
                   {/* A fixed share that may wrap, so the longest entry ("Weeks
                       1 to 2 of the quarter") no longer sets the width and
                       Activity takes the rest. */}
-                  <th className="w-1/4 px-3.5 py-1.5 text-left text-xs font-bold tracking-wide text-ink-3 uppercase">
+                  <th className="w-1/4 px-3.5 py-1.5 text-start text-xs font-bold tracking-wide text-ink-3 uppercase">
                     {t("cycle.inputPack.weeksBefore")}
                   </th>
-                  <th className="px-3.5 py-1.5 text-left text-xs font-bold tracking-wide text-ink-3 uppercase">
+                  <th className="px-3.5 py-1.5 text-start text-xs font-bold tracking-wide text-ink-3 uppercase">
                     {t("common.activity")}
                   </th>
                 </tr>

@@ -54,6 +54,7 @@ import {
 } from "../agents/scope.ts";
 import { blockerClockOf, frequencyOf } from "../cadence/blockers.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { visibleKpiIds } from "../kpis/access.ts";
 import {
   KPI_RULE_COLUMNS,
   type KpiRule,
@@ -65,6 +66,7 @@ import { DEFAULT_DAILY_SUMMARY_TIME } from "../notifications/settings.ts";
 import { OperationError } from "../operations/errors.ts";
 import { workspaceAdministratorIds } from "../people/lifecycle.ts";
 import { practiceFromRow } from "../practice/settings.ts";
+import { resolveDraftLanguageInTx } from "../settings/member-language.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
 import {
   type DueNudge,
@@ -264,7 +266,21 @@ export async function dueKpiCorridorNudges(
   const due: DueNudge[] = [];
 
   for (const kpi of rows) {
-    const owners = await kpiOwners(tx, input.workspaceId, kpi);
+    const candidateOwners = await kpiOwners(tx, input.workspaceId, kpi);
+    if (candidateOwners.length === 0) {
+      continue;
+    }
+    const owners: string[] = [];
+    for (const candidate of candidateOwners) {
+      const visible = await visibleKpiIds(tx, {
+        workspaceId: input.workspaceId,
+        memberId: candidate,
+        ids: [kpi.id],
+      });
+      if (visible.has(kpi.id)) {
+        owners.push(candidate);
+      }
+    }
     if (owners.length === 0) {
       continue;
     }
@@ -325,6 +341,8 @@ export async function dueKpiCorridorNudges(
         // what P3-T14 golden-master tested and what the deterministic path has
         // always proposed.
         const refined = await refinedRecoveryTitle(
+          tx,
+          input.workspaceId,
           input.drafter,
           kpi.title,
           achievement,
@@ -406,6 +424,8 @@ export async function dueKpiCorridorNudges(
  * §6.5's `recoveryObjective` whenever this returns null.
  */
 async function refinedRecoveryTitle(
+  tx: WorkspaceTx,
+  workspaceId: string,
   drafter: AgentDrafter | undefined,
   kpiTitle: string,
   achievementPct: number | null,
@@ -416,6 +436,7 @@ async function refinedRecoveryTitle(
   try {
     return (
       (await drafter.refineRecoveryTitle?.({
+        locale: await resolveDraftLanguageInTx(tx, workspaceId),
         kpiTitle,
         templateTitle: recoveryObjective(kpiTitle),
         achievementPct,
@@ -649,6 +670,7 @@ function summaryHour(value: string): number {
 
 /** The member's own local hour, for the one comparison that decides morning. */
 function localHourIn(now: Date, timeZone: string): number {
+  // machine use: extracting time parts
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone,
     hour: "2-digit",

@@ -88,4 +88,88 @@ describe("browserLocale", () => {
     // "msa" is not "ms", and "english" is not a language the product ships.
     expect(browserLocale("msa, english", SHIPPED)).toBeNull();
   });
+
+  describe("languages §8.2 browser matching table", () => {
+    const WITH_ALL = [
+      "en",
+      "ms",
+      "zh-Hans",
+      "es",
+      "ar",
+      "de",
+      "pt",
+      "fr",
+      "it",
+      "id",
+    ] as const;
+
+    test("exact match with a shipped code, compared case-insensitively", () => {
+      expect(browserLocale("zh-hans", WITH_ALL)).toBe("zh-Hans");
+      expect(browserLocale("ZH-HANS", WITH_ALL)).toBe("zh-Hans");
+      expect(browserLocale("ES", WITH_ALL)).toBe("es");
+      expect(browserLocale("Ms", WITH_ALL)).toBe("ms");
+    });
+
+    test("zh, zh-cn, zh-sg, zh-my, zh-hans, zh-hans-* map to zh-Hans", () => {
+      for (const range of [
+        "zh",
+        "zh-cn",
+        "zh-sg",
+        "zh-my",
+        "zh-hans",
+        "zh-hans-cn",
+        "zh-Hans-SG",
+      ]) {
+        expect(browserLocale(range, WITH_ALL), range).toBe("zh-Hans");
+      }
+    });
+
+    test("zh-tw, zh-hk, zh-mo, zh-hant, zh-hant-* are not zh-Hans and try the next range", () => {
+      for (const range of [
+        "zh-tw",
+        "zh-hk",
+        "zh-mo",
+        "zh-hant",
+        "zh-hant-tw",
+        "zh-Hant-HK",
+      ]) {
+        expect(browserLocale(`${range}, en;q=0.5`, WITH_ALL), range).toBe("en");
+        expect(browserLocale(range, WITH_ALL), range).toBeNull();
+      }
+    });
+
+    test("in (the old code for Indonesian) maps to id", () => {
+      expect(browserLocale("in", WITH_ALL)).toBe("id");
+      expect(browserLocale("in-ID, in;q=0.9", WITH_ALL)).toBe("id");
+    });
+
+    test("any other range falls back to its primary subtag if shipped", () => {
+      expect(browserLocale("pt-BR", WITH_ALL)).toBe("pt");
+      expect(browserLocale("pt-PT", WITH_ALL)).toBe("pt");
+      expect(browserLocale("es-419", WITH_ALL)).toBe("es");
+      expect(browserLocale("ar-EG", WITH_ALL)).toBe("ar");
+      expect(browserLocale("de-AT", WITH_ALL)).toBe("de");
+      expect(browserLocale("fr-CA", WITH_ALL)).toBe("fr");
+      expect(browserLocale("it-CH", WITH_ALL)).toBe("it");
+    });
+
+    test("* matches nothing", () => {
+      expect(browserLocale("*", WITH_ALL)).toBeNull();
+      expect(browserLocale("*, en;q=0.1", WITH_ALL)).toBe("en");
+    });
+
+    test("AC-3: Accept-Language: zh-CN,zh;q=0.9,en;q=0.8 renders in zh-Hans", () => {
+      const shippedWithZh = ["en", "ms", "zh-Hans"] as const;
+      expect(browserLocale("zh-CN,zh;q=0.9,en;q=0.8", shippedWithZh)).toBe(
+        "zh-Hans",
+      );
+    });
+
+    test("AC-4: Accept-Language: zh-TW,zh-Hant;q=0.9,en;q=0.8 renders in English, never Simplified Chinese", () => {
+      const shippedWithZh = ["en", "ms", "zh-Hans"] as const;
+      expect(browserLocale("zh-TW,zh-Hant;q=0.9,en;q=0.8", shippedWithZh)).toBe(
+        "en",
+      );
+    });
+  });
 });

@@ -22,6 +22,7 @@ import {
   type BuiltinRoleKey,
   comments,
   documents,
+  kpis,
   reactions,
   type WorkspaceTx,
   withWorkspace,
@@ -481,6 +482,66 @@ const ownContextResolver = (resourceType: string): SubjectResolver => {
 };
 
 /**
+ * Resolves a KPI's context (0.10.0 K2, §4).
+ * Own context when present; for a straggler (live KPI with no context yet),
+ * falls back to the workspace context. Deleted or unknown KPI returns undefined.
+ */
+export const kpiContextResolver: SubjectResolver = async (
+  tx,
+  subjectId,
+  workspaceId,
+) => {
+  const [kpi] = await tx
+    .select({ id: kpis.id })
+    .from(kpis)
+    .where(
+      activeOnly(
+        kpis,
+        eq(kpis.workspaceId, workspaceId),
+        eq(kpis.id, subjectId),
+      ),
+    )
+    .limit(1);
+
+  if (!kpi) {
+    return undefined;
+  }
+
+  const [row] = await tx
+    .select({ id: accessContexts.id })
+    .from(accessContexts)
+    .where(
+      activeOnly(
+        accessContexts,
+        eq(accessContexts.workspaceId, workspaceId),
+        eq(accessContexts.resourceType, "kpi"),
+        eq(accessContexts.resourceId, subjectId),
+      ),
+    )
+    .limit(1);
+
+  if (row) {
+    return { contextId: row.id };
+  }
+
+  // Straggler: fall back to workspace context
+  const [wsContext] = await tx
+    .select({ id: accessContexts.id })
+    .from(accessContexts)
+    .where(
+      activeOnly(
+        accessContexts,
+        eq(accessContexts.workspaceId, workspaceId),
+        eq(accessContexts.resourceType, "workspace"),
+        eq(accessContexts.resourceId, workspaceId),
+      ),
+    )
+    .limit(1);
+
+  return wsContext ? { contextId: wsContext.id } : undefined;
+};
+
+/**
  * The subject-to-context resolver (TECHNICAL-PLAN §4.1, "sub-resources
  * inherit"). Exhaustive and fail-closed: a subject type absent from this map
  * raises rather than defaulting to some context, so a new subject type
@@ -493,6 +554,7 @@ const SUBJECT_RESOLVERS: Record<string, SubjectResolver> = {
   workspace: ownContextResolver("workspace"),
   blob: ownContextResolver("blob"),
   space: ownContextResolver("space"),
+  kpi: kpiContextResolver,
   // P3-T04. A key result is deliberately absent: it inherits its goal's context,
   // and its callers resolve the owning goal first so the not-found answer covers
   // "no such key result" and "not yours to see" identically.
@@ -799,7 +861,7 @@ export async function resolveSubjectContext<
  * answers demand opposite handling: the first must hide the row, the second
  * must not, because the types with no resolver are the ones with no context of
  * their own, whose visibility the workspace floor already decides. A check-in,
- * a blocker, a KPI, a session and a cycle are all in that group, and every
+ * a blocker, a session and a cycle are all in that group, and every
  * nudge in the product is about one of them.
  */
 export function hasSubjectResolver(subjectType: string): boolean {

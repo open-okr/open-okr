@@ -1,0 +1,18 @@
+{
+  "objective": "Objective",
+  "keyResult": "Key result",
+  "checkIn": "Check-in",
+  "confidence": "Confidence",
+  "champion": "Champion",
+  "reviewer": "Reviewer",
+  "space": "Space",
+  "cycle": "Cycle",
+  "initiative": "Initiative",
+  "kpi": "KPI",
+  "health.onTrack": "On track",
+  "health.caution": "Caution",
+  "health.offTrack": "Off track",
+  "health.healthy": "Healthy",
+  "health.watch": "Watch",
+  "health.unhealthy": "Unhealthy"
+}

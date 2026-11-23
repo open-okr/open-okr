@@ -1,5 +1,6 @@
 "use client";
 
+import { useDirection } from "@base-ui-components/react/direction-provider";
 import { type KpiFrequency, normalisePeriod } from "@openokr/method";
 import {
   Avatar,
@@ -11,6 +12,7 @@ import {
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { INDICATOR_NAME_KEYS, nameOf } from "../../lib/identifier-names.ts";
+import { horizontalArrowStep } from "../../lib/reading-direction.ts";
 import { recordCell } from "./actions.ts";
 import { CategorySubtotal, RowSparkline } from "./grid-extras.tsx";
 import { kpiCount } from "./kpi-count.ts";
@@ -221,12 +223,14 @@ export function KpiGrid({
   categories,
   kpis,
   canEdit,
+  editableKpiIds,
   today,
   addHref,
 }: {
   readonly categories: readonly GridCategory[];
   readonly kpis: readonly GridKpi[];
   readonly canEdit: boolean;
+  readonly editableKpiIds?: ReadonlySet<string>;
   /**
    * Today in the workspace calendar, from the server. Never `new Date()` here:
    * the browser's clock is the reader's, and a value typed at 23:00 in Jakarta
@@ -239,6 +243,7 @@ export function KpiGrid({
    */
   readonly addHref: string;
 }) {
+  const direction = useDirection();
   const { t, locale } = useTranslations();
   const language = locale === "pseudo" ? "en" : locale;
 
@@ -308,12 +313,9 @@ export function KpiGrid({
         move(-1, 0);
         break;
       case "ArrowRight":
-        event.preventDefault();
-        move(0, 1);
-        break;
       case "ArrowLeft":
         event.preventDefault();
-        move(0, -1);
+        move(0, horizontalArrowStep(event.key, direction));
         break;
       default:
         break;
@@ -323,7 +325,9 @@ export function KpiGrid({
   if (kpis.length === 0) {
     return (
       <p className="rounded-xl border border-line bg-surface p-4 text-sm text-ink-3">
-        {t("kpis.grid.noKpisYetA")}
+        {canEdit
+          ? t("kpis.grid.noKpisYetA")
+          : t("kpis.grid.noKpisSharedWithYou")}
       </p>
     );
   }
@@ -355,13 +359,13 @@ export function KpiGrid({
           <caption className="sr-only">{t("kpis.grid.kpisAsRowsAnd")}</caption>
           <thead>
             <tr className="text-[11.5px] font-semibold text-ink-3">
-              <th className="sticky left-0 z-10 h-8.5 w-[270px] border-r border-b border-line bg-bg px-3 text-left font-semibold">
+              <th className="sticky start-0 z-10 h-8.5 w-[270px] border-e border-b border-line bg-bg px-3 text-start font-semibold">
                 {t("kpis.grid.kpi")}
               </th>
-              <th className="min-w-23 border-b border-line bg-bg px-2 text-left font-semibold">
+              <th className="min-w-23 border-b border-line bg-bg px-2 text-start font-semibold">
                 {t("kpis.grid.trend")}
               </th>
-              <th className="min-w-30 border-r border-b border-line bg-bg px-2.5 text-left font-semibold">
+              <th className="min-w-30 border-e border-b border-line bg-bg px-2.5 text-start font-semibold">
                 {t("kpis.grid.now")}
               </th>
               {columns.map((column, index) => (
@@ -389,9 +393,9 @@ export function KpiGrid({
                 <th
                   colSpan={columns.length + 4}
                   scope="colgroup"
-                  className="h-10 border-b border-line bg-bg p-0 text-left font-normal"
+                  className="h-10 border-b border-line bg-bg p-0 text-start font-normal"
                 >
-                  <span className="sticky left-0 inline-flex items-center gap-2.5 px-3 whitespace-nowrap">
+                  <span className="sticky start-0 inline-flex items-center gap-2.5 px-3 whitespace-nowrap">
                     <span className="text-[13px] font-bold text-ink">
                       {category.name}
                     </span>
@@ -407,7 +411,7 @@ export function KpiGrid({
                   <tr key={kpi.id} className="group">
                     <th
                       scope="row"
-                      className="sticky left-0 z-10 w-[270px] max-w-[270px] border-r border-b border-line bg-surface px-3 py-2 text-left font-normal group-hover:bg-bg"
+                      className="sticky start-0 z-10 w-[270px] max-w-[270px] border-e border-b border-line bg-surface px-3 py-2 text-start font-normal group-hover:bg-bg"
                     >
                       <Link
                         href={`/kpis/${kpi.id}`}
@@ -444,7 +448,7 @@ export function KpiGrid({
                     </td>
                     <td
                       data-state={kpi.state}
-                      className="border-r border-b border-line px-2.5 group-hover:bg-bg"
+                      className="border-e border-b border-line px-2.5 group-hover:bg-bg"
                     >
                       {latest === null ? (
                         <span className="block text-[11.5px] whitespace-nowrap text-ink-4">
@@ -539,7 +543,8 @@ export function KpiGrid({
                                 target: figure(target, language),
                               })}
                             >
-                              {canEdit && !kpi.isCalculated ? (
+                              {!kpi.isCalculated &&
+                              (canEdit || editableKpiIds?.has(kpi.id)) ? (
                                 <GridCell
                                   id={`cell-${kpi.id}-${column}`}
                                   label={t("kpis.grid.periodBeginning", {
@@ -591,7 +596,7 @@ export function KpiGrid({
                     colSpan={columns.length + 4}
                     className="h-10 border-b border-line p-0"
                   >
-                    <span className="sticky left-0 inline-flex px-3">
+                    <span className="sticky start-0 inline-flex px-3">
                       <AddKpiLink
                         href={addInto(category.id)}
                         label={t("kpis.grid.addTo", {
@@ -674,7 +679,7 @@ export function KpiGrid({
                         {kpi.achievementPct}%
                       </span>
                     ) : null}
-                    <span className="ml-auto">
+                    <span className="ms-auto">
                       <RowSparkline
                         records={kpi.records}
                         state={kpi.state}

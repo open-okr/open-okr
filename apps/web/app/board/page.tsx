@@ -127,10 +127,7 @@ export default async function BoardPage({
       : [];
 
   const cards = board.columns.flatMap((column) => column.cards);
-  const tasks =
-    cards.length === 1
-      ? t("common.count.taskOne", { count: cards.length })
-      : t("common.count.taskOther", { count: cards.length });
+  const tasks = t("common.count.task", { count: cards.length });
 
   return (
     <>

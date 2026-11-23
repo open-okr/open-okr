@@ -204,7 +204,7 @@ export default async function AdminWebhooksPage({
 
   const cardHead = "flex-col items-stretch gap-0.5";
   const scroll =
-    "relative flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain";
+    "relative flex max-h-[296px] flex-col gap-2 overflow-y-auto pe-1.5 overscroll-contain";
 
   return (
     <div className="flex w-full flex-col gap-4">

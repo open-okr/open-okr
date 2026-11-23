@@ -89,7 +89,15 @@ export const accessBindings = pgTable("access_bindings", {
   /** view 10 / comment 40 / edit 70 / full 100 (§4.1). Mirrors ACCESS_LEVELS. */
   level: integer("level").notNull(),
   tag: text("tag", {
-    enum: ["champion", "reviewer", "sponsor", "facilitator", "coordinator"],
+    enum: [
+      "champion",
+      "reviewer",
+      "sponsor",
+      "facilitator",
+      "coordinator",
+      "owner",
+      "share",
+    ],
   }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

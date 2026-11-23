@@ -1,3 +1,6 @@
+import type { LocaleDirection } from "@openokr/formats";
+import { horizontalArrowStep } from "../../lib/reading-direction.ts";
+
 /**
  * Moving a card with the keyboard, as arithmetic (UIUX-PLAN §9, completeness
  * review M-02).
@@ -71,6 +74,7 @@ export function stepTarget<TCard extends KeyCard>(
   columns: readonly KeyColumn<TCard>[],
   id: string,
   key: MoveKey,
+  direction: LocaleDirection = "ltr",
 ): { readonly status: string; readonly index: number } | null {
   const here = slotOf(columns, id);
   if (!here) {
@@ -87,7 +91,7 @@ export function stepTarget<TCard extends KeyCard>(
       : null;
   }
   const at = columns.findIndex((column) => column.status === here.status);
-  const next = columns[at + (key === "ArrowRight" ? 1 : -1)];
+  const next = columns[at + horizontalArrowStep(key, direction)];
   if (!next) {
     return null;
   }

@@ -11,6 +11,7 @@ export function formatPrice(
   locale: string,
 ): string {
   const code = currency.toUpperCase();
+  // machine use: resolving currency decimals
   const decimals =
     new Intl.NumberFormat("en", {
       style: "currency",

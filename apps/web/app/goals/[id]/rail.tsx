@@ -4,6 +4,7 @@ import {
   deliveryReading,
   type ProviderKeyResult,
 } from "../../../lib/dependency-delivery.ts";
+import { GOAL_LEVEL_NAME_KEYS, nameOf } from "../../../lib/identifier-names.ts";
 import { getTranslations } from "../../../lib/translations";
 import { HealthChip } from "../health-chip.tsx";
 
@@ -84,7 +85,7 @@ export async function Rail({
                 {relations.parent.title}
               </span>
               <span className="text-xs text-ink-3">
-                {relations.parent.level}
+                {nameOf(GOAL_LEVEL_NAME_KEYS, relations.parent.level, t)}
               </span>
             </Link>
           ) : level === "company" ? (
@@ -123,7 +124,8 @@ export async function Rail({
                     {child.title}
                   </span>
                   <span className="text-xs text-ink-3">
-                    {child.level} · {Math.round(child.progressPct)}%
+                    {nameOf(GOAL_LEVEL_NAME_KEYS, child.level, t)} ·{" "}
+                    {Math.round(child.progressPct)}%
                   </span>
                 </span>
                 <HealthChip health={child.health} />

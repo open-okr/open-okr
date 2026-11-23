@@ -79,12 +79,9 @@ export async function Capacity({
           >
             <p className="font-semibold">
               {t("cycle.capacity.gateFiveRefusesThisSet", {
-                capacity:
-                  overCommitted.length === 1
-                    ? t("cycle.capacity.overCapacityOne")
-                    : t("cycle.capacity.overCapacityOther", {
-                        count: overCommitted.length,
-                      }),
+                capacity: t("cycle.capacity.overCapacity", {
+                  count: overCommitted.length,
+                }),
               })}
             </p>
             <ul className="mt-1 flex flex-col gap-0.5">
@@ -105,12 +102,9 @@ export async function Capacity({
         {unjudged.length > 0 ? (
           <p className="rounded-md bg-raised px-2.5 py-1.5 text-xs text-ink-2">
             {t("cycle.capacity.55IfTheAnswer", {
-              yet:
-                unjudged.length === 1
-                  ? t("cycle.capacity.noVerdictOne")
-                  : t("cycle.capacity.noVerdictOther", {
-                      count: unjudged.length,
-                    }),
+              yet: t("cycle.capacity.noVerdict", {
+                count: unjudged.length,
+              }),
             })}
           </p>
         ) : null}

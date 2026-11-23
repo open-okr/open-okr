@@ -80,6 +80,7 @@ export function parseLocalDate(value: string): LocalDate {
  * changes twice a year in most of them.
  */
 export function localDateIn(instant: Date, timeZone: string): LocalDate {
+  // machine use: extracting ISO date parts
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",

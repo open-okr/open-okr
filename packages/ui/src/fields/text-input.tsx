@@ -100,6 +100,7 @@ export function TextInput({
               ? String(input.defaultValue ?? "")
               : undefined
           }
+          dir="auto"
           {...input}
           aria-label={hideLabel ? label : input["aria-label"]}
           name={name}
@@ -114,7 +115,7 @@ export function TextInput({
           }}
           className={cn(
             FIELD_CONTROL_CLASS,
-            trailing ? "pr-8" : null,
+            trailing ? "pe-8" : null,
             inputClassName,
           )}
         />

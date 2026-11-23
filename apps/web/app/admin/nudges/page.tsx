@@ -28,14 +28,14 @@ export const generateMetadata = pageTitle("pageTitle.adminNudges");
  * is being nudged the most is not a fact everybody in a workspace needs.
  */
 
-const REASON_LABEL: Record<string, string> = {
-  dedup: "Already said today",
-  quiet_hours: "Quiet hours",
-  snooze: "Snoozed by the member",
-  disabled: "Rule switched off",
-  ceiling: "Weekly ceiling reached",
-  holiday: "Space on holiday",
-  leave: "Member on leave",
+const REASON_LABEL_KEYS: Record<string, string> = {
+  dedup: "admin.nudges.reason.dedup",
+  quiet_hours: "admin.nudges.reason.quietHours",
+  snooze: "admin.nudges.reason.snooze",
+  disabled: "admin.nudges.reason.disabled",
+  ceiling: "admin.nudges.reason.ceiling",
+  holiday: "admin.nudges.reason.holiday",
+  leave: "admin.nudges.reason.leave",
 };
 
 /**
@@ -47,14 +47,16 @@ const REASON_LABEL: Record<string, string> = {
  * database layer into its bundle and the build fails on `dns`, which is
  * exactly what happened at P6-G13b.
  */
-const NUDGE_CHANNELS = [
-  { value: "app", label: "in-app only" },
-  { value: "email", label: "email" },
-  { value: "slack", label: "Slack" },
-  { value: "teams", label: "Microsoft Teams" },
-  { value: "whatsapp", label: "WhatsApp" },
-  { value: "telegram", label: "Telegram" },
-];
+function nudgeChannels(t: (key: string) => string) {
+  return [
+    { value: "app", label: t("admin.nudges.inAppOnly") },
+    { value: "email", label: t("channels.email") },
+    { value: "slack", label: t("channels.slack") },
+    { value: "teams", label: t("channels.teams") },
+    { value: "whatsapp", label: t("channels.whatsapp") },
+    { value: "telegram", label: t("channels.telegram") },
+  ];
+}
 
 /**
  * The rule's name for the volume list, which linked its key (P8-G11d).
@@ -153,7 +155,7 @@ export default async function NudgeVolumePage() {
               aria-label={t("admin.nudges.theNoisiestRules")}
               // Scrolls inside the card after about five rows, because it
               // lists every rule that has ever fired.
-              className="relative flex max-h-[220px] flex-col overflow-y-auto pr-1.5 overscroll-contain"
+              className="relative flex max-h-[220px] flex-col overflow-y-auto pe-1.5 overscroll-contain"
             >
               {volume.rules.map((rule) => (
                 <li
@@ -201,7 +203,9 @@ export default async function NudgeVolumePage() {
                 className="flex items-center justify-between gap-2 text-sm"
               >
                 <span className="text-ink-2">
-                  {REASON_LABEL[reason.reason] ?? reason.reason}
+                  {REASON_LABEL_KEYS[reason.reason] === undefined
+                    ? reason.reason
+                    : t(REASON_LABEL_KEYS[reason.reason] as string)}
                 </span>
                 <span className="tabular-nums text-ink-3">{reason.count}</span>
               </div>
@@ -255,7 +259,7 @@ export default async function NudgeVolumePage() {
       <NudgeRuleCards
         rules={rules.rules}
         quietMode={rules.quietMode}
-        channels={NUDGE_CHANNELS}
+        channels={nudgeChannels(t)}
       />
     </div>
   );

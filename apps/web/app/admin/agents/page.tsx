@@ -11,7 +11,13 @@ import {
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { moodForRun } from "../../../lib/agent-moods.ts";
 import { getPool } from "../../../lib/auth";
-import { SCHEDULE_NAME_KEYS } from "../../../lib/identifier-names.ts";
+import {
+  AGENT_LOG_KIND_NAME_KEYS,
+  AGENT_RUN_STATUS_NAME_KEYS,
+  AUTONOMY_NAME_KEYS,
+  nameOf,
+  SCHEDULE_NAME_KEYS,
+} from "../../../lib/identifier-names.ts";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -187,7 +193,7 @@ export default async function AgentsPage() {
         {agent.enabled ? t("admin.agents.on") : t("admin.agents.off")}
       </Chip>
       <Chip tone="neutral">{scheduleLabel(agent.schedule, t)}</Chip>
-      <Chip tone="agent">{agent.autonomy}</Chip>
+      <Chip tone="agent">{nameOf(AUTONOMY_NAME_KEYS, agent.autonomy, t)}</Chip>
     </>
   );
 
@@ -328,7 +334,7 @@ export default async function AgentsPage() {
               aria-label={t("common.recentRuns")}
               // biome-ignore lint/a11y/noNoninteractiveTabindex: a list that scrolls has to be reachable from the keyboard.
               tabIndex={0}
-              className="flex max-h-[420px] flex-col overflow-y-auto pr-1.5"
+              className="flex max-h-[420px] flex-col overflow-y-auto pe-1.5"
             >
               {runs.map((run) => (
                 <li
@@ -364,7 +370,7 @@ export default async function AgentsPage() {
                         </span>
                       ) : null}
                       <Chip tone={STATUS_TONE[run.status] ?? "neutral"}>
-                        {run.status}
+                        {nameOf(AGENT_RUN_STATUS_NAME_KEYS, run.status, t)}
                       </Chip>
                       {run.finishedAt ? (
                         <span className="text-xs tabular-nums text-ink-4">
@@ -393,7 +399,7 @@ export default async function AgentsPage() {
                           className="text-xs text-ink-2"
                         >
                           <span className="font-mono text-ink-4">
-                            {entry.kind}
+                            {nameOf(AGENT_LOG_KIND_NAME_KEYS, entry.kind, t)}
                           </span>{" "}
                           {entry.message}
                         </li>

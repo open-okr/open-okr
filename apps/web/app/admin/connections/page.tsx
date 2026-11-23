@@ -100,7 +100,7 @@ export default async function AdminConnectionsPage({
               tabIndex={0}
               aria-label={t("admin.connections.list")}
               // Scrolls inside the card after about five rows. The pager stays.
-              className="relative flex max-h-[420px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain"
+              className="relative flex max-h-[420px] flex-col gap-2 overflow-y-auto pe-1.5 overscroll-contain"
             >
               {items.map((item) => (
                 <li

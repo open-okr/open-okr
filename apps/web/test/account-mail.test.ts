@@ -50,7 +50,7 @@ describe("the password reset mail", () => {
     language = "ms";
     const mail = await resetPasswordMail("sara@example.com", RESET);
     expect(mail.subject).toBe("Tetapkan semula kata laluan Northwind OKR anda");
-    expect(mail.html).toContain('<html lang="ms">');
+    expect(mail.html).toContain('<html lang="ms" dir="ltr">');
   });
 });
 

@@ -461,7 +461,7 @@ export function AnswerText({
           case "list": {
             const items = block.items.map((item, itemIndex) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: as above.
-              <li key={itemIndex} className="pl-0.5">
+              <li key={itemIndex} className="ps-0.5">
                 <Lines
                   lines={item}
                   renderCitation={renderCitation}
@@ -476,13 +476,13 @@ export function AnswerText({
                 // biome-ignore lint/suspicious/noArrayIndexKey: as above.
                 key={index}
                 start={block.start}
-                className="flex list-decimal flex-col gap-1 pl-5"
+                className="flex list-decimal flex-col gap-1 ps-5"
               >
                 {items}
               </ol>
             ) : (
               // biome-ignore lint/suspicious/noArrayIndexKey: as above.
-              <ul key={index} className="flex list-disc flex-col gap-1 pl-5">
+              <ul key={index} className="flex list-disc flex-col gap-1 ps-5">
                 {items}
               </ul>
             );

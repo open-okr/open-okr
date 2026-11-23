@@ -66,6 +66,10 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     caller: "packages/importer/src/flowyteam/mappers/organisation.ts",
     why: "the FlowyTeam importer brings people across through it",
   },
+  "kpis.importShare": {
+    caller: "packages/importer/src/flowyteam/mappers/kpi-shares.ts",
+    why: "the FlowyTeam importer brings named KPI shares across through it",
+  },
   "subscriptions.importWatcher": {
     caller: "packages/importer/src/flowyteam/mappers/collaboration.ts",
     why: "the FlowyTeam importer brings task watchers across through it",

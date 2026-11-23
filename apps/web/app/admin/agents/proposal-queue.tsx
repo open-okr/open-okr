@@ -68,13 +68,9 @@ function describe(
               // reviewer needs to know something is there, and the run log is
               // where the whole thing lives.
               Array.isArray(value)
-              ? value.length === 1
-                ? t("admin.agents.proposalQueue.itemsOne", {
-                    count: value.length,
-                  })
-                : t("admin.agents.proposalQueue.itemsOther", {
-                    count: value.length,
-                  })
+              ? t("admin.agents.proposalQueue.items", {
+                  count: value.length,
+                })
               : t("admin.agents.proposalQueue.anObject");
       return `${key}: ${rendered}`;
     });
@@ -167,7 +163,7 @@ export function ProposalQueue({
               aria-label={t("admin.agents.proposalQueue.proposalsWaiting")}
               // biome-ignore lint/a11y/noNoninteractiveTabindex: a list that scrolls has to be reachable from the keyboard.
               tabIndex={0}
-              className="flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5"
+              className="flex max-h-[296px] flex-col gap-2 overflow-y-auto pe-1.5"
             >
               {proposals.map((proposal) => (
                 <li

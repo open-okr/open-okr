@@ -1,6 +1,8 @@
 "use client";
 
+import { useDirection } from "@base-ui-components/react/direction-provider";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
+import { horizontalArrowStep } from "../../../lib/reading-direction.ts";
 
 /** One agent: its tab (face, name and chips) and the cards that tab shows. */
 export interface AgentTab {
@@ -29,12 +31,12 @@ export function AgentTabs({
   readonly tabs: readonly AgentTab[];
   readonly label: string;
 }) {
+  const direction = useDirection();
   const [current, setCurrent] = useState(tabs[0]?.id ?? "");
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const move = (event: KeyboardEvent, index: number) => {
-    const step =
-      event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    const step = horizontalArrowStep(event.key, direction);
     if (step === 0) {
       return;
     }
@@ -67,8 +69,8 @@ export function AgentTabs({
               onKeyDown={(event) => move(event, index)}
               className={
                 on
-                  ? "flex min-w-32 flex-col items-start gap-1 rounded-lg border border-brand-line bg-brand-weak px-3 py-2 text-left"
-                  : "flex min-w-32 flex-col items-start gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-left hover:bg-raised"
+                  ? "flex min-w-32 flex-col items-start gap-1 rounded-lg border border-brand-line bg-brand-weak px-3 py-2 text-start"
+                  : "flex min-w-32 flex-col items-start gap-1 rounded-lg border border-line bg-surface px-3 py-2 text-start hover:bg-raised"
               }
             >
               <span className="flex items-center gap-2 text-sm font-semibold text-ink">

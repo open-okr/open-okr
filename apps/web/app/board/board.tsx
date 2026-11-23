@@ -1,5 +1,6 @@
 "use client";
 
+import { useDirection } from "@base-ui-components/react/direction-provider";
 import {
   Chip,
   guardPress,
@@ -125,6 +126,7 @@ export function Board({
     afterTaskId: string | null,
   ) => Promise<WriteState>;
 }) {
+  const direction = useDirection();
   const { t } = useTranslations();
 
   const router = useRouter();
@@ -333,7 +335,7 @@ export function Board({
     if (!held) {
       return;
     }
-    const target = stepTarget(shown, held.id, key);
+    const target = stepTarget(shown, held.id, key, direction);
     const next = target
       ? placeAt(shown, held.id, target.status, target.index)
       : null;
@@ -638,7 +640,7 @@ function Card({
                   type="button"
                   aria-label={t("board.board.moveBack", { title: card.title })}
                   onClick={() => onShift(-1)}
-                  className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand"
+                  className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand rtl:-scale-x-100"
                 >
                   ←
                 </button>
@@ -646,7 +648,7 @@ function Card({
                   type="button"
                   aria-label={t("board.board.moveOn", { title: card.title })}
                   onClick={() => onShift(1)}
-                  className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand"
+                  className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand rtl:-scale-x-100"
                 >
                   →
                 </button>

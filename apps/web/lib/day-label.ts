@@ -1,3 +1,5 @@
+import { intlTagFor } from "@openokr/formats";
+
 /**
  * A calendar day as a reader writes it: "9 Nov 2026", in the reader's locale.
  *
@@ -16,7 +18,7 @@ export function dayLabel(day: string, locale: string): string {
     return day;
   }
   const [, year, month, date] = match;
-  return new Intl.DateTimeFormat(locale === "ms" ? "ms-MY" : "en-GB", {
+  return new Intl.DateTimeFormat(intlTagFor(locale), {
     day: "numeric",
     month: "short",
     year: "numeric",

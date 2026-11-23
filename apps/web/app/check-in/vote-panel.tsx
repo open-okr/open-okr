@@ -51,10 +51,7 @@ export async function VotePanel({
                 average: shown(vote.average ?? 0),
               })
             : t("checkIn.votePanel.votesIn", {
-                votes:
-                  vote.count === 1
-                    ? t("common.count.voteOne", { count: vote.count })
-                    : t("common.count.voteOther", { count: vote.count }),
+                votes: t("common.count.vote", { count: vote.count }),
               })}
         </Chip>
       </div>

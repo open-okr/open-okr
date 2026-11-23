@@ -151,7 +151,7 @@ export function RoleMatrix({
               <tr className="border-b border-line">
                 <th
                   scope="col"
-                  className="w-[160px] px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-ink-3"
+                  className="w-[160px] px-3 py-2 text-start text-[10px] font-bold uppercase tracking-wider text-ink-3"
                 >
                   {t("admin.roles.role")}
                 </th>
@@ -159,7 +159,7 @@ export function RoleMatrix({
                   <th
                     key={domain}
                     scope="col"
-                    className="px-1 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-ink-3"
+                    className="px-1 py-2 text-start text-[10px] font-bold uppercase tracking-wider text-ink-3"
                   >
                     {t(DOMAIN_LABEL[domain] ?? "admin.roles.domainGoal")}
                   </th>
@@ -172,7 +172,7 @@ export function RoleMatrix({
             <tbody>
               {roles.map((role) => (
                 <tr key={role.id} className="border-b border-line align-top">
-                  <th scope="row" className="w-[160px] px-3 py-2.5 text-left">
+                  <th scope="row" className="w-[160px] px-3 py-2.5 text-start">
                     <span className="flex flex-col gap-0.5">
                       <span className="text-sm font-semibold text-ink">
                         {role.name}
@@ -237,7 +237,10 @@ export function RoleMatrix({
                               // as nothing when the table shares out its width,
                               // and the columns shrank until "Manage" read
                               // "Man" (Q-10d, 0.8.0 acceptance test).
-                              inputClassName="h-7 w-full min-w-0 pl-1 pr-5! bg-position-[right_0.25rem_center] text-xs"
+                              inputClassName={
+                                /* direction-neutral: The chevron offset is set on the inline end in both directions. */
+                                "h-7 w-full min-w-0 ps-1 pe-5! bg-position-[right_0.25rem_center] rtl:bg-position-[left_0.25rem_center] text-xs"
+                              }
                             >
                               {LEVELS.map((entry) => (
                                 <option key={entry.value} value={entry.value}>
@@ -261,7 +264,7 @@ export function RoleMatrix({
                     );
                   })}
 
-                  <td className="px-3 py-2.5 text-right">
+                  <td className="px-3 py-2.5 text-end">
                     {role.editable && role.builtinKey === null ? (
                       confirming === role.id ? (
                         <span className="flex flex-col items-end gap-1">

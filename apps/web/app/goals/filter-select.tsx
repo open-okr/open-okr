@@ -75,7 +75,7 @@ export function FilterSelect({
     return <div className="w-52 max-w-full">{picker}</div>;
   }
   return (
-    <div className="flex min-w-0 items-center gap-1 rounded-control bg-raised p-0.5 pl-2">
+    <div className="flex min-w-0 items-center gap-1 rounded-control bg-raised p-0.5 ps-2">
       <span
         aria-hidden="true"
         className="flex-none text-xs font-semibold text-ink-3"

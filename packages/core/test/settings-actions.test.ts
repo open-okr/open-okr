@@ -315,7 +315,7 @@ describe("settings.updateWorkspaceGeneral", () => {
     await callAction(
       { pool: (await workerDb()).appPool, ...context(OWNER) },
       "settings.updateWorkspaceGeneral",
-      { language: "fr", trustedEmailDomains: ["example.com"] },
+      { language: "ms", trustedEmailDomains: ["example.com"] },
     );
 
     expect(await readActivityKinds()).toContain(
@@ -447,7 +447,7 @@ describe("settings.resetWorkspaceSettings", () => {
       "settings.updateWorkspaceGeneral",
       {
         timezone: "Asia/Kuala_Lumpur",
-        language: "fr",
+        language: "ms",
         trustedEmailDomains: ["example.com"],
       },
     );

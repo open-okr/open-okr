@@ -67,7 +67,7 @@ that this page cannot quietly stop being true.
 
 | Check | What it proves |
 |---|---|
-| `fonts-self-hosted` | The typeface is committed and served by the instance, so no page load reaches a font service |
+| `fonts-self-hosted` | Geist loads through `next/font/local` and no screen imports `next/font/google`. Each `@font-face` URL in the web CSS points to a committed local file, and both minutes PDF font files are present |
 | `no-external-hosts` | No shipped source names a CDN or a font service to fetch from at runtime |
 | `no-runtime-network-install` | The image's runtime stage installs nothing from a network, so a container starts with no registry |
 | `ai-off-by-default` | No AI provider is enabled until somebody enables one, so an instance nobody configured makes no AI call |

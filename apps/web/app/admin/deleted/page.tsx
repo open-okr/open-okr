@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { resolveLocale } from "../../../lib/locale";
@@ -73,7 +74,7 @@ export default async function DeletedItemsPage() {
   );
 
   const locale = await resolveLocale();
-  const when = new Intl.DateTimeFormat(locale === "ms" ? "ms-MY" : "en-GB", {
+  const when = new Intl.DateTimeFormat(intlTagFor(locale), {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -104,7 +105,7 @@ export default async function DeletedItemsPage() {
             </p>
           ) : (
             <ul
-              className="relative max-h-[420px] divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain rounded-lg border border-line"
+              className="relative max-h-[420px] divide-y divide-line overflow-y-auto pe-1.5 overscroll-contain rounded-lg border border-line"
               data-testid="deleted-items"
             >
               {items.map((item) => {

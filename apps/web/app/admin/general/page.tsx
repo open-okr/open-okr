@@ -9,6 +9,7 @@ import {
   readRegistrationPolicy,
   readUpdateCheck,
   resolveEmailConfirmation,
+  resolveInstanceDefaultLanguage,
   resolveWorkspaceSettings,
   unresolvedCallersSeen,
 } from "@openokr/core";
@@ -18,6 +19,8 @@ import { getPool } from "../../../lib/auth";
 import { getBilling } from "../../../lib/billing";
 import { EmailConfirmationCard } from "../../../lib/email-confirmation-card";
 import { holdOf, readLifecycle } from "../../../lib/held-by";
+import { saveSelfHostedLanguage } from "../../../lib/instance-language-action";
+import { InstanceLanguageCard } from "../../../lib/instance-language-card";
 import { getMailSettings } from "../../../lib/mail";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { schedulerNotice } from "../../../lib/scheduler-status";
@@ -69,6 +72,9 @@ export default async function GeneralSettingsPage() {
   const instanceName = cloud
     ? null
     : await readInstanceName(getPool()).catch(() => null);
+  const instanceLanguage = cloud
+    ? null
+    : await resolveInstanceDefaultLanguage(getPool()).catch(() => null);
   // Who may register (docs/design/registration-policy.md). Absent on a cloud
   // like the name, and left out rather than failing the page.
   const registration = cloud
@@ -138,7 +144,11 @@ export default async function GeneralSettingsPage() {
   );
 
   const instanceCards =
-    instanceName || registration || emailConfirmation || updateCheck;
+    instanceName ||
+    instanceLanguage ||
+    registration ||
+    emailConfirmation ||
+    updateCheck;
   const groupHeading =
     "text-xs font-semibold uppercase tracking-wide text-ink-4";
   const chip =
@@ -192,6 +202,12 @@ export default async function GeneralSettingsPage() {
               name={instanceName.value}
               source={instanceName.source}
               deploymentName={deploymentInstanceName()}
+            />
+          ) : null}
+          {instanceLanguage !== null ? (
+            <InstanceLanguageCard
+              language={instanceLanguage}
+              save={saveSelfHostedLanguage}
             />
           ) : null}
           {registration ? (

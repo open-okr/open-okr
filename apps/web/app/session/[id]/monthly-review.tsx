@@ -24,6 +24,7 @@
  * and an update is made on the objective, where easing a target asks for its
  * reason.
  */
+import { intlTagFor } from "@openokr/formats";
 import {
   Button,
   Card,
@@ -164,7 +165,7 @@ export function MonthlyReview({
   readonly subjects: readonly DecisionSubject[];
   readonly canEdit: boolean;
 }) {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -557,8 +558,10 @@ export function MonthlyReview({
                   )}
                   <span className="text-xs text-ink-3">
                     {decision.keyResultTitle ?? decision.goalTitle} ·{" "}
-                    {new Date(decision.at).toLocaleDateString()} ·{" "}
-                    {decision.authorName}
+                    {new Date(decision.at).toLocaleDateString(
+                      intlTagFor(locale),
+                    )}{" "}
+                    · {decision.authorName}
                   </span>
                 </li>
               ))}

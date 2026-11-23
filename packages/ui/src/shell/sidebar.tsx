@@ -86,7 +86,7 @@ export function Sidebar({
     <nav
       aria-label="Primary"
       className={cn(
-        "side hidden flex-col gap-0.5 overflow-y-auto border-r border-line md:flex",
+        "side hidden flex-col gap-0.5 overflow-y-auto border-e border-line md:flex",
         // The mockup's `.side`: a vertical gradient from the card surface to
         // the app background, 14px/10px padding, 2px between rows. It shipped
         // flat with 8px padding and 4px gaps, which read as a different panel.
@@ -150,7 +150,7 @@ export function Sidebar({
                     with the label, and the accessible name below carries it at
                     every width. */}
                 {item.badge !== undefined ? (
-                  <span className="absolute -top-1 -right-1 size-2 rounded-full bg-bad ring-2 ring-surface xl:hidden xl:in-data-[sidebar=rail]:block" />
+                  <span className="absolute -top-1 -end-1 size-2 rounded-full bg-bad ring-2 ring-surface xl:hidden xl:in-data-[sidebar=rail]:block" />
                 ) : null}
               </span>
               <span className="hidden truncate xl:inline xl:in-data-[sidebar=rail]:hidden">
@@ -173,7 +173,7 @@ export function Sidebar({
                     data-sidebar-badge=""
                     title={item.badgeLabel}
                     aria-hidden="true"
-                    className="ml-auto hidden h-4.25 items-center rounded-full bg-bad-solid px-1.5 text-[10.5px] font-bold text-on-bad-solid xl:inline-flex xl:in-data-[sidebar=rail]:hidden"
+                    className="ms-auto hidden h-4.25 items-center rounded-full bg-bad-solid px-1.5 text-[10.5px] font-bold text-on-bad-solid xl:inline-flex xl:in-data-[sidebar=rail]:hidden"
                   >
                     {item.badge}
                   </span>

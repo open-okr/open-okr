@@ -121,9 +121,7 @@ export default async function PlanPage({
   const seatsOf = (count: number | null): string =>
     count === null
       ? t("admin.plan.unlimitedSeats")
-      : count === 1
-        ? t("admin.plan.seatCountOne", { count })
-        : t("admin.plan.seatCountOther", { count });
+      : t("admin.plan.seatCount", { count });
 
   const bigFigure = "font-semibold text-ink text-xl tabular-nums";
   const listBox =
@@ -225,9 +223,7 @@ export default async function PlanPage({
         <CardBody className="flex flex-col gap-3">
           <p className={bigFigure}>
             {seats.limit === null
-              ? seats.used === 1
-                ? t("common.count.personOne", { count: seats.used })
-                : t("common.count.personOther", { count: seats.used })
+              ? t("common.count.person", { count: seats.used })
               : t("admin.plan.seatsUsedOf", {
                   used: seats.used,
                   limit: seats.limit,
@@ -260,7 +256,7 @@ export default async function PlanPage({
                 aria-label={t("admin.plan.holders")}
                 // Scrolls inside the card at about five rows, since the list
                 // grows with the members.
-                className={`relative max-h-[296px] overflow-y-auto pr-1.5 overscroll-contain ${listBox}`}
+                className={`relative max-h-[296px] overflow-y-auto pe-1.5 overscroll-contain ${listBox}`}
               >
                 {holders.map((holder) => (
                   <li

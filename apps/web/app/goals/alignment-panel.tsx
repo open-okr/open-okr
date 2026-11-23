@@ -185,7 +185,7 @@ export function AlignmentPanel({
                     <button
                       type="button"
                       onClick={() => onOpen(goal.id)}
-                      className="text-left text-xs text-brand-text underline"
+                      className="text-start text-xs text-brand-text underline"
                     >
                       {goal.title}
                     </button>
@@ -375,7 +375,7 @@ function Subject({
     <button
       type="button"
       onClick={() => onOpen(goalId)}
-      className="self-start text-left text-xs text-brand-text underline"
+      className="self-start text-start text-xs text-brand-text underline"
     >
       {finding.subjectGoalTitle ?? t("workMap.openTheGoal")}
     </button>

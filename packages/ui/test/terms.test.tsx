@@ -3,11 +3,11 @@ import { render } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import {
   buildPseudoCatalogue,
-  CATALOGUES,
   findUnwrappedText,
   messageHoles,
   translate,
 } from "../src/i18n/catalogue.ts";
+import { CATALOGUES } from "../src/i18n/catalogues.ts";
 import {
   inRunningText,
   isTermHole,
@@ -84,8 +84,8 @@ describe("a workspace that renamed nothing reads exactly what it read before", (
     ["cycle.noCycleYet", undefined, "No cycle yet"],
     ["goals.noGoalsInThisCycleYet", undefined, "No goals in this cycle yet"],
     ["goals.detail.keyResults", { length: 3 }, "Key results (3)"],
-    ["common.count.objectiveOther", { count: 4 }, "4 objectives"],
-    ["common.count.keyResultOne", { count: 1 }, "1 key result"],
+    ["common.count.objective", { count: 4 }, "4 objectives"],
+    ["common.count.keyResult", { count: 1 }, "1 key result"],
     ["common.kpis", { length: 2 }, "2 KPIs"],
     ["checkIn.timeline.checkInHistory", undefined, "Check-in history"],
     ["kpis.trees.kpiTrees", undefined, "KPI trees"],
@@ -132,7 +132,7 @@ describe("a renamed term follows into every message that holds it", () => {
     expect(
       translate(
         CATALOGUES.en,
-        "common.count.objectiveOther",
+        "common.count.objective",
         { count: 3 },
         AMBITION,
       ),

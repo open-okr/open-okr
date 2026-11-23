@@ -78,23 +78,16 @@ export function ExportButton({
       if (outcome.queued || !bytes) {
         setMessage(
           t("search.exportButton.tooManyToBuild", {
-            rows:
-              outcome.rowCount === 1
-                ? t("common.count.rowOne", { count: outcome.rowCount })
-                : t("common.count.rowOther", { count: outcome.rowCount }),
+            rows: t("common.count.row", { count: outcome.rowCount }),
           }),
         );
         return;
       }
       download(outcome.filename, bytes, CONTENT_TYPES[chosen]);
       setMessage(
-        outcome.rowCount === 1
-          ? t("search.exportButton.rowsDownloadedOne", {
-              count: outcome.rowCount,
-            })
-          : t("search.exportButton.rowsDownloadedOther", {
-              count: outcome.rowCount,
-            }),
+        t("search.exportButton.rowsDownloaded", {
+          count: outcome.rowCount,
+        }),
       );
     });
   };
@@ -131,7 +124,7 @@ export function ExportButton({
           </Menu.Portal>
         </Menu.Root>
         {message || error ? (
-          <span className="absolute top-full right-0 z-10 mt-1 w-64 rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs shadow-(--shadow-popover)">
+          <span className="absolute top-full end-0 z-10 mt-1 w-64 rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs shadow-(--shadow-popover)">
             {message ? (
               <span className="text-ink-3" data-testid="export-result">
                 {message}

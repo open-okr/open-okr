@@ -271,6 +271,7 @@ export {
   type QualityStatus,
   type QualityVerdict,
   strengthScore,
+  WORD_CHECKS_SKIPPED_NOTICE,
 } from "./quality.ts";
 export { describeRule, type RuleDescription } from "./rule-description.ts";
 export {

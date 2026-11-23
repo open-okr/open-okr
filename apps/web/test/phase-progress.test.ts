@@ -1,4 +1,5 @@
-import { CATALOGUES, translate } from "@openokr/ui";
+import { translate } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 import { describe, expect, it } from "vitest";
 import { phaseProgress } from "../lib/phase-progress.ts";
 

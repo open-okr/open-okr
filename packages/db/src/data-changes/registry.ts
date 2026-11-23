@@ -45,6 +45,7 @@ import { attachmentRowsFromText } from "./0033_attachment_rows_from_text.ts";
 import { shortIds } from "./0034_short_ids.ts";
 import { indexContentNeverQueued } from "./0035_index_content_never_queued.ts";
 import { sessionRolePermissions } from "./0036_session_role_permissions.ts";
+import { kpiAccessContexts } from "./0037_kpi_access_contexts.ts";
 
 export function registeredDataChanges(
   encryptionKey: string | undefined,
@@ -104,5 +105,6 @@ export function registeredDataChanges(
     // goal, the space, the cycle or the KPI instead.
     indexContentNeverQueued,
     sessionRolePermissions,
+    kpiAccessContexts,
   ];
 }

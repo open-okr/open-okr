@@ -57,6 +57,7 @@ import {
 } from "../notifications/subscriptions.ts";
 import { readerMaySeeSubject } from "../notifications/visibility.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { wallClock } from "./wall-clock.ts";
 
@@ -164,6 +165,7 @@ export const listNotifications = defineReadAction({
   page: { cursorFrom: ["createdAt", "id"] },
   async handler(context, input) {
     const db = drizzle(context.pool);
+    const locale = await resolveMemberLanguage(context);
     return withWorkspace(db, context.workspaceId, async (rawTx) => {
       const tx = rawTx as OperationTx;
       const memberId = await actingMember(
@@ -292,7 +294,11 @@ export const listNotifications = defineReadAction({
           subjectId,
           subjectTitle: null,
           rendered: row.activityKind
-            ? renderActivity(row.activityKind, row.activityPayload ?? {})
+            ? renderActivity(
+                row.activityKind,
+                row.activityPayload ?? {},
+                locale,
+              )
             : null,
           actorName: row.actorName ?? null,
           ruleKey: row.ruleKey ?? null,

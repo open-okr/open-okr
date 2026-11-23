@@ -12,6 +12,7 @@ import {
 import { useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useMemo } from "react";
+import { methodTitle, methodVerdictWords } from "../../lib/method-words.ts";
 import type { CoachKeyResult, CoachObjective } from "./draft-coach.tsx";
 
 /**
@@ -118,9 +119,9 @@ export function QualityPanel({
           .map((verdict) => ({
             id: verdict.id,
             status: verdict.status,
-            prompt: verdict.prompt,
+            prompt: methodVerdictWords(t, verdict).prompt,
             href: `/goals/${entry.objective.id}`,
-            where: "the objective",
+            where: t("cycle.qualityPanel.objective"),
           })),
         ...keyResults
           .filter(
@@ -132,9 +133,9 @@ export function QualityPanel({
                   {
                     id: verdict.id,
                     status: verdict.status,
-                    prompt: verdict.prompt,
+                    prompt: methodVerdictWords(t, verdict).prompt,
                     href: `/goals/${entry.objective.id}`,
-                    where: "the set",
+                    where: t("cycle.qualityPanel.set"),
                   },
                 ]
               : verdict.keyResults.map((index) => {
@@ -142,11 +143,11 @@ export function QualityPanel({
                   return {
                     id: verdict.id,
                     status: verdict.status,
-                    prompt: verdict.prompt,
+                    prompt: methodVerdictWords(t, verdict).prompt,
                     href: row
                       ? `/goals/${entry.objective.id}#kr-${row.id}`
                       : `/goals/${entry.objective.id}`,
-                    where: row?.title ?? "a key result",
+                    where: row?.title ?? t("cycle.qualityPanel.keyResult"),
                   };
                 }),
           ),
@@ -154,7 +155,7 @@ export function QualityPanel({
 
       return { objective: entry.objective, issues };
     });
-  }, [set, thresholds, practice]);
+  }, [set, thresholds, practice, t]);
 
   const total = groups.reduce((sum, group) => sum + group.issues.length, 0);
 
@@ -190,23 +191,14 @@ export function QualityPanel({
       ) : total === 0 ? (
         <p className="text-xs text-ok">
           {t("cycle.qualityPanel.everyCheckPassesAcrossObjective", {
-            objectives:
-              set.length === 1
-                ? t("common.count.objectiveOne", { count: set.length })
-                : t("common.count.objectiveOther", { count: set.length }),
+            objectives: t("common.count.objective", { count: set.length }),
           })}
         </p>
       ) : (
         <p className="text-xs text-ink-3">
           {t("cycle.qualityPanel.issueAcrossObjectiveEachOne", {
-            issues:
-              total === 1
-                ? t("common.count.issueOne", { count: total })
-                : t("common.count.issueOther", { count: total }),
-            objectives:
-              withIssues === 1
-                ? t("common.count.objectiveOne", { count: withIssues })
-                : t("common.count.objectiveOther", { count: withIssues }),
+            issues: t("common.count.issue", { count: total }),
+            objectives: t("common.count.objective", { count: withIssues }),
           })}
         </p>
       )}
@@ -232,7 +224,11 @@ export function QualityPanel({
                         {issue.id}
                       </span>
                       <span className="truncate text-xs font-semibold text-ink">
-                        {titles.get(issue.id) ?? issue.id}
+                        {methodTitle(
+                          t,
+                          issue.id,
+                          titles.get(issue.id) ?? issue.id,
+                        )}
                       </span>
                     </span>
                     <span className="text-xs text-ink-3">{issue.prompt}</span>

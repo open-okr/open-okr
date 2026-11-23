@@ -22,7 +22,7 @@ import type { ResolvedThresholds } from "./thresholds.ts";
 /**
  * `info` is a note rather than a warning (METHOD.md §4, P9-T03a): a check
  * whose level is information shows what it saw and asks nothing of anybody.
- * Only `applyEnforcement` produces it; no condition row carries it.
+ * The language notice also uses `info` when a word check is skipped.
  */
 export type QualityStatus = "pass" | "info" | "warn" | "fail" | "todo";
 
@@ -59,6 +59,8 @@ export interface QualityVerdict {
    */
   readonly condition: string;
   readonly feedsStrengthScore: boolean;
+  /** The text's script skipped a word-list or word-count condition. */
+  readonly wordChecksSkipped?: true;
 }
 
 /**
@@ -72,6 +74,10 @@ export {
   QUALITY_WORD_LISTS,
 } from "./word-lists.ts";
 
+import {
+  normaliseArabicIndicDigits,
+  skipsEnglishWordChecks,
+} from "./text-script.ts";
 import { matchesEndStateShape, wordListsFrom } from "./word-lists.ts";
 
 export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
@@ -560,6 +566,20 @@ const verdictOf = (check: QualityCheck, condition: string): QualityVerdict => {
   };
 };
 
+export const WORD_CHECKS_SKIPPED_NOTICE =
+  "The word checks read English only, so this text was not checked for them.";
+
+function skippedWordVerdict(rule: QualityCheck): QualityVerdict {
+  return {
+    id: rule.id,
+    status: "info",
+    prompt: WORD_CHECKS_SKIPPED_NOTICE,
+    condition: "English word checks skipped",
+    feedsStrengthScore: false,
+    wordChecksSkipped: true,
+  };
+}
+
 const check = (id: string): QualityCheck => {
   const found = [
     ...OBJECTIVE_CHECKS,
@@ -573,34 +593,11 @@ const check = (id: string): QualityCheck => {
   return found;
 };
 
-/**
- * §4.1's five objective checks, first match wins within each.
- *
- * The order inside OBJ-1 is the order METHOD.md lists, and `pnpm
- * method:check` compares it row by row since completeness review M-27.
- */
-export function evaluateObjective(
-  input: ObjectiveInput,
-  thresholds: ResolvedThresholds,
-): readonly QualityVerdict[] {
-  const title = input.title.trim();
-  const wordCount = words(title).length;
-  // A quarter label is a time reference, not a metric, so it does not trip
-  // OBJ-2. The approved corpus says so in as many words on entry 1: "Launch the
-  // new mobile app by end of Q3" is scored "no digits (Q3 is not a digit)".
-  // Without this, every objective that names its own quarter would be warned
-  // for the one thing OBJ-3 asks it to do.
-  const hasDigits = /\d/.test(title.replace(/\bQ[1-4]\b/gi, ""));
-  // OBJ-2 also lets a four-digit year through since P9-T03a: "Be the
-  // mid-market's first choice by 2027" names a time, not a metric.
-  const hasMetricDigits = /\d/.test(
-    title.replace(/\bQ[1-4]\b/gi, "").replace(/\b(19|20)\d{2}\b/g, ""),
-  );
-  // From the registry rather than the module, so a workspace's added terms
-  // reach the check that uses them. §11 carries these as a parameter.
-  const lists = wordListsFrom(thresholds["quality.wordLists"]);
-
-  // OBJ-1
+function evaluateObjectiveWording(
+  title: string,
+  hasDigits: boolean,
+  lists: ReturnType<typeof wordListsFrom>,
+): QualityVerdict {
   const obj1 = check("OBJ-1");
   const startsOutput = startsWith(title, lists.outputVerbs);
   const startsMovement = startsWith(title, lists.movementVerbs);
@@ -613,7 +610,7 @@ export function evaluateObjective(
   // which puts the output-verb sweep above movement, why and state words.
   // This chain used to ask the sweep second to last, so "Grow revenue so that
   // we can launch in Europe" passed on its why and never met the warning.
-  const obj1Verdict = startsOutput
+  return startsOutput
     ? verdictOf(obj1, "Starts with an output verb")
     : matchesEndStateShape(title)
       ? verdictOf(obj1, "Matches an end-state shape")
@@ -626,17 +623,53 @@ export function evaluateObjective(
             : hasState
               ? verdictOf(obj1, "Names a change in state")
               : verdictOf(obj1, "Cannot tell");
+}
 
-  // OBJ-2. The limit is the §11 registry's, not this function's, so a
-  // workspace that tunes it tunes the check rather than being ignored by it.
-  // There is no lower bound since P9-T03a (METHOD.md §4.1).
+/**
+ * §4.1's five objective checks, first match wins within each.
+ *
+ * The order inside OBJ-1 is the order METHOD.md lists, and `pnpm
+ * method:check` compares it row by row since completeness review M-27.
+ */
+export function evaluateObjective(
+  input: ObjectiveInput,
+  thresholds: ResolvedThresholds,
+): readonly QualityVerdict[] {
+  const title = input.title.trim();
+  const digitsTitle = normaliseArabicIndicDigits(title);
+  // A quarter label is a time reference, not a metric, so it does not trip
+  // OBJ-2. The approved corpus says so in as many words on entry 1: "Launch the
+  // new mobile app by end of Q3" is scored "no digits (Q3 is not a digit)".
+  // Without this, every objective that names its own quarter would be warned
+  // for the one thing OBJ-3 asks it to do.
+  const hasDigits = /\d/.test(digitsTitle.replace(/\bQ[1-4]\b/gi, ""));
+  // OBJ-2 also lets a four-digit year through since P9-T03a: "Be the
+  // mid-market's first choice by 2027" names a time, not a metric.
+  const hasMetricDigits = /\d/.test(
+    digitsTitle.replace(/\bQ[1-4]\b/gi, "").replace(/\b(19|20)\d{2}\b/g, ""),
+  );
+  // From the registry rather than the module, so a workspace's added terms
+  // reach the check that uses them. §11 carries these as a parameter.
+  const lists = wordListsFrom(thresholds["quality.wordLists"]);
+
+  const skipWords = skipsEnglishWordChecks(title);
+  const obj1Verdict = skipWords
+    ? skippedWordVerdict(check("OBJ-1"))
+    : evaluateObjectiveWording(title, hasDigits, lists);
+
+  // When word count is skipped, a digit condition can still fire.
   const obj2 = check("OBJ-2");
   const limit = thresholds["quality.objectiveLengthLimit"];
-  const obj2Verdict = hasMetricDigits
-    ? verdictOf(obj2, "Contains digits other than a four-digit year")
-    : wordCount > limit
-      ? verdictOf(obj2, "More than 18 words")
-      : verdictOf(obj2, "Otherwise");
+  const obj2Verdict: QualityVerdict = hasMetricDigits
+    ? {
+        ...verdictOf(obj2, "Contains digits other than a four-digit year"),
+        ...(skipWords ? { wordChecksSkipped: true } : {}),
+      }
+    : skipWords
+      ? skippedWordVerdict(obj2)
+      : words(title).length > limit
+        ? verdictOf(obj2, "More than 18 words")
+        : verdictOf(obj2, "Otherwise");
 
   // OBJ-3
   const obj3 = check("OBJ-3");
@@ -712,7 +745,7 @@ export interface KeyResultVerdict extends QualityVerdict {
 
 /** How many separate numbers the text carries, for KR-2 and KR-5. */
 const numbersIn = (text: string): number =>
-  (text.match(/\d+(?:[.,]\d+)?/g) ?? []).length;
+  (normaliseArabicIndicDigits(text).match(/\d+(?:[.,]\d+)?/g) ?? []).length;
 
 const WORST: Record<QualityStatus, number> = {
   pass: 0,
@@ -876,10 +909,14 @@ export function evaluateKeyResults(
     keyResults: [],
   };
 
-  // KR-5
-  const kr5 = rollUp(
+  // KR-5 rolls up the word checks only over the key results they can read.
+  const checkedIndexes = indexes.filter(
+    (index) => !skipsEnglishWordChecks(set[index]?.text ?? ""),
+  );
+  const skipSome = checkedIndexes.length !== indexes.length;
+  const checkedImpact = rollUp(
     "KR-5",
-    indexes.map((index) => {
+    checkedIndexes.map((index) => {
       const text = set[index]?.text ?? "";
       // A key result tagged leading is exempt (METHOD.md §4.2, P9-T03a): an
       // activity can be a fair leading signal, which is what the tag says.
@@ -904,6 +941,13 @@ export function evaluateKeyResults(
       };
     }),
   );
+
+  const kr5: KeyResultVerdict =
+    skipSome && checkedIndexes.length === 0
+      ? { ...skippedWordVerdict(check("KR-5")), keyResults: [] }
+      : skipSome
+        ? { ...checkedImpact, wordChecksSkipped: true }
+        : checkedImpact;
 
   // KR-6. The set average, never one key result: §3.2 says so in as many
   // words. Over the aspirational key results only (P9-T11a).

@@ -141,7 +141,7 @@ test("the goal page links the key result drafted by hand", async () => {
   await expect(
     page.getByRole("heading", { level: 1, name: OBJECTIVE }),
   ).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("from a KPI", { exact: true })).toHaveCount(1);
+  await expect(page.getByTestId("kpi-visible-chip")).toHaveCount(1);
 
   // The one-time writes sit behind "Manage this goal" (OKRGoal UX review, N6).
   await page.getByText("Manage this goal", { exact: true }).click();
@@ -150,7 +150,7 @@ test("the goal page links the key result drafted by hand", async () => {
   await choose(page.getByRole("combobox", { name: "KPI it reads from" }), KPI);
   await page.getByTestId("link-kpi").click();
 
-  await expect(page.getByText("from a KPI", { exact: true })).toHaveCount(2, {
+  await expect(page.getByTestId("kpi-visible-chip")).toHaveCount(2, {
     timeout: 15_000,
   });
   // Nothing measured by hand is left, so there is nothing left to offer.

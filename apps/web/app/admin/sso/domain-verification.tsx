@@ -237,7 +237,10 @@ function DomainRow({
             <Dialog.Backdrop className="fixed inset-0 z-50 bg-ink/20 data-ending-style:opacity-0 data-starting-style:opacity-0" />
             <Dialog.Popup
               data-testid={`sso-domain-dialog-${domain.domain}`}
-              className="fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-surface shadow-(--shadow-popover) outline-none"
+              className={
+                /* direction-neutral: Keep the element centered in its container. */
+                "fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-line bg-surface shadow-(--shadow-popover) outline-none"
+              }
             >
               <header className="flex flex-none items-start gap-3 border-b border-line px-4 py-3">
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">

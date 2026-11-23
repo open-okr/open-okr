@@ -26,6 +26,7 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { RHYTHM_ASSIST_KEYS } from "../ai/assist-keys.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { defineReadAction } from "./define.ts";
 import { readKpiGrid } from "./kpis.ts";
 
@@ -109,6 +110,7 @@ export const suggestKpi = defineReadAction({
     let suggested: Awaited<ReturnType<NonNullable<typeof drafter.suggestKpi>>>;
     try {
       suggested = await drafter.suggestKpi({
+        locale: await resolveMemberLanguage(context),
         description: input.description,
         existing: existing.map((kpi) => kpi.title),
       });

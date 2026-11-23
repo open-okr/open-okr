@@ -1,10 +1,12 @@
-import { activeOnly, goals, keyResults, kpis } from "@openokr/db";
+import { activeOnly, goals, keyResults } from "@openokr/db";
 import { eq, inArray, isNull } from "drizzle-orm";
+import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { asNumber, recordValueInTx } from "../goals/service.ts";
-import { OperationError, type OperationTx } from "../operations/operation.ts";
+import type { OperationTx } from "../operations/operation.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
+import { requireKpiAccess } from "./access.ts";
 import { latestKpiReading } from "./service.ts";
 
 /**
@@ -38,27 +40,20 @@ import { latestKpiReading } from "./service.ts";
 /**
  * The KPI a key result is about to read, and the value it last reported.
  *
- * KPIs are read at the workspace floor: every member who can open the grid
- * sees every row in it (`actions/kpis.ts`), and the caller has already been
- * admitted to the workspace. So "may this member read it" is "does it exist,
- * here, and is it live". Checked by hand, because the foreign key accepts a
- * KPI from another workspace: a key check does not see row-level security.
+ * Access is enforced at view (0.10.0 K4, §6 R15).
  */
 export async function readLinkableKpi(
   tx: OperationTx,
   workspaceId: string,
   kpiId: string,
+  memberId: string,
 ): Promise<{ readonly reading: number | null }> {
-  const [kpi] = await tx
-    .select({ id: kpis.id })
-    .from(kpis)
-    .where(
-      activeOnly(kpis, eq(kpis.workspaceId, workspaceId), eq(kpis.id, kpiId)),
-    )
-    .limit(1);
-  if (!kpi) {
-    throw new OperationError("not_found", "No such KPI.");
-  }
+  await requireKpiAccess(tx, {
+    workspaceId,
+    memberId,
+    kpiId,
+    requires: ACCESS_LEVELS.view,
+  });
   const latest = await latestKpiReading(tx, workspaceId, kpiId);
   return { reading: latest?.actualValue ?? null };
 }

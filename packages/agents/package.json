@@ -10,6 +10,7 @@
     "test": "vitest run",
     "ai:evaluate": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/evaluate.ts",
     "ai:measure": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/measure-credits.ts",
+    "i18n:translate": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/i18n-translate.ts",
     "typecheck": "tsc --noEmit --singleThreaded"
   },
   "dependencies": {

@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { directionFor } from "@openokr/formats";
 import {
   Bar,
   Card,
@@ -11,6 +12,7 @@ import {
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { pageTitle } from "../../lib/page-title.ts";
+import { timeAxisX } from "../../lib/reading-direction.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
@@ -31,8 +33,8 @@ const BAND_TONE = {
 /**
  * The scorecard (METHOD.md §8.9, TECHNICAL-PLAN §4.6, P3-T15).
  *
- * One row per archived cycle, oldest first, so the trend reads left to right
- * the way time does. The band table and the verdict come from the snapshot
+ * One row per archived cycle, oldest first in reading order.
+ * The band table and the verdict come from the snapshot
  * rather than being recomputed here: a scorecard that recalculated would drift
  * from the number the review actually agreed on.
  *
@@ -41,7 +43,8 @@ const BAND_TONE = {
  * answer different questions.
  */
 export default async function ScorecardPage() {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  const direction = directionFor(locale);
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -82,14 +85,27 @@ export default async function ScorecardPage() {
   const trend = points
     .map(
       (point) =>
-        `${point.index * trendStep},${trendHeight - point.value * trendHeight}`,
+        `${timeAxisX(point.index * trendStep, trendWidth, direction)},${trendHeight - point.value * trendHeight}`,
     )
     .join(" ");
 
   // The export is a data URL rather than a route, so it needs no endpoint and
   // no second read that could disagree with the table above it.
   const csv = [
-    "cycle,starts_on,result,verdict,fully_achieved,strong,partial,little",
+    // Headers are read by people in a spreadsheet, so they are in the
+    // requester's locale; the values below stay machine values (§13).
+    [
+      t("scorecard.cycle"),
+      t("scorecard.startsOn"),
+      t("scorecard.result"),
+      t("scorecard.verdict"),
+      t("scorecard.fullyAchieved"),
+      t("scorecard.strong"),
+      t("scorecard.partial"),
+      t("scorecard.little"),
+    ]
+      .map((header) => `"${header.replace(/"/g, '""')}"`)
+      .join(","),
     ...scorecard.rows.map((row) =>
       [
         `"${row.cycleName.replace(/"/g, '""')}"`,
@@ -116,13 +132,9 @@ export default async function ScorecardPage() {
             <p className="text-xs text-ink-3">
               {scorecard.rows.length === 0
                 ? t("scorecard.noCycleHasBeen")
-                : scorecard.rows.length === 1
-                  ? t("scorecard.archivedCyclesOne", {
-                      count: scorecard.rows.length,
-                    })
-                  : t("scorecard.archivedCyclesOther", {
-                      count: scorecard.rows.length,
-                    })}
+                : t("scorecard.archivedCycles", {
+                    count: scorecard.rows.length,
+                  })}
             </p>
           </div>
           {scorecard.rows.length > 0 ? (
@@ -163,97 +175,101 @@ export default async function ScorecardPage() {
               {t("scorecard.aCycleJoinsThis")}
             </p>
           ) : (
-            <table className="w-full text-sm">
-              <caption className="sr-only">
-                {t("scorecard.everyArchivedCycleWith")}
-              </caption>
-              <thead>
-                <tr className="border-line border-b text-xs text-ink-3">
-                  <th className="px-3 py-1.5 text-left font-semibold">
-                    {t("scorecard.cycle")}
-                  </th>
-                  <th className="px-3 py-1.5 text-left font-semibold">
-                    {t("scorecard.result")}
-                  </th>
-                  <th className="px-3 py-1.5 text-left font-semibold">
-                    {t("scorecard.verdict")}
-                  </th>
-                  <th className="px-3 py-1.5 text-right font-semibold">1.0</th>
-                  <th className="px-3 py-1.5 text-right font-semibold">
-                    {t("scorecard.strong")}
-                  </th>
-                  <th className="px-3 py-1.5 text-right font-semibold">
-                    {t("scorecard.partial")}
-                  </th>
-                  <th className="px-3 py-1.5 text-right font-semibold">
-                    {t("scorecard.little")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {scorecard.rows.map((row) => (
-                  <tr
-                    key={row.cycleId}
-                    className="border-line border-b last:border-b-0"
-                  >
-                    <td className="px-3 py-2">
-                      <span className="text-ink">{row.cycleName}</span>
-                      <span className="ml-1.5 text-xs text-ink-4">
-                        {row.startsOn}
-                      </span>
-                      {/* §12 (P9-T14c): the bands this cycle was graded
-                       * under, which a band moved since does not change. */}
-                      <span
-                        className="block text-xs text-ink-4"
-                        data-testid="scorecard-bands"
-                      >
-                        {t("scorecard.gradedOn", {
-                          strong: row.bands.strong.toFixed(1),
-                          partial: row.bands.partial.toFixed(1),
-                        })}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        {row.resultValue === null ? (
-                          <span className="w-10 text-ink tabular-nums">—</span>
-                        ) : (
-                          // Coloured by its own cycle's bands (§12).
-                          <Chip
-                            tone={BAND_TONE[row.resultBand ?? "little"]}
-                            data-testid="scorecard-result"
-                            data-band={row.resultBand ?? undefined}
-                          >
-                            {row.resultValue.toFixed(2)}
-                          </Chip>
-                        )}
-                        <Bar
-                          value={(row.resultValue ?? 0) * 100}
-                          className="w-20"
-                        />
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Chip tone={verdictTone(row.verdict)} dot>
-                        {verdictLabel(row.verdict)}
-                      </Chip>
-                    </td>
-                    <td className="px-3 py-2 text-right text-ink-2 tabular-nums">
-                      {row.fullyAchieved}
-                    </td>
-                    <td className="px-3 py-2 text-right text-ink-2 tabular-nums">
-                      {row.strong}
-                    </td>
-                    <td className="px-3 py-2 text-right text-ink-2 tabular-nums">
-                      {row.partial}
-                    </td>
-                    <td className="px-3 py-2 text-right text-ink-2 tabular-nums">
-                      {row.little}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-max text-sm">
+                <caption className="sr-only">
+                  {t("scorecard.everyArchivedCycleWith")}
+                </caption>
+                <thead>
+                  <tr className="border-line border-b text-xs text-ink-3">
+                    <th className="px-3 py-1.5 text-start font-semibold">
+                      {t("scorecard.cycle")}
+                    </th>
+                    <th className="px-3 py-1.5 text-start font-semibold">
+                      {t("scorecard.result")}
+                    </th>
+                    <th className="px-3 py-1.5 text-start font-semibold">
+                      {t("scorecard.verdict")}
+                    </th>
+                    <th className="px-3 py-1.5 text-end font-semibold">1.0</th>
+                    <th className="px-3 py-1.5 text-end font-semibold">
+                      {t("scorecard.strong")}
+                    </th>
+                    <th className="px-3 py-1.5 text-end font-semibold">
+                      {t("scorecard.partial")}
+                    </th>
+                    <th className="px-3 py-1.5 text-end font-semibold">
+                      {t("scorecard.little")}
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {scorecard.rows.map((row) => (
+                    <tr
+                      key={row.cycleId}
+                      className="border-line border-b last:border-b-0"
+                    >
+                      <td className="px-3 py-2">
+                        <span className="text-ink">{row.cycleName}</span>
+                        <span className="ms-1.5 text-xs text-ink-4">
+                          {row.startsOn}
+                        </span>
+                        {/* §12 (P9-T14c): the bands this cycle was graded
+                         * under, which a band moved since does not change. */}
+                        <span
+                          className="block text-xs text-ink-4"
+                          data-testid="scorecard-bands"
+                        >
+                          {t("scorecard.gradedOn", {
+                            strong: row.bands.strong.toFixed(1),
+                            partial: row.bands.partial.toFixed(1),
+                          })}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          {row.resultValue === null ? (
+                            <span className="w-10 text-ink tabular-nums">
+                              —
+                            </span>
+                          ) : (
+                            // Coloured by its own cycle's bands (§12).
+                            <Chip
+                              tone={BAND_TONE[row.resultBand ?? "little"]}
+                              data-testid="scorecard-result"
+                              data-band={row.resultBand ?? undefined}
+                            >
+                              {row.resultValue.toFixed(2)}
+                            </Chip>
+                          )}
+                          <Bar
+                            value={(row.resultValue ?? 0) * 100}
+                            className="w-20"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Chip tone={verdictTone(row.verdict)} dot>
+                          {verdictLabel(row.verdict, t)}
+                        </Chip>
+                      </td>
+                      <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
+                        {row.fullyAchieved}
+                      </td>
+                      <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
+                        {row.strong}
+                      </td>
+                      <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
+                        {row.partial}
+                      </td>
+                      <td className="px-3 py-2 text-end text-ink-2 tabular-nums">
+                        {row.little}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardBody>
       </Card>

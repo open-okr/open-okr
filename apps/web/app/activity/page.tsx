@@ -1,4 +1,5 @@
 import { callAction } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { workspaceReaderLevel } from "../../lib/access";
@@ -55,8 +56,8 @@ function parseCursor(
   return at && id ? { at, id } : undefined;
 }
 
-const when = (at: string, timeZone: string): string =>
-  new Intl.DateTimeFormat("en-GB", {
+const when = (at: string, timeZone: string, locale?: string): string =>
+  new Intl.DateTimeFormat(intlTagFor(locale), {
     timeZone,
     day: "numeric",
     month: "short",
@@ -69,7 +70,7 @@ export default async function ActivityPage({
 }: {
   readonly searchParams: Promise<{ at?: string; id?: string }>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
   // A guest holds nothing here, and is moved to their spaces (L-23).
@@ -137,7 +138,7 @@ export default async function ActivityPage({
                           t("activity.aMember"))
                         : instanceName}
                       {" · "}
-                      {when(item.at, timeZone)}
+                      {when(item.at, timeZone, locale)}
                     </span>
                   </span>
                   {item.aggregatedCount > 1 ? (

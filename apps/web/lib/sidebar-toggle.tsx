@@ -62,7 +62,7 @@ export function SidebarToggle() {
         }}
         className="hidden size-8 items-center justify-center rounded-control text-ink-3 hover:bg-ink/[0.045] hover:text-ink xl:flex"
       >
-        <Icon aria-hidden="true" className="size-4" />
+        <Icon aria-hidden="true" className="size-4 rtl:-scale-x-100" />
       </button>
     </Tooltip>
   );

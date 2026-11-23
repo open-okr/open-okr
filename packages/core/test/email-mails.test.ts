@@ -1,9 +1,11 @@
+import { catalogueWithLocalePlurals } from "@openokr/formats";
 import { describe, expect, it } from "vitest";
 import {
   changeEmailMail,
   emailChangeNoticeMail,
   emailChangeTakenMail,
   passwordChangedMail,
+  resetPasswordMail,
   verifyEmailMail,
 } from "../src/mail/account.ts";
 import {
@@ -21,6 +23,35 @@ import type { WorkspaceMail } from "../src/mail/workspace.ts";
  */
 
 const BASE = "https://okr.example.test";
+
+describe("a password reset link", () => {
+  const input = {
+    instanceName: "Northwind OKR",
+    to: "sara@example.com",
+    url: `${BASE}/api/auth/reset-password/token?callbackURL=%2Freset-password`,
+  };
+
+  it("uses Malay when requested from the Malay sign-in page of an English instance", () => {
+    const built = resetPasswordMail({
+      ...input,
+      instanceLanguage: "en",
+      requestLocale: "ms",
+    });
+    expect(built.subject).toBe(
+      "Tetapkan semula kata laluan Northwind OKR anda",
+    );
+    expect(built.html).toContain('<html lang="ms" dir="ltr">');
+    expect(built.text).toContain(input.url);
+  });
+
+  it("uses the instance language when there is no visitor request", () => {
+    const built = resetPasswordMail({ ...input, instanceLanguage: "ms" });
+    expect(built.subject).toBe(
+      "Tetapkan semula kata laluan Northwind OKR anda",
+    );
+    expect(built.html).toContain('<html lang="ms" dir="ltr">');
+  });
+});
 
 const mail = (over: Partial<WorkspaceMail> = {}): WorkspaceMail => ({
   name: "Northwind Labs",
@@ -41,7 +72,9 @@ describe("the word tables", () => {
       [...value.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
     const en = MAIL_WORD_TABLES.en;
     for (const [locale, table] of Object.entries(MAIL_WORD_TABLES)) {
-      expect(Object.keys(table).sort(), locale).toEqual(Object.keys(en).sort());
+      expect(Object.keys(table).sort(), locale).toEqual(
+        Object.keys(catalogueWithLocalePlurals(en, locale)).sort(),
+      );
       for (const key of Object.keys(en) as (keyof typeof en)[]) {
         expect(holes(table[key]), `${locale} ${key}`).toEqual(holes(en[key]));
       }
@@ -78,7 +111,7 @@ describe("the invitation", () => {
       expiresAt: null,
     });
     expect(built.subject).toBe("Anda dijemput ke Northwind Labs");
-    expect(built.html).toContain('<html lang="ms">');
+    expect(built.html).toContain('<html lang="ms" dir="ltr">');
     expect(built.html).toContain("Terima jemputan");
   });
 });
@@ -226,7 +259,7 @@ describe("the confirmation mail", () => {
       hours: 24,
     });
     expect(built.subject).toBe("Sahkan alamat e-mel anda untuk Northwind OKR");
-    expect(built.html).toContain('<html lang="ms">');
+    expect(built.html).toContain('<html lang="ms" dir="ltr">');
     expect(built.text).toContain("Pautan ini berfungsi selama 24 jam.");
   });
 });
@@ -309,9 +342,9 @@ describe("the password notice", () => {
   it("is written in the instance's language", () => {
     const built = notice({ locale: "ms" });
     expect(built.subject).toBe("Kata laluan Northwind OKR anda telah ditukar");
-    expect(built.html).toContain('<html lang="ms">');
+    expect(built.html).toContain('<html lang="ms" dir="ltr">');
     expect(built.text).toContain(
-      "telah ditukar pada 11 November 2026 jam 07:05 (UTC).",
+      "telah ditukar pada 11 November 2026 jam 07:05 PG (UTC).",
     );
     expect(built.text).toContain("Tetapkan semula kata laluan");
   });
@@ -403,7 +436,7 @@ describe("a change of sign-in email", () => {
       url: URL_,
       hours: 24,
     });
-    expect(link.html).toContain('<html lang="ms">');
+    expect(link.html).toContain('<html lang="ms" dir="ltr">');
     expect(link.text).toContain("Ia berfungsi selama 24 jam");
     const notice = emailChangeNoticeMail({
       instanceName: "Northwind OKR",
@@ -413,7 +446,7 @@ describe("a change of sign-in email", () => {
       at: AT,
       baseUrl: BASE,
     });
-    expect(notice.text).toContain("pada 11 November 2026 jam 07:05 (UTC).");
+    expect(notice.text).toContain("pada 11 November 2026 jam 07:05 PG (UTC).");
     const taken = emailChangeTakenMail({
       instanceName: "Northwind OKR",
       locale: "ms",

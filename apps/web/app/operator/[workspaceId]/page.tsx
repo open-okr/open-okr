@@ -250,7 +250,7 @@ export default async function OperatorWorkspacePage({
       {/* Once erasure has claimed it there is one thing to say, and nothing to
        * press: no reopening, no plan, no way in (workspace-erasure.md §8). */}
       {tenant.erasingAt ? (
-        <div className="rounded-lg border-y border-r border-l-4 border-bad-dot bg-bad-bg px-4 py-3 text-bad">
+        <div className="rounded-lg border-y border-e border-s-4 border-bad-dot bg-bad-bg px-4 py-3 text-bad">
           <p className="font-semibold text-sm">
             {t("operator.workspace.erasingSince", {
               date: day(tenant.erasingAt),
@@ -262,7 +262,7 @@ export default async function OperatorWorkspacePage({
         </div>
       ) : band ? (
         <div
-          className={`rounded-lg border-l-4 border-y border-r px-4 py-3 ${
+          className={`rounded-lg border-s-4 border-y border-e px-4 py-3 ${
             BAND_STYLE[tenant.tenantState] ?? "border-line bg-raised text-ink-2"
           }`}
         >
@@ -481,15 +481,10 @@ export default async function OperatorWorkspacePage({
                   ? t("operator.workspace.planUnlimitedSeats", {
                       name: plan.name,
                     })
-                  : plan.seats === 1
-                    ? t("operator.workspace.planSeatsOne", {
-                        name: plan.name,
-                        count: plan.seats,
-                      })
-                    : t("operator.workspace.planSeatsOther", {
-                        name: plan.name,
-                        count: plan.seats,
-                      }),
+                  : t("operator.workspace.planSeats", {
+                      name: plan.name,
+                      count: plan.seats,
+                    }),
             }))}
             workspaceId={tenant.workspaceId}
             workspaceName={tenant.name}

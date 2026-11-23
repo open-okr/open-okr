@@ -220,22 +220,63 @@ export interface ResolvedMapping {
   readonly bindings: readonly string[];
 }
 
+export function resolveChannelTemplate(input: {
+  readonly templates: readonly {
+    readonly name: string;
+    readonly language: string;
+    readonly status: string;
+  }[];
+  readonly templateName: string;
+  readonly recipientLocale?: string;
+  readonly workspaceLanguage?: string;
+}): { readonly name: string; readonly language: string } | null {
+  const approved = input.templates.filter(
+    (t) =>
+      t.name === input.templateName && t.status.toUpperCase() === "APPROVED",
+  );
+  if (approved.length === 0) {
+    return null;
+  }
+  if (input.recipientLocale) {
+    const direct = approved.find(
+      (t) => t.language.toLowerCase() === input.recipientLocale?.toLowerCase(),
+    );
+    if (direct) {
+      return direct;
+    }
+  }
+  const wsLang = input.workspaceLanguage ?? "en";
+  const wsFallback = approved.find(
+    (t) => t.language.toLowerCase() === wsLang.toLowerCase(),
+  );
+  if (wsFallback) {
+    return wsFallback;
+  }
+  return approved[0] ?? null;
+}
+
 /**
  * The template one rule key uses, or null.
  *
  * Null for a rule with no mapping, and for one whose template Meta has since
  * withdrawn or un-approved. Both mean the same thing to a sender: there is
  * nothing here it may send outside the window.
+ *
+ * Falls back to the workspace language template if no approved template exists
+ * in the recipient's resolved language (languages §13).
  */
 export async function mappingFor(
   tx: WorkspaceTx,
-  input: { readonly workspaceId: string; readonly ruleKey: string },
+  input: {
+    readonly workspaceId: string;
+    readonly ruleKey: string;
+    readonly locale?: string;
+    readonly workspaceLanguage?: string;
+  },
 ): Promise<ResolvedMapping | null> {
   const [row] = await tx
     .select({
-      name: whatsappTemplates.name,
-      language: whatsappTemplates.language,
-      status: whatsappTemplates.status,
+      templateName: whatsappTemplates.name,
       bindings: whatsappTemplateMappings.bindings,
     })
     .from(whatsappTemplateMappings)
@@ -255,12 +296,42 @@ export async function mappingFor(
     )
     .limit(1);
 
-  if (row?.status.toUpperCase() !== "APPROVED") {
+  if (!row) {
     return null;
   }
+
+  // Load all templates with this name for language matching
+  const matchingTemplates = await tx
+    .select({
+      name: whatsappTemplates.name,
+      language: whatsappTemplates.language,
+      status: whatsappTemplates.status,
+    })
+    .from(whatsappTemplates)
+    .where(
+      activeOnly(
+        whatsappTemplates,
+        and(
+          eq(whatsappTemplates.workspaceId, input.workspaceId),
+          eq(whatsappTemplates.name, row.templateName),
+        ),
+      ),
+    );
+
+  const matched = resolveChannelTemplate({
+    templates: matchingTemplates,
+    templateName: row.templateName,
+    recipientLocale: input.locale,
+    workspaceLanguage: input.workspaceLanguage,
+  });
+
+  if (!matched) {
+    return null;
+  }
+
   return {
-    templateName: row.name,
-    language: row.language,
+    templateName: matched.name,
+    language: matched.language,
     bindings: row.bindings,
   };
 }

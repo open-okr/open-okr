@@ -96,23 +96,35 @@ function Corridor({
   return (
     <div role="img" aria-label={label} className="relative h-6">
       <div
-        className="absolute inset-x-0 top-2 h-1.5 rounded-full"
+        className="absolute start-0 end-0 top-2 h-1.5 rounded-full"
         style={{
           background: `linear-gradient(to right, var(--color-bad-bg) 0 ${at(watchPct)}, var(--color-warn-bg) ${at(watchPct)} ${at(healthyPct)}, var(--color-ok-bg) ${at(healthyPct)} 100%)`,
         }}
       />
       {achievementPct === null ? null : (
         <span
-          className="absolute top-0.5 h-4.5 w-0.5 -translate-x-1/2 rounded-full bg-ink"
-          style={{ left: at(achievementPct) }}
+          className={
+            /* direction-neutral: Keep the markers on the fixed value axis. */
+            "absolute top-0.5 h-4.5 w-0.5 -translate-x-1/2 rounded-full bg-ink"
+          }
+          style={{
+            // direction-neutral: Keep the markers on the fixed value axis.
+            left: at(achievementPct),
+          }}
         />
       )}
       {[watchPct, healthyPct].map((line) => (
         <span
           key={line}
           aria-hidden="true"
-          className="absolute top-4 -translate-x-1/2 text-[10px] text-ink-4 tabular-nums"
-          style={{ left: at(line) }}
+          className={
+            /* direction-neutral: Keep the markers on the fixed value axis. */
+            "absolute top-4 -translate-x-1/2 text-[10px] text-ink-4 tabular-nums"
+          }
+          style={{
+            // direction-neutral: Keep the markers on the fixed value axis.
+            left: at(line),
+          }}
         >
           {Math.round(line)}
         </span>
@@ -138,10 +150,9 @@ function recoverySummary(
   },
   t: Translate,
 ): string {
-  const keyResults =
-    recovery.keyResults === 1
-      ? t("common.count.keyResultOne", { count: recovery.keyResults })
-      : t("common.count.keyResultOther", { count: recovery.keyResults });
+  const keyResults = t("common.count.keyResult", {
+    count: recovery.keyResults,
+  });
   return recovery.startedPct === null
     ? keyResults
     : t("kpis.recovery.keyResultsLaunchedAt", {
@@ -233,13 +244,9 @@ export default async function RecoveryBoardPage() {
             <p className="text-xs text-ink-3">
               {board.cards.length === 0
                 ? t("kpis.recovery.allKpisHealthy")
-                : board.cards.length === 1
-                  ? t("kpis.recovery.measuresBelowOne", {
-                      count: board.cards.length,
-                    })
-                  : t("kpis.recovery.measuresBelowOther", {
-                      count: board.cards.length,
-                    })}
+                : t("kpis.recovery.measuresBelow", {
+                    count: board.cards.length,
+                  })}
             </p>
           </div>
           <GoalsToolbar
@@ -413,7 +420,7 @@ export default async function RecoveryBoardPage() {
                           <svg
                             viewBox="0 0 12 12"
                             aria-hidden="true"
-                            className="size-3 flex-none text-ink-4 transition-transform group-open:rotate-90"
+                            className="size-3 flex-none text-ink-4 transition-transform group-open:rotate-90 rtl:-scale-x-100 rtl:group-open:-rotate-90"
                           >
                             <path
                               d="m4.5 3 3 3-3 3"
@@ -509,7 +516,7 @@ export default async function RecoveryBoardPage() {
                           <svg
                             viewBox="0 0 12 12"
                             aria-hidden="true"
-                            className="size-3 flex-none text-ink-4 transition-transform group-open:rotate-90"
+                            className="size-3 flex-none text-ink-4 transition-transform group-open:rotate-90 rtl:-scale-x-100 rtl:group-open:-rotate-90"
                           >
                             <path
                               d="m4.5 3 3 3-3 3"
@@ -674,7 +681,7 @@ export default async function RecoveryBoardPage() {
                           <svg
                             viewBox="0 0 12 12"
                             aria-hidden="true"
-                            className="size-3 flex-none text-ink-4 transition-transform group-open:rotate-90"
+                            className="size-3 flex-none text-ink-4 transition-transform group-open:rotate-90 rtl:-scale-x-100 rtl:group-open:-rotate-90"
                           >
                             <path
                               d="m4.5 3 3 3-3 3"
@@ -702,7 +709,7 @@ export default async function RecoveryBoardPage() {
                               <p className="text-sm text-ink">
                                 {recoveryDrafts.get(card.kpiId)?.objective}
                               </p>
-                              <ul className="flex list-disc flex-col gap-0.5 pl-4">
+                              <ul className="flex list-disc flex-col gap-0.5 ps-4">
                                 {recoveryDrafts
                                   .get(card.kpiId)
                                   ?.keyResults.map((keyResult) => (

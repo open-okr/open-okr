@@ -7,11 +7,14 @@ import {
   readRegistrationPolicy,
   registrationPolicyOrigin,
   resolveEmailConfirmation,
+  resolveInstanceDefaultLanguage,
 } from "@openokr/core";
 import { Chip, type ChipProps } from "@openokr/ui";
 import Link from "next/link";
 import { RUNNING_VERSION } from "../../../lib/app-version.ts";
 import { EmailConfirmationCard } from "../../../lib/email-confirmation-card";
+import { saveOperatorLanguage } from "../../../lib/instance-language-action";
+import { InstanceLanguageCard } from "../../../lib/instance-language-card";
 import { releaseCheck } from "../../../lib/newest-release.ts";
 import { requireOperator } from "../../../lib/operator";
 import { pageTitle } from "../../../lib/page-title.ts";
@@ -71,6 +74,7 @@ export default async function OperatorInstancePage() {
     confirmation,
     check,
     preflight,
+    instanceLanguage,
   ] = await Promise.all([
     readInstanceFlags(pool),
     listSiteMessages(pool),
@@ -83,6 +87,7 @@ export default async function OperatorInstancePage() {
     releaseCheck(pool),
     // A warning that cannot be read is no warning: the page must still open.
     readCloudPreflight(pool).catch(() => []),
+    resolveInstanceDefaultLanguage(pool),
   ]);
   // On a cloud with nothing chosen, sign-up is open, whatever the computed
   // default for a self-hosted instance would say (registration-policy.md D5).
@@ -113,6 +118,10 @@ export default async function OperatorInstancePage() {
 
       {/* Plan 0.7.0 B1: the policy is the operator's on a cloud. */}
       <OperatorRegistrationCard policy={policyInForce} origin={origin} />
+      <InstanceLanguageCard
+        language={instanceLanguage}
+        save={saveOperatorLanguage}
+      />
 
       {/* Plan 0.8.0 S4: on a cloud the operator decides (Q12). */}
       <EmailConfirmationCard
@@ -170,13 +179,9 @@ export default async function OperatorInstancePage() {
                     </span>
                     {message.targetWorkspaceIds ? (
                       <span className="text-ink-3 text-xs">
-                        {message.targetWorkspaceIds.length === 1
-                          ? t("operator.instance.workspacesOne", {
-                              count: message.targetWorkspaceIds.length,
-                            })
-                          : t("operator.instance.workspacesOther", {
-                              count: message.targetWorkspaceIds.length,
-                            })}
+                        {t("operator.instance.workspaces", {
+                          count: message.targetWorkspaceIds.length,
+                        })}
                       </span>
                     ) : (
                       <span className="text-ink-3 text-xs">
@@ -227,7 +232,7 @@ export default async function OperatorInstancePage() {
                         ?.summary ?? ""}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-right align-top">
+                  <td className="px-4 py-2.5 text-end align-top">
                     <Chip tone={flag.value ? "ok" : "neutral"}>
                       {flag.value ? t("admin.ai.on") : t("admin.ai.off")}
                     </Chip>

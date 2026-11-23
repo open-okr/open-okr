@@ -1,3 +1,4 @@
+import { intlTagFor } from "@openokr/formats";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { FeedLive } from "./feed-live.tsx";
@@ -61,7 +62,7 @@ export async function FeedPanel({
     readonly subjectId: string;
   };
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
   // A row with no member behind it is the instance acting, and reads as its
   // name rather than the software's (M-33).
   const instanceName = await getInstanceName();
@@ -105,7 +106,7 @@ export async function FeedPanel({
                         t("feedPanel.aMember"))
                       : instanceName}
                     {" · "}
-                    {new Intl.DateTimeFormat("en-GB", {
+                    {new Intl.DateTimeFormat(intlTagFor(locale), {
                       timeZone,
                       day: "numeric",
                       month: "short",

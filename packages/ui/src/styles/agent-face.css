@@ -310,28 +310,34 @@
 
 @keyframes af-in-left {
   0% {
+    /* direction-neutral: the eyes move in the illustration coordinates. */
     transform: translateX(3.4px);
   }
   8.75% {
+    /* direction-neutral: the eyes move in the illustration coordinates. */
     transform: translateX(3.4px);
     animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   }
   15%,
   100% {
+    /* direction-neutral: the eyes move in the illustration coordinates. */
     transform: translateX(0);
   }
 }
 
 @keyframes af-in-right {
   0% {
+    /* direction-neutral: the eyes move in the illustration coordinates. */
     transform: translateX(-3.4px);
   }
   8.75% {
+    /* direction-neutral: the eyes move in the illustration coordinates. */
     transform: translateX(-3.4px);
     animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   }
   15%,
   100% {
+    /* direction-neutral: the eyes move in the illustration coordinates. */
     transform: translateX(0);
   }
 }

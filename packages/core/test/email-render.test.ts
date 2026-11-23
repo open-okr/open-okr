@@ -173,9 +173,14 @@ describe("the email layout", () => {
 
   it("declares its language and its light and dark schemes", () => {
     const { html } = renderEmail(frame({ lang: "ms" }), everyBlock);
-    expect(html).toContain('<html lang="ms">');
+    expect(html).toContain('<html lang="ms" dir="ltr">');
     expect(html).toContain('name="color-scheme" content="light dark"');
     expect(html).toContain("prefers-color-scheme:dark");
+  });
+
+  it("declares dir=rtl for an arabic recipient (AC-19)", () => {
+    const { html } = renderEmail(frame({ lang: "ar" }), everyBlock);
+    expect(html).toContain('<html lang="ar" dir="rtl">');
   });
 });
 

@@ -47,13 +47,11 @@ export function AdoptWaiting({
 
   return (
     <section
-      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border-y border-r border-l-4 border-info-dot bg-info-bg px-4 py-3 text-info text-sm"
+      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border-y border-e border-s-4 border-info-dot bg-info-bg px-4 py-3 text-info text-sm"
       data-testid="adoption-waiting"
     >
       <p className="min-w-0 flex-1">
-        {count === 1
-          ? t("operator.workspaces.waitingOne")
-          : t("operator.workspaces.waitingOther", { count })}
+        {t("operator.workspaces.waiting", { count })}
       </p>
       <form action={formAction} aria-busy={pending}>
         <Button type="submit" variant="primary">

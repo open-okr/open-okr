@@ -6,6 +6,7 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { LocaleCode } from "../../../formats/src/locales.ts";
 import { newId } from "../id.ts";
 import { users } from "./auth.ts";
 
@@ -106,11 +107,10 @@ export const workspaceMembers = pgTable("workspace_members", {
    * The member's own language (P6-G22a).
    *
    * Null means "follow the workspace", which is what a member who has never
-   * chosen gets and what every member had before this column existed. A closed
-   * set, because a locale with no catalogue would make `translate()` raise:
-   * a new locale is a new catalogue plus a value here, in that order.
+   * chosen gets. Migration 0173 enforces the registry's ten codes. The client
+   * only offers shipped locales and skips other codes when reading.
    */
-  language: text("language", { enum: ["en", "ms"] }),
+  language: text("language").$type<LocaleCode>(),
   /**
    * When the member finished the first-visit tour (UIUX-PLAN S-34, L-08).
    *

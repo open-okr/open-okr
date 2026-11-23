@@ -6,4 +6,4 @@
  * at all.
  */
 export const menuRowClass =
-  "block w-full rounded-md px-2.5 py-1.5 text-left text-sm text-ink-2 data-highlighted:bg-raised hover:bg-raised";
+  "block w-full rounded-md px-2.5 py-1.5 text-start text-sm text-ink-2 data-highlighted:bg-raised hover:bg-raised";

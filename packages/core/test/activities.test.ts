@@ -12,7 +12,10 @@ import {
 import { ACCESS_LEVELS } from "../src/access/levels.ts";
 import { callAction } from "../src/actions/registry.ts";
 import { aggregateFeed, queryFeed } from "../src/activities/feed.ts";
-import { renderActivity } from "../src/activities/renderers.ts";
+import {
+  ACTIVITY_RENDERERS,
+  renderActivity,
+} from "../src/activities/renderers.ts";
 import {
   ensureSubscriptionList,
   subscribeMember,
@@ -390,6 +393,77 @@ describe("rendering", () => {
     expect(renderActivity("session.commitmentsSet", { count: 3 })).toBe(
       "Set 3 commitments for this week",
     );
+  });
+
+  it("renders each summary family from the catalogue in the reader's language", () => {
+    expect(renderActivity("role.assigned", {}, "ms")).toBe(
+      "Seorang ahli diberi peranan yang berbeza",
+    );
+    expect(renderActivity("member.suspended", { name: "Jane Doe" }, "ms")).toBe(
+      "Jane Doe telah digantung",
+    );
+    expect(
+      renderActivity("check_in.published", { status: "on_track" }, "ms"),
+    ).toBe("Satu kemas kini diterbitkan sebagai di landasan");
+    expect(
+      renderActivity(
+        "comment.created",
+        { subjectType: "goal", excerpt: "Hi" },
+        "ms",
+      ),
+    ).toBe("Mengulas pada matlamat: Hi");
+    expect(
+      renderActivity("goal.created", { title: "Grow", level: "team" }, "ms"),
+    ).toBe('Matlamat pasukan "Grow" telah dibuat');
+    expect(renderActivity("key_result.removed", { title: "NPS" }, "ms")).toBe(
+      'Keputusan utama "NPS" telah dibuang',
+    );
+    expect(renderActivity("session.winsNamed", { count: 3 }, "ms")).toBe(
+      "Menamakan 3 kejayaan untuk minggu ini",
+    );
+    expect(renderActivity("cycle.created", { name: "Q1" }, "ms")).toBe(
+      'Kitaran "Q1" telah dibuat',
+    );
+    expect(
+      renderActivity("webhook.turned_off", { name: "Hook", failures: 4 }, "ms"),
+    ).toBe(
+      'Webhook "Hook" dimatikan selepas 4 penghantaran gagal berturut-turut',
+    );
+    expect(
+      renderActivity("member.self_deleted", { goals: 2, keyResults: 1 }, "ms"),
+    ).toBe(
+      "Seorang ahli memadam akaunnya. 2 matlamat dan 1 keputusan utama kini memerlukan pemilik",
+    );
+  });
+
+  it("keeps the English sentences and user content as written", () => {
+    expect(renderActivity("role.assigned", {})).toBe(
+      "A member was given a different role",
+    );
+    expect(renderActivity("check_in.published", { status: "on_track" })).toBe(
+      "A check-in was published as on track",
+    );
+    expect(
+      renderActivity("comment.created", { subjectType: "goal", excerpt: "Hi" }),
+    ).toBe("Commented on a goal: Hi");
+    expect(
+      renderActivity("member.self_deleted", { goals: 2, keyResults: 1 }),
+    ).toBe(
+      "A member deleted their account. 2 goals and 1 key result now need an owner",
+    );
+    expect(
+      renderActivity(
+        "comment.created",
+        { subjectType: "goal", excerpt: "Halo" },
+        "xx",
+      ),
+    ).toBe("Commented on a goal: Halo");
+  });
+
+  it("renders every registered kind in Malay without a missing key", () => {
+    for (const kind of Object.keys(ACTIVITY_RENDERERS)) {
+      expect(() => renderActivity(kind, {}, "ms"), kind).not.toThrow();
+    }
   });
 
   it("renders a registered kind's payload into a readable sentence", () => {

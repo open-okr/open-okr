@@ -265,10 +265,8 @@ describe("recording a KPI moves the key results that read it", () => {
   });
 
   it("moves a goal the recorder cannot see, and tells them nothing about it", async () => {
-    // A support session's guest, let in at edit. A guest reaches nothing
-    // through the workspace-wide binding every goal carries, so the goal is
-    // invisible to them. The KPI is not: KPIs sit at the workspace floor, and
-    // edit on the workspace is what recording one asks for.
+    // An edit share lets this guest record the KPI. The share covers only
+    // that KPI, so the linked goal remains invisible to the guest.
     const wb = await workerDb();
     await runOperation(
       { pool: wb.appPool },
@@ -296,6 +294,18 @@ describe("recording a KPI moves the key results that read it", () => {
       },
     );
     const kpi = await makeKpi("Weekly active teams");
+    const guest = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, READER],
+    );
+    const guestId = guest.rows[0]?.id;
+    if (!guestId) throw new Error("Missing guest member");
+    await call("kpis.share", {
+      kpiId: kpi.id,
+      memberId: guestId,
+      level: "edit",
+    });
+
     const title = "Teams make the product a weekly habit";
     const goal = await makeGoal(title);
     await addKeyResult(goal.id, { kpiId: kpi.id });

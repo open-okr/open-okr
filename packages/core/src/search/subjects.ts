@@ -90,10 +90,8 @@ const CONTEXT_FOR: Readonly<Record<IndexableType, string>> = {
   // A key result inherits its goal's context, which is the rule the whole
   // product follows: "no such key result" and "not yours to see" answer alike.
   key_result: "goal",
-  // A KPI has no context of its own yet, and a measure everybody can read is
-  // what §6 describes. The workspace's context is what every active member
-  // holds, so a KPI is searchable by the same people who can open the grid.
-  kpi: "workspace",
+  // A KPI owns its own context (0.10.0 K2, §6 R11).
+  kpi: "kpi",
   initiative: "initiative",
   task: "task",
   document: "document",
@@ -221,7 +219,7 @@ async function contentFor(
         ? {
             title: row.title,
             body: plain(row.description),
-            contextResourceId: workspaceId,
+            contextResourceId: entityId,
           }
         : null;
     }

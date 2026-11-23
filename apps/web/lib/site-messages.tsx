@@ -54,7 +54,7 @@ export async function SiteMessages({
     <div className="mb-4.5 flex flex-col gap-2">
       {messages.map((message) => (
         <div
-          className={`flex items-start gap-3 rounded-lg border-l-4 border-y border-r px-4 py-3 ${
+          className={`flex items-start gap-3 rounded-lg border-s-4 border-y border-e px-4 py-3 ${
             TONE[message.level] ?? TONE.info
           }`}
           key={message.id}

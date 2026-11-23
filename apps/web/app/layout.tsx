@@ -1,10 +1,10 @@
+import { DirectionProvider } from "@base-ui-components/react/direction-provider";
 import { loadEnv } from "@openokr/config";
+import { directionFor } from "@openokr/formats";
 import {
-  CATALOGUES,
   QueryProvider,
   ThemeProvider,
   ToastProvider,
-  TranslationsProvider,
   themeInitScript,
   translate,
 } from "@openokr/ui";
@@ -18,6 +18,8 @@ import { ClientErrorReporter } from "../lib/client-error-reporter";
 import { getInstanceName } from "../lib/instance-name";
 import { InstanceNameProvider } from "../lib/instance-name-context";
 import { resolveLocale } from "../lib/locale";
+import { LocaleProvider } from "../lib/locale-provider";
+import { getCatalogue } from "../lib/translations";
 import {
   workspaceBrandImages,
   workspaceBrandStyleSheet,
@@ -69,10 +71,12 @@ const geistSans = localFont({
   style: "normal",
   display: "swap",
   variable: "--font-sans-face",
-  // The stack tokens.css falls back through, declared here too so the metrics
-  // Next computes for its size-adjust fallback come from the same face the
-  // browser would actually use.
+  // An automatic Arial face would sit ahead of Noto on missing Geist glyphs.
+  // Keep the locale faces first in the fallback stack used by tokens.css.
+  adjustFontFallback: false,
   fallback: [
+    "Noto Sans Arabic",
+    "Noto Sans SC",
     "-apple-system",
     "SF Pro Text",
     "Helvetica Neue",
@@ -99,6 +103,7 @@ export default async function RootLayout({
   // signed-out screens too. `resolveLocale` never throws and answers English
   // for a visitor the product does not know yet.
   const locale = await resolveLocale();
+  const direction = directionFor(locale);
   // For the client components that name the instance, the sign-in heading
   // first among them (M-33). Never throws, so it cannot take the layout down.
   const instanceName = await getInstanceName();
@@ -109,10 +114,12 @@ export default async function RootLayout({
   // never throw, and are empty before sign-in.
   const renamed = await workspaceTerms();
   const brandStyle = await workspaceBrandStyleSheet();
+  const catalogue = getCatalogue(locale);
 
   return (
     <html
       lang={locale}
+      dir={direction}
       className={geistSans.variable}
       data-theme="light"
       data-density="comfortable"
@@ -120,6 +127,10 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <link rel="stylesheet" href="/fonts/noto-sans-arabic/fonts.css" />
+        {locale === "zh-Hans" ? (
+          <link rel="stylesheet" href="/fonts/noto-sans-sc/fonts.css" />
+        ) : null}
         <script
           nonce={nonce}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: the no-flash theme bootstrap has to run before hydration, which only a synchronous inline script can do (Next's own documented pattern for this); the string is generated, not user input
@@ -147,26 +158,28 @@ export default async function RootLayout({
          * the server keeps a report only from a signed-in person.
          */}
         <ClientErrorReporter />
-        <ThemeProvider>
-          <TranslationsProvider locale={locale} renamed={renamed}>
-            {/*
-             * Here rather than in the shell (M-13). Each top-level screen
-             * renders the shell afresh, so a provider inside it was replaced
-             * on every move between screens and its toasts went with it. A
-             * delete's undo is offered on the page that sends you somewhere
-             * else, and has to still be there when you arrive.
-             */}
-            <ToastProvider
-              dismissLabel={translate(CATALOGUES[locale], "common.dismiss")}
-            >
-              <QueryProvider buildId={loadEnv().APP_BUILD_ID}>
-                <InstanceNameProvider name={instanceName}>
-                  {children}
-                </InstanceNameProvider>
-              </QueryProvider>
-            </ToastProvider>
-          </TranslationsProvider>
-        </ThemeProvider>
+        <DirectionProvider direction={direction}>
+          <ThemeProvider>
+            <LocaleProvider locale={locale} renamed={renamed}>
+              {/*
+               * Here rather than in the shell (M-13). Each top-level screen
+               * renders the shell afresh, so a provider inside it was replaced
+               * on every move between screens and its toasts went with it. A
+               * delete's undo is offered on the page that sends you somewhere
+               * else, and has to still be there when you arrive.
+               */}
+              <ToastProvider
+                dismissLabel={translate(catalogue, "common.dismiss")}
+              >
+                <QueryProvider buildId={loadEnv().APP_BUILD_ID}>
+                  <InstanceNameProvider name={instanceName}>
+                    {children}
+                  </InstanceNameProvider>
+                </QueryProvider>
+              </ToastProvider>
+            </LocaleProvider>
+          </ThemeProvider>
+        </DirectionProvider>
       </body>
     </html>
   );
