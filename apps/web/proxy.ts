@@ -138,6 +138,10 @@ const PUBLIC_PREFIXES = [
   // E3). The route answers 204 to everybody and acts only on a session, so a
   // redirect here would be the one answer that told a caller anything.
   "/api/client-errors",
+  // The OAuth client metadata document FlowyTeam fetches to identify this
+  // instance (docs/design/flowyteam-connect.md §4.4). FlowyTeam has no session
+  // here, and the document holds only the instance's own address.
+  "/api/imports/flowyteam/client",
   // The discovery documents are what a client reads *before* it has anything
   // to authenticate with. Gating them behind a session would mean no client
   // could ever find the endpoints it needs to get one.

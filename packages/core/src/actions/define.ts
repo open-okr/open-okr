@@ -23,6 +23,7 @@ import type { PromptEvaluator } from "../ai/prompt-evaluation.ts";
 import type { BillingGateway } from "../billing/gateway.ts";
 import type { EmbedFunction } from "../embeddings/service.ts";
 import { resolveAddresses } from "../ids/address.ts";
+import type { FlowyteamGateway } from "../imports/flowyteam/connection.ts";
 import {
   type ActorInput,
   type OperationSpec,
@@ -134,6 +135,16 @@ export interface ActionCallContext {
    * absent, a message goes without its links rather than not at all.
    */
   readonly baseUrl?: string;
+  /**
+   * Talks to FlowyTeam for the connect flow (docs/design/flowyteam-connect.md
+   * §4.1): the token exchange, the company read and the revocation.
+   *
+   * Structural, like `dns` and `billing`: the driver lives in
+   * `packages/adapters`, which this package may not import, and every request
+   * goes through the outbound guard there. Absent, finishing a connection is
+   * refused rather than attempted without the guard.
+   */
+  readonly flowyteam?: FlowyteamGateway;
   /**
    * What the instance calls itself, for the text an action writes that names
    * it (completeness review M-33): a nudge's subject and button, a channel

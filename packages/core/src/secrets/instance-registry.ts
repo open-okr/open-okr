@@ -540,6 +540,34 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     summary:
       "Base URL for the deployment default, when the provider needs one (ollama, openai-compatible).",
   },
+  // Connecting FlowyTeam from Admin > Import (docs/design/flowyteam-connect.md
+  // §4.4). Instance scope, because the FlowyTeam address and the OAuth client
+  // describe the deployment, not a workspace.
+  {
+    key: "imports.flowyteam.baseUrl",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_FLOWYTEAM_URL",
+    summary:
+      "The FlowyTeam a workspace may connect to and import from. Empty means https://app.flowyteam.com on the managed cloud and no connect step on a self-hosted instance, which imports with the command line instead.",
+  },
+  {
+    key: "imports.flowyteam.clientId",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_FLOWYTEAM_CLIENT_ID",
+    summary:
+      "The OAuth client FlowyTeam registered for this deployment. Empty means this instance identifies itself with its own client metadata document, which FlowyTeam accepts for a public client using PKCE.",
+  },
+  {
+    key: "imports.flowyteam.clientSecret",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_FLOWYTEAM_CLIENT_SECRET",
+    secret: true,
+    summary:
+      "The registered client's secret. Envelope-encrypted, never returned to a page. Empty with a client id set means FlowyTeam treats the client as public.",
+  },
 ];
 
 const BY_KEY = new Map(

@@ -427,6 +427,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
       "An import that happened on this instance, with a report describing rows in this database.",
   },
   {
+    table: "import_connections",
+    decision: "exclude",
+    reason:
+      "A FlowyTeam access token, envelope-encrypted under this instance's root key and granted to this instance. Neither decryptable elsewhere nor the exporter's to hand over; the imported workspace connects again.",
+  },
+  {
     table: "export_runs",
     decision: "exclude",
     reason:

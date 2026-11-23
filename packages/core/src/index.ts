@@ -982,6 +982,18 @@ export {
   SUMMARY_TABLES,
 } from "./imports/flowyteam/companies.ts";
 export {
+  FLOWYTEAM_CALLBACK_PATH,
+  FLOWYTEAM_CLIENT_METADATA_PATH,
+  FLOWYTEAM_FAILURE_MESSAGES,
+  FLOWYTEAM_REVOKE_TOPIC,
+  FLOWYTEAM_STATE_COOKIE,
+  FLOWYTEAM_STATE_TTL_MS,
+  type FlowyteamAnswer,
+  type FlowyteamFailure,
+  type FlowyteamGateway,
+  flowyteamClientMetadata,
+} from "./imports/flowyteam/connection.ts";
+export {
   DOMAIN_KEYS,
   selectDomains,
   UnknownDomainError,

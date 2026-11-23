@@ -95,15 +95,16 @@ Admin (OKRGoal)        OKRGoal server                  FlowyTeam
 
 ## 4. OpenOKR side
 
-### 4.1 Actions (registry, `packages/core/src/actions/imports.ts`)
+### 4.1 Actions (registry, `packages/core/src/actions/imports-flowyteam.ts`)
 
 | Action | Level | Does |
 |---|---|---|
-| `imports.flowyteamConnect` | `full` on imports | Starts authorisation: stores `state` and the PKCE verifier for 10 minutes, returns the FlowyTeam URL |
-| (route) `/admin/imports/flowyteam/callback` | session + `state` | Exchanges the code, seals the token, writes the connection with the company id and name FlowyTeam returns, audit row |
+| `imports.flowyteamConnect` | `full` on imports | Starts authorisation: returns the FlowyTeam URL and the sealed state (`state`, PKCE verifier, workspace, member, client, 10 minutes). The route `POST /admin/imports/flowyteam/connect` keeps it in an httpOnly SameSite=Lax cookie and redirects |
+| `imports.flowyteamFinishConnect`, called by the route `/admin/imports/flowyteam/callback` | `full`, session + `state` cookie | Checks the state (sealed, unexpired, same value, same workspace, same member) before any network call, exchanges the code, reads `companies.byId`, then one Operation seals the token and writes the connection with the company id and name FlowyTeam returns, plus the audit row. A replaced connection is closed and its token revoked through the outbox |
+| `imports.flowyteamConnection` | `full` | The card's read: whether this instance offers connecting, and the live connection (`connected` or `revoked`). Never the token |
 | `imports.flowyteamPreview` | `full` | Enqueues a dry run; refuses when the workspace already holds another company (today's rule) |
 | `imports.flowyteamRun` | `full` | Enqueues the write. Requires `acceptBroaderVisibility` when the preview named restricted KPIs (today's `--accept-broader-visibility`) |
-| `imports.flowyteamDisconnect` | `full` | Revokes the token at FlowyTeam when reachable, marks the connection revoked, keeps imported data and the company link |
+| `imports.flowyteamDisconnect` | `full` | Marks the connection revoked and disconnected (soft delete), keeps imported data and the company link. An outbox row (`imports.flowyteamRevoke`) revokes the token at FlowyTeam (RFC 7009, `POST <baseUrl>/oauth/revoke`) through the outbound guard and then clears it from the row; no answer is retried, a refusal or 404 is not |
 | `imports.listRuns` | existing | Gains the source `flowyteam-api` |
 
 All writes go through the Operation pipeline. The audit rows name the acting member and the FlowyTeam company id.
@@ -116,13 +117,15 @@ All writes go through the Operation pipeline. The audit rows name the acting mem
 | `source` | text | `flowyteam` |
 | `base_url` | text | The FlowyTeam instance; the cloud default comes from a setting (section 4.4) |
 | `company_id`, `company_name` | text | As FlowyTeam returned them at consent |
-| `token_sealed` | bytea | Envelope-encrypted with the key ring |
+| `client_id` | text | The OAuth client that asked: registered, or the client metadata document address. Revoking names it |
+| `token_ciphertext`, `token_data_key`, `token_key_id` | text null | Envelope-encrypted with the key ring, in the three columns every sealed credential uses so `pnpm keys:rotate` re-wraps them. Null once a closed row's token is revoked |
 | `scopes` | text | `flowyteam:export` |
 | `connected_by_member_id`, `connected_at` | | |
 | `last_read_at` | timestamptz | |
-| `revoked_at` | timestamptz null | Soft delete scope applies |
+| `revoked_at` | timestamptz null | The token no longer works: revoked here, or refused by FlowyTeam later |
+| `deleted_at` | timestamptz null | Disconnected. Soft delete scope applies |
 
-One live connection per workspace and source (partial unique index on `revoked_at is null`). Importer mapping: no legacy source (TECHNICAL-PLAN §7.2). Portability: excluded from archives, like other credentials.
+One live connection per workspace and source (partial unique index on `deleted_at is null`, so a row FlowyTeam revoked stays visible until Connect again replaces it). Importer mapping: no legacy source (TECHNICAL-PLAN §7.2). Portability: excluded from archives, like other credentials.
 
 ### 4.3 The HTTP source (`packages/adapters`)
 
@@ -133,7 +136,10 @@ A driver behind the existing outbound HTTP port: `query(name, values)` posts to 
 | Key | Default | Note |
 |---|---|---|
 | `imports.flowyteam.baseUrl` | `https://app.flowyteam.com` on the managed cloud, empty on self-hosted | Empty hides the connect step and shows the command line instead |
-| `imports.flowyteam.clientId` | Instance setting from the environment | The cloud uses a registered confidential client; a self-hosted instance identifies itself with a client metadata document URL, which FlowyTeam already accepts |
+| `imports.flowyteam.clientId` | Empty (`OPENOKR_FLOWYTEAM_CLIENT_ID`) | The cloud uses a registered confidential client; empty means the instance identifies itself with its client metadata document at `/api/imports/flowyteam/client` (public, `client_name` OKRGoal, one redirect URI, `token_endpoint_auth_method` none), which FlowyTeam already accepts for a trusted host |
+| `imports.flowyteam.clientSecret` | Empty, sealed (`OPENOKR_FLOWYTEAM_CLIENT_SECRET`) | Sent only for the registered client |
+
+All three are instance settings in `packages/core/src/secrets/instance-registry.ts`; `imports.flowyteam.baseUrl` is bootstrapped by `OPENOKR_FLOWYTEAM_URL`. The managed cloud default is applied when the setting is empty and `cloud.enabled` is on.
 
 ### 4.5 Screen (S-36 Import)
 
@@ -157,6 +163,7 @@ As in the prototype: a "From FlowyTeam" card above the spreadsheet card with fiv
 | F1 | Scope `flowyteam:export` | Read-only. Not granted together with any other scope. Offered in discovery |
 | F2 | Consent | The existing authorize page, with the company picker limited to companies where the user is an admin, and the list of what is read. A non-admin sees why they cannot approve |
 | F3 | Clients | OKRGoal cloud as a confidential client registered by the super admin; self-hosted instances through the client metadata document path that already exists |
+| F4b | Revocation | `POST /oauth/revoke` (RFC 7009) with `token`, `client_id` and, for a confidential client, `client_secret`. OpenOKR calls it on disconnect and treats 404 as "not offered" |
 | F4 | Token lifetime | Expires after 90 days without a read. Revocable from Settings > Integrations > OKRGoal |
 | F5 | `POST /api/export/v1/query` | Body `{ version, name, values, cursor }`. Runs the named statement from the vendored catalogue on a read-only connection, binds `:company` from the token, expands list values, 2,000 rows a page with a cursor. 409 on a version mismatch, 404 on an unknown name. Entries of scope `reference` return only the ids that exist |
 | F6 | `GET /api/export/v1/files/{task_file_id}` | Streams one task file of the token's company |

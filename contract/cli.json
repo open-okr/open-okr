@@ -6580,6 +6580,65 @@
       "pages": false
     },
     {
+      "name": "imports flowyteamConnection",
+      "action": "imports.flowyteamConnection",
+      "method": "GET",
+      "path": "/imports/flowyteamConnection",
+      "scope": "read",
+      "summary": "Whether this instance offers connecting FlowyTeam, and this workspace's connection if it has one. Never the token.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "imports flowyteamConnect",
+      "action": "imports.flowyteamConnect",
+      "method": "POST",
+      "path": "/imports/flowyteamConnect",
+      "scope": "write",
+      "summary": "Starts connecting FlowyTeam: the address to approve the connection at, and the sealed state the browser keeps for ten minutes.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "imports flowyteamFinishConnect",
+      "action": "imports.flowyteamFinishConnect",
+      "method": "POST",
+      "path": "/imports/flowyteamFinishConnect",
+      "scope": "write",
+      "summary": "Finishes connecting FlowyTeam with the code it returned, and stores the sealed connection.",
+      "flags": [
+        {
+          "name": "code",
+          "field": "code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "state",
+          "field": "state",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "state-cookie",
+          "field": "stateCookie",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "imports flowyteamDisconnect",
+      "action": "imports.flowyteamDisconnect",
+      "method": "POST",
+      "path": "/imports/flowyteamDisconnect",
+      "scope": "destructive",
+      "summary": "Disconnects FlowyTeam and revokes its token there when it can be reached. Imported data stays.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "tasks board",
       "action": "tasks.board",
       "method": "GET",

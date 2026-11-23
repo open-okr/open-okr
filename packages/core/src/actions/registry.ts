@@ -320,6 +320,12 @@ import {
   startImportRun,
 } from "./imports.ts";
 import {
+  flowyteamConnect,
+  flowyteamConnection,
+  flowyteamDisconnect,
+  flowyteamFinishConnect,
+} from "./imports-flowyteam.ts";
+import {
   createInitiative,
   deleteInitiative,
   linkInitiativeKeyResult,
@@ -865,6 +871,10 @@ export const ACTION_MAP = {
   "imports.runTable": runImportTable,
   "imports.startRun": startImportRun,
   "imports.finishRun": finishImportRun,
+  "imports.flowyteamConnection": flowyteamConnection,
+  "imports.flowyteamConnect": flowyteamConnect,
+  "imports.flowyteamFinishConnect": flowyteamFinishConnect,
+  "imports.flowyteamDisconnect": flowyteamDisconnect,
   "tasks.board": readBoard,
   "tasks.list": listTasks,
   "tasks.read": readTask,

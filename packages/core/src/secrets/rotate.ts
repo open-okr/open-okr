@@ -32,6 +32,7 @@ import {
   accounts,
   aiCredentials,
   channelConnections,
+  importConnections,
   includeDeleted,
   ssoConnections,
   systemSettings,
@@ -215,7 +216,7 @@ async function rotateAccountTokens(
   }
 }
 
-/** The four workspace tables that hold a sealed secret. */
+/** The five workspace tables that hold a sealed secret. */
 async function rotateWorkspaceSecrets(
   db: ReturnType<typeof drizzle>,
   ring: KeyRing,
@@ -362,6 +363,40 @@ async function rotateWorkspaceSecrets(
             })
             .where(
               includeDeleted(ssoConnections, eq(ssoConnections.id, row.id)),
+            );
+        }
+      }
+
+      // A FlowyTeam connection's token (flowyteam-connect.md §4.2). A closed
+      // row whose token was revoked holds none, and is skipped.
+      const imports = await tx
+        .select({
+          id: importConnections.id,
+          ciphertext: importConnections.tokenCiphertext,
+          dataKey: importConnections.tokenDataKey,
+          keyId: importConnections.tokenKeyId,
+        })
+        .from(importConnections)
+        .where(includeDeleted(importConnections));
+      for (const row of imports) {
+        if (!row.ciphertext || !row.dataKey || !row.keyId) {
+          continue;
+        }
+        const wrapped = next({
+          ciphertext: row.ciphertext,
+          dataKey: row.dataKey,
+          keyId: row.keyId,
+        });
+        if (wrapped) {
+          // openokr:allow-mutation: key rotation re-wraps a data key and changes no value; see rotateInstanceSecrets.
+          await tx
+            .update(importConnections)
+            .set({ tokenDataKey: wrapped.dataKey, tokenKeyId: wrapped.keyId })
+            .where(
+              includeDeleted(
+                importConnections,
+                eq(importConnections.id, row.id),
+              ),
             );
         }
       }

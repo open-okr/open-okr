@@ -370,6 +370,14 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
       "Being named as the reviewer of somebody else's check-in is a role, not content. What they wrote is exported under author_member_id.",
   },
   {
+    // docs/design/flowyteam-connect.md section 4.2.
+    table: "import_connections",
+    column: "connected_by_member_id",
+    skip: "workspace_record",
+    because:
+      "The workspace's connection to FlowyTeam, made by an administrator for the workspace and holding a sealed token. Not personal data.",
+  },
+  {
     table: "invite_links",
     column: "member_id",
     skip: "structural",
