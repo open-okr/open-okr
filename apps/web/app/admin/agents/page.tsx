@@ -10,6 +10,7 @@ import {
 } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { moodForRun } from "../../../lib/agent-moods.ts";
+import { runLogText } from "../../../lib/agent-run-log.ts";
 import { getPool } from "../../../lib/auth";
 import {
   AGENT_LOG_KIND_NAME_KEYS,
@@ -401,7 +402,7 @@ export default async function AgentsPage() {
                           <span className="font-mono text-ink-4">
                             {nameOf(AGENT_LOG_KIND_NAME_KEYS, entry.kind, t)}
                           </span>{" "}
-                          {entry.message}
+                          {runLogText(entry, t)}
                         </li>
                       ))}
                     </ul>
