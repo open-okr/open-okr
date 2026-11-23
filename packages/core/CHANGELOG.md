@@ -1,5 +1,18 @@
 # @openokr/core
 
+## 0.9.1
+
+### Patch Changes
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`4c2a632`](https://github.com/open-okr/open-okr/commit/4c2a6321355cf50d8f39557ca2174290e4d179ac) Thanks [@agungksidik](https://github.com/agungksidik)! - Add per-card move capabilities to task boards and compute them with one batched edit check.
+
+- [#222](https://github.com/open-okr/open-okr/pull/222) [`d6800b8`](https://github.com/open-okr/open-okr/commit/d6800b848d08930eea529b1da72c38495b1b9985) Thanks [@agungksidik](https://github.com/agungksidik)! - Time copilot answer stages and add narrow fast path for single-record questions on anchored records.
+- Updated dependencies []:
+  - @openokr/config@0.9.1
+  - @openokr/db@0.9.1
+  - @openokr/formats@0.9.1
+  - @openokr/method@0.9.1
+
 ## 0.9.0
 
 ### Patch Changes
