@@ -209,12 +209,14 @@ guessing would import a stranger's quarter.
 
 It brings across people, spaces and space membership, cycles, objectives, key
 results and their history, check-ins, KPI categories and KPIs with their
-records, initiatives, tasks, checklists, task comments and watchers.
+records, KPI shares, initiatives, tasks, checklists, task comments and
+watchers.
 
 | Flag | For |
 |---|---|
 | `--write` | Make it real. Without it, a dry run |
-| `--only <domains>` | A comma-separated subset: organisation, objectives, checkins, kpis, work, collaboration, files. A domain brings whatever it depends on, and the report says which it added |
+| `--only <domains>` | A comma-separated subset: organisation, objectives, checkins, kpis, kpi-shares, work, collaboration, files. A domain brings whatever it depends on, and the report says which it added: `--only kpi-shares` runs `kpis` first |
+| `--accept-broader-visibility` | Needed for `--write` when a KPI of this company has per-person rows in `indicator_accesses`. Without it the run refuses before writing, because those KPIs may become visible to more workspace members than in FlowyTeam. The dry run does not need it |
 | `--files-root <path>` | The FlowyTeam server's storage directory. Task files live on that server's disk rather than in MySQL, so without this they are reported by name instead of copied |
 
 An image sitting inline in comment markup needs no directory: those bytes are
@@ -241,7 +243,6 @@ stay in FlowyTeam, and the report says so every time.
 | `keyresult_indicator` | Which KPIs each key result is linked to. It has no company column, so it is counted through the key result | The KPI a key result reads. A key result here reads one KPI, so one linked to several needs a rule for which |
 | `checkins` | Each person's check-in session: a mood score and answers to the check-in questions. The objective and key result check-ins inside it do import | No home for the mood. The answers could be added to the narrative of the check-ins from the same session, which changes what an imported check-in says |
 | `key_result_files` | Files attached to key result check-ins | Attachments on the imported check-in, copied the same way task files are |
-| `indicator_accesses` | Who else may see or update each KPI | KPI shares |
 | `indicator_calculates` | Which KPIs each calculated KPI is worked out from | Already lands: the same links are rebuilt from each KPI's own formula. Nothing to decide unless the two disagree |
 | `task_boards` | The named boards tasks were organised on. Each task still takes its status from its board column | No home: a board here is a view of a space, an initiative or a key result, not something with a name |
 | `task_category` | The category each task was filed under | No home: a task has no category or label, and custom fields are not in this version |
