@@ -145,15 +145,10 @@ export async function runFlowyteamImport(
       const hasIndicatorAccesses =
         !missingTables(introspection).has("indicator_accesses");
       if (hasIndicatorAccesses) {
-        const flagged = await source.query<{ id: number }>(
-          `select distinct i.id
-             from indicators i
-             join indicator_accesses ia on ia.indicator_id = i.id
-            where i.company_id = ?
-              and i.deleted_at is null
-              and ia.user_id is not null
-            limit 1`,
-          [company.id],
+        const flagged = await source.read<{ id: number }>(
+          "kpis.flaggedAccess",
+          [],
+          company.id,
         );
         if (flagged.length > 0 && !options.acceptBroaderVisibility) {
           throw new Error(

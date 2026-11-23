@@ -26,11 +26,15 @@
  * when a table a domain is said to want is read nowhere. Start reading one of
  * these and it has to come off this list in the same change.
  */
+import {
+  FLOWYTEAM_UNREAD_TABLES,
+  type FlowyteamQueryName,
+  type FlowyteamUnreadTable,
+} from "@openokr/core";
 import type { Source } from "./source.ts";
-import { SourceError } from "./source.ts";
 
 export interface UnreadTable {
-  readonly table: string;
+  readonly table: FlowyteamUnreadTable;
   /**
    * The parent that ties a row to a company, for a table with no `company_id`
    * of its own. Absent means the table carries `company_id`.
@@ -41,88 +45,51 @@ export interface UnreadTable {
 }
 
 /**
+ * What each unread table holds and why it is not imported, in one plain
+ * sentence. The names, their order and the parent a count goes through live in
+ * the catalogue, which is what the statements are generated from.
+ */
+const HOLDS: Readonly<Record<FlowyteamUnreadTable, string>> = {
+  employee_teams:
+    "A second, older list of who belongs to which team; space membership is filled from other_departments only, and whether this list adds anybody has not been decided.",
+  performance_settings:
+    "The company's OKR settings: terminology labels, colour thresholds, limits on objectives and key results, and who may edit what; not read, because the thresholds and limits are METHOD.md's to set and which of the rest to carry is a decision.",
+  objective_accesses:
+    "Who else may see or update each objective; not read yet, because turning these rows into access on the imported goal is an open decision.",
+  objective_discussions:
+    "Comment threads on objectives; not read yet, because only task comments are imported so far.",
+  keyresult_discussions:
+    "Comment threads on key results; not read yet, because only task comments are imported so far.",
+  keyresult_indicator:
+    "Which KPIs each key result is linked to; not read yet, because a key result in this product reads one KPI and the source allows several.",
+  checkins:
+    "Each person's check-in session with a mood score and answers to the check-in questions; the objective and key result check-ins inside it import, and the mood and answers are not read because a check-in in this product has no place for either.",
+  key_result_files:
+    "Files attached to key result check-ins; not read yet, because only task files are copied so far.",
+  indicator_calculates:
+    "Which KPIs each calculated KPI is worked out from; not read, because the KPI domain rebuilds the same links from each indicator's own formula.",
+  task_boards:
+    "The named boards tasks were organised on; each task still takes its status from its board column, and the board itself is not read because a board in this product is a view of a space, an initiative or a key result rather than something with a name.",
+  task_category:
+    "The category each task was filed under; not read, because a task in this product has no category or label to put it in.",
+  project_time_logs:
+    "Time logged against projects and tasks; not read, because time tracking is out of scope for this version.",
+  performance_records:
+    "The score FlowyTeam stored for each owner when a cycle closed; not read, because this product works out its own per-owner results when a cycle closes and never takes them from a source.",
+  reward_settings:
+    "How the company turned OKR, KPI and attendance results into points; not read, because the points layer is off by default and whether to build it is an open question.",
+  scores:
+    "The points each person, team or company was awarded; not read, because the points layer is off by default and whether to build it is an open question.",
+};
+/**
  * In the order the report names them: the organisation, the company's
  * settings, objectives, check-ins, KPIs, work and the points layer.
  */
-export const UNREAD_TABLES: readonly UnreadTable[] = [
-  {
-    table: "employee_teams",
-    through: { column: "team_id", parent: "teams" },
-    holds:
-      "A second, older list of who belongs to which team; space membership is filled from other_departments only, and whether this list adds anybody has not been decided.",
-  },
-  {
-    table: "performance_settings",
-    holds:
-      "The company's OKR settings: terminology labels, colour thresholds, limits on objectives and key results, and who may edit what; not read, because the thresholds and limits are METHOD.md's to set and which of the rest to carry is a decision.",
-  },
-  {
-    table: "objective_accesses",
-    holds:
-      "Who else may see or update each objective; not read yet, because turning these rows into access on the imported goal is an open decision.",
-  },
-  {
-    table: "objective_discussions",
-    holds:
-      "Comment threads on objectives; not read yet, because only task comments are imported so far.",
-  },
-  {
-    table: "keyresult_discussions",
-    holds:
-      "Comment threads on key results; not read yet, because only task comments are imported so far.",
-  },
-  {
-    table: "keyresult_indicator",
-    through: { column: "key_result_id", parent: "key_results" },
-    holds:
-      "Which KPIs each key result is linked to; not read yet, because a key result in this product reads one KPI and the source allows several.",
-  },
-  {
-    table: "checkins",
-    holds:
-      "Each person's check-in session with a mood score and answers to the check-in questions; the objective and key result check-ins inside it import, and the mood and answers are not read because a check-in in this product has no place for either.",
-  },
-  {
-    table: "key_result_files",
-    holds:
-      "Files attached to key result check-ins; not read yet, because only task files are copied so far.",
-  },
-  {
-    table: "indicator_calculates",
-    holds:
-      "Which KPIs each calculated KPI is worked out from; not read, because the KPI domain rebuilds the same links from each indicator's own formula.",
-  },
-  {
-    table: "task_boards",
-    holds:
-      "The named boards tasks were organised on; each task still takes its status from its board column, and the board itself is not read because a board in this product is a view of a space, an initiative or a key result rather than something with a name.",
-  },
-  {
-    table: "task_category",
-    holds:
-      "The category each task was filed under; not read, because a task in this product has no category or label to put it in.",
-  },
-  {
-    table: "project_time_logs",
-    holds:
-      "Time logged against projects and tasks; not read, because time tracking is out of scope for this version.",
-  },
-  {
-    table: "performance_records",
-    holds:
-      "The score FlowyTeam stored for each owner when a cycle closed; not read, because this product works out its own per-owner results when a cycle closes and never takes them from a source.",
-  },
-  {
-    table: "reward_settings",
-    holds:
-      "How the company turned OKR, KPI and attendance results into points; not read, because the points layer is off by default and whether to build it is an open question.",
-  },
-  {
-    table: "scores",
-    holds:
-      "The points each person, team or company was awarded; not read, because the points layer is off by default and whether to build it is an open question.",
-  },
-];
+export const UNREAD_TABLES: readonly UnreadTable[] =
+  FLOWYTEAM_UNREAD_TABLES.map((entry) => ({
+    ...entry,
+    holds: HOLDS[entry.table],
+  }));
 
 export interface UnreadCount {
   readonly table: string;
@@ -152,13 +119,12 @@ export async function countUnread(
     if (!own) {
       continue;
     }
-    const { sql, values, scope } = countStatement(
-      entry,
-      own,
-      columns,
-      companyId,
+    const { name, company, scope } = countStatement(entry, own, columns);
+    const rows = await source.read<{ n: number | string }>(
+      name,
+      [],
+      company ? companyId : undefined,
     );
-    const rows = await source.query<{ n: number | string }>(sql, values);
     const count = Number(rows[0]?.n ?? 0);
     if (count > 0) {
       found.push({
@@ -186,11 +152,9 @@ async function columnsOf(
       ),
     ),
   ];
-  const rows = await source.query<{ TABLE_NAME: string; COLUMN_NAME: string }>(
-    `select table_name as TABLE_NAME, column_name as COLUMN_NAME
-       from information_schema.columns
-      where table_schema = ? and table_name in (${names.map(() => "?").join(", ")})`,
-    [source.database, ...names],
+  const rows = await source.read<{ TABLE_NAME: string; COLUMN_NAME: string }>(
+    "unread.columns",
+    [source.database, names],
   );
 
   const columns = new Map<string, Set<string>>();
@@ -207,13 +171,11 @@ function countStatement(
   entry: UnreadTable,
   own: ReadonlySet<string>,
   columns: ReadonlyMap<string, ReadonlySet<string>>,
-  companyId: number,
-): { sql: string; values: readonly unknown[]; scope: UnreadCount["scope"] } {
-  const table = quoted(entry.table);
+): { name: FlowyteamQueryName; company: boolean; scope: UnreadCount["scope"] } {
   if (own.has("company_id")) {
     return {
-      sql: `select count(*) as n from ${table} where company_id = ?`,
-      values: [companyId],
+      name: `unread.${entry.table}.company`,
+      company: true,
       scope: "company",
     };
   }
@@ -225,28 +187,15 @@ function countStatement(
     columns.get(through.parent)?.has("company_id")
   ) {
     return {
-      sql: `select count(*) as n from ${table} t join ${quoted(through.parent)} p on p.id = t.${quoted(through.column)} where p.company_id = ?`,
-      values: [companyId],
+      name: `unread.${entry.table}.through` as FlowyteamQueryName,
+      company: true,
       scope: "company",
     };
   }
 
   return {
-    sql: `select count(*) as n from ${table}`,
-    values: [],
+    name: `unread.${entry.table}.all`,
+    company: false,
     scope: "source",
   };
-}
-
-/**
- * A name from this file's own constants, quoted for MySQL.
- *
- * The names never come from input. The check is here so that stays true after
- * somebody adds a table, the same guard `countFor` keeps.
- */
-function quoted(name: string): string {
-  if (!/^[a-z_][a-z0-9_]*$/.test(name)) {
-    throw new SourceError(`"${name}" is not a table or column name.`);
-  }
-  return `\`${name}\``;
 }

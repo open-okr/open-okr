@@ -61,19 +61,20 @@ async function plannedOwnerUser(
   options: MapperOptions,
   indicatorId: number,
 ): Promise<number | undefined> {
-  const [indicator] = await options.source.query<{
+  const [indicator] = await options.source.read<{
     model_id: number | null;
     model_type: string | null;
-  }>("select model_id, model_type from indicators where id = ?", [indicatorId]);
+  }>("kpiShares.indicatorOwner", [indicatorId], options.companyId);
   if (
     indicator?.model_type !== "App\\Models\\EmployeeDetails" ||
     !indicator.model_id
   ) {
     return undefined;
   }
-  const [employee] = await options.source.query<{ user_id: number | null }>(
-    "select user_id from employee_details where id = ? and deleted_at is null",
+  const [employee] = await options.source.read<{ user_id: number | null }>(
+    "organisation.employeeUser",
     [indicator.model_id],
+    options.companyId,
   );
   return employee?.user_id ?? undefined;
 }
@@ -85,18 +86,22 @@ export async function importKpiShares(
   const cols = await introspectIndicatorAccesses(options.source);
 
   // 1. Read source rows
-  const whereDeleted = cols.hasDeletedAt ? "and ia.deleted_at is null" : "";
-  const orderCol = cols.hasId ? "ia.id" : "ia.indicator_id, ia.user_id";
+  const accessesName = (
+    {
+      "true:true": "kpiShares.accessesLive",
+      "true:false": "kpiShares.accessesLiveNoId",
+      "false:true": "kpiShares.accessesAll",
+      "false:false": "kpiShares.accessesAllNoId",
+    } as const
+  )[`${cols.hasDeletedAt}:${cols.hasId}`];
+  const flaggedName = cols.hasDeletedAt
+    ? "kpiShares.flaggedLive"
+    : "kpiShares.flaggedAll";
 
-  const rows = await options.source.query<SourceAccessRow>(
-    `select ia.*
-       from indicator_accesses ia
-       join indicators i on i.id = ia.indicator_id
-      where i.company_id = ?
-        and i.deleted_at is null
-        ${whereDeleted}
-      order by ${orderCol}`,
-    [options.companyId],
+  const rows = await options.source.read<SourceAccessRow>(
+    accessesName,
+    [],
+    options.companyId,
   );
 
   let writtenAtView = 0;
@@ -433,17 +438,10 @@ export async function importKpiShares(
   }
 
   // 4. Restriction detection (§8.4)
-  const flaggedKpis = await options.source.query<FlaggedIndicator>(
-    `select i.id, i.title, count(distinct ia.user_id) as named_people
-       from indicators i
-       join indicator_accesses ia on ia.indicator_id = i.id
-      where i.company_id = ?
-        and i.deleted_at is null
-        ${whereDeleted}
-        and ia.user_id is not null
-      group by i.id, i.title
-      order by i.id`,
-    [options.companyId],
+  const flaggedKpis = await options.source.read<FlaggedIndicator>(
+    flaggedName,
+    [],
+    options.companyId,
   );
 
   for (const flagged of flaggedKpis) {

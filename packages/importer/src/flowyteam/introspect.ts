@@ -96,10 +96,9 @@ export interface Introspection {
 }
 
 export async function introspect(source: Source): Promise<Introspection> {
-  const rows = await source.query<{ TABLE_NAME: string }>(
-    "select table_name as TABLE_NAME from information_schema.tables where table_schema = ?",
-    [source.database],
-  );
+  const rows = await source.read<{ TABLE_NAME: string }>("schema.tables", [
+    source.database,
+  ]);
   const present = new Set(
     rows.map((row) => String(row.TABLE_NAME).toLowerCase()),
   );
@@ -140,8 +139,8 @@ export async function introspect(source: Source): Promise<Introspection> {
  * this instance been migrated", not "which file sorts highest".
  */
 export async function inferVersion(source: Source): Promise<SourceVersion> {
-  const rows = await source.query<{ migration: string }>(
-    "select migration from migrations order by id desc limit 1",
+  const rows = await source.read<{ migration: string }>(
+    "schema.latestMigration",
   );
   const latest = rows[0]?.migration;
   if (!latest) {
@@ -149,9 +148,7 @@ export async function inferVersion(source: Source): Promise<SourceVersion> {
       "The migrations table is empty, so there is no way to tell which FlowyTeam version this is.",
     );
   }
-  const counted = await source.query<{ n: number }>(
-    "select count(*) as n from migrations",
-  );
+  const counted = await source.read<{ n: number }>("schema.migrationCount");
   const date = /^(\d{4}_\d{2}_\d{2})_/.exec(latest);
 
   return {
@@ -173,10 +170,8 @@ export interface IndicatorAccessesColumns {
 export async function introspectIndicatorAccesses(
   source: Source,
 ): Promise<IndicatorAccessesColumns> {
-  const rows = await source.query<{ COLUMN_NAME: string }>(
-    `select column_name as COLUMN_NAME
-       from information_schema.columns
-      where table_schema = ? and table_name = 'indicator_accesses'`,
+  const rows = await source.read<{ COLUMN_NAME: string }>(
+    "schema.indicatorAccessesColumns",
     [source.database],
   );
   const cols = new Set(rows.map((r) => r.COLUMN_NAME.toLowerCase()));

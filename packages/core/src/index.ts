@@ -969,6 +969,19 @@ export { myExportBlob } from "./exports/collect.ts";
 export type { PutFile } from "./exports/worker.ts";
 export { getServerCatalogue, serverTranslate } from "./i18n/catalogue.ts";
 export {
+  FLOWYTEAM_QUERIES,
+  FLOWYTEAM_SUMMARY_TABLES,
+  FLOWYTEAM_UNREAD_TABLES,
+  type FlowyteamQuery,
+  type FlowyteamQueryCatalogue,
+  type FlowyteamQueryEntry,
+  type FlowyteamQueryName,
+  type FlowyteamQueryScope,
+  type FlowyteamSummaryTable,
+  type FlowyteamUnreadTable,
+  flowyteamQueryCatalogue,
+} from "./imports/flowyteam/queries.ts";
+export {
   assertLegacyKeyFree,
   findLegacyRowInTx,
   LEGACY_SOURCES,

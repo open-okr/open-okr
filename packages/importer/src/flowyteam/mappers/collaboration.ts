@@ -95,16 +95,12 @@ async function importComments(options: MapperOptions): Promise<{
   readonly unmodelled: readonly string[];
 }> {
   const tally = new DomainTally("comments");
-  const rows = await options.source.query<SourceComment>(
+  const rows = await options.source.read<SourceComment>(
     // `task_comments` carries no `company_id`, which §11 of the reference
     // records: it is scoped through its parent task and nothing else.
-    `select c.id, c.comment, c.user_id, c.task_id, c.parent_id,
-            c.created_at, c.edited_at
-       from task_comments c
-       join tasks t on t.id = c.task_id
-      where t.company_id = ? and t.deleted_at is null
-      order by c.id`,
-    [options.companyId],
+    "collaboration.taskComments",
+    [],
+    options.companyId,
   );
 
   const state: ConversionState = {
@@ -306,12 +302,10 @@ async function importWatchers(
   options: MapperOptions,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("watchers");
-  const rows = await options.source.query<{ task_id: number; user_id: number }>(
-    `select task_id, user_id
-       from tasks_accesses
-      where company_id = ?
-      order by task_id, user_id`,
-    [options.companyId],
+  const rows = await options.source.read<{ task_id: number; user_id: number }>(
+    "collaboration.taskAccesses",
+    [],
+    options.companyId,
   );
 
   // Who can hold a subscription at all, read once. §7.2 excludes a

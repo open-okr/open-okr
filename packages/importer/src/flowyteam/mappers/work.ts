@@ -86,13 +86,10 @@ async function importInitiatives(
   options: MapperOptions,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("initiatives");
-  const rows = await options.source.query<SourceProject>(
-    `select id, project_name, project_summary, project_admin, start_date,
-            deadline, status
-       from projects
-      where company_id = ? and deleted_at is null
-      order by id`,
-    [options.companyId],
+  const rows = await options.source.read<SourceProject>(
+    "work.projects",
+    [],
+    options.companyId,
   );
 
   for (const row of rows) {
@@ -208,21 +205,10 @@ async function spaceFor(
   options: MapperOptions,
   project: SourceProject,
 ): Promise<string | undefined> {
-  const teams = await options.source.query<{ department_id: number | null }>(
-    `select e.department_id
-       from employee_details e
-      where e.company_id = ? and e.deleted_at is null
-        and e.department_id is not null
-        and (e.user_id = ? or e.user_id in (
-          select pm.user_id from project_members pm where pm.project_id = ?
-        ))
-      order by case when e.user_id = ? then 0 else 1 end, e.id`,
-    [
-      options.companyId,
-      project.project_admin ?? 0,
-      project.id,
-      project.project_admin ?? 0,
-    ],
+  const teams = await options.source.read<{ department_id: number | null }>(
+    "work.projectAdminTeams",
+    [project.project_admin ?? 0, project.id, project.project_admin ?? 0],
+    options.companyId,
   );
 
   for (const row of teams) {
@@ -275,14 +261,10 @@ async function importTasks(
   options: MapperOptions,
 ): Promise<{ tally: DomainReconciliation }> {
   const tally = new DomainTally("tasks");
-  const rows = await options.source.query<SourceTask>(
-    `select id, heading, description, due_date, user_id, project_id,
-            key_results_id, status, board_column_id, dependent_task_id,
-            recurring_task_id
-       from tasks
-      where company_id = ? and deleted_at is null
-      order by id`,
-    [options.companyId],
+  const rows = await options.source.read<SourceTask>(
+    "work.tasks",
+    [],
+    options.companyId,
   );
 
   const columns = await columnSlugs(options);
@@ -384,9 +366,10 @@ async function importTasks(
 async function columnSlugs(
   options: MapperOptions,
 ): Promise<ReadonlyMap<number, string>> {
-  const rows = await options.source.query<{ id: number; slug: string | null }>(
-    "select id, slug from taskboard_columns where company_id = ?",
-    [options.companyId],
+  const rows = await options.source.read<{ id: number; slug: string | null }>(
+    "work.boardColumns",
+    [],
+    options.companyId,
   );
   return new Map(
     rows.map((row) => [row.id, (row.slug ?? "").toLowerCase().trim()]),
@@ -429,7 +412,7 @@ async function importChecklists(
   options: MapperOptions,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("checklists");
-  const rows = await options.source.query<{
+  const rows = await options.source.read<{
     id: number;
     task_id: number;
     title: string | null;
@@ -437,12 +420,9 @@ async function importChecklists(
   }>(
     // `sub_tasks` carries no `company_id`, which §11 records: it is scoped
     // through its parent task and nothing else.
-    `select s.id, s.task_id, s.title, s.status
-       from sub_tasks s
-       join tasks t on t.id = s.task_id
-      where t.company_id = ? and t.deleted_at is null
-      order by s.id`,
-    [options.companyId],
+    "work.subTasks",
+    [],
+    options.companyId,
   );
 
   for (const row of rows) {
@@ -515,16 +495,10 @@ async function importChecklists(
 async function unmodelledLinks(
   options: MapperOptions,
 ): Promise<readonly string[]> {
-  const [counts] = await options.source.query<{
+  const [counts] = await options.source.read<{
     dependent: number;
     recurring: number;
-  }>(
-    `select
-       sum(case when dependent_task_id is not null then 1 else 0 end) as dependent,
-       sum(case when recurring_task_id is not null then 1 else 0 end) as recurring
-       from tasks where company_id = ? and deleted_at is null`,
-    [options.companyId],
-  );
+  }>("work.taskLinkCounts", [], options.companyId);
 
   const notes: string[] = [];
   if (Number(counts?.dependent ?? 0) > 0) {

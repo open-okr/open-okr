@@ -20,6 +20,10 @@
  * apart. The check reads what earlier runs recorded rather than a column added
  * for it: the company is in the run's own report.
  */
+import {
+  FLOWYTEAM_SUMMARY_TABLES,
+  type FlowyteamSummaryTable,
+} from "@openokr/core";
 import type { Source } from "./source.ts";
 import { SourceError } from "./source.ts";
 
@@ -38,20 +42,14 @@ export async function listCompanies(
   source: Source,
   limit = LISTABLE,
 ): Promise<readonly Company[]> {
-  const rows = await source.query<Record<string, unknown>>(
-    `select id, company_name, company_username, timezone, status
-       from companies
-      order by id
-      limit ?`,
-    [limit],
-  );
+  const rows = await source.read<Record<string, unknown>>("companies.list", [
+    limit,
+  ]);
   return rows.map(toCompany);
 }
 
 export async function countCompanies(source: Source): Promise<number> {
-  const rows = await source.query<{ n: number }>(
-    "select count(*) as n from companies",
-  );
+  const rows = await source.read<{ n: number }>("companies.count");
   return Number(rows[0]?.n ?? 0);
 }
 
@@ -79,11 +77,10 @@ export async function requireCompany(
     );
   }
 
-  const rows = await source.query<Record<string, unknown>>(
-    `select id, company_name, company_username, timezone, status
-       from companies
-      where id = ?`,
-    [companyId],
+  const rows = await source.read<Record<string, unknown>>(
+    "companies.byId",
+    [],
+    companyId,
   );
   const found = rows[0];
   if (!found) {
@@ -114,30 +111,27 @@ export async function countFor(
 ): Promise<CompanyCounts> {
   const counts: Record<string, number> = {};
   for (const table of tables) {
-    if (!/^[a-z_][a-z0-9_]*$/.test(table)) {
-      // The names come from this file's own constants, never from input. The
-      // check is here so that stays true after somebody adds a table.
+    if (!isSummaryTable(table)) {
+      // Only the catalogue's own tables have a statement. A name from anywhere
+      // else is refused here rather than turned into SQL.
       throw new SourceError(`"${table}" is not a table name.`);
     }
-    const rows = await source.query<{ n: number }>(
-      `select count(*) as n from \`${table}\` where company_id = ?`,
-      [companyId],
+    const rows = await source.read<{ n: number }>(
+      `companyCounts.${table}`,
+      [],
+      companyId,
     );
     counts[table] = Number(rows[0]?.n ?? 0);
   }
   return counts;
 }
 
+function isSummaryTable(name: string): name is FlowyteamSummaryTable {
+  return (FLOWYTEAM_SUMMARY_TABLES as readonly string[]).includes(name);
+}
+
 /** The tables a dry run counts, in the order the summary reads best. */
-export const SUMMARY_TABLES = [
-  "teams",
-  "employee_details",
-  "performance_cycles",
-  "objectives",
-  "key_results",
-  "indicators",
-  "tasks",
-] as const;
+export const SUMMARY_TABLES = FLOWYTEAM_SUMMARY_TABLES;
 
 function toCompany(row: Record<string, unknown>): Company {
   return {

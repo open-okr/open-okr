@@ -72,10 +72,10 @@ async function importCategories(
   options: MapperOptions,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("KPI categories");
-  const rows = await options.source.query<{ id: number; name: string | null }>(
-    `select id, name from indicator_types
-      where company_id = ? and deleted_at is null order by id`,
-    [options.companyId],
+  const rows = await options.source.read<{ id: number; name: string | null }>(
+    "kpis.categories",
+    [],
+    options.companyId,
   );
 
   for (const row of rows) {
@@ -148,14 +148,10 @@ async function importIndicators(
   options: MapperOptions,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("KPIs");
-  const rows = await options.source.query<SourceIndicator>(
-    `select id, indicator_type_id, title, description, occurance, direction,
-            aggregate, unit_value, indicator_parent_id, target_value,
-            model_id, model_type
-       from indicators
-      where company_id = ? and deleted_at is null
-      order by id`,
-    [options.companyId],
+  const rows = await options.source.read<SourceIndicator>(
+    "kpis.indicators",
+    [],
+    options.companyId,
   );
 
   // **Depth order, not id order.** A child can have a lower id than its parent,
@@ -352,16 +348,10 @@ interface FormulaPlan {
  * calculated before it writes their values.
  */
 async function planFormulas(options: MapperOptions): Promise<FormulaPlan> {
-  const rows = await options.source.query<{
+  const rows = await options.source.read<{
     id: number;
     calculated_value: string | null;
-  }>(
-    `select id, calculated_value from indicators
-      where company_id = ? and deleted_at is null and calculated = 1
-        and calculated_value is not null and calculated_value <> ''
-      order by id`,
-    [options.companyId],
-  );
+  }>("kpis.formulas", [], options.companyId);
 
   const entries: FormulaPlanEntry[] = [];
   const edges: DependencyEdge[] = [];
@@ -482,14 +472,10 @@ async function importRecords(
   plan: FormulaPlan,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("KPI records");
-  const rows = await options.source.query<SourceRecord>(
-    `select r.id, r.indicator_id, r.period_key, r.current_value, r.target_value,
-            r.remark, i.occurance, i.aggregate
-       from indicator_records r
-       join indicators i on i.id = r.indicator_id
-      where r.company_id = ? and r.deleted_at is null and i.deleted_at is null
-      order by r.period_key, r.id`,
-    [options.companyId],
+  const rows = await options.source.read<SourceRecord>(
+    "kpis.records",
+    [],
+    options.companyId,
   );
 
   // What earlier runs wrote, read once. By key, and by KPI and period for a
@@ -802,12 +788,10 @@ async function periodsOf(
   if (references.length === 0) {
     return [new Date().toISOString().slice(0, 10)];
   }
-  const rows = await options.source.query<{ period_key: string | null }>(
-    `select distinct period_key from indicator_records
-      where company_id = ? and deleted_at is null
-        and indicator_id in (${references.map(() => "?").join(", ")})
-      order by period_key`,
-    [options.companyId, ...references],
+  const rows = await options.source.read<{ period_key: string | null }>(
+    "kpis.recordPeriods",
+    [references],
+    options.companyId,
   );
   const periods = rows
     .map((row) => (row.period_key ? String(row.period_key).slice(0, 10) : null))
@@ -851,10 +835,8 @@ async function ownerGone(
   if (!modelId) {
     return true;
   }
-  const rows = await options.source.query<{ id: number }>(
-    kind === "space"
-      ? "select id from teams where id = ?"
-      : "select id from employee_details where id = ?",
+  const rows = await options.source.read<{ id: number }>(
+    kind === "space" ? "kpis.ownerSpaceExists" : "kpis.ownerMemberExists",
     [modelId],
   );
   return rows.length === 0;
@@ -868,9 +850,10 @@ async function memberOf(
   if (!employeeId) {
     return undefined;
   }
-  const rows = await options.source.query<{ user_id: number | null }>(
-    "select user_id from employee_details where id = ? and deleted_at is null",
+  const rows = await options.source.read<{ user_id: number | null }>(
+    "organisation.employeeUser",
     [employeeId],
+    options.companyId,
   );
   const userId = rows[0]?.user_id;
   return userId ? options.resolver.resolve("users", userId) : undefined;

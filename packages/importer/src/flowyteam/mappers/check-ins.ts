@@ -110,14 +110,10 @@ async function importObjectiveCheckIns(
   const tally = new DomainTally("check-ins");
   const thresholds = (await callAction(options.context, "rhythm.read", {}))
     .thresholds as unknown as ResolvedThresholds;
-  const rows = await options.source.query<SourceObjectiveCheckIn>(
-    `select c.id, c.objective_id, c.user_id, c.checkin_id, c.start_date,
-            c.end_date, c.confidence, c.remarks, c.created_at
-       from objective_checkins c
-       join objectives o on o.id = c.objective_id
-      where c.company_id = ? and o.deleted_at is null
-      order by c.created_at, c.id`,
-    [options.companyId],
+  const rows = await options.source.read<SourceObjectiveCheckIn>(
+    "checkIns.objectiveCheckIns",
+    [],
+    options.companyId,
   );
 
   for (const row of rows) {
@@ -219,19 +215,15 @@ async function valuesFor(
   row: SourceObjectiveCheckIn,
 ): Promise<{ keyResultId: string; value: number }[]> {
   const measures = row.checkin_id
-    ? await options.source.query<SourceKeyResultCheckIn>(
-        `select key_result_id, current_value, confidence, remarks
-           from key_result_checkins
-          where company_id = ? and checkin_id = ?`,
-        [options.companyId, row.checkin_id],
+    ? await options.source.read<SourceKeyResultCheckIn>(
+        "checkIns.keyResultsByCheckIn",
+        [row.checkin_id],
+        options.companyId,
       )
-    : await options.source.query<SourceKeyResultCheckIn>(
-        `select k.key_result_id, k.current_value, k.confidence, k.remarks
-           from key_result_checkins k
-           join key_results r on r.id = k.key_result_id
-          where k.company_id = ? and r.objective_id = ?
-            and k.start_date = ? and k.end_date = ?`,
-        [options.companyId, row.objective_id, row.start_date, row.end_date],
+    : await options.source.read<SourceKeyResultCheckIn>(
+        "checkIns.keyResultsByPeriod",
+        [row.objective_id, row.start_date, row.end_date],
+        options.companyId,
       );
 
   const values: { keyResultId: string; value: number }[] = [];
@@ -256,15 +248,10 @@ async function acknowledgementFor(
   if (!row.checkin_id) {
     return {};
   }
-  const reviews = await options.source.query<{
+  const reviews = await options.source.read<{
     user_id: number | null;
     created_at: string | null;
-  }>(
-    `select user_id, created_at from checkin_reviews
-      where company_id = ? and checkin_id = ?
-      order by created_at limit 1`,
-    [options.companyId, row.checkin_id],
-  );
+  }>("checkIns.reviews", [row.checkin_id], options.companyId);
   const review = reviews[0];
   if (!review?.user_id) {
     return {};

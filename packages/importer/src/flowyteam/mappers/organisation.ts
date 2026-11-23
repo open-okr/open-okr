@@ -75,16 +75,10 @@ async function importMembers(
   options: MapperOptions,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("members");
-  const rows = await options.source.query<SourceUser>(
-    `select u.id, u.name, u.email, u.timezone, u.status,
-            d.name as title
-       from users u
-       left join employee_details e
-         on e.user_id = u.id and e.company_id = u.company_id and e.deleted_at is null
-       left join designations d on d.id = e.designation_id
-      where u.company_id = ?
-      order by u.id`,
-    [options.companyId],
+  const rows = await options.source.read<SourceUser>(
+    "organisation.users",
+    [],
+    options.companyId,
   );
 
   for (const row of rows) {
@@ -144,12 +138,10 @@ async function importSpaces(
   options: MapperOptions,
 ): Promise<{ tally: DomainReconciliation; depth: number }> {
   const tally = new DomainTally("spaces");
-  const rows = await options.source.query<SourceTeam>(
-    `select id, team_name, parent_id, leader_id, description
-       from teams
-      where company_id = ? and deleted_at is null
-      order by id`,
-    [options.companyId],
+  const rows = await options.source.read<SourceTeam>(
+    "organisation.teams",
+    [],
+    options.companyId,
   );
 
   const byId = new Map(rows.map((row) => [row.id, row]));
@@ -238,13 +230,10 @@ async function importSpaceMembers(
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("space members");
   const seen = new Map<string, Set<string>>();
-  const rows = await options.source.query<{ user_id: number; team_id: number }>(
-    `select o.user_id, o.team_id
-       from other_departments o
-       join teams t on t.id = o.team_id
-      where t.company_id = ? and t.deleted_at is null
-      order by o.id`,
-    [options.companyId],
+  const rows = await options.source.read<{ user_id: number; team_id: number }>(
+    "organisation.otherDepartments",
+    [],
+    options.companyId,
   );
 
   for (const row of rows) {
@@ -345,12 +334,10 @@ async function importCycles(
   options: MapperOptions,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("cycles");
-  const rows = await options.source.query<SourceCycle>(
-    `select id, name, cycle_type, type, started_at, finished_at
-       from performance_cycles
-      where company_id = ? and deleted_at is null
-      order by started_at, id`,
-    [options.companyId],
+  const rows = await options.source.read<SourceCycle>(
+    "organisation.cycles",
+    [],
+    options.companyId,
   );
 
   // **The periods a dry run has to refuse the way the write does.** The

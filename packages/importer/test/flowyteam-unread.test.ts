@@ -14,6 +14,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { FLOWYTEAM_QUERIES } from "@openokr/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CORE_TABLES, EXPECTED_TABLES } from "../src/flowyteam/introspect.ts";
 import { openSource, type Source } from "../src/flowyteam/source.ts";
@@ -53,16 +54,29 @@ const COMPANY_SEVEN = [
 // ── The list, against the code ──────────────────────────────────────────
 
 /**
- * Every table named in a `from` or `join` in the connector's own source.
+ * Every table named in a `from` or `join` in the statements the connector
+ * sends, which now live in the catalogue in `@openokr/core`.
  *
- * Comments are stripped first, because a comment saying where a value comes
- * from is not a read. `unread.ts` is left out on purpose: counting a table for
- * the report is the opposite of importing it, and its statements name the
- * table through a variable anyway.
+ * The per-table counts (`unread.*` and `companyCounts.*`) are left out on
+ * purpose: counting a table for the report is the opposite of importing it.
+ * The connector's own source is still scanned for anything written inline.
  */
 function tablesTheCodeReads(): ReadonlySet<string> {
   const root = fileURLToPath(new URL("../src/flowyteam", import.meta.url));
   const read = new Set<string>();
+  for (const [name, entry] of Object.entries(FLOWYTEAM_QUERIES)) {
+    if (name.startsWith("unread.") && name !== "unread.columns") {
+      continue;
+    }
+    if (name.startsWith("companyCounts.")) {
+      continue;
+    }
+    for (const match of entry.sql.matchAll(
+      /\b(?:from|join)\s+`?([a-z_][a-z0-9_]*)`?/gi,
+    )) {
+      read.add((match[1] as string).toLowerCase());
+    }
+  }
   for (const entry of readdirSync(root, { recursive: true })) {
     const file = String(entry);
     if (!file.endsWith(".ts") || file === "unread.ts") {

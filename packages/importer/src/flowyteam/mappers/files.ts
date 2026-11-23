@@ -92,13 +92,10 @@ async function importTaskFiles(options: MapperOptions): Promise<{
   readonly notes: readonly string[];
 }> {
   const tally = new DomainTally("files");
-  const rows = await options.source.query<SourceTaskFile>(
-    `select id, task_id, user_id, filename, hashname, size,
-            google_url, dropbox_link, external_link, external_link_name
-       from task_files
-      where company_id = ?
-      order by id`,
-    [options.companyId],
+  const rows = await options.source.read<SourceTaskFile>(
+    "files.taskFiles",
+    [],
+    options.companyId,
   );
 
   /** External addresses to append, grouped by the task they belong to. */
@@ -338,14 +335,10 @@ async function importInlineImages(options: MapperOptions): Promise<{
   readonly notes: readonly string[];
 }> {
   const tally = new DomainTally("comment images");
-  const rows = await options.source.query<{ id: number; comment: string }>(
-    `select c.id, c.comment
-       from task_comments c
-       join tasks t on t.id = c.task_id
-      where t.company_id = ? and t.deleted_at is null
-        and c.comment like '%data:%'
-      order by c.id`,
-    [options.companyId],
+  const rows = await options.source.read<{ id: number; comment: string }>(
+    "files.inlineImageComments",
+    [],
+    options.companyId,
   );
 
   let rewritten = 0;

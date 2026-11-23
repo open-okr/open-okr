@@ -87,14 +87,10 @@ interface SourceObjective {
 async function readObjectives(
   options: MapperOptions,
 ): Promise<readonly SourceObjective[]> {
-  return options.source.query<SourceObjective>(
-    `select id, model_id, model_type, leader_model_id, title, description,
-            performance_cycle_id, started_at, finished_at, weight,
-            result_percentage, objective_parent_id, key_result_parent_id
-       from objectives
-      where company_id = ? and deleted_at is null
-      order by id`,
-    [options.companyId],
+  return options.source.read<SourceObjective>(
+    "okrs.objectives",
+    [],
+    options.companyId,
   );
 }
 
@@ -347,15 +343,10 @@ async function importKeyResults(
 ): Promise<{ tally: DomainReconciliation; truncated: boolean }> {
   const tally = new DomainTally("key results");
   let truncated = false;
-  const rows = await options.source.query<SourceKeyResult>(
-    `select k.id, k.objective_id, k.title, k.description, k.unit_value,
-            k.initial_value, k.target_value, k.current_value, k.weight,
-            k.leader_model_id
-       from key_results k
-       join objectives o on o.id = k.objective_id
-      where k.company_id = ? and k.deleted_at is null and o.deleted_at is null
-      order by k.id`,
-    [options.companyId],
+  const rows = await options.source.read<SourceKeyResult>(
+    "okrs.keyResults",
+    [],
+    options.companyId,
   );
 
   for (const row of rows) {
@@ -469,18 +460,11 @@ export async function importKeyResultValues(
   options: MapperOptions,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("key result history");
-  const rows = await options.source.query<{
+  const rows = await options.source.read<{
     id: number;
     key_results_id: number;
     history_value: number | null;
-  }>(
-    `select r.id, r.key_results_id, r.history_value
-       from key_result_records r
-       join key_results k on k.id = r.key_results_id
-      where r.company_id = ? and k.deleted_at is null
-      order by r.created_at, r.id`,
-    [options.companyId],
-  );
+  }>("okrs.keyResultRecords", [], options.companyId);
 
   // A record has no legacy key of its own: `key_result_values` is written by
   // `goals.recordValue` and the value is the row. Re-running would replay the
@@ -613,9 +597,10 @@ async function championOf(
     return member(options, modelId);
   }
   if (kind === "space") {
-    const rows = await options.source.query<{ leader_id: number | null }>(
-      "select leader_id from teams where id = ? and deleted_at is null",
+    const rows = await options.source.read<{ leader_id: number | null }>(
+      "organisation.teamLeader",
       [modelId],
+      options.companyId,
     );
     const leader = rows[0]?.leader_id;
     return leader ? options.resolver.resolve("users", leader) : undefined;
@@ -653,9 +638,10 @@ async function member(
   if (!employeeId) {
     return undefined;
   }
-  const rows = await options.source.query<{ user_id: number | null }>(
-    "select user_id from employee_details where id = ? and deleted_at is null",
+  const rows = await options.source.read<{ user_id: number | null }>(
+    "organisation.employeeUser",
     [employeeId],
+    options.companyId,
   );
   const userId = rows[0]?.user_id;
   return userId ? options.resolver.resolve("users", userId) : undefined;
@@ -669,9 +655,10 @@ async function managerOf(
   if (!employeeId) {
     return undefined;
   }
-  const rows = await options.source.query<{ reports_to: number | null }>(
-    "select reports_to from employee_details where id = ? and deleted_at is null",
+  const rows = await options.source.read<{ reports_to: number | null }>(
+    "organisation.employeeManager",
     [employeeId],
+    options.companyId,
   );
   const reportsTo = rows[0]?.reports_to;
   return reportsTo ? options.resolver.resolve("users", reportsTo) : undefined;

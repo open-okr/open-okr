@@ -68,6 +68,7 @@ Prototype of both sides, clickable: [flowyteam-connect-prototype.html](flowyteam
 | Other values | Positional `?`. A list is one `?` taking an array, which the MySQL client expands; an empty list is never sent |
 | Scope `company` | Must contain a `company_id = :company` predicate, directly or through a joined parent. A unit test fails naming any entry that does not |
 | Scope `schema` | Reads `information_schema` only, no company data (introspection, the unread-table check) |
+| Scope `reference` | An existence check by id across the whole source, selecting only `id`. Used where a row owned by another company must count as present (the KPI owner check). FlowyTeam may answer it with ids only. No `:company` |
 | Scope `mysql-only` | Never offered over HTTP, such as listing every company in the source. A token holds one company |
 | Dynamic SQL | Every variant becomes its own named entry (the deleted-row variants in KPI shares, one count per table in the unread check), so the catalogue lists every statement that can be sent |
 | Generated file | `contract/flowyteam-queries.json` with a `version` (SHA-256 of the entries), written by `pnpm gen:contract` and checked by `pnpm check:contract` |
@@ -157,7 +158,7 @@ As in the prototype: a "From FlowyTeam" card above the spreadsheet card with fiv
 | F2 | Consent | The existing authorize page, with the company picker limited to companies where the user is an admin, and the list of what is read. A non-admin sees why they cannot approve |
 | F3 | Clients | OKRGoal cloud as a confidential client registered by the super admin; self-hosted instances through the client metadata document path that already exists |
 | F4 | Token lifetime | Expires after 90 days without a read. Revocable from Settings > Integrations > OKRGoal |
-| F5 | `POST /api/export/v1/query` | Body `{ version, name, values, cursor }`. Runs the named statement from the vendored catalogue on a read-only connection, binds `:company` from the token, expands list values, 2,000 rows a page with a cursor. 409 on a version mismatch, 404 on an unknown name |
+| F5 | `POST /api/export/v1/query` | Body `{ version, name, values, cursor }`. Runs the named statement from the vendored catalogue on a read-only connection, binds `:company` from the token, expands list values, 2,000 rows a page with a cursor. 409 on a version mismatch, 404 on an unknown name. Entries of scope `reference` return only the ids that exist |
 | F6 | `GET /api/export/v1/files/{task_file_id}` | Streams one task file of the token's company |
 | F7 | Read log and screen | A row per request (who approved, OKRGoal workspace, name, rows). Settings > Integrations > OKRGoal shows the connection, the log and Revoke, as in the prototype |
 | F8 | Rate limit | Separate from the MCP limit, sized for an import (about 300 requests for a company of 10,000 rows) |
