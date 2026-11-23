@@ -3,6 +3,8 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../lib/auth";
+import { operationMessage } from "../lib/refusal";
+import { getTranslations } from "../lib/translations";
 import { requireWorkspace } from "../lib/workspace";
 
 /**
@@ -26,7 +28,7 @@ export async function finishTour(): Promise<{ error: string | null }> {
     );
   } catch (error) {
     if (error instanceof OperationError) {
-      return { error: error.message };
+      return { error: operationMessage(error, (await getTranslations()).t) };
     }
     throw error;
   }

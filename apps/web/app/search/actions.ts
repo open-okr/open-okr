@@ -15,6 +15,8 @@ import {
   RECENT_STORE_LIMIT,
   type RecentStoreKind,
 } from "../../lib/recent-store.ts";
+import { operationMessage } from "../../lib/refusal";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import {
   EMPTY_ANSWER,
@@ -129,7 +131,10 @@ export async function paletteSearchAction(
     return { goTo, hits: hits.map(asHit), error: null };
   } catch (error) {
     if (error instanceof OperationError) {
-      return { ...EMPTY_ANSWER, error: error.message };
+      return {
+        ...EMPTY_ANSWER,
+        error: operationMessage(error, (await getTranslations()).t),
+      };
     }
     throw error;
   }
@@ -253,7 +258,7 @@ export async function exportListAction(
         rowCount: 0,
         queued: false,
         runId: null,
-        error: error.message,
+        error: operationMessage(error, (await getTranslations()).t),
       };
     }
     throw error;

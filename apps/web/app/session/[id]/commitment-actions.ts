@@ -13,7 +13,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
-import { refusedByField } from "../../../lib/refusal";
+import { operationMessage, refusedByField } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { type CommitmentState, NO_ERROR } from "./commitment-state.ts";
@@ -209,7 +209,7 @@ export async function advanceStageWithReason(
       if (error.code === "conflict") {
         revalidatePath(`/session/${sessionId}`);
       }
-      return { error: error.message };
+      return { error: operationMessage(error, (await getTranslations()).t) };
     }
     throw error;
   }
