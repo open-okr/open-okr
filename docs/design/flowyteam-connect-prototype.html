@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlowyTeam to OKRGoal import</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; background: #e9ecf1; color: #0f172a; }
+  button { font: inherit; cursor: pointer; }
+  /* prototype chrome */
+  .proto-bar { position: sticky; top: 0; z-index: 20; background: #111827; color: #e5e7eb; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; font-size: 13px; }
+  .proto-bar b { color: #fff; margin-right: 8px; }
+  .proto-bar button { background: #374151; color: #e5e7eb; border: 0; border-radius: 6px; padding: 6px 10px; }
+  .proto-bar button.on { background: #fff; color: #111827; font-weight: 600; }
+  .proto-bar .sep { width: 1px; height: 20px; background: #4b5563; margin: 0 4px; }
+  .proto-note { max-width: 1240px; margin: 12px auto 0; padding: 0 16px; font-size: 12.5px; color: #475569; }
+  .view { display: none; } .view.on { display: block; }
+
+  /* ================= FlowyTeam (Bootstrap 5 look) ================= */
+  .ft { font-family: "Rubik", -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: #fff; color: #28313c; display: grid; grid-template-columns: 270px 1fr; min-height: calc(100vh - 44px); margin-top: 12px; }
+  .ft-side { background: #f5f6f8; border-right: 1px solid #e8eef3; padding: 18px 22px; }
+  .ft-logo { font-weight: 700; color: #1d82f5; font-size: 20px; margin: 4px 0 22px 12px; }
+  .ft-logo span { color: #2eb872; }
+  .ft-nav a { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 6px; color: #28313c; text-decoration: none; font-size: 15px; }
+  .ft-nav a.on { background: #2eb872; color: #fff; }
+  .ft-nav .h { font-size: 12px; font-weight: 600; letter-spacing: .03em; margin: 18px 12px 6px; color: #28313c; }
+  .ft-ico { width: 18px; text-align: center; opacity: .8; }
+  .ft-main { padding: 0 24px 40px; }
+  .ft-top { display: flex; align-items: center; gap: 22px; height: 64px; border-bottom: 1px solid #f1f1f1; font-size: 15px; color: #28313c; }
+  .ft-top .right { margin-left: auto; display: flex; gap: 18px; align-items: center; }
+  .ft-avatar { width: 32px; height: 32px; border-radius: 50%; background: #ffd9a8; display: inline-block; }
+  .ft-title { display: flex; align-items: center; justify-content: space-between; margin: 20px 0 16px; }
+  .ft-title h4 { margin: 0; font-size: 19px; font-weight: 500; }
+  .ft-crumb { color: #2eb872; font-size: 14px; }
+  .ft-settings { display: grid; grid-template-columns: 220px 1fr; gap: 20px; }
+  .ft-subnav { border: 1px solid #e8eef3; border-radius: 6px; background: #fff; padding: 8px 0; align-self: start; }
+  .ft-subnav a { display: block; padding: 9px 16px; color: #616e80; text-decoration: none; font-size: 14px; border-left: 3px solid transparent; }
+  .ft-subnav a.on { color: #2eb872; border-left-color: #2eb872; background: #f2fbf6; font-weight: 500; }
+  .ft-card { border: 1px solid #e8eef3; border-radius: 6px; background: #fff; margin-bottom: 20px; }
+  .ft-card-h { padding: 16px 20px; border-bottom: 1px solid #e8eef3; display: flex; align-items: center; gap: 14px; }
+  .ft-card-h h5 { margin: 0; font-size: 16px; font-weight: 500; }
+  .ft-card-b { padding: 18px 20px; font-size: 14px; color: #4b5563; line-height: 1.55; }
+  .ft-app-logo { width: 40px; height: 40px; border-radius: 8px; background: #4f46e5; color: #fff; display: grid; place-items: center; font-weight: 700; }
+  .ft-badge { font-size: 12px; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+  .ft-badge.green { background: #2eb872; color: #fff; }
+  .ft-badge.grey { background: #e8eef3; color: #616e80; }
+  .ft-badge.amber { background: #fcbd01; color: #fff; }
+  .ft-btn { border-radius: 4px; padding: 8px 16px; font-size: 14px; border: 1px solid transparent; }
+  .ft-btn.primary { background: #2eb872; color: #fff; }
+  .ft-btn.outline { background: #fff; border-color: #cfd6de; color: #28313c; }
+  .ft-btn.danger { background: #fff; border-color: #d21010; color: #d21010; }
+  .ft-dl { display: grid; grid-template-columns: 180px 1fr; gap: 8px 16px; margin: 0; }
+  .ft-dl dt { color: #99a5b5; } .ft-dl dd { margin: 0; color: #28313c; }
+  .ft-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .ft-table th { text-align: left; font-weight: 500; color: #99a5b5; padding: 10px 12px; border-bottom: 1px solid #e8eef3; background: #f9fafb; }
+  .ft-table td { padding: 10px 12px; border-bottom: 1px solid #f1f1f1; color: #28313c; }
+  .ft-alert { border-radius: 4px; padding: 12px 14px; font-size: 14px; margin: 12px 0; }
+  .ft-alert.info { background: #e8f3fe; color: #1d5fa8; }
+  .ft-alert.warn { background: #fff7e0; color: #8a6100; }
+  /* consent */
+  .ft-auth { background: #f5f6f8; min-height: calc(100vh - 44px); margin-top: 12px; display: grid; place-items: center; padding: 30px 16px; font-family: "Rubik", -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #28313c; }
+  .ft-auth-box { background: #fff; border: 1px solid #e8eef3; border-radius: 8px; width: 100%; max-width: 520px; padding: 30px; }
+  .ft-auth-box h3 { font-size: 20px; font-weight: 500; margin: 14px 0 6px; }
+  .ft-link-row { display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .ft-link-row .dots { color: #99a5b5; letter-spacing: 4px; }
+  .ft-ft-logo { width: 48px; height: 48px; border-radius: 10px; background: #2eb872; color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 20px; }
+  .ft-scope { list-style: none; padding: 0; margin: 14px 0; border: 1px solid #e8eef3; border-radius: 6px; }
+  .ft-scope li { padding: 10px 14px; border-bottom: 1px solid #f1f1f1; font-size: 14px; display: flex; gap: 10px; }
+  .ft-scope li:last-child { border-bottom: 0; }
+  .ft-scope .ok { color: #2eb872; font-weight: 700; }
+  .ft-select { width: 100%; padding: 9px 12px; border: 1px solid #cfd6de; border-radius: 4px; font: inherit; font-size: 14px; background: #fff; }
+  .ft-label { font-size: 14px; color: #616e80; margin: 14px 0 6px; display: block; }
+
+  /* ================= OKRGoal (OpenOKR tokens) ================= */
+  .og { --brand: #4f46e5; --brand-text: #4338ca; --brand-weak: #eef2ff; --brand-line: #c7d2fe; --ink: #0f172a; --ink-2: #475569; --ink-3: #64748b; --line: #e4e9f2; --bg: #f6f8fc; --surface: #fff; --raised: #eff3f9; --ok: #15803d; --ok-bg: #e4f9ec; --warn: #b45309; --warn-bg: #fdf3d5; --bad: #b91c1c; --bad-bg: #fde9e9; --info: #1d4ed8; --info-bg: #e8effd;
+    font-family: "Geist", -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; background: var(--bg); color: var(--ink); display: grid; grid-template-columns: 232px 1fr; min-height: calc(100vh - 44px); margin-top: 12px; font-size: 14px; }
+  .og-side { background: var(--surface); border-right: 1px solid var(--line); padding: 16px 12px; }
+  .og-ws { display: flex; align-items: center; gap: 10px; padding: 6px 8px 16px; font-weight: 600; }
+  .og-ws i { width: 28px; height: 28px; border-radius: 8px; background: var(--brand); display: inline-block; }
+  .og-side .h { font-size: 11.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; margin: 14px 8px 6px; }
+  .og-side a { display: block; padding: 7px 10px; border-radius: 8px; color: var(--ink-2); text-decoration: none; }
+  .og-side a.on { background: var(--brand-weak); color: var(--brand-text); font-weight: 600; }
+  .og-main { min-width: 0; }
+  .og-top { height: 56px; border-bottom: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; padding: 0 24px; gap: 12px; color: var(--ink-3); }
+  .og-top .right { margin-left: auto; display: flex; gap: 14px; align-items: center; }
+  .og-search { border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; width: 280px; color: var(--ink-3); background: var(--bg); }
+  .og-page { max-width: 980px; margin: 0 auto; padding: 24px; }
+  .og-page h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .og-intro { color: var(--ink-2); margin: 0 0 20px; }
+  .og-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+  .og-card-h { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .og-card-h h2 { font-size: 15px; margin: 0; }
+  .og-card-h .sub { color: var(--ink-3); font-size: 13px; }
+  .og-card-h .end { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .og-card-b { padding: 18px; }
+  .og-card-f { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--line); background: #fbfcfe; }
+  .og-card-f .end { margin-left: auto; display: flex; gap: 8px; }
+  .og-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--raised); color: var(--ink-2); font-weight: 500; white-space: nowrap; }
+  .og-chip.ok { background: var(--ok-bg); color: var(--ok); } .og-chip.warn { background: var(--warn-bg); color: var(--warn); } .og-chip.brand { background: var(--brand-weak); color: var(--brand-text); } .og-chip.bad { background: var(--bad-bg); color: var(--bad); }
+  .og-chip.ok::before, .og-chip.warn::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .og-btn { border-radius: 8px; padding: 7px 14px; font-size: 13.5px; font-weight: 500; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+  .og-btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .og-btn.primary:disabled { opacity: .45; cursor: not-allowed; }
+  .og-btn.ghost { border-color: transparent; background: transparent; color: var(--brand-text); }
+  .og-btn.danger { color: var(--bad); }
+  .og-steps { display: flex; gap: 0; padding: 14px 18px; border-bottom: 1px solid var(--line); background: #fbfcfe; overflow-x: auto; }
+  .og-step { display: flex; align-items: center; gap: 8px; color: var(--ink-3); font-size: 13px; white-space: nowrap; }
+  .og-step + .og-step::before { content: ""; width: 28px; height: 1px; background: var(--line); margin: 0 10px; }
+  .og-step b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; background: var(--raised); color: var(--ink-3); }
+  .og-step.on { color: var(--ink); font-weight: 600; } .og-step.on b { background: var(--brand); color: #fff; }
+  .og-step.done b { background: var(--ok-bg); color: var(--ok); }
+  .og-panel { display: none; } .og-panel.on { display: block; }
+  .og-muted { color: var(--ink-3); } .og-small { font-size: 12.5px; }
+  .og-box { border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .og-box.info { background: var(--info-bg); border-color: #cbd8f8; color: #1e3a8a; }
+  .og-box.warn { background: var(--warn-bg); border-color: #f3dfa6; color: #713f12; }
+  .og-box.ok { background: var(--ok-bg); border-color: #b7ebc8; color: #14532d; }
+  .og-box + .og-box { margin-top: 10px; }
+  .og-box h3 { margin: 0 0 4px; font-size: 14px; }
+  .og-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .og-check { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .og-check input { margin-top: 3px; accent-color: var(--brand); }
+  .og-check .t { font-weight: 500; } .og-check .d { color: var(--ink-3); font-size: 12.5px; }
+  .og-check.locked { background: var(--raised); }
+  .og-table { width: 100%; border-collapse: collapse; }
+  .og-table th { text-align: left; font-size: 12px; color: var(--ink-3); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .og-table td { padding: 9px 10px; border-bottom: 1px solid #eef2f7; vertical-align: top; }
+  .og-table td.n, .og-table th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .og-scroll { max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+  .og-bar { height: 8px; background: var(--raised); border-radius: 99px; overflow: hidden; }
+  .og-bar i { display: block; height: 100%; background: var(--brand); width: 0; transition: width .3s; }
+  .og-prog-row { display: grid; grid-template-columns: 130px 1fr 90px; gap: 12px; align-items: center; padding: 6px 0; }
+  details.og-more { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-top: 10px; }
+  details.og-more summary { cursor: pointer; font-weight: 500; }
+  .og-collapsed .og-card-h { border-bottom: 0; }
+  .og-connected { display: flex; align-items: center; gap: 12px; }
+  .og-connected .logo { width: 36px; height: 36px; border-radius: 8px; background: #2eb872; color: #fff; display: grid; place-items: center; font-weight: 700; }
+  .og-sel { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font: inherit; background: #fff; }
+
+  @media (max-width: 760px) {
+    .ft, .og { grid-template-columns: 1fr; }
+    .ft-side, .og-side { display: none; }
+    .ft-settings { grid-template-columns: 1fr; }
+    .ft-subnav { display: none; }
+    .og-grid2 { grid-template-columns: 1fr; }
+    .og-search { display: none; }
+    .og-page { padding: 16px; }
+    .ft-dl { grid-template-columns: 1fr; }
+    .og-prog-row { grid-template-columns: 90px 1fr 60px; }
+    .og-hide-sm { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <b>Prototype</b>
+  <span>FlowyTeam:</span>
+  <button data-go="ft-int">Settings &gt; Integrations</button>
+  <button data-go="ft-consent">Consent screen</button>
+  <span class="sep"></span>
+  <span>OKRGoal:</span>
+  <button data-go="og">Admin &gt; Import</button>
+  <span class="sep"></span>
+  <button id="reset">Reset</button>
+</div>
+<p class="proto-note">Flow: start in OKRGoal (Admin &gt; Import &gt; From FlowyTeam), click Connect, approve on the FlowyTeam consent screen, return to OKRGoal for choose, preview, import and invite. FlowyTeam Settings &gt; Integrations shows the connection and every read. All names and numbers are invented.</p>
+
+<!-- ============ FlowyTeam: Settings > Integrations ============ -->
+<section class="view" id="ft-int">
+  <div class="ft">
+    <aside class="ft-side">
+      <div class="ft-logo">Flowy<span>Team</span></div>
+      <nav class="ft-nav">
+        <a href="#"><span class="ft-ico">▦</span>Dashboard</a>
+        <a href="#"><span class="ft-ico">▤</span>Calendar</a>
+        <div class="h">GROWTH</div>
+        <a href="#"><span class="ft-ico">◎</span>Strategic Plannings</a>
+        <a href="#"><span class="ft-ico">◔</span>KPI</a>
+        <div class="h">SETTINGS</div>
+        <a href="#"><span class="ft-ico">⚙</span>Company Settings</a>
+        <a href="#" class="on"><span class="ft-ico">⇄</span>Integrations</a>
+      </nav>
+    </aside>
+    <main class="ft-main">
+      <div class="ft-top"><span>☰</span><span>⌕</span><span>Add +</span><span>Invite ✉</span><div class="right"><span>EN ⌄</span><span>🔔</span><span class="ft-avatar"></span></div></div>
+      <div class="ft-title"><h4>⇄ Integrations</h4><span class="ft-crumb">Home / Settings / Integrations</span></div>
+      <div class="ft-settings">
+        <nav class="ft-subnav">
+          <a href="#">Slack</a><a href="#">Microsoft Teams</a><a href="#">Google Calendar</a><a href="#">API keys</a><a href="#" class="on">OKRGoal</a>
+        </nav>
+        <div>
+          <div class="ft-card">
+            <div class="ft-card-h">
+              <div class="ft-app-logo">OG</div>
+              <div><h5>OKRGoal</h5><div style="font-size:13px;color:#99a5b5">Move your OKRs, KPIs and tasks to OKRGoal</div></div>
+              <span style="margin-left:auto" class="ft-badge grey" data-ft-state="off">Not connected</span>
+              <span style="margin-left:auto;display:none" class="ft-badge green" data-ft-state="on">Connected</span>
+            </div>
+            <div class="ft-card-b">
+              <div data-ft-state="off">
+                <p style="margin-top:0">An OKRGoal workspace can read this company's data and copy it. The connection is started from OKRGoal, so the data lands in the right workspace:</p>
+                <ol style="padding-left:18px;margin:0 0 10px">
+                  <li>Sign in to your OKRGoal workspace as an admin.</li>
+                  <li>Open Admin &gt; Import &gt; From FlowyTeam and click Connect FlowyTeam.</li>
+                  <li>Approve the request here in FlowyTeam.</li>
+                </ol>
+                <div class="ft-alert info">Read only. OKRGoal never changes FlowyTeam data. You can keep using FlowyTeam during the move and revoke access at any time.</div>
+                <button class="ft-btn outline">Open OKRGoal ↗</button>
+              </div>
+              <div data-ft-state="on" style="display:none">
+                <dl class="ft-dl">
+                  <dt>OKRGoal workspace</dt><dd>okrgoal.com/contoh-maju</dd>
+                  <dt>Approved by</dt><dd>Rina Hartono (Admin), 23 Nov 2026 09:31</dd>
+                  <dt>Access</dt><dd>Read only: employees, teams, OKRs, check-ins, KPIs, tasks, files</dd>
+                  <dt>Last read</dt><dd id="ft-lastread">Not read yet</dd>
+                  <dt>Expires</dt><dd>When revoked, or after 90 days without a read</dd>
+                </dl>
+                <div class="ft-alert warn">Revoking stops further imports. What OKRGoal already copied stays in OKRGoal.</div>
+                <button class="ft-btn danger" id="ft-revoke">Revoke access</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="ft-card" data-ft-state="on" style="display:none">
+            <div class="ft-card-h"><h5>Read activity</h5><span style="margin-left:auto;font-size:13px;color:#99a5b5">Every read by OKRGoal is logged</span></div>
+            <div class="ft-card-b" style="padding:0">
+              <table class="ft-table">
+                <thead><tr><th>Date</th><th>Started by (OKRGoal)</th><th>Kind</th><th>Rows read</th></tr></thead>
+                <tbody id="ft-reads"><tr><td colspan="4" style="color:#99a5b5">No reads yet</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ============ FlowyTeam: OAuth consent ============ -->
+<section class="view" id="ft-consent">
+  <div class="ft-auth">
+    <div class="ft-auth-box">
+      <div class="ft-link-row"><div class="ft-ft-logo">F</div><span class="dots">• • •</span><div class="ft-app-logo" style="width:48px;height:48px;border-radius:10px">OG</div></div>
+      <h3 style="text-align:center">OKRGoal wants to read your company's data</h3>
+      <p style="text-align:center;margin:0;color:#616e80;font-size:14px">Requested from workspace <b>okrgoal.com/contoh-maju</b> by rina@contohmaju.co.id</p>
+      <label class="ft-label" for="ft-company">Company</label>
+      <select id="ft-company" class="ft-select">
+        <option>PT Contoh Maju (you are an admin)</option>
+        <option disabled>PT Contoh Lain (you are not an admin)</option>
+      </select>
+      <ul class="ft-scope">
+        <li><span class="ok">✓</span>Employees and teams (names, emails, managers, teams)</li>
+        <li><span class="ok">✓</span>Performance cycles, objectives, key results and check-ins</li>
+        <li><span class="ok">✓</span>KPIs, KPI values, formulas and who may see each KPI</li>
+        <li><span class="ok">✓</span>Projects, tasks, checklists, comments and attached files</li>
+      </ul>
+      <div class="ft-alert info" style="font-size:13px">Read only. Nothing in FlowyTeam is changed, moved or deleted. Only a company admin can approve. You can revoke this under Settings &gt; Integrations.</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button class="ft-btn outline" id="ft-cancel">Cancel</button>
+        <button class="ft-btn primary" id="ft-allow">Allow read access</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ OKRGoal: Admin > Import ============ -->
+<section class="view" id="og">
+  <div class="og">
+    <aside class="og-side">
+      <div class="og-ws"><i></i>PT Contoh Maju</div>
+      <div class="h">Workspace</div>
+      <a href="#">General</a><a href="#">Members and access</a><a href="#">Spaces</a><a href="#">Rhythm</a><a href="#">Practice</a>
+      <div class="h">Data</div>
+      <a href="#" class="on">Import</a><a href="#">Backups</a><a href="#">Deleted items</a><a href="#">Invitations</a>
+      <div class="h">Connections</div>
+      <a href="#">Notifications and channels</a><a href="#">Agent connections</a><a href="#">Webhooks</a>
+    </aside>
+    <main class="og-main">
+      <div class="og-top"><span class="og-search">Search or jump to ⌘K</span><div class="right"><span>🌐 English ⌄</span><span>🔔</span><span class="ft-avatar" style="background:#c7d2fe"></span></div></div>
+      <div class="og-page">
+        <h1>Import</h1>
+        <p class="og-intro">Bring goals, KPIs and work into this workspace from FlowyTeam or from a spreadsheet. Every import shows a preview first, and nothing is written until you confirm.</p>
+
+        <!-- FlowyTeam card -->
+        <div class="og-card" id="og-ft">
+          <div class="og-card-h">
+            <div class="og-connected"><div class="logo">F</div><div><h2>From FlowyTeam</h2><div class="sub" id="og-ft-sub">Read-only connection. FlowyTeam is not changed.</div></div></div>
+            <div class="end"><span class="og-chip" id="og-ft-chip">Not connected</span></div>
+          </div>
+          <div class="og-steps" id="og-steps">
+            <div class="og-step" data-s="1"><b>1</b>Connect</div>
+            <div class="og-step" data-s="2"><b>2</b>Choose</div>
+            <div class="og-step" data-s="3"><b>3</b>Preview</div>
+            <div class="og-step" data-s="4"><b>4</b>Import</div>
+            <div class="og-step" data-s="5"><b>5</b>Invite people</div>
+          </div>
+
+          <!-- 1 connect -->
+          <div class="og-panel" data-p="1">
+            <div class="og-card-b">
+              <p style="margin-top:0">Connect the FlowyTeam company this workspace replaces. You approve the request in FlowyTeam as a company admin, and this workspace can then read that company's data, never change it.</p>
+              <div class="og-box info"><h3>One company per workspace</h3>Once a company is imported, this workspace stays linked to it. Another company needs its own workspace.</div>
+            </div>
+            <div class="og-card-f"><span class="og-muted og-small">You will be sent to FlowyTeam and back.</span><div class="end"><button class="og-btn primary" id="og-connect">Connect FlowyTeam</button></div></div>
+          </div>
+
+          <!-- 2 choose -->
+          <div class="og-panel" data-p="2">
+            <div class="og-card-b">
+              <div class="og-box ok" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div><b>Connected to PT Contoh Maju</b><div class="og-small">Approved in FlowyTeam by Rina Hartono, 23 Nov 2026 09:31. 214 employees, 3 cycles.</div></div><button class="og-btn ghost" style="margin-left:auto" id="og-disconnect">Disconnect</button></div>
+              <p style="margin:16px 0 8px;font-weight:600">What to bring across</p>
+              <div class="og-grid2" id="og-domains">
+                <label class="og-check locked"><input type="checkbox" checked disabled data-d="organisation"><span><span class="t">People and teams</span><div class="d">Members, spaces, space membership. Everything else needs it.</div></span></label>
+                <label class="og-check"><input type="checkbox" checked data-d="objectives"><span><span class="t">Cycles and OKRs</span><div class="d">Cycles, objectives, key results and their history</div></span></label>
+                <label class="og-check"><input type="checkbox" checked data-d="checkins" data-needs="objectives"><span><span class="t">Check-ins</span><div class="d">Needs Cycles and OKRs</div></span></label>
+                <label class="og-check"><input type="checkbox" checked data-d="kpis"><span><span class="t">KPIs and values</span><div class="d">Categories, KPIs, values and formulas</div></span></label>
+                <label class="og-check"><input type="checkbox" checked data-d="kpi-shares" data-needs="kpis"><span><span class="t">Who sees each KPI</span><div class="d">Needs KPIs and values</div></span></label>
+                <label class="og-check"><input type="checkbox" checked data-d="work"><span><span class="t">Initiatives and tasks</span><div class="d">Projects, tasks, checklists</div></span></label>
+                <label class="og-check"><input type="checkbox" checked data-d="collaboration" data-needs="work"><span><span class="t">Comments and watchers</span><div class="d">Task comments, inline images, watchers</div></span></label>
+                <label class="og-check"><input type="checkbox" checked data-d="files" data-needs="work"><span><span class="t">Attached files</span><div class="d">Task files, copied into this workspace's storage</div></span></label>
+              </div>
+              <p class="og-muted og-small" id="og-dep-note" style="min-height:18px"></p>
+            </div>
+            <div class="og-card-f"><span class="og-muted og-small">The preview reads FlowyTeam and writes nothing here.</span><div class="end"><button class="og-btn primary" id="og-preview">Run preview</button></div></div>
+          </div>
+
+          <!-- 3 preview -->
+          <div class="og-panel" data-p="3">
+            <div class="og-card-b">
+              <div id="og-prev-loading">
+                <p style="margin-top:0">Reading PT Contoh Maju from FlowyTeam…</p>
+                <div class="og-bar"><i id="og-prev-bar"></i></div>
+              </div>
+              <div id="og-prev-done" style="display:none">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap"><b>Preview</b><span class="og-chip">Dry run, nothing written</span><span class="og-muted og-small" id="og-prev-time">Read 23 Nov 2026 09:34</span><button class="og-btn ghost" style="margin-left:auto">Download report</button></div>
+                <div class="og-scroll">
+                  <table class="og-table">
+                    <thead><tr><th>Data</th><th class="n">In FlowyTeam</th><th class="n">Will add</th><th class="n og-hide-sm">Already here</th><th class="n">Skipped</th></tr></thead>
+                    <tbody id="og-prev-rows"></tbody>
+                  </table>
+                </div>
+
+                <p style="margin:18px 0 8px;font-weight:600">Read before importing</p>
+                <div class="og-box warn">
+                  <h3>12 KPIs will be visible to more people</h3>
+                  In FlowyTeam these KPIs are shown only to named people. Here a KPI is visible by workspace role, plus the people it is shared with, so more members may see them.
+                  <details class="og-more" style="background:#fff"><summary>Show the 12 KPIs</summary>
+                    <table class="og-table og-small"><thead><tr><th>KPI</th><th>Owner</th><th>Shown in FlowyTeam to</th></tr></thead><tbody>
+                      <tr><td>Gross margin per branch</td><td>Finance</td><td>4 people</td></tr>
+                      <tr><td>Payroll cost ratio</td><td>HR</td><td>2 people</td></tr>
+                      <tr><td>Sales per rep</td><td>Sales</td><td>6 people</td></tr>
+                      <tr><td colspan="3" class="og-muted">9 more…</td></tr>
+                    </tbody></table>
+                  </details>
+                  <label style="display:flex;gap:8px;margin-top:10px;align-items:flex-start"><input type="checkbox" id="og-accept" style="accent-color:#4f46e5;margin-top:3px"><span>I understand these 12 KPIs may become visible to more members. I can restrict them after the import.</span></label>
+                </div>
+                <div class="og-box info">
+                  <h3>Changed on the way in</h3>
+                  <ul style="margin:4px 0 0;padding-left:18px">
+                    <li>41 KPI values shared a period with another value and were combined by the KPI's own rule (sum, average, max, min or count).</li>
+                    <li>3 KPIs belong to people or teams FlowyTeam no longer holds. They are imported at workspace level.</li>
+                    <li>18 calculated KPIs are worked out again from their formulas, not copied.</li>
+                    <li>Progress, health, scores and alignment are recalculated here, never copied.</li>
+                  </ul>
+                </div>
+                <details class="og-more"><summary>Not brought across (6 kinds of FlowyTeam data)</summary>
+                  <table class="og-table og-small"><tbody>
+                    <tr><td>Objective comments</td><td class="n">312</td><td class="og-muted">Open decision</td></tr>
+                    <tr><td>Key result comments</td><td class="n">88</td><td class="og-muted">Open decision</td></tr>
+                    <tr><td>Check-in mood and answers</td><td class="n">1,904</td><td class="og-muted">No place here yet</td></tr>
+                    <tr><td>Time logs</td><td class="n">5,120</td><td class="og-muted">Not in this product</td></tr>
+                    <tr><td>Points and rewards</td><td class="n">640</td><td class="og-muted">Points layer is off</td></tr>
+                    <tr><td>Stored cycle scores</td><td class="n">96</td><td class="og-muted">Recalculated here by design</td></tr>
+                  </tbody></table>
+                  <p class="og-small og-muted" style="margin-bottom:0">These stay in FlowyTeam. Keep FlowyTeam readable if you need them.</p>
+                </details>
+              </div>
+            </div>
+            <div class="og-card-f"><button class="og-btn" data-back="2">Back</button><span class="og-muted og-small" id="og-import-hint">Tick the KPI visibility box to import.</span><div class="end"><button class="og-btn primary" id="og-import" disabled>Import 9,846 rows</button></div></div>
+          </div>
+
+          <!-- 4 import -->
+          <div class="og-panel" data-p="4">
+            <div class="og-card-b">
+              <div id="og-run">
+                <p style="margin-top:0">Importing. This runs on the server, so you can leave this page. You get a notification when it ends.</p>
+                <div id="og-prog"></div>
+              </div>
+              <div id="og-run-done" style="display:none">
+                <div class="og-box ok"><h3>Import finished</h3>9,846 rows added in 3 min 12 s. 22 rows skipped, each named in the report.</div>
+                <p style="margin:14px 0 6px;font-weight:600">Check three things before telling anybody</p>
+                <ul style="margin:0;padding-left:18px;color:var(--ink-2)">
+                  <li>The people are the right people (Members and access)</li>
+                  <li>Cycle dates are the ones you expect (Cycles)</li>
+                  <li>One goal's history looks like it did in FlowyTeam</li>
+                </ul>
+              </div>
+            </div>
+            <div class="og-card-f"><button class="og-btn ghost" id="og-report">Open the report</button><div class="end"><button class="og-btn primary" id="og-to-invite" disabled>Next: invite people</button></div></div>
+          </div>
+
+          <!-- 5 invite -->
+          <div class="og-panel" data-p="5">
+            <div class="og-card-b">
+              <p style="margin-top:0">214 people came across as members without an account. Nobody has been emailed. Choose who gets an invitation now; the rest can be invited later from Invitations.</p>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+                <select class="og-sel" id="og-filter"><option value="active">Active in FlowyTeam in the last 90 days (168)</option><option value="all">Everyone (214)</option></select>
+                <label class="og-small"><input type="checkbox" id="og-all" checked style="accent-color:#4f46e5"> Select all shown</label>
+              </div>
+              <div class="og-scroll">
+                <table class="og-table">
+                  <thead><tr><th></th><th>Name</th><th class="og-hide-sm">Email</th><th>Team</th><th class="og-hide-sm">Last active</th></tr></thead>
+                  <tbody id="og-people"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="og-card-f"><button class="og-btn" id="og-later">Not now</button><span class="og-muted og-small" id="og-inv-count"></span><div class="end"><button class="og-btn primary" id="og-send">Send invitations</button></div></div>
+          </div>
+
+          <!-- 6 linked state -->
+          <div class="og-panel" data-p="6">
+            <div class="og-card-b">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+                <div style="flex:1;min-width:240px">
+                  <b>Linked to PT Contoh Maju</b>
+                  <div class="og-muted og-small" id="og-linked-line">Last import 23 Nov 2026 09:38 by Rina Hartono. 168 invitations sent.</div>
+                </div>
+                <button class="og-btn primary" id="og-again">Import new data</button>
+              </div>
+              <div class="og-box info" style="margin-top:12px"><h3>What "Import new data" does</h3>It adds what was created in FlowyTeam since the last import: new check-ins, KPI values, tasks and people. What was already imported is not changed, even if it was edited in FlowyTeam later. Stop using FlowyTeam for a team once that team works here.</div>
+            </div>
+            <div class="og-card-f"><button class="og-btn ghost danger" id="og-unlink">Disconnect FlowyTeam</button><div class="end"></div></div>
+          </div>
+        </div>
+
+        <!-- Recent runs -->
+        <div class="og-card">
+          <div class="og-card-h"><h2>Recent runs</h2><div class="end"><span class="og-chip" id="og-runs-count">0</span></div></div>
+          <div class="og-card-b" style="padding:0">
+            <table class="og-table">
+              <thead><tr><th>When</th><th>Source</th><th>Kind</th><th class="og-hide-sm">By</th><th class="n">Added</th><th class="n">Skipped</th><th></th></tr></thead>
+              <tbody id="og-runs"><tr><td colspan="7" class="og-muted">No imports yet</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="og-card og-collapsed"><div class="og-card-h"><h2>From a spreadsheet</h2><span class="sub og-hide-sm">Goals, key results, KPIs, values, initiatives, tasks</span><div class="end"><button class="og-btn">Open</button></div></div></div>
+        <div class="og-card og-collapsed"><div class="og-card-h"><h2>Workspace archive</h2><span class="sub og-hide-sm">Restore a workspace exported from OKRGoal</span><div class="end"><button class="og-btn ghost">Backups ↗</button></div></div></div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const state = { connected: false, step: 1, runs: [], ftReads: [], imported: false };
+
+  function go(id) {
+    $$(".view").forEach(v => v.classList.toggle("on", v.id === id));
+    $$(".proto-bar [data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === id));
+    window.scrollTo(0, 0);
+  }
+  $$(".proto-bar [data-go]").forEach(b => b.addEventListener("click", () => go(b.dataset.go)));
+
+  function setStep(n) {
+    state.step = n;
+    $$("#og-ft .og-panel").forEach(p => p.classList.toggle("on", +p.dataset.p === n));
+    $("#og-steps").style.display = n === 6 ? "none" : "";
+    $$("#og-steps .og-step").forEach(s => {
+      const k = +s.dataset.s;
+      s.classList.toggle("on", k === n);
+      s.classList.toggle("done", k < n);
+      s.querySelector("b").textContent = k < n ? "✓" : k;
+    });
+    const chip = $("#og-ft-chip");
+    if (n === 6) { chip.className = "og-chip ok"; chip.textContent = "Linked"; }
+    else if (state.connected) { chip.className = "og-chip ok"; chip.textContent = "Connected"; }
+    else { chip.className = "og-chip"; chip.textContent = "Not connected"; }
+  }
+
+  function renderFt() {
+    $$("[data-ft-state]").forEach(el => {
+      const want = el.dataset.ftState === (state.connected ? "on" : "off");
+      el.style.display = want ? "" : "none";
+    });
+    const tb = $("#ft-reads");
+    tb.innerHTML = state.ftReads.length ? state.ftReads.map(r => `<tr><td>${r.when}</td><td>${r.by}</td><td>${r.kind}</td><td>${r.rows}</td></tr>`).join("") : `<tr><td colspan="4" style="color:#99a5b5">No reads yet</td></tr>`;
+    $("#ft-lastread").textContent = state.ftReads.length ? state.ftReads[0].when : "Not read yet";
+  }
+
+  function renderRuns() {
+    $("#og-runs-count").textContent = state.runs.length;
+    $("#og-runs").innerHTML = state.runs.length ? state.runs.map(r => `<tr><td>${r.when}</td><td>FlowyTeam</td><td><span class="og-chip ${r.kind === "Import" ? "brand" : ""}">${r.kind}</span></td><td class="og-hide-sm">Rina Hartono</td><td class="n">${r.added}</td><td class="n">${r.skipped}</td><td><button class="og-btn ghost">Report</button></td></tr>`).join("") : `<tr><td colspan="7" class="og-muted">No imports yet</td></tr>`;
+  }
+
+  let minute = 31;
+  const stamp = () => `23 Nov 2026 09:${String(minute++).padStart(2, "0")}`;
+
+  // FlowyTeam consent
+  $("#og-connect").addEventListener("click", () => go("ft-consent"));
+  $("#ft-allow").addEventListener("click", () => { state.connected = true; renderFt(); go("og"); setStep(2); });
+  $("#ft-cancel").addEventListener("click", () => { go("og"); setStep(1); });
+  $("#ft-revoke").addEventListener("click", () => { state.connected = false; renderFt(); setStep(state.imported ? 6 : 1); if (state.imported) $("#og-linked-line").textContent = "Access revoked in FlowyTeam. Reconnect to import new data."; });
+  $("#og-disconnect").addEventListener("click", () => { state.connected = false; renderFt(); setStep(1); });
+  $("#og-unlink").addEventListener("click", () => { state.connected = false; renderFt(); $("#og-linked-line").textContent = "Disconnected. The imported data stays. This workspace stays linked to PT Contoh Maju."; });
+
+  // dependencies
+  $$("#og-domains input[data-needs]").forEach(i => i.addEventListener("change", () => {
+    if (i.checked) { const p = $(`#og-domains input[data-d="${i.dataset.needs}"]`); if (!p.checked) { p.checked = true; $("#og-dep-note").textContent = `${p.closest("label").querySelector(".t").textContent} was ticked too, because ${i.closest("label").querySelector(".t").textContent} needs it.`; } }
+  }));
+  $$("#og-domains input[data-d]").forEach(i => i.addEventListener("change", () => {
+    if (!i.checked) $$(`#og-domains input[data-needs="${i.dataset.d}"]`).forEach(c => { if (c.checked) { c.checked = false; $("#og-dep-note").textContent = `${c.closest("label").querySelector(".t").textContent} was unticked too, because it needs ${i.closest("label").querySelector(".t").textContent}.`; } });
+  }));
+
+  const rows = [
+    ["People", 214, 214, 0, 0],
+    ["Teams (spaces)", 18, 18, 0, 0],
+    ["Cycles", 3, 3, 0, 0],
+    ["Objectives", 142, 140, 0, 2],
+    ["Key results", 488, 481, 0, 7],
+    ["Check-ins", 3912, 3912, 0, 0],
+    ["KPIs", 198, 195, 0, 3],
+    ["KPI values", 4210, 4169, 0, 41],
+    ["KPI shares", 77, 77, 0, 0],
+    ["Initiatives and tasks", 612, 605, 0, 7],
+    ["Comments and watchers", 32, 32, 0, 0],
+  ];
+  function preview(again) {
+    setStep(3);
+    $("#og-prev-loading").style.display = ""; $("#og-prev-done").style.display = "none";
+    const bar = $("#og-prev-bar"); bar.style.width = "0";
+    let w = 0; const t = setInterval(() => { w += 20; bar.style.width = w + "%"; if (w >= 100) { clearInterval(t); done(); } }, 220);
+    function done() {
+      $("#og-prev-loading").style.display = "none"; $("#og-prev-done").style.display = "";
+      const data = again ? rows.map(([n, f, a, h, s]) => { const add = n === "Check-ins" ? 46 : n === "KPI values" ? 120 : n === "Initiatives and tasks" ? 14 : n === "People" ? 2 : 0; return [n, f + add, add, a, s]; }) : rows;
+      $("#og-prev-rows").innerHTML = data.map(([n, f, a, h, s]) => `<tr><td>${n}</td><td class="n">${f.toLocaleString("en")}</td><td class="n"><b>${a.toLocaleString("en")}</b></td><td class="n og-hide-sm">${h.toLocaleString("en")}</td><td class="n">${s}</td></tr>`).join("");
+      const total = data.reduce((x, r) => x + r[2], 0);
+      $("#og-import").textContent = `Import ${total.toLocaleString("en")} rows`;
+      $("#og-prev-time").textContent = "Read " + stamp();
+      state.ftReads.unshift({ when: $("#og-prev-time").textContent.slice(5), by: "Rina Hartono", kind: "Preview", rows: data.reduce((x, r) => x + r[1], 0).toLocaleString("en") });
+      state.runs.unshift({ when: $("#og-prev-time").textContent.slice(5), kind: "Preview", added: "0", skipped: data.reduce((x, r) => x + r[4], 0) });
+      state.lastTotal = total; renderFt(); renderRuns(); gate();
+    }
+  }
+  $("#og-preview").addEventListener("click", () => preview(false));
+  $$("[data-back]").forEach(b => b.addEventListener("click", () => setStep(+b.dataset.back)));
+
+  function gate() {
+    const ok = $("#og-accept").checked;
+    $("#og-import").disabled = !ok;
+    $("#og-import-hint").textContent = ok ? "" : "Tick the KPI visibility box to import.";
+  }
+  $("#og-accept").addEventListener("change", gate);
+
+  $("#og-import").addEventListener("click", () => {
+    setStep(4); $("#og-run").style.display = ""; $("#og-run-done").style.display = "none"; $("#og-to-invite").disabled = true;
+    const names = ["People and teams", "Cycles and OKRs", "Check-ins", "KPIs and values", "Who sees each KPI", "Tasks and comments", "Files"];
+    $("#og-prog").innerHTML = names.map((n, i) => `<div class="og-prog-row"><span>${n}</span><div class="og-bar"><i id="pb${i}"></i></div><span class="og-small og-muted" id="pt${i}">Waiting</span></div>`).join("");
+    let i = 0;
+    const tick = () => {
+      if (i >= names.length) {
+        $("#og-run").style.display = "none"; $("#og-run-done").style.display = ""; $("#og-to-invite").disabled = false;
+        const when = stamp();
+        state.ftReads.unshift({ when, by: "Rina Hartono", kind: "Import", rows: "9,868" });
+        state.runs.unshift({ when, kind: "Import", added: (state.lastTotal || 0).toLocaleString("en"), skipped: 22 });
+        state.imported = true; renderFt(); renderRuns(); return;
+      }
+      $("#pb" + i).style.width = "100%"; $("#pt" + i).textContent = "Done"; i++; setTimeout(tick, 350);
+    };
+    setTimeout(tick, 300);
+  });
+  $("#og-report").addEventListener("click", () => alert("Opens the full import report: every skipped row with its reason, every combined value, every KPI imported at workspace level."));
+
+  // invite
+  const people = [
+    ["Rina Hartono", "Management", "Today", true], ["Budi Santoso", "Sales", "2 days ago", true], ["Sari Wulandari", "Finance", "1 week ago", true],
+    ["Dimas Pratama", "Operations", "3 days ago", true], ["Ayu Lestari", "HR", "5 weeks ago", true], ["Hendra Wijaya", "Sales", "8 months ago", false],
+    ["Maya Putri", "Marketing", "Yesterday", true], ["Agus Salim", "Operations", "1 year ago", false],
+  ];
+  function renderPeople() {
+    const all = $("#og-filter").value === "all";
+    const shown = people.filter(p => all || p[3]);
+    $("#og-people").innerHTML = shown.map(([n, t, l]) => `<tr><td><input type="checkbox" class="pp" ${$("#og-all").checked ? "checked" : ""} style="accent-color:#4f46e5"></td><td>${n}</td><td class="og-hide-sm og-muted">${n.split(" ")[0].toLowerCase()}@contohmaju.co.id</td><td>${t}</td><td class="og-hide-sm og-muted">${l}</td></tr>`).join("") + `<tr><td></td><td colspan="4" class="og-muted og-small">${all ? 206 : 162} more…</td></tr>`;
+    count();
+  }
+  function count() {
+    const base = $("#og-filter").value === "all" ? 214 : 168;
+    const shown = $$("#og-people .pp"); const ticked = shown.filter(c => c.checked).length;
+    const n = base - (shown.length - ticked) - ($("#og-all").checked ? 0 : base - shown.length);
+    $("#og-send").textContent = `Send ${n} invitations`; $("#og-send").disabled = n === 0; state.invites = n;
+  }
+  $("#og-filter").addEventListener("change", renderPeople);
+  $("#og-all").addEventListener("change", renderPeople);
+  $("#og-people").addEventListener("change", count);
+  $("#og-to-invite").addEventListener("click", () => { setStep(5); renderPeople(); });
+  $("#og-send").addEventListener("click", () => { $("#og-linked-line").textContent = `Last import ${state.runs[0].when} by Rina Hartono. ${state.invites} invitations sent.`; setStep(6); });
+  $("#og-later").addEventListener("click", () => { $("#og-linked-line").textContent = `Last import ${state.runs[0].when} by Rina Hartono. No invitations sent yet.`; setStep(6); });
+  $("#og-again").addEventListener("click", () => {
+    if (!state.connected) { go("ft-consent"); return; }
+    $("#og-accept").checked = true; preview(true);
+  });
+
+  $("#reset").addEventListener("click", () => location.reload());
+  renderFt(); renderRuns(); setStep(1); go("og");
+})();
+</script>
+</body>
+</html>
