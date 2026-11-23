@@ -8,6 +8,7 @@ import {
 } from "@openokr/adapters";
 import { callAction, openConnection, parseWhatsAppSecret } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { getInstanceName } from "../../../lib/instance-name";
 import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
@@ -97,7 +98,7 @@ export async function connectProvider(
       ok: false,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
@@ -128,7 +129,7 @@ export async function disconnectProvider(
       ok: false,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
@@ -167,7 +168,7 @@ export async function sendTest(
       ok: false,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
@@ -242,7 +243,7 @@ export async function syncTemplates(
       message:
         error instanceof Error
           ? t("admin.channels.actions.metaRefusedTheListBecause", {
-              reason: error.message,
+              reason: translateErrorMessage(error.message, t),
             })
           : t("admin.channels.actions.metaRefusedTheList"),
     };
@@ -320,7 +321,7 @@ export async function saveTemplateMapping(
       ok: false,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("admin.channels.actions.mappingCouldNotBeSaved"),
     };
   }
@@ -349,7 +350,7 @@ export async function removeTemplateMapping(
       ok: false,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("admin.channels.actions.couldNotBeRemoved"),
     };
   }

@@ -30,6 +30,7 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { narrateDiagnosticAction, recordDiagnosticAction } from "./actions";
 
 export interface Diagnostic {
@@ -109,7 +110,7 @@ export function DiagnosticPanel({
       } catch (error) {
         setProblem(
           error instanceof Error
-            ? error.message
+            ? translateErrorMessage(error.message, t)
             : t("session.detail.thatDidNotSave"),
         );
       }

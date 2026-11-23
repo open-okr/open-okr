@@ -2,6 +2,7 @@
 
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { getPool } from "../../../lib/pool";
 import { refusedByField } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
@@ -94,7 +95,7 @@ export async function createToken(
       token: null,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
@@ -114,7 +115,7 @@ export async function revokeToken(
       token: null,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }

@@ -31,6 +31,7 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { rootCause } from "../../../lib/method-texts.ts";
 import { setRootCauseAction } from "./actions";
 
@@ -121,7 +122,7 @@ function MissedRow({
         } catch (error) {
           onProblem(
             error instanceof Error
-              ? error.message
+              ? translateErrorMessage(error.message, t)
               : t("session.detail.thatDidNotSave"),
           );
         }

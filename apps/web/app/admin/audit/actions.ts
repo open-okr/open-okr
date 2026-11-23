@@ -6,6 +6,7 @@ import {
   OperationError,
 } from "@openokr/core";
 import { localDayBounds } from "@openokr/formats";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -53,7 +54,7 @@ export async function verifyChain(): Promise<ChainResult> {
       reason: null,
       error:
         error instanceof OperationError
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("admin.audit.actions.chainCouldNotBeChecked"),
     };
   }
@@ -164,7 +165,7 @@ export async function browseAudit(
     return {
       error:
         error instanceof OperationError
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("admin.audit.actions.trailCouldNotBeRead"),
     };
   }
@@ -199,7 +200,7 @@ export async function exportAudit(
     return {
       error:
         error instanceof OperationError
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("admin.audit.actions.exportCouldNotBeBuilt"),
     };
   }

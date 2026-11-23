@@ -35,6 +35,7 @@ import {
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import {
   reviewStagePurpose,
   reviewStageTitle,
@@ -149,7 +150,7 @@ export function QuarterlyReview({
         } catch (error) {
           setProblem(
             error instanceof Error
-              ? error.message
+              ? translateErrorMessage(error.message, t)
               : t("session.detail.thatDidNotSave"),
           );
         }
