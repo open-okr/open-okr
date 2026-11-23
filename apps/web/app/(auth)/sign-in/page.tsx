@@ -10,7 +10,7 @@ import {
   useTranslations,
 } from "@openokr/ui";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { DemoPill } from "../../../lib/demo-pill";
 import { useInstanceName } from "../../../lib/instance-name-context";
@@ -55,6 +55,7 @@ export default function SignInPage() {
   // The instance this is, not the software it runs (M-33).
   const instanceName = useInstanceName();
 
+  const languageForm = useRef<HTMLFormElement>(null);
   const [error, setError] = useState("");
   // A sign-in hold, in whole minutes, kept apart from `error` because its
   // message carries a link to the reset page (account-lockout.md D12).
@@ -332,21 +333,31 @@ export default function SignInPage() {
       title={t("auth.signIn.heading", { instanceName })}
       badge={demo ? <DemoPill /> : undefined}
       footer={
-        <>
-          <Link
-            href="/forgot-password"
-            className="font-medium text-brand-text hover:underline"
-          >
-            {t("auth.signIn.forgotYourPassword")}
-          </Link>
-          {" · "}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/sign-up"
             className="font-medium text-brand-text hover:underline"
           >
             {t("common.createAnAccount")}
           </Link>
-        </>
+          <form ref={languageForm} action={setVisitorLanguage}>
+            <SelectInput
+              label={t("admin.general.generalSettingsForm.language")}
+              hideLabel
+              name="language"
+              data-testid="visitor-language"
+              defaultValue={locale}
+              className="w-auto"
+              onChange={() => languageForm.current?.requestSubmit()}
+            >
+              {LOCALES.filter((entry) => entry.shipped).map((entry) => (
+                <option key={entry.code} value={entry.code} lang={entry.code}>
+                  {t(entry.endonymKey)}
+                </option>
+              ))}
+            </SelectInput>
+          </form>
+        </div>
       }
     >
       <div role="status" aria-live="polite" className="contents">
@@ -396,6 +407,12 @@ export default function SignInPage() {
           autoComplete="current-password"
           required
         />
+        <Link
+          href="/forgot-password"
+          className="self-end text-sm font-medium text-brand-text hover:underline"
+        >
+          {t("auth.signIn.forgotYourPassword")}
+        </Link>
         <Button
           type="submit"
           variant="primary"
@@ -405,25 +422,6 @@ export default function SignInPage() {
           {pending ? t("auth.signIn.signingIn") : t("setup.account.signIn")}
         </Button>
       </form>
-      <form action={setVisitorLanguage} className="flex items-end gap-2">
-        <SelectInput
-          label={t("admin.general.generalSettingsForm.language")}
-          name="language"
-          data-testid="visitor-language"
-          defaultValue={locale}
-          className="flex-1"
-        >
-          {LOCALES.filter((entry) => entry.shipped).map((entry) => (
-            <option key={entry.code} value={entry.code} lang={entry.code}>
-              {t(entry.endonymKey)}
-            </option>
-          ))}
-        </SelectInput>
-        <Button type="submit" variant="secondary">
-          {t("common.apply")}
-        </Button>
-      </form>
-
       <Button
         type="button"
         variant="default"
