@@ -1,5 +1,28 @@
 # @openokr/ui
 
+## 0.10.0
+
+### Minor Changes
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`6f96b4b`](https://github.com/open-okr/open-okr/commit/6f96b4b815c0cce015e415f6ac7da0018958f325) Thanks [@agungksidik](https://github.com/agungksidik)! - The topbar has a language switcher. It saves the choice on the member, the same setting as the one under Your account, and "Follow workspace" goes back to the workspace language. Choosing Arabic turns the page right to left.
+
+### Patch Changes
+
+- [#224](https://github.com/open-okr/open-okr/pull/224) [`bae909c`](https://github.com/open-okr/open-okr/commit/bae909cf0374d94f2b1ca77724b8e02aff64bc60) Thanks [@agungksidik](https://github.com/agungksidik)! - Screen readers now hear which navigation item is the current page, the primary navigation's name in the reader's language, one heading 1 on Home before the section headings, and the command palette's result count once a search settles. An access refusal reads as a plain sentence in the reader's language instead of naming the internal action.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`6352556`](https://github.com/open-okr/open-okr/commit/63525564572542f699c86b1f3afdcdbf2b3e5a80) Thanks [@agungksidik](https://github.com/agungksidik)! - A guest sees only the KPIs shared with them, on every screen, search, export, copilot and MCP path.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`c9016fd`](https://github.com/open-okr/open-okr/commit/c9016fd3d9aac70a33856ca76967e711f315d769) Thanks [@agungksidik](https://github.com/agungksidik)! - Arrow keys and charts follow the reading direction.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`78084c7`](https://github.com/open-okr/open-okr/commit/78084c792ad6a1b6a8702945cf958a017fd142a2) Thanks [@agungksidik](https://github.com/agungksidik)! - Browsers download only the catalogue of the language they use.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`43e2bfe`](https://github.com/open-okr/open-okr/commit/43e2bfe2d579f4f8ef64983a672cf9ca3d0462e4) Thanks [@agungksidik](https://github.com/agungksidik)! - Count messages pick their plural form with the language's own rules.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`afcc3ac`](https://github.com/open-okr/open-okr/commit/afcc3acf134bbe3a782c9fbd3369c74e41090c02) Thanks [@agungksidik](https://github.com/agungksidik)! - Dates, times and numbers follow the reader's language everywhere.
+- Updated dependencies [[`43e2bfe`](https://github.com/open-okr/open-okr/commit/43e2bfe2d579f4f8ef64983a672cf9ca3d0462e4), [`afcc3ac`](https://github.com/open-okr/open-okr/commit/afcc3acf134bbe3a782c9fbd3369c74e41090c02)]:
+  - @openokr/formats@0.10.0
+  - @openokr/method@0.10.0
+
 ## 0.9.1
 
 ### Patch Changes

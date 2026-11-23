@@ -1,5 +1,34 @@
 # @openokr/core
 
+## 0.10.0
+
+### Minor Changes
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`a9a048e`](https://github.com/open-okr/open-okr/commit/a9a048ea2ab6f7548a44d9376f18baaa4338fba3) Thanks [@agungksidik](https://github.com/agungksidik)! - Every new KPI gets its own access context, and changing a KPI's owner needs manage access on it.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`6352556`](https://github.com/open-okr/open-okr/commit/63525564572542f699c86b1f3afdcdbf2b3e5a80) Thanks [@agungksidik](https://github.com/agungksidik)! - A guest sees only the KPIs shared with them, on every screen, search, export, copilot and MCP path.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`fdf0695`](https://github.com/open-okr/open-okr/commit/fdf069573c55c0f070aa00649125fecc347fe184) Thanks [@agungksidik](https://github.com/agungksidik)! - Recording on a KPI follows access on that KPI; deleting readings and recovery actions still need the workspace role.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`00423dc`](https://github.com/open-okr/open-okr/commit/00423dc550b3c7d033813228d477df5dd929c789) Thanks [@agungksidik](https://github.com/agungksidik)! - KPI owners share a KPI with a person at view or edit, and anyone who can view it sees who it is shared with.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`5557516`](https://github.com/open-okr/open-okr/commit/5557516aee0ac8cb18e96600cdbb80ac8cc359d5) Thanks [@agungksidik](https://github.com/agungksidik)! - The FlowyTeam importer carries per-person KPI shares and refuses to write until broader visibility is accepted.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`e7b8026`](https://github.com/open-okr/open-okr/commit/e7b80262f46e6f5010b2ba53fcd9c6a528ed7a0d) Thanks [@agungksidik](https://github.com/agungksidik)! - The KPI page shows who a KPI is shared with and lets its owner share it.
+
+### Patch Changes
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`bfa0371`](https://github.com/open-okr/open-okr/commit/bfa0371482005c4fc460a044c5c70fb88d531b17) Thanks [@agungksidik](https://github.com/agungksidik)! - Review inbox titles, due labels, weekday names and action buttons now appear in the member's language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`e6b38cb`](https://github.com/open-okr/open-okr/commit/e6b38cbc07f99f238d25c8470180c4b3067af100) Thanks [@agungksidik](https://github.com/agungksidik)! - Mail, notifications and chat render in each recipient's language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`afcc3ac`](https://github.com/open-okr/open-okr/commit/afcc3acf134bbe3a782c9fbd3369c74e41090c02) Thanks [@agungksidik](https://github.com/agungksidik)! - Dates, times and numbers follow the reader's language everywhere.
+- Updated dependencies [[`97a935d`](https://github.com/open-okr/open-okr/commit/97a935dec5b970c66b94afd6804c4d9993b83c17), [`43e2bfe`](https://github.com/open-okr/open-okr/commit/43e2bfe2d579f4f8ef64983a672cf9ca3d0462e4), [`afcc3ac`](https://github.com/open-okr/open-okr/commit/afcc3acf134bbe3a782c9fbd3369c74e41090c02)]:
+  - @openokr/db@0.10.0
+  - @openokr/formats@0.10.0
+  - @openokr/config@0.10.0
+  - @openokr/method@0.10.0
+
 ## 0.9.1
 
 ### Patch Changes
