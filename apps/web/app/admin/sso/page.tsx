@@ -92,7 +92,7 @@ export default async function SSOPage() {
               aria-label={t("admin.sso.connectionsList")}
               // Scrolls inside the card after about five rows, so a long list
               // never pushes the add card out of reach.
-              className="relative flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain"
+              className="relative flex max-h-[296px] flex-col gap-2 overflow-y-auto pe-1.5 overscroll-contain"
             >
               {connections.map((c) => {
                 const urls = samlServiceProviderUrls(baseUrl, c.signInId);

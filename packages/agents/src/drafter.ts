@@ -62,12 +62,14 @@ import type {
   ThreadComment,
   ThreadSummary,
   TrendContext,
+  WritingLocale,
 } from "@openokr/core";
 import {
   COPILOT_MAX_READS_PER_ROUND,
   COPILOT_MAX_ROUNDS,
   costOfUsage,
   DEFAULT_PROMPTS,
+  languageName,
   PROMPT_KEYS,
   type PromptKey,
   TOOL_RESULTS_ARE_DATA,
@@ -360,16 +362,27 @@ const subjectBlock = (subject: ReadingContext["subject"]) =>
         },
       ];
 
+export function withWritingLanguage(
+  prompt: string,
+  locale: WritingLocale["locale"],
+): string {
+  return `${prompt} Write human-readable text in ${languageName(locale)}. Keep schema keys, enum values, and identifiers unchanged.`;
+}
+
+const ENGLISH_REQUEST =
+  /(?:^|[.!?]\s+)(?:please\s+)?(?:reply|answer|respond) in English\b/i;
+
 /** The conversation so far, then the passages, then the question. */
 const copilotMessages = (context: GroundedQuestionContext) => {
   const note = proposalNoteFor(context.proposal);
   const readingNote = readingNoteFor(context.reading);
-  const language =
-    context.locale === "ms" ? "Malay (Bahasa Melayu)" : "English";
+  const language = languageName(
+    ENGLISH_REQUEST.test(context.question.trim()) ? "en" : context.locale,
+  );
   return [
     {
       role: "system" as const,
-      content: `${COPILOT_SYSTEM} Write the answer in ${language}. Use human-readable health names, preserve record names and the SOURCES line.`,
+      content: `${COPILOT_SYSTEM} Write the answer in ${language}. Honour any explicit language request from the member in the conversation. Use human-readable health names, preserve record names and the SOURCES line.`,
     },
     ...askerNote(context.asker),
     ...context.history.map((turn) => ({
@@ -1401,7 +1414,10 @@ export function createProviderDrafter(
           maxTokens: 400,
           onUsage: charge,
           messages: [
-            { role: "system", content: CHECK_IN_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(CHECK_IN_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content:
@@ -1442,7 +1458,10 @@ export function createProviderDrafter(
           maxTokens: 400,
           onUsage: charge,
           messages: [
-            { role: "system", content: TITLE_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(TITLE_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content:
@@ -1793,7 +1812,10 @@ export function createProviderDrafter(
           maxTokens: 900,
           onUsage: charge,
           messages: [
-            { role: "system", content: PROPOSAL_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(PROPOSAL_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content:
@@ -1860,7 +1882,10 @@ export function createProviderDrafter(
           messages: [
             {
               role: "system",
-              content: systemPromptFor(PROMPT_KEYS.draftObjective),
+              content: withWritingLanguage(
+                systemPromptFor(PROMPT_KEYS.draftObjective),
+                context.locale,
+              ),
             },
             {
               role: "user",
@@ -1944,7 +1969,10 @@ export function createProviderDrafter(
           maxTokens: 250,
           onUsage: charge,
           messages: [
-            { role: "system", content: PARENT_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(PARENT_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content:
@@ -1976,9 +2004,11 @@ export function createProviderDrafter(
       }
     },
 
-    async narrateDigest(context: {
-      readonly lines: readonly string[];
-    }): Promise<string | null> {
+    async narrateDigest(
+      context: WritingLocale & {
+        readonly lines: readonly string[];
+      },
+    ): Promise<string | null> {
       if (!affordable() || context.lines.length === 0) {
         return null;
       }
@@ -1992,7 +2022,13 @@ export function createProviderDrafter(
           maxTokens: 400,
           onUsage: charge,
           messages: [
-            { role: "system", content: DIGEST_NARRATION_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(
+                DIGEST_NARRATION_SYSTEM,
+                context.locale,
+              ),
+            },
             {
               role: "user",
               content: `The digest:${NEWLINE}${context.lines.join(NEWLINE)}`,
@@ -2019,7 +2055,10 @@ export function createProviderDrafter(
           maxTokens: 500,
           onUsage: charge,
           messages: [
-            { role: "system", content: TREND_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(TREND_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content:
@@ -2065,7 +2104,10 @@ export function createProviderDrafter(
           maxTokens: 250,
           onUsage: charge,
           messages: [
-            { role: "system", content: FILTER_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(FILTER_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content:
@@ -2117,7 +2159,10 @@ export function createProviderDrafter(
           maxTokens: 60 * context.headers.length + 200,
           onUsage: charge,
           messages: [
-            { role: "system", content: MAPPING_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(MAPPING_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content:
@@ -2154,9 +2199,11 @@ export function createProviderDrafter(
       }
     },
 
-    async summariseBlockers(context: {
-      readonly blockers: readonly SummarisableBlocker[];
-    }): Promise<string | null> {
+    async summariseBlockers(
+      context: WritingLocale & {
+        readonly blockers: readonly SummarisableBlocker[];
+      },
+    ): Promise<string | null> {
       if (!affordable() || context.blockers.length === 0) {
         return null;
       }
@@ -2170,7 +2217,13 @@ export function createProviderDrafter(
           maxTokens: 400,
           onUsage: charge,
           messages: [
-            { role: "system", content: BLOCKER_SUMMARY_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(
+                BLOCKER_SUMMARY_SYSTEM,
+                context.locale,
+              ),
+            },
             {
               role: "user",
               content:
@@ -2208,7 +2261,10 @@ export function createProviderDrafter(
           maxTokens: 1500,
           onUsage: charge,
           messages: [
-            { role: "system", content: PLAN_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(PLAN_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content: [
@@ -2281,7 +2337,10 @@ export function createProviderDrafter(
           maxTokens: 500,
           onUsage: charge,
           messages: [
-            { role: "system", content: KPI_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(KPI_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content:
@@ -2321,9 +2380,11 @@ export function createProviderDrafter(
       }
     },
 
-    async clusterNotes(context: {
-      readonly notes: readonly ClusterableNote[];
-    }): Promise<NoteThemes | null> {
+    async clusterNotes(
+      context: WritingLocale & {
+        readonly notes: readonly ClusterableNote[];
+      },
+    ): Promise<NoteThemes | null> {
       if (!affordable() || context.notes.length < 3) {
         return null;
       }
@@ -2337,7 +2398,10 @@ export function createProviderDrafter(
           maxTokens: 600,
           onUsage: charge,
           messages: [
-            { role: "system", content: CLUSTER_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(CLUSTER_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content:
@@ -2373,7 +2437,10 @@ export function createProviderDrafter(
           maxTokens: 400,
           onUsage: charge,
           messages: [
-            { role: "system", content: DIAGNOSTIC_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(DIAGNOSTIC_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content:
@@ -2395,12 +2462,14 @@ export function createProviderDrafter(
       }
     },
 
-    async draftMinutes(context: {
-      readonly sections: readonly {
-        readonly label: string;
-        readonly body: string;
-      }[];
-    }): Promise<string | null> {
+    async draftMinutes(
+      context: WritingLocale & {
+        readonly sections: readonly {
+          readonly label: string;
+          readonly body: string;
+        }[];
+      },
+    ): Promise<string | null> {
       if (!affordable() || context.sections.length === 0) {
         return null;
       }
@@ -2414,7 +2483,10 @@ export function createProviderDrafter(
           maxTokens: 900,
           onUsage: charge,
           messages: [
-            { role: "system", content: MINUTES_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(MINUTES_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content: context.sections
@@ -2429,10 +2501,12 @@ export function createProviderDrafter(
       }
     },
 
-    async draftRetrospective(context: {
-      readonly goalTitle: string;
-      readonly checkIns: readonly RetrospectiveCheckIn[];
-    }): Promise<string | null> {
+    async draftRetrospective(
+      context: WritingLocale & {
+        readonly goalTitle: string;
+        readonly checkIns: readonly RetrospectiveCheckIn[];
+      },
+    ): Promise<string | null> {
       if (!affordable() || context.checkIns.length === 0) {
         return null;
       }
@@ -2446,7 +2520,13 @@ export function createProviderDrafter(
           maxTokens: 700,
           onUsage: charge,
           messages: [
-            { role: "system", content: RETROSPECTIVE_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(
+                RETROSPECTIVE_SYSTEM,
+                context.locale,
+              ),
+            },
             {
               role: "user",
               content:
@@ -2473,9 +2553,11 @@ export function createProviderDrafter(
       }
     },
 
-    async proposeObjectives(context: {
-      readonly learnings: readonly string[];
-    }): Promise<readonly ProposedObjective[] | null> {
+    async proposeObjectives(
+      context: WritingLocale & {
+        readonly learnings: readonly string[];
+      },
+    ): Promise<readonly ProposedObjective[] | null> {
       if (!affordable() || context.learnings.length === 0) {
         return null;
       }
@@ -2489,7 +2571,10 @@ export function createProviderDrafter(
           maxTokens: 700,
           onUsage: charge,
           messages: [
-            { role: "system", content: OBJECTIVES_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(OBJECTIVES_SYSTEM, context.locale),
+            },
             {
               role: "user",
               content:
@@ -2507,10 +2592,12 @@ export function createProviderDrafter(
       }
     },
 
-    async summariseThread(context: {
-      readonly subject: string;
-      readonly comments: readonly ThreadComment[];
-    }): Promise<ThreadSummary | null> {
+    async summariseThread(
+      context: WritingLocale & {
+        readonly subject: string;
+        readonly comments: readonly ThreadComment[];
+      },
+    ): Promise<ThreadSummary | null> {
       if (!affordable() || context.comments.length === 0) {
         return null;
       }
@@ -2524,7 +2611,13 @@ export function createProviderDrafter(
           maxTokens: 500,
           onUsage: charge,
           messages: [
-            { role: "system", content: THREAD_SUMMARY_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(
+                THREAD_SUMMARY_SYSTEM,
+                context.locale,
+              ),
+            },
             {
               role: "user",
               content:
@@ -2569,7 +2662,13 @@ export function createProviderDrafter(
           maxTokens: 900,
           onUsage: charge,
           messages: [
-            { role: "system", content: DECOMPOSITION_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(
+                DECOMPOSITION_SYSTEM,
+                context.locale,
+              ),
+            },
             {
               role: "user",
               content:
@@ -2617,7 +2716,10 @@ export function createProviderDrafter(
           messages: [
             {
               role: "system",
-              content: systemPromptFor(PROMPT_KEYS.rewriteForRule),
+              content: withWritingLanguage(
+                systemPromptFor(PROMPT_KEYS.rewriteForRule),
+                context.locale,
+              ),
             },
             {
               role: "user",
@@ -2638,6 +2740,7 @@ export function createProviderDrafter(
 
     async reviewAlignment(
       goals: readonly ReviewableGoal[],
+      context?: WritingLocale,
     ): Promise<readonly SemanticFinding[] | null> {
       if (!affordable()) {
         return null;
@@ -2677,7 +2780,10 @@ export function createProviderDrafter(
           maxTokens: 1500,
           onUsage: charge,
           messages: [
-            { role: "system", content: REVIEW_SYSTEM },
+            {
+              role: "system",
+              content: withWritingLanguage(REVIEW_SYSTEM, context?.locale),
+            },
             { role: "user", content: listing },
           ],
         });

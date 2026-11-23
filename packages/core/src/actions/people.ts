@@ -36,7 +36,12 @@ import {
   workspaceMembers,
   workspaceRoles,
 } from "@openokr/db";
-import { EMAIL_PATTERN, isListedTimezone } from "@openokr/formats";
+import {
+  EMAIL_PATTERN,
+  isListedTimezone,
+  LOCALE_CODES,
+  SHIPPED_LOCALES,
+} from "@openokr/formats";
 import {
   and,
   asc,
@@ -198,7 +203,7 @@ export const updateOwnProfile = defineWriteAction({
      * set, because a locale with no catalogue would make `translate()` raise
      * on the first key it met.
      */
-    language: z.enum(["en", "ms"]).nullable().optional(),
+    language: z.enum(SHIPPED_LOCALES).nullable().optional(),
     /**
      * When not to be messaged, in the member's own timezone.
      *
@@ -1094,7 +1099,7 @@ const memberProfile = z.object({
    * the locale on the server, which is the only place it can be decided: the
    * text is rendered there.
    */
-  language: z.enum(["en", "ms"]).nullable(),
+  language: z.enum(LOCALE_CODES).nullable(),
   /**
    * The name of this member's workspace role: Owner, Admin, Member, Viewer or
    * one the workspace made (plan 0.8.0 Y1). Null for a guest, an agent and a

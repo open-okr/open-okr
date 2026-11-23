@@ -75,10 +75,7 @@ export async function savePractice(
   revalidatePath("/admin/practice");
   return {
     error: null,
-    saved:
-      count === 1
-        ? t("admin.practice.actions.savedOne", { count })
-        : t("admin.practice.actions.savedOther", { count }),
+    saved: t("admin.practice.actions.saved", { count }),
   };
 }
 
@@ -114,14 +111,9 @@ export async function applyProfile(
     saved:
       count === 0
         ? t("admin.practice.actions.applied", { profile: chosen.label })
-        : count === 1
-          ? t("admin.practice.actions.appliedThresholdsOne", {
-              profile: chosen.label,
-              count,
-            })
-          : t("admin.practice.actions.appliedThresholdsOther", {
-              profile: chosen.label,
-              count,
-            }),
+        : t("admin.practice.actions.appliedThresholds", {
+            profile: chosen.label,
+            count,
+          }),
   };
 }

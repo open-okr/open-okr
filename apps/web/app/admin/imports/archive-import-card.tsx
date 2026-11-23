@@ -107,14 +107,8 @@ export function ArchiveImportCard() {
     Object.values(diff.created).reduce((sum, n) => sum + n, 0);
   const totalSkipped = (diff: ImportResult["difference"]) =>
     Object.values(diff.skipped).reduce((sum, n) => sum + n, 0);
-  const rowsPhrase = (count: number) =>
-    count === 1
-      ? t("common.count.rowOne", { count })
-      : t("common.count.rowOther", { count });
-  const membersPhrase = (count: number) =>
-    count === 1
-      ? t("common.count.memberOne", { count })
-      : t("common.count.memberOther", { count });
+  const rowsPhrase = (count: number) => t("common.count.row", { count });
+  const membersPhrase = (count: number) => t("common.count.member", { count });
 
   return (
     <Card>
@@ -161,7 +155,7 @@ export function ArchiveImportCard() {
               accept=".okr"
               onChange={handleFileChange}
               disabled={pending}
-              className="text-sm text-ink file:mr-3 file:rounded-md file:border-0 file:bg-brand file:px-2.5 file:py-1.5 file:text-xs file:font-semibold file:text-on-brand"
+              className="text-sm text-ink file:me-3 file:rounded-md file:border-0 file:bg-brand file:px-2.5 file:py-1.5 file:text-xs file:font-semibold file:text-on-brand"
             />
             {stage === "analyzing" && (
               <span className="text-sm text-ink-3">
@@ -212,7 +206,7 @@ export function ArchiveImportCard() {
                     length: Object.keys(preview.difference.created).length,
                   })}
                 </summary>
-                <ul className="mt-1 flex flex-col gap-0.5 pl-3">
+                <ul className="mt-1 flex flex-col gap-0.5 ps-3">
                   {Object.entries(preview.difference.created).map(
                     ([table, count]) => (
                       <li key={table}>

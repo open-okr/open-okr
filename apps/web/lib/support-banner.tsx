@@ -64,9 +64,7 @@ function remaining(
   const minutes = Math.floor(ms / 60000);
   const hours = Math.floor(minutes / 60);
   if (hours === 0) {
-    return minutes === 1
-      ? t("common.count.minuteOne", { count: minutes })
-      : t("common.count.minuteOther", { count: minutes });
+    return t("common.count.minute", { count: minutes });
   }
   return t("lib.supportBanner.hoursAndMinutes", {
     hours,
@@ -87,7 +85,7 @@ export async function SupportBanner({
 
   return (
     <div
-      className="mb-4.5 flex flex-wrap items-start gap-3 rounded-lg border-y border-r border-l-4 border-bad-dot bg-bad-bg px-4 py-3 text-bad"
+      className="mb-4.5 flex flex-wrap items-start gap-3 rounded-lg border-y border-e border-s-4 border-bad-dot bg-bad-bg px-4 py-3 text-bad"
       // `alert` rather than `status`: a screen reader should be told this
       // without waiting for a pause, because it is about who is reading the
       // page they are on.

@@ -34,7 +34,7 @@ export function RestrictedWriting({
       className="flex max-w-xl flex-col gap-1.5 rounded-control border border-warn-dot bg-warn-bg px-3 py-2 text-xs text-ink-2"
     >
       <p className="font-semibold text-ink">{t("okrList.writingHeldBack")}</p>
-      <ul className="flex list-disc flex-col gap-0.5 pl-4">
+      <ul className="flex list-disc flex-col gap-0.5 ps-4">
         {refusal.reasons.map((reason) => (
           <li key={reason}>{reason}</li>
         ))}

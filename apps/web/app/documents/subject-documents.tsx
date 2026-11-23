@@ -89,13 +89,9 @@ export async function SubjectDocuments({
         <span className="text-xs text-ink-3" data-testid="document-count">
           {documents.length === 0
             ? t("board.noneYet")
-            : documents.length === 1
-              ? t("documents.subjectDocuments.documentCountOne", {
-                  count: documents.length,
-                })
-              : t("documents.subjectDocuments.documentCountOther", {
-                  count: documents.length,
-                })}
+            : t("documents.subjectDocuments.documentCount", {
+                count: documents.length,
+              })}
         </span>
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
@@ -124,14 +120,9 @@ export async function SubjectDocuments({
                     {document.versionCount > 0
                       ? t("documents.subjectDocuments.authorAndVersions", {
                           name: document.authorName,
-                          versions:
-                            document.versionCount === 1
-                              ? t("common.count.versionOne", {
-                                  count: document.versionCount,
-                                })
-                              : t("common.count.versionOther", {
-                                  count: document.versionCount,
-                                }),
+                          versions: t("common.count.version", {
+                            count: document.versionCount,
+                          }),
                         })
                       : document.authorName}
                   </span>

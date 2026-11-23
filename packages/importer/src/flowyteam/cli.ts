@@ -31,9 +31,14 @@ export interface FlowyteamArgs {
    * are championed by".
    */
   readonly only: readonly string[] | undefined;
+  /**
+   * Confirms that KPIs with restricted visibility in FlowyTeam may become visible
+   * to all workspace members in OpenOKR.
+   */
+  readonly acceptBroaderVisibility: boolean;
 }
 
-export const FLOWYTEAM_USAGE = `pnpm import:flowyteam --source <mysql://user:password@host:3306/database> --company <id> --workspace <slug> --as <email> [--only <domains>] [--files-root <path>] [--dry-run]
+export const FLOWYTEAM_USAGE = `pnpm import:flowyteam --source <mysql://user:password@host:3306/database> --company <id> --workspace <slug> --as <email> [--only <domains>] [--files-root <path>] [--accept-broader-visibility] [--dry-run]
 
 Reads a FlowyTeam MySQL database and never writes to it. A dry run unless
 --write is given: it reports which FlowyTeam the source is, which company was
@@ -67,6 +72,7 @@ Run without --company to see the companies the source holds.`;
 export function parseFlowyteamArgs(argv: readonly string[]): FlowyteamArgs {
   const values: Record<string, string> = {};
   let write = false;
+  let acceptBroaderVisibility = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index] as string;
@@ -77,6 +83,10 @@ export function parseFlowyteamArgs(argv: readonly string[]): FlowyteamArgs {
     }
     if (arg === "--write") {
       write = true;
+      continue;
+    }
+    if (arg === "--accept-broader-visibility") {
+      acceptBroaderVisibility = true;
       continue;
     }
     if (!arg.startsWith("--")) {
@@ -106,15 +116,29 @@ export function parseFlowyteamArgs(argv: readonly string[]): FlowyteamArgs {
     );
   }
 
-  return {
+  const result: FlowyteamArgs = {
     source: values.source as string,
     company: company === undefined ? undefined : Number(company),
     workspace: values.workspace as string,
     as: values.as as string,
     write,
+    acceptBroaderVisibility,
     filesRoot: values["files-root"],
     only: onlyFrom(values.only),
   };
+
+  if (result.filesRoot === undefined) {
+    delete (result as unknown as Record<string, unknown>).filesRoot;
+  }
+  if (result.only === undefined) {
+    delete (result as unknown as Record<string, unknown>).only;
+  }
+  if (!result.acceptBroaderVisibility) {
+    delete (result as unknown as Record<string, unknown>)
+      .acceptBroaderVisibility;
+  }
+
+  return result;
 }
 
 /**

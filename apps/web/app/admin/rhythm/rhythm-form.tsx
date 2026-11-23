@@ -32,6 +32,10 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  nameOf,
+  THRESHOLD_PART_NAME_KEYS,
+} from "../../../lib/identifier-names.ts";
 import { checkInFrequencyOptions } from "./check-in-options.ts";
 import { saveRhythm } from "./rhythm-actions.ts";
 import {
@@ -383,7 +387,7 @@ function WordLists({
                   would mean renaming them in `packages/method`, and they are
                   the method's names rather than this screen's. */}
               {spaced}
-              <span className="ml-1.5 font-normal text-ink-4">
+              <span className="ms-1.5 font-normal text-ink-4">
                 {theirs.length}
                 {stored.length > 0 ? ` + ${stored.length}` : ""}
               </span>
@@ -520,7 +524,7 @@ function Parameter({
                 className={`col-span-12 min-w-0 ${partSpans(parts.length)[index]}`}
               >
                 <NumberInput
-                  label={part}
+                  label={nameOf(THRESHOLD_PART_NAME_KEYS, part, t)}
                   name={field}
                   step={Number.isInteger(inForce) ? 1 : 0.01}
                   disabled={!canManage}
@@ -556,7 +560,7 @@ function Parameter({
             {t("admin.rhythm.rhythmForm.inForce", {
               resolved: JSON.stringify(resolved),
             })}
-            <span className="ml-1.5 text-ink-4">
+            <span className="ms-1.5 text-ink-4">
               {t("admin.rhythm.rhythmForm.shownAsItStands")}
             </span>
           </p>

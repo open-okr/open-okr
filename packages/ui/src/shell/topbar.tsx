@@ -29,6 +29,8 @@ export interface TopbarProps {
   readonly newAction?: ReactNode;
   readonly askAi?: ReactNode;
   readonly notifications?: ReactNode;
+  /** The language switcher, drawn just before the avatar menu. */
+  readonly language?: ReactNode;
   readonly avatarMenu?: ReactNode;
   readonly className?: string;
 }
@@ -40,6 +42,7 @@ export function Topbar({
   newAction,
   askAi,
   notifications,
+  language,
   avatarMenu,
   className,
 }: TopbarProps) {
@@ -53,10 +56,11 @@ export function Topbar({
       <div className="min-w-0 truncate text-sm text-ink-3">{breadcrumb}</div>
       {badge ? <div className="flex-none">{badge}</div> : null}
       {search}
-      <div className="ml-auto flex items-center gap-2.5">
+      <div className="ms-auto flex items-center gap-2.5">
         {newAction}
         {askAi}
         {notifications}
+        {language}
         {avatarMenu}
       </div>
     </header>
@@ -83,7 +87,7 @@ export function TopbarSearch({
 }: TopbarSearchProps) {
   const { t } = useTranslations();
   const box = (
-    <label className="ml-3.5 hidden h-7.75 w-75 items-center gap-1.5 rounded-[9px] border border-line bg-bg px-2.5 text-sm text-ink-4 transition-colors duration-fast ease-out hover:border-line-2 sm:flex">
+    <label className="ms-3.5 hidden h-7.75 w-75 items-center gap-1.5 rounded-[9px] border border-line bg-bg px-2.5 text-sm text-ink-4 transition-colors duration-fast ease-out hover:border-line-2 sm:flex">
       <span className="sr-only">{t("shell.search.label")}</span>
       <input
         ref={inputRef}
@@ -92,7 +96,7 @@ export function TopbarSearch({
         placeholder={placeholder ?? t("shell.search.placeholder")}
         className="w-full bg-transparent text-ink outline-none placeholder:text-ink-4"
       />
-      <Kbd className="ml-auto">⌘K</Kbd>
+      <Kbd className="ms-auto">⌘K</Kbd>
     </label>
   );
   // `contents`, so the form adds no box to the topbar's row.

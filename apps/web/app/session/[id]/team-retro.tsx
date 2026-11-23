@@ -117,9 +117,7 @@ function NoteRow({
           {note.authorName ?? t("session.detail.teamRetro.anonymous")}
         </span>
         <Chip tone={note.votes === 0 ? "neutral" : "ok"}>
-          {note.votes === 1
-            ? t("session.detail.dotCountOne", { count: note.votes })
-            : t("session.detail.dotCountOther", { count: note.votes })}
+          {t("session.detail.dotCount", { count: note.votes })}
         </Chip>
         {canVote ? (
           <Button

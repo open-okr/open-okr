@@ -126,7 +126,12 @@ export async function runExportJob(
       {
         pool: deps.pool,
         workspaceId: job.workspaceId,
-        actor: { kind: "human", userId: run.userId },
+        actor: {
+          kind: "human",
+          userId: run.userId,
+          // The requester's profile stays live until the relay builds the file.
+          memberId: run.requestedById,
+        },
       },
       {
         list: run.list,

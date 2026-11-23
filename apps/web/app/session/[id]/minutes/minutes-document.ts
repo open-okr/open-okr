@@ -1,3 +1,7 @@
+import { serverTranslate } from "@openokr/core";
+import { intlTagFor, type MessageValues } from "@openokr/formats";
+import { dayLabel } from "../../../../lib/day-label";
+
 /**
  * The minutes as one plain-text document (METHOD.md §8.10, P4-T12-a).
  *
@@ -81,14 +85,14 @@ export interface Minutes {
 }
 
 const VERDICTS: Record<string, string> = {
-  results_delivered: "Results delivered",
-  strategy_or_quality: "Strategy or OKR-quality problem",
-  rhythm: "Rhythm problem",
+  results_delivered: "verdictDelivered",
+  strategy_or_quality: "verdictStrategy",
+  rhythm: "verdictRhythm",
 };
 
 const COLUMNS: Record<string, string> = {
-  worked: "What worked",
-  didnt: "What did not",
+  worked: "retroWorked",
+  didnt: "retroDidnt",
 };
 
 /** One section, or nothing at all when the stage produced nothing. */
@@ -99,66 +103,103 @@ function section(heading: string, lines: readonly string[]): string[] {
   return ["", `## ${heading}`, "", ...lines];
 }
 
-export function minutesToMarkdown(minutes: Minutes): string {
+/** Pass a locale for the human-facing PDF and print view. */
+export function minutesToMarkdown(minutes: Minutes, locale?: string): string {
+  const t = (key: string, values?: MessageValues) =>
+    serverTranslate(locale ?? "en", `minutes.${key}`, values);
+  const numberFormat = (digits: number) =>
+    new Intl.NumberFormat(intlTagFor(locale), {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+  const formats = locale
+    ? ([numberFormat(0), numberFormat(1), numberFormat(2)] as const)
+    : undefined;
+  const number = (value: number, digits: 0 | 1 | 2 = 0) =>
+    formats?.[digits].format(value) ?? value.toFixed(digits);
+  const date = (value: string) => (locale ? dayLabel(value, locale) : value);
+
   const lines: string[] = [`# ${minutes.title}`];
   if (minutes.heldOn) {
-    lines.push("", `Held ${minutes.heldOn.slice(0, 10)}.`);
+    lines.push("", t("held", { date: date(minutes.heldOn.slice(0, 10)) }));
   }
   if (minutes.state !== "closed") {
     // Said plainly rather than left for the reader to work out. A document
     // exported mid-review is a draft, and a draft that does not say so gets
     // quoted as a record.
-    lines.push(
-      "",
-      "**This review is still running. These minutes are a draft.**",
-    );
+    lines.push("", `**${t("draft")}**`);
   }
 
   const summary = minutes.summary;
+  const verdict =
+    summary.verdict === null ? undefined : VERDICTS[summary.verdict];
+  const score =
+    summary.cycleScore === null
+      ? t("notReadYet")
+      : number(summary.cycleScore, 2);
+  const committed =
+    summary.committed.reviewed === 0
+      ? t("noneCommitted")
+      : t("metOf", {
+          met: number(summary.committed.met),
+          reviewed: number(summary.committed.reviewed),
+        });
+  const pulse =
+    summary.teamPulse === null
+      ? t("noneGiven")
+      : t("pulseOf", {
+          value: number(summary.teamPulse, 1),
+          maximum: number(5),
+        });
   lines.push(
     "",
-    "## Executive summary",
+    `## ${t("executiveSummary")}`,
     "",
-    `- Cycle score: ${summary.cycleScore === null ? "not read yet" : summary.cycleScore.toFixed(2)}`,
-    `- Committed key results met: ${summary.committed.reviewed === 0 ? "none committed" : `${summary.committed.met} of ${summary.committed.reviewed}`}`,
-    `- Diagnostic: ${summary.verdict === null ? "not read yet" : (VERDICTS[summary.verdict] ?? summary.verdict)}`,
-    `- Objectives reviewed: ${summary.objectivesReviewed}`,
-    `- Key results reviewed: ${summary.keyResultsReviewed}`,
-    `- Key results below their root-cause threshold: ${summary.belowThreshold}`,
-    `- Team pulse: ${summary.teamPulse === null ? "none given" : `${summary.teamPulse.toFixed(1)} of 5`}`,
-    `- Learnings carried: ${summary.learningsCarried}`,
-    `- Actions agreed: ${summary.actionsAgreed}`,
+    `- ${t("cycleScore", { value: score })}`,
+    `- ${t("committedMet", { value: committed })}`,
+    `- ${t("diagnostic", { value: verdict ? t(verdict) : (summary.verdict ?? t("notReadYet")) })}`,
+    `- ${t("objectivesReviewed", { total: number(summary.objectivesReviewed) })}`,
+    `- ${t("keyResultsReviewed", { total: number(summary.keyResultsReviewed) })}`,
+    `- ${t("belowThreshold", { total: number(summary.belowThreshold) })}`,
+    `- ${t("teamPulse", { value: pulse })}`,
+    `- ${t("learningsCarried", { total: number(summary.learningsCarried) })}`,
+    `- ${t("actionsAgreed", { total: number(summary.actionsAgreed) })}`,
   );
 
   lines.push(
     ...section(
-      "Scores",
+      t("scores"),
       minutes.scores.map(
         (row) =>
-          `- ${row.score.toFixed(1)} · ${row.keyResultTitle} (${row.goalTitle}) — ${row.reason}`,
+          `- ${number(row.score, 1)} · ${row.keyResultTitle} (${row.goalTitle}) — ${row.reason}`,
       ),
     ),
     ...section(
-      "Objective narratives",
+      t("narratives"),
       minutes.narratives
         .filter((row) => row.excerpt !== null)
         .map((row) => `- **${row.goalTitle}** — ${row.excerpt}`),
     ),
     ...section(
-      "Recognition",
+      t("recognition"),
       minutes.recognition.map(
-        (row) => `- ${row.toName}, named by ${row.fromName} — ${row.text}`,
-      ),
-    ),
-    ...section(
-      "Team retro",
-      minutes.retro.map(
         (row) =>
-          `- ${COLUMNS[row.columnKey] ?? row.columnKey}: ${row.text} (${row.votes} ${row.votes === 1 ? "dot" : "dots"})`,
+          `- ${t("recognitionLine", { to: row.toName, from: row.fromName, text: row.text })}`,
       ),
     ),
     ...section(
-      "Management retro",
+      t("teamRetro"),
+      minutes.retro.map((row) => {
+        const key = COLUMNS[row.columnKey];
+        const votes = t("votes", {
+          count: row.votes,
+          votes: number(row.votes),
+        });
+        return `- ${key ? t(key) : row.columnKey}: ${row.text} (${votes})`;
+      }),
+    ),
+    ...section(
+      t("managementRetro"),
       // Absent entirely for a reader who may not see it: the read hands back
       // null rather than an empty list, so this cannot render a heading over
       // nothing and imply the stage was skipped.
@@ -167,39 +208,40 @@ export function minutesToMarkdown(minutes: Minutes): string {
       ),
     ),
     ...section(
-      "Root causes",
+      t("rootCauses"),
       minutes.rootCauses.map(
         (row) =>
           `- ${row.keyResultTitle}: ${row.cause}${row.detail ? ` — ${row.detail}` : ""}`,
       ),
     ),
     ...section(
-      "Process health",
+      t("processHealth"),
       minutes.processHealth.map(
-        (row) => `- ${row.average.toFixed(1)} · ${row.statement}`,
+        (row) => `- ${number(row.average, 1)} · ${row.statement}`,
       ),
     ),
     ...section(
-      "Keep, modify or abandon",
+      t("decisions"),
       minutes.decisions.map(
         (row) => `- ${row.decision}: ${row.goalTitle} — ${row.why}`,
       ),
     ),
     ...section(
-      "Learnings",
+      t("learnings"),
       minutes.learnings.map(
-        (row) => `- ${row.text}${row.carryForward ? " (carried)" : ""}`,
+        (row) =>
+          `- ${row.carryForward ? t("carriedLearning", { text: row.text }) : row.text}`,
       ),
     ),
     ...section(
-      "Next-cycle drafts",
+      t("drafts"),
       minutes.drafts.map((row) => `- ${row.title} — ${row.why}`),
     ),
     ...section(
-      "Actions",
+      t("actions"),
       minutes.actions.map(
         (row) =>
-          `- ${row.done ? "[x]" : "[ ]"} ${row.what} — ${row.ownerName}, by ${row.dueOn}`,
+          `- ${row.done ? "[x]" : "[ ]"} ${t("actionLine", { what: row.what, owner: row.ownerName, dueOn: date(row.dueOn) })}`,
       ),
     ),
   );

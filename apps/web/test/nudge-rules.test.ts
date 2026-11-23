@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { TRIGGER_CATALOGUE } from "@openokr/method";
 import { describe, expect, test } from "vitest";
@@ -25,6 +26,12 @@ const at = (path: string) =>
 const cards = at("../app/admin/nudges/rule-cards.tsx");
 const actions = at("../app/admin/nudges/rule-actions.ts");
 const page = at("../app/admin/nudges/page.tsx");
+// Raw source: `readScreen` resolves `t("key")` to its English words, which is
+// the opposite of what the catalogue check below needs to see.
+const pageRaw = readFileSync(
+  fileURLToPath(new URL("../app/admin/nudges/page.tsx", import.meta.url)),
+  "utf8",
+);
 
 describe("the nudge rule cards", () => {
   test("enumerate the catalogue rather than a list of their own", () => {
@@ -38,6 +45,26 @@ describe("the nudge rule cards", () => {
         trigger.key,
       );
     }
+  });
+
+  test("the page's own labels come from the catalogue, not literals", () => {
+    // Suppression reasons and the channel list were English strings in the
+    // page, shown unchanged in every locale (R1 D2).
+    for (const english of [
+      "Already said today",
+      "Quiet hours",
+      "Snoozed by the member",
+      "Rule switched off",
+      "Weekly ceiling reached",
+      "Space on holiday",
+      "Member on leave",
+      "in-app only",
+    ]) {
+      expect(pageRaw, english).not.toContain(`"${english}"`);
+    }
+    expect(pageRaw).toContain('"admin.nudges.reason.ceiling"');
+    expect(pageRaw).toContain('"admin.nudges.inAppOnly"');
+    expect(pageRaw).toContain('"channels.slack"');
   });
 
   test("call the two writes that had no caller", () => {
@@ -56,7 +83,7 @@ describe("the nudge rule cards", () => {
     expect(cards).not.toContain('from "@openokr/core"');
     expect(cards).not.toContain('from "@openokr/db"');
     expect(cards).not.toContain('from "@openokr/method"');
-    expect(page).toContain("const NUDGE_CHANNELS");
+    expect(page).toContain("function nudgeChannels");
   });
 
   test("show the volume beside the switch, because that is the argument", () => {

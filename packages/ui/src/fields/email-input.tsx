@@ -24,6 +24,7 @@ export function EmailInput({
   return (
     <TextInput
       {...props}
+      dir="ltr"
       onBlur={(event) => {
         const control = event.currentTarget;
         const trimmed = control.value.trim();

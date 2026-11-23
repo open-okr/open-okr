@@ -55,7 +55,7 @@ export function CycleStrip({
           <span className="font-semibold text-warn">{blocking}</span>
         </>
       ) : null}
-      <span className="ml-auto font-bold">{due}</span>
+      <span className="ms-auto font-bold">{due}</span>
     </div>
   );
 }

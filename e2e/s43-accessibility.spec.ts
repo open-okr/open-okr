@@ -11,6 +11,7 @@ import type {
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { readArabicLabels, selectMemberArabic } from "./s19e-arabic.ts";
 
 /**
  * Every screen a signed-in member can open, checked against WCAG (P7-T05).
@@ -420,7 +421,11 @@ test("the screen list is derived from the route tree and is not empty", () => {
  * The words no screen may show, and axe's serious findings against the
  * baseline, for whatever is on the page now.
  */
-async function assertAccessible(route: string, on: Page): Promise<void> {
+async function assertAccessible(
+  route: string,
+  on: Page,
+  arabic = false,
+): Promise<void> {
   // **No screen tells a user that part of it arrives at a task**
   // (completeness review H-24). The first-run wizard said channels and AI
   // were "not in this build" long after both shipped, and the cycle phases
@@ -446,14 +451,14 @@ async function assertAccessible(route: string, on: Page): Promise<void> {
   // The message names the rule and the first element, because "3 violations"
   // sends the next person back to the browser to find out what.
   const ruleIds = [...new Set(fatal.map((violation) => violation.id))].sort();
-  if (ruleIds.length > 0) {
+  if (!arabic && ruleIds.length > 0) {
     OBSERVED[route] = ruleIds;
   }
-  if (WRITING_BASELINE) {
+  if (!arabic && WRITING_BASELINE) {
     return;
   }
 
-  const allowed = new Set(BASELINE[route] ?? []);
+  const allowed = new Set(arabic ? [] : (BASELINE[route] ?? []));
   const introduced = fatal.filter((violation) => !allowed.has(violation.id));
   const described = introduced.map((violation) => {
     const node = violation.nodes[0];
@@ -479,83 +484,144 @@ async function assertAccessible(route: string, on: Page): Promise<void> {
   ).toEqual([]);
 }
 
-for (const route of CHECKED) {
-  test(`${route} has no serious accessibility findings`, async () => {
-    await goTo(page, await urlFor(route));
-    // The shell, so a screen that threw and rendered its error boundary is a
-    // failure here rather than a clean scan of an error page. A session is
-    // the one screen drawn without it, full width for the room, so there the
-    // page's own heading is the sign, and it must not be the not-found one.
-    if (FOCUS_SCREENS.some((prefix) => route.startsWith(prefix))) {
-      await expect(page.locator("h1").first()).toBeVisible({ timeout: 15_000 });
-      await expect(page.locator("h1").first()).not.toHaveText("Not found");
-    } else {
-      await expect(
-        page.getByRole("navigation", { name: "Primary" }).first(),
-      ).toBeVisible({ timeout: 15_000 });
-    }
+function registerSignedInScans(arabic: boolean) {
+  let labels: Readonly<Record<string, string>> = {};
+  if (arabic) {
+    test.beforeAll(async () => {
+      await selectMemberArabic(page, true);
+      labels = readArabicLabels();
+    });
+    test.afterAll(async () => {
+      if (page && (await page.locator("html").getAttribute("lang")) === "ar") {
+        await selectMemberArabic(page, false);
+      }
+    });
+  }
 
-    // **Wait for the content, or the gate is a coin toss** (found while
-    // writing it). Two runs of identical code produced baselines of two
-    // routes and of twenty-three, because most of these screens are
-    // client-owned (TECHNICAL-PLAN §13.3) and the shell paints long before
-    // the table under it does. axe scanning a skeleton finds nothing and
-    // reports a clean screen, which is worse than reporting a finding: it
-    // makes the gate flaky in the direction of passing.
+  function label(key: string, english: string): string {
+    if (!arabic) return english;
+    const translated = labels[key];
+    if (!translated)
+      throw new Error(`Missing Arabic accessibility label: ${key}`);
+    return translated;
+  }
+
+  for (const route of CHECKED) {
+    test(`${route} has no serious accessibility findings`, async () => {
+      await goTo(page, await urlFor(route));
+      if (arabic)
+        await expect(page.locator("html")).toHaveAttribute("lang", "ar");
+      // The shell, so a screen that threw and rendered its error boundary is a
+      // failure here rather than a clean scan of an error page. A session is
+      // the one screen drawn without it, full width for the room, so there the
+      // page's own heading is the sign, and it must not be the not-found one.
+      if (FOCUS_SCREENS.some((prefix) => route.startsWith(prefix))) {
+        await expect(page.locator("h1").first()).toBeVisible({
+          timeout: 15_000,
+        });
+        await expect(page.locator("h1").first()).not.toHaveText(
+          label("notFound.notFound", "Not found"),
+        );
+      } else {
+        await expect(
+          page.getByRole("navigation", { name: "Primary" }).first(),
+        ).toBeVisible({ timeout: 15_000 });
+      }
+
+      // **Wait for the content, or the gate is a coin toss** (found while
+      // writing it). Two runs of identical code produced baselines of two
+      // routes and of twenty-three, because most of these screens are
+      // client-owned (TECHNICAL-PLAN §13.3) and the shell paints long before
+      // the table under it does. axe scanning a skeleton finds nothing and
+      // reports a clean screen, which is worse than reporting a finding: it
+      // makes the gate flaky in the direction of passing.
+      await page
+        .waitForLoadState("networkidle", { timeout: 15_000 })
+        .catch(() => {
+          // A screen holding a subscription open never goes idle. The main
+          // region check below is the real signal; this is the cheap one.
+        });
+      // A focus screen has no `main` of its own; its heading was waited for
+      // above, and its content streams inside the same response.
+      if (!FOCUS_SCREENS.some((prefix) => route.startsWith(prefix))) {
+        await expect(page.locator("main").first()).not.toBeEmpty({
+          timeout: 15_000,
+        });
+      }
+
+      await assertAccessible(route, page, arabic);
+    });
+  }
+
+  /**
+   * **The copilot panel, in the states a person meets** (plan 0.8.1 W3).
+   *
+   * The panel is not a route, so the walk above never opens it. Scanned here
+   * empty with AI off, in History, and holding a conversation, which is every
+   * state this instance can reach without an AI provider.
+   */
+  test("the copilot panel has no serious accessibility findings", async () => {
+    await goTo(page, "/");
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).first(),
+    ).toBeVisible({ timeout: 15_000 });
     await page
-      .waitForLoadState("networkidle", { timeout: 15_000 })
-      .catch(() => {
-        // A screen holding a subscription open never goes idle. The main
-        // region check below is the real signal; this is the cheap one.
-      });
-    // A focus screen has no `main` of its own; its heading was waited for
-    // above, and its content streams inside the same response.
-    if (!FOCUS_SCREENS.some((prefix) => route.startsWith(prefix))) {
-      await expect(page.locator("main").first()).not.toBeEmpty({
-        timeout: 15_000,
-      });
-    }
+      .getByRole("button", {
+        name: label("copilot.copilotPanel.askTheCopilot", "Ask the copilot"),
+      })
+      .click();
+    const panel = page.getByRole("dialog", {
+      name: label("copilot.copilotPanel.copilot", "Copilot"),
+    });
+    await expect(panel).toBeVisible({ timeout: 15_000 });
+    await assertAccessible("copilot panel, empty", page, arabic);
 
-    await assertAccessible(route, page);
+    await panel
+      .getByRole("textbox")
+      .fill("What have people said about onboarding?");
+    await panel
+      .getByRole("button", {
+        name: label(
+          "copilot.copilotPanel.sendTheQuestion",
+          "Send the question",
+        ),
+      })
+      .click();
+    await expect(
+      panel.getByRole("log", {
+        name: label("copilot.copilotPanel.conversation", "Conversation"),
+      }),
+    ).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(panel.locator("article[aria-busy]")).toHaveCount(0, {
+      timeout: 30_000,
+    });
+    await assertAccessible("copilot panel, a conversation", page, arabic);
+
+    await panel
+      .getByRole("button", {
+        name: label("copilot.copilotPanel.history.title", "History"),
+      })
+      .click();
+    await expect(
+      panel.getByRole("navigation", {
+        name: label("copilot.copilotPanel.history.title", "History"),
+      }),
+    ).toBeVisible({ timeout: 15_000 });
+    await assertAccessible("copilot panel, History", page, arabic);
+    await panel
+      .getByRole("button", {
+        name: label(
+          "copilot.copilotPanel.closeTheCopilot",
+          "Close the copilot",
+        ),
+      })
+      .click();
   });
 }
 
-/**
- * **The copilot panel, in the states a person meets** (plan 0.8.1 W3).
- *
- * The panel is not a route, so the walk above never opens it. Scanned here
- * empty with AI off, in History, and holding a conversation, which is every
- * state this instance can reach without an AI provider.
- */
-test("the copilot panel has no serious accessibility findings", async () => {
-  await goTo(page, "/");
-  await expect(
-    page.getByRole("navigation", { name: "Primary" }).first(),
-  ).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("button", { name: "Ask the copilot" }).click();
-  const panel = page.getByRole("dialog", { name: "Copilot" });
-  await expect(panel).toBeVisible({ timeout: 15_000 });
-  await assertAccessible("copilot panel, empty", page);
-
-  await panel
-    .getByRole("textbox")
-    .fill("What have people said about onboarding?");
-  await panel.getByRole("button", { name: "Send the question" }).click();
-  await expect(panel.getByRole("log", { name: "Conversation" })).toBeVisible({
-    timeout: 15_000,
-  });
-  await expect(panel.locator("article[aria-busy]")).toHaveCount(0, {
-    timeout: 30_000,
-  });
-  await assertAccessible("copilot panel, a conversation", page);
-
-  await panel.getByRole("button", { name: "History" }).click();
-  await expect(panel.getByRole("navigation", { name: "History" })).toBeVisible(
-    { timeout: 15_000 },
-  );
-  await assertAccessible("copilot panel, History", page);
-  await panel.getByRole("button", { name: "Close the copilot" }).click();
-});
+registerSignedInScans(false);
 
 for (const route of SIGNED_OUT) {
   test(`${route}, signed out, has no serious accessibility findings`, async ({
@@ -572,6 +638,8 @@ for (const route of SIGNED_OUT) {
     await visitorContext.close();
   });
 }
+
+test.describe("Arabic member", () => registerSignedInScans(true));
 
 test.afterAll(() => {
   if (!WRITING_BASELINE) {

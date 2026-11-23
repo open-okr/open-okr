@@ -1,0 +1,18 @@
+{
+  "objective": "هدف",
+  "keyResult": "نتيجة رئيسية",
+  "checkIn": "تحديث",
+  "confidence": "الثقة",
+  "champion": "مناصر",
+  "reviewer": "مراجع",
+  "space": "مساحة",
+  "cycle": "دورة",
+  "initiative": "مبادرة",
+  "kpi": "مؤشر",
+  "health.onTrack": "على المسار",
+  "health.caution": "تنبيه",
+  "health.offTrack": "خارج المسار",
+  "health.healthy": "سليم",
+  "health.watch": "قيد المراقبة",
+  "health.unhealthy": "غير سليم"
+}

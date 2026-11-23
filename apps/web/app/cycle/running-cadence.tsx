@@ -314,19 +314,14 @@ export async function RunningCadence({
               >
                 <span className="min-w-0 text-ink">
                   {blocker.title}
-                  <span className="ml-1.5 text-xs text-ink-3">
+                  <span className="ms-1.5 text-xs text-ink-3">
                     {blocker.spaceName}
                     {blocker.ownerName ? ` · ${blocker.ownerName}` : ""}
                   </span>
                 </span>
                 <Chip tone={blocker.ageDays >= 14 ? "bad" : "warn"}>
                   {t("cycle.runningCadence.ageOld", {
-                    days:
-                      blocker.ageDays === 1
-                        ? t("common.count.dayOne", { count: blocker.ageDays })
-                        : t("common.count.dayOther", {
-                            count: blocker.ageDays,
-                          }),
+                    days: t("common.count.day", { count: blocker.ageDays }),
                   })}
                 </Chip>
               </div>

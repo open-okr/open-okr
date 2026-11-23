@@ -16,16 +16,17 @@
 import { callAction } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getPool } from "../../../../../lib/auth";
+import { resolveLocale } from "../../../../../lib/locale";
 import { requireWorkspace } from "../../../../../lib/workspace";
 import {
   type Minutes,
   minutesFilename,
   minutesToMarkdown,
 } from "../minutes-document";
-import { renderMinutesPdf } from "./render";
+import { renderMinutesPdf, renderMinutesPrintView } from "./render";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -51,7 +52,25 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  const body = await renderMinutesPdf(minutesToMarkdown(minutes));
+  const locale = await resolveLocale();
+  const markdown = minutesToMarkdown(minutes, locale);
+  if (locale === "ar") {
+    return new Response(
+      renderMinutesPrintView({
+        markdown,
+        title: minutes.title,
+        locale,
+        nonce: request.headers.get("x-nonce"),
+      }),
+      {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  }
+  const body = await renderMinutesPdf(markdown, locale);
 
   return new Response(body as unknown as BodyInit, {
     headers: {

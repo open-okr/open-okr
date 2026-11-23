@@ -10,6 +10,7 @@ import {
   OperationError,
   resolveSourceUrl,
 } from "@openokr/core";
+import { isShippedLocale } from "@openokr/formats";
 import {
   AppShell,
   Button,
@@ -52,6 +53,7 @@ import { embedFor } from "./embedder";
 import { readHold } from "./held-by.ts";
 import { loadInboxBadge } from "./inbox-badge.ts";
 import { getInstanceName } from "./instance-name";
+import { LanguageSwitcher } from "./language-switcher.tsx";
 import {
   builtinRoleLabel,
   navBlocks,
@@ -586,6 +588,11 @@ export async function AppShellLayout({
                 ) : undefined
               }
               askAi={<CopilotPanel initialAvailability={copilot} />}
+              language={
+                <LanguageSwitcher
+                  language={isShippedLocale(me.language) ? me.language : null}
+                />
+              }
               avatarMenu={
                 <AvatarMenu
                   // The person, not the workspace (plan 0.8.0 Y1): the circle

@@ -31,6 +31,7 @@ import { dayLabel } from "../../lib/day-label.ts";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { focusOnMount } from "../../lib/focus-on-mount.ts";
 import { searchMembers } from "../../lib/member-search.ts";
+import { methodPromptText, methodTitle } from "../../lib/method-words.ts";
 import { RulePreview } from "../../lib/rule-preview";
 
 /**
@@ -280,7 +281,7 @@ export function InlineNumber({
       onKeyDown={keys(() => setDraft(value))}
       inputClassName={cn(
         FIELD,
-        "h-auto text-right text-xs font-semibold",
+        "h-auto text-end text-xs font-semibold",
         wide ? "w-20" : "w-14",
       )}
     />
@@ -455,7 +456,7 @@ export function InlineDate({
       <span className="px-1 text-xs tabular-nums text-ink-3">
         {asText ? shown : (value ?? t("okrList.noDueDate"))}
         {asText && relative ? (
-          <span className="ml-1 text-ink-4">{relative}</span>
+          <span className="ms-1 text-ink-4">{relative}</span>
         ) : null}
       </span>
     );
@@ -733,7 +734,7 @@ export function KindControl({
           data-testid="kind-reason"
           className={cn(
             "inline-flex flex-wrap items-center gap-1.5 rounded-control bg-warn-bg px-2 py-1 text-xs",
-            floating && "absolute top-full left-0 z-10 mt-1 w-64 shadow-md",
+            floating && "absolute top-full start-0 z-10 mt-1 w-64 shadow-md",
           )}
         >
           <TextInput
@@ -890,7 +891,9 @@ export function AdditionDraftMark({
   const needs = [
     ...draft.missing.map((field) => t(ADDITION_FIELD_KEYS[field])),
     ...draft.failing.map((id) =>
-      t("additionDraft.check", { title: CHECK_TITLES.get(id) ?? id }),
+      t("additionDraft.check", {
+        title: methodTitle(t, id, CHECK_TITLES.get(id) ?? id),
+      }),
     ),
   ];
   return (
@@ -1033,7 +1036,7 @@ export function ReasonField({
       data-testid="target-reason"
       className={cn(
         "flex flex-wrap items-center gap-2 bg-warn-bg py-1.5 text-xs",
-        inset ? "border-b border-line px-3.5 pl-14" : "rounded-control px-2",
+        inset ? "border-b border-line px-3.5 ps-14" : "rounded-control px-2",
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1121,7 +1124,9 @@ export function VerdictChips({
           >
             {verdict.id}
           </span>
-          <span className="min-w-0 flex-1 text-ink-2">{verdict.prompt}</span>
+          <span className="min-w-0 flex-1 text-ink-2">
+            {methodPromptText(t, verdict.id, verdict.prompt)}
+          </span>
           <RulePreview
             ruleKey={verdict.id}
             className="flex-none font-semibold text-brand-text no-underline hover:underline"

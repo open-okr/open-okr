@@ -171,7 +171,7 @@ export function AuditLog({
             <table
               data-testid="audit-log"
               aria-busy={state.busy !== null}
-              className={`w-full text-left text-xs ${state.busy === "replace" ? "opacity-60" : ""}`}
+              className={`w-full text-start text-xs ${state.busy === "replace" ? "opacity-60" : ""}`}
             >
               <caption className="sr-only">
                 {t("admin.audit.log.caption")}
@@ -180,25 +180,25 @@ export function AuditLog({
                 <tr>
                   <th
                     scope="col"
-                    className="sticky top-0 z-10 bg-surface py-1 pr-3 font-semibold"
+                    className="sticky top-0 z-10 bg-surface py-1 pe-3 font-semibold"
                   >
                     {t("admin.audit.log.when", { timeZone: zone })}
                   </th>
                   <th
                     scope="col"
-                    className="sticky top-0 z-10 bg-surface py-1 pr-3 font-semibold"
+                    className="sticky top-0 z-10 bg-surface py-1 pe-3 font-semibold"
                   >
                     {t("admin.audit.log.who")}
                   </th>
                   <th
                     scope="col"
-                    className="sticky top-0 z-10 bg-surface py-1 pr-3 font-semibold"
+                    className="sticky top-0 z-10 bg-surface py-1 pe-3 font-semibold"
                   >
                     {t("admin.audit.action")}
                   </th>
                   <th
                     scope="col"
-                    className="sticky top-0 z-10 bg-surface py-1 pr-3 font-semibold"
+                    className="sticky top-0 z-10 bg-surface py-1 pe-3 font-semibold"
                   >
                     {t("admin.audit.log.target")}
                   </th>
@@ -217,10 +217,10 @@ export function AuditLog({
                     data-testid="audit-row"
                     className="border-t border-line align-top"
                   >
-                    <td className="py-1.5 pr-3 whitespace-nowrap tabular-nums">
+                    <td className="py-1.5 pe-3 whitespace-nowrap tabular-nums">
                       <time dateTime={row.at}>{stamp(row.at)}</time>
                     </td>
-                    <td className="py-1.5 pr-3">
+                    <td className="py-1.5 pe-3">
                       <span className="block text-ink">{who(row)}</span>
                       {row.actorKind === "agent" ? (
                         <span className="block text-ink-4">
@@ -238,10 +238,10 @@ export function AuditLog({
                         </span>
                       ) : null}
                     </td>
-                    <td className="py-1.5 pr-3 font-mono text-ink">
+                    <td className="py-1.5 pe-3 font-mono text-ink">
                       {row.action}
                     </td>
-                    <td className="py-1.5 pr-3">
+                    <td className="py-1.5 pe-3">
                       <span className="block font-mono">{row.targetType}</span>
                       {row.targetId ? (
                         <span className="block font-mono break-all text-ink-4">

@@ -165,6 +165,7 @@ describe("summarising a thread", () => {
       }),
     );
     expect(seen).toEqual({
+      locale: "en",
       subject: "goal",
       comments: [
         { author: "Ada", text: "Billing keeps blocking the trial handover." },
@@ -307,6 +308,7 @@ describe("decomposing a key result", () => {
       }),
     );
     expect(seen).toEqual({
+      locale: "en",
       goalTitle: "Raise mid-market activation",
       keyResultTitle: "Raise trial to paid conversion from 18% to 30%",
       unit: "%",

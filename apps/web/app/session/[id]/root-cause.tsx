@@ -229,7 +229,7 @@ function MissedRow({
             }}
             trailing={
               pending && acting === "detail" ? (
-                <Spinner className="absolute top-1/2 right-2.5 -translate-y-1/2 text-ink-3" />
+                <Spinner className="absolute top-1/2 end-2.5 -translate-y-1/2 text-ink-3" />
               ) : undefined
             }
             maxLength={1000}

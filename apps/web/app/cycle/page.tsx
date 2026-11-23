@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import {
   canonThresholds,
   defaultPractice,
@@ -101,7 +102,7 @@ export default async function CyclePage({
     team?: string;
   }>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -550,7 +551,7 @@ export default async function CyclePage({
                     {t("cycle.thePhasesGuideNothingWaits")}
                   </p>
                 )}
-                <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-warn">
+                <ul className="flex list-disc flex-col gap-0.5 ps-4 text-xs text-warn">
                   {work.because.map((reason) => (
                     <li key={reason}>{reason}</li>
                   ))}
@@ -581,7 +582,7 @@ export default async function CyclePage({
                 <p className="mb-1 text-xs font-bold tracking-wide text-ink-3 uppercase">
                   {t("cycle.stillNeededHere")}
                 </p>
-                <ul className="flex list-disc flex-col gap-0.5 pl-4 text-sm text-ink-2">
+                <ul className="flex list-disc flex-col gap-0.5 ps-4 text-sm text-ink-2">
                   {phase.needs.map((need) => {
                     const reason = need.text;
                     // A reason that carries its gaps as further sentences,
@@ -633,7 +634,7 @@ export default async function CyclePage({
                           <NeedLink anchor={place.anchor}>{text}</NeedLink>
                         )}
                         {gaps.length > 0 ? (
-                          <ul className="mt-0.5 list-[circle] pl-4 text-ink-3">
+                          <ul className="mt-0.5 list-[circle] ps-4 text-ink-3">
                             {gaps.map((gap) => (
                               <li key={gap}>{gap.replace(/\.$/, "")}</li>
                             ))}
@@ -985,8 +986,11 @@ export default async function CyclePage({
                         ) : (
                           (decision.keyResultTitle ?? decision.goalTitle)
                         )}{" "}
-                        · {new Date(decision.at).toLocaleDateString()} ·{" "}
-                        {decision.authorName}
+                        ·{" "}
+                        {new Date(decision.at).toLocaleDateString(
+                          intlTagFor(locale),
+                        )}{" "}
+                        · {decision.authorName}
                       </span>
                     </li>
                   ))}

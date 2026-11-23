@@ -131,7 +131,7 @@ export function ThreadList({
                         type="button"
                         aria-current={current ? "true" : undefined}
                         onClick={() => onOpen(thread.id)}
-                        className={`min-w-0 flex-1 truncate rounded-control px-2 py-1.5 text-left text-sm hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-strong ${
+                        className={`min-w-0 flex-1 truncate rounded-control px-2 py-1.5 text-start text-sm hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-strong ${
                           current
                             ? "bg-raised font-semibold text-ink"
                             : "text-ink-2"

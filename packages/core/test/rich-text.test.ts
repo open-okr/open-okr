@@ -185,6 +185,25 @@ describe("parseRichText: golden round trip", () => {
   }
 });
 
+test("accepts the direction attributes written by the editor", () => {
+  expect(
+    isValidRichText(
+      {
+        type: "doc",
+        attrs: { dir: "auto" },
+        content: [
+          {
+            type: "paragraph",
+            attrs: { dir: "auto" },
+            content: [{ type: "text", text: "هدف" }],
+          },
+        ],
+      },
+      RICH_TEXT_SCHEMA_VERSION,
+    ),
+  ).toBe(true);
+});
+
 describe("parseRichText: rejects what is not on the allow-list", () => {
   test("an unknown node type", () => {
     const doc = {

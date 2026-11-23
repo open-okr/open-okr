@@ -1,14 +1,15 @@
 "use client";
 
+import { LOCALES } from "@openokr/formats";
 import {
   Button,
   CodeInput,
   EmailInput,
   SecretInput,
+  SelectInput,
   useTranslations,
 } from "@openokr/ui";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { DemoPill } from "../../../lib/demo-pill";
@@ -16,6 +17,7 @@ import { useInstanceName } from "../../../lib/instance-name-context";
 import { AuthCard, FormError } from "../auth-card";
 import { ResendLink, useLinkHours } from "../resend-link";
 import { pathAfterSignIn } from "./deletion-actions";
+import { setVisitorLanguage } from "./language-action";
 
 /**
  * What Better Auth answers a sign-in with while the account is being erased
@@ -49,11 +51,10 @@ interface DemoPersona {
  * one-time code challenge when a second factor is enrolled.
  */
 export default function SignInPage() {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
   // The instance this is, not the software it runs (M-33).
   const instanceName = useInstanceName();
 
-  const router = useRouter();
   const [error, setError] = useState("");
   // A sign-in hold, in whole minutes, kept apart from `error` because its
   // message carries a link to the reset page (account-lockout.md D12).
@@ -230,7 +231,9 @@ export default function SignInPage() {
       setChallenge(true);
       return;
     }
-    router.push(await pathAfterSignIn());
+    // A full load, not router.push: the root layout holds <html lang dir> and
+    // the catalogue, and a soft navigation keeps the signed-out one.
+    window.location.assign(await pathAfterSignIn());
   };
 
   // Called by the code field once its sixth digit is in, and by Verify.
@@ -252,7 +255,9 @@ export default function SignInPage() {
       );
       return;
     }
-    router.push(await pathAfterSignIn());
+    // A full load, not router.push: the root layout holds <html lang dir> and
+    // the catalogue, and a soft navigation keeps the signed-out one.
+    window.location.assign(await pathAfterSignIn());
   };
 
   const signInWithPasskey = async () => {
@@ -269,7 +274,9 @@ export default function SignInPage() {
       );
       return;
     }
-    router.push(await pathAfterSignIn());
+    // A full load, not router.push: the root layout holds <html lang dir> and
+    // the catalogue, and a soft navigation keeps the signed-out one.
+    window.location.assign(await pathAfterSignIn());
   };
 
   if (challenge) {
@@ -398,6 +405,24 @@ export default function SignInPage() {
           {pending ? t("auth.signIn.signingIn") : t("setup.account.signIn")}
         </Button>
       </form>
+      <form action={setVisitorLanguage} className="flex items-end gap-2">
+        <SelectInput
+          label={t("admin.general.generalSettingsForm.language")}
+          name="language"
+          data-testid="visitor-language"
+          defaultValue={locale}
+          className="flex-1"
+        >
+          {LOCALES.filter((entry) => entry.shipped).map((entry) => (
+            <option key={entry.code} value={entry.code} lang={entry.code}>
+              {t(entry.endonymKey)}
+            </option>
+          ))}
+        </SelectInput>
+        <Button type="submit" variant="secondary">
+          {t("common.apply")}
+        </Button>
+      </form>
 
       <Button
         type="button"
@@ -441,11 +466,11 @@ export default function SignInPage() {
                     provider.kind === "saml"
                       ? await authClient.signIn.sso({
                           providerId: provider.id,
-                          callbackURL: "/",
+                          callbackURL: "/sign-in/continue",
                         })
                       : await authClient.signIn.social({
                           provider: provider.id as "github",
-                          callbackURL: "/",
+                          callbackURL: "/sign-in/continue",
                         });
                 } finally {
                   setActing(null);
@@ -480,7 +505,7 @@ export default function SignInPage() {
                 type="button"
                 data-testid={`persona-${persona.email}`}
                 onClick={() => fillForPersona(persona.email)}
-                className="flex flex-col gap-0.5 rounded-md border border-line px-2.5 py-1.5 text-left hover:border-ink-4"
+                className="flex flex-col gap-0.5 rounded-md border border-line px-2.5 py-1.5 text-start hover:border-ink-4"
               >
                 <span className="text-xs font-semibold text-ink">
                   {persona.name}

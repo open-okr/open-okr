@@ -145,9 +145,7 @@ export function stepWords(
     case "found":
       return step.count === 0
         ? t("copilot.copilotPanel.step.foundNone")
-        : step.count === 1
-          ? t("copilot.copilotPanel.step.foundOne", { count: step.count })
-          : t("copilot.copilotPanel.step.foundOther", { count: step.count });
+        : t("copilot.copilotPanel.step.found", { count: step.count });
     case "reading":
       return readingWords(step, t);
     case "proposing":
@@ -233,7 +231,7 @@ function SourceList({
               key={`${item.n}:${item.entityType}:${item.entityId}`}
               className="flex items-center gap-1.5 text-xs"
             >
-              <span className="w-5 shrink-0 text-right tabular-nums text-ink-4">
+              <span className="w-5 shrink-0 text-end tabular-nums text-ink-4">
                 {item.n}.
               </span>
               <EntityIcon entityType={item.entityType} />

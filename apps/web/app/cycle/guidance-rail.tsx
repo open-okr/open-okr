@@ -38,7 +38,7 @@ export async function GuidanceRail({
               <h3 className="text-xs font-bold tracking-wide text-ink-3 uppercase">
                 {t("cycle.guidanceRail.keyOutput")}
               </h3>
-              <p className="border-brand-line border-l-2 pl-2.5 text-sm text-ink italic">
+              <p className="border-brand-line border-s-2 ps-2.5 text-sm text-ink italic">
                 {guidance.output}
               </p>
             </section>
@@ -46,7 +46,7 @@ export async function GuidanceRail({
               <h3 className="text-xs font-bold tracking-wide text-ink-3 uppercase">
                 {t("cycle.guidanceRail.watchFor")}
               </h3>
-              <ul className="flex list-disc flex-col gap-1.5 pl-4 text-sm text-ink-2">
+              <ul className="flex list-disc flex-col gap-1.5 ps-4 text-sm text-ink-2">
                 {guidance.guidance.map((line) => (
                   <li key={line}>{line}</li>
                 ))}

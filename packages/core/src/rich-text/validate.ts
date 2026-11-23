@@ -38,7 +38,15 @@ function isNodeType(value: unknown): value is NodeType {
 
 function validateAttrs(type: NodeType, attrs: unknown, path: string): void {
   const schema = NODE_ATTRS_SCHEMAS[type];
-  const result = schema.safeParse(attrs);
+  let nodeAttrs = attrs;
+  if (attrs && typeof attrs === "object" && "dir" in attrs) {
+    const { dir, ...rest } = attrs;
+    if (dir !== "auto" && dir !== "ltr" && dir !== "rtl") {
+      throw new RichTextValidationError(path, `invalid dir for "${type}"`);
+    }
+    nodeAttrs = Object.keys(rest).length ? rest : undefined;
+  }
+  const result = schema.safeParse(nodeAttrs);
   if (!result.success) {
     throw new RichTextValidationError(
       path,
@@ -223,6 +231,7 @@ export function parseRichText(
   if (record.type !== "doc") {
     throw new RichTextValidationError("$", 'top-level type must be "doc"');
   }
+  validateAttrs("doc", record.attrs, "$");
   validateChildren("doc", record.content, "$");
   return input as RichTextDocument;
 }

@@ -1,11 +1,7 @@
 // @vitest-environment jsdom
 import { OperationError } from "@openokr/core";
-import {
-  CATALOGUES,
-  TextInput,
-  TranslationsProvider,
-  translate,
-} from "@openokr/ui";
+import { TextInput, TranslationsProvider, translate } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

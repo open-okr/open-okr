@@ -390,7 +390,7 @@ Specified only enough that the v1 data model does not block them: a saved query 
 - Language is a per-user setting with a pre-authentication switcher and an instance default. Signed in, the member's own language wins, then the workspace's. Signed out, a page speaks the browser's language (its `Accept-Language`) when the product ships it, otherwise the instance default, otherwise English (Q-8, decided 12 November 2026).
 - A pseudo-locale build check catches hardcoded strings in continuous integration. Keys are namespaced per module.
 - Coaching prompts, rule names, band labels and taxonomy labels all live in the catalogues, sourced from `packages/method`.
-- Right-to-left is not required for v1, but use logical CSS properties anyway.
+- Arabic reads right to left. Use logical CSS properties as required by the [language design §9](../design/languages.md#9-right-to-left).
 - **The words for work** (Akmal, 11 November 2026), in every screen, message and catalogue:
 
   | Word | Means | Not |

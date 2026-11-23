@@ -126,7 +126,7 @@ export function CloseWorkspaceCard(
         </div>
       </CardHeader>
       <CardBody className="grid grid-cols-12 gap-x-6 gap-y-4 text-sm">
-        <ul className="col-span-12 flex list-disc flex-col gap-1 pl-5 text-sm text-ink-2">
+        <ul className="col-span-12 flex list-disc flex-col gap-1 ps-5 text-sm text-ink-2">
           <li>
             {props.eraseIfClosedToday
               ? t("admin.close.deletedOn", { date: props.eraseIfClosedToday })

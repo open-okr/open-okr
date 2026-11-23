@@ -42,12 +42,10 @@ export function DefaultPlanForm({
         role="status"
       >
         <p className="font-semibold text-ink">
-          {moved === 1
-            ? t("operator.defaultPlan.movedOne", { plan: planName })
-            : t("operator.defaultPlan.movedOther", {
-                count: moved,
-                plan: planName,
-              })}
+          {t("operator.defaultPlan.moved", {
+            count: moved,
+            plan: planName,
+          })}
         </p>
         {[...refused, ...skipped].length > 0 ? (
           <ul className="flex flex-col gap-1 text-ink-2">
@@ -101,12 +99,10 @@ export function DefaultPlanForm({
       >
         {pending ? <Spinner /> : null}
         <span>
-          {workspaces.length === 1
-            ? t("operator.defaultPlan.confirmOne", { plan: planName })
-            : t("operator.defaultPlan.confirmOther", {
-                count: workspaces.length,
-                plan: planName,
-              })}
+          {t("operator.defaultPlan.confirm", {
+            count: workspaces.length,
+            plan: planName,
+          })}
         </span>
       </button>
       {state?.error ? (

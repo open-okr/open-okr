@@ -25,6 +25,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { dayLabel } from "../../lib/day-label.ts";
+import { GOAL_LEVEL_NAME_KEYS, nameOf } from "../../lib/identifier-names.ts";
 import type { OkrDetail } from "../../lib/okr-tree/actions.ts";
 import {
   OKR_DETAIL_ALL,
@@ -227,7 +228,7 @@ export function OkrDrawer({
           data-testid="okr-drawer"
           aria-busy={saving || undefined}
           // Below the toasts (z-50), so an undo stays reachable over it.
-          className="fixed inset-y-0 right-0 z-40 flex w-full max-w-lg flex-col border-l border-line bg-surface shadow-lg outline-none"
+          className="fixed inset-y-0 end-0 z-40 flex w-full max-w-lg flex-col border-s border-line bg-surface shadow-lg outline-none"
         >
           <header className="flex flex-none items-center gap-2 border-b border-line px-4 py-3">
             <Dialog.Title className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
@@ -418,7 +419,9 @@ function DrawerBody({
               </dd>
             ) : null}
             <dt className="text-ink-3">{t("okrDrawer.level")}</dt>
-            <dd className="px-1 text-ink-2">{goal.level}</dd>
+            <dd className="px-1 text-ink-2">
+              {nameOf(GOAL_LEVEL_NAME_KEYS, goal.level, t)}
+            </dd>
             {/* §2.9: a team that merges or splits takes its OKRs with it. */}
             <dt className="text-ink-3">{t("okrDrawer.space")}</dt>
             <dd>
@@ -1172,7 +1175,7 @@ function Alignment({
       <button
         type="button"
         onClick={() => onOpen(id)}
-        className="text-left text-xs font-semibold text-brand-text hover:underline"
+        className="text-start text-xs font-semibold text-brand-text hover:underline"
       >
         {title}
       </button>

@@ -125,7 +125,7 @@ export function ConfidenceInput({
         required={required}
         disabled={disabled}
         error={error}
-        inputClassName={cn("w-16 text-right", inputClassName)}
+        inputClassName={cn("w-16 text-end", inputClassName)}
       />
       {band ? (
         <span

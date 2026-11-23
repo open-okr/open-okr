@@ -136,10 +136,7 @@ export function AuditPanel({
   // order, and the slower one would otherwise overwrite the one asked last.
   const latest = useRef(0);
 
-  const rowsPhrase = (count: number) =>
-    count === 1
-      ? t("common.count.rowOne", { count })
-      : t("common.count.rowOther", { count });
+  const rowsPhrase = (count: number) => t("common.count.row", { count });
 
   const check = async () => {
     setChecking(true);
@@ -208,9 +205,7 @@ export function AuditPanel({
       setNote(
         result.truncated
           ? t("admin.audit.rowsAtCeiling", { rows: rowsPhrase(count) })
-          : count === 1
-            ? t("admin.audit.exportedRowsOne", { count })
-            : t("admin.audit.exportedRowsOther", { count }),
+          : t("admin.audit.exportedRows", { count }),
       );
     } finally {
       setExporting(false);

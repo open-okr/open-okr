@@ -6,10 +6,35 @@
  * line is generated from data the product already trusts (a name it stored
  * itself), never from a member's own written content, so there is nothing
  * here for the sanitising allow-list to do.
+ *
+ * Every sentence comes from the server catalogue (`activity.*` keys) in the
+ * reader's language, with named holes for the values. Nothing is stored: the
+ * sentence is built at read time from the kind and the payload. A value that
+ * is user content (a title, a comment excerpt) is passed through as written.
  */
+import type { MessageValues } from "@openokr/formats";
+import { getServerCatalogue, serverTranslate } from "../i18n/catalogue.ts";
 import type { ActivityKind } from "./catalogue.ts";
 
-export type ActivityRenderer = (payload: Record<string, unknown>) => string;
+/** Resolves one catalogue key in the reader's language. */
+type ActivityTranslate = (key: string, values?: MessageValues) => string;
+
+/**
+ * Names a payload token (a level, a role, a status) in the reader's language
+ * when the catalogue has a word for it, and leaves the token as it is when
+ * it does not.
+ */
+type ActivityWord = (
+  prefix: string,
+  value: string,
+  fallback?: string,
+) => string;
+
+export type ActivityRenderer = (
+  payload: Record<string, unknown>,
+  t: ActivityTranslate,
+  w: ActivityWord,
+) => string;
 
 const asString = (value: unknown, fallback = ""): string =>
   typeof value === "string" ? value : fallback;
@@ -18,686 +43,1109 @@ const asString = (value: unknown, fallback = ""): string =>
 const asCount = (value: unknown, fallback = 0): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
-/** "3 goals", "1 review", or null for none. */
-const plural = (count: number, noun: string): string | null =>
-  count === 0 ? null : `${count} ${noun}${count === 1 ? "" : "s"}`;
-
-/** §8.8's five decisions as a feed line says them (P9-T20e-a). */
-/** How a support session ended, in words (support-access.md §10.3). */
-const SUPPORT_END_WORDS: Readonly<Record<string, string>> = {
-  expired: "the time ran out",
-  revoked: "revoked by a member",
-  finished: "finished by support",
-  refused: "refused",
-};
-
-const CLOSE_DECISION_PHRASE: Readonly<Record<string, string>> = {
-  achieved: "nothing left to carry",
-  keep: "a decision to keep it",
-  modify: "a decision to modify it",
-  defer: "a decision to defer it to the issue list",
-  abandon: "a decision to abandon it",
-};
-
 export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
-  "workspace.provisioned": (p) => `Workspace "${asString(p.name)}" created`,
-  "workspace.adopted": () => "Workspace added to the operator console",
-  "workspace.renamed": (p) =>
-    `Workspace renamed from "${asString(p.from)}" to "${asString(p.to)}"`,
-  "workspace.onboarded": () => "Workspace setup finished",
-  "workspace.onboarding_reopened": () => "Workspace setup opened again",
-  "workspace.state_changed": (p) =>
-    `Workspace state changed from "${asString(p.from)}" to "${asString(p.to)}"`,
-  "support.granted": (p) =>
-    `Support access granted for ${asCount(p.hours)} hours`,
-  "support.ended": (p) =>
-    `Support access ended: ${SUPPORT_END_WORDS[asString(p.reason)] ?? asString(p.reason)}`,
-  "support.requested": () => "Support asked to enter this workspace",
-  "workspace.limits_updated": () => "Workspace limits changed",
-  "workspace.erasure_reminded": (p) =>
-    `The owners and administrators were reminded that the workspace is deleted on ${asString(p.eraseOn).slice(0, 10)}`,
-  "workspace.trial_set": (p) =>
+  "workspace.provisioned": (p, t) =>
+    t("activity.workspace.provisioned", { name: asString(p.name) }),
+  "workspace.adopted": (_p, t) => t("activity.workspace.adopted"),
+  "workspace.renamed": (p, t) =>
+    t("activity.workspace.renamed", {
+      from: asString(p.from),
+      to: asString(p.to),
+    }),
+  "workspace.onboarded": (_p, t) => t("activity.workspace.onboarded"),
+  "workspace.onboarding_reopened": (_p, t) =>
+    t("activity.workspace.onboarding_reopened"),
+  "workspace.state_changed": (p, t) =>
+    t("activity.workspace.state_changed", {
+      from: asString(p.from),
+      to: asString(p.to),
+    }),
+  "support.granted": (p, t) =>
+    t("activity.support.granted", { hours: asCount(p.hours) }),
+  "support.ended": (p, t, w) =>
+    t("activity.support.ended", {
+      reason: w("activity.word.supportEnd", asString(p.reason)),
+    }),
+  "support.requested": (_p, t) => t("activity.support.requested"),
+  "workspace.limits_updated": (_p, t) => t("activity.workspace.limits_updated"),
+  "workspace.erasure_reminded": (p, t) =>
+    t("activity.workspace.erasure_reminded", {
+      date: asString(p.eraseOn).slice(0, 10),
+    }),
+  "workspace.trial_set": (p, t) =>
     p.endsAt === null
-      ? "The trial was ended by the provider"
+      ? t("activity.workspace.trial_set.ended")
       : p.plan
-        ? `A trial of the ${asString(p.plan)} plan runs until ${asString(p.endsAt).slice(0, 10)}`
-        : `The trial now runs until ${asString(p.endsAt).slice(0, 10)}`,
-  "workspace.trial_reminded": (p) =>
-    `The owners and administrators were reminded that the trial ends on ${asString(p.endsAt).slice(0, 10)}`,
-  "workspace.trial_ended": (p) =>
+        ? t("activity.workspace.trial_set.plan", {
+            plan: asString(p.plan),
+            date: asString(p.endsAt).slice(0, 10),
+          })
+        : t("activity.workspace.trial_set.until", {
+            date: asString(p.endsAt).slice(0, 10),
+          }),
+  "workspace.trial_reminded": (p, t) =>
+    t("activity.workspace.trial_reminded", {
+      date: asString(p.endsAt).slice(0, 10),
+    }),
+  "workspace.trial_ended": (p, t) =>
     p.outcome === "moved"
-      ? `The trial ended and the workspace moved to the ${asString(p.plan, "free")} plan`
+      ? t("activity.workspace.trial_ended.moved", {
+          plan: asString(p.plan, t("activity.fb.free")),
+        })
       : p.outcome === "suspended"
-        ? "The trial ended and the workspace is read-only until its people fit a plan or somebody subscribes"
-        : "The trial ended; the subscription carries on",
-  "workspace.lifecycle_changed": (p) =>
-    `Workspace lifecycle set to "${asString(p.state)}"`,
-  "billing.requested": () => "Somebody used the billing screen",
-  "billing.credits_purchased": (p) =>
-    `${String(p.credits)} AI credits were bought`,
-  "billing.subscription_changed": (p) =>
-    `The subscription is now ${asString(p.status)}`,
-  "workspace.plan_changed": (p) =>
+        ? t("activity.workspace.trial_ended.suspended")
+        : t("activity.workspace.trial_ended.kept"),
+  "workspace.lifecycle_changed": (p, t) =>
+    t("activity.workspace.lifecycle_changed", { state: asString(p.state) }),
+  "billing.requested": (_p, t) => t("activity.billing.requested"),
+  "billing.credits_purchased": (p, t) =>
+    t("activity.billing.credits_purchased", { credits: String(p.credits) }),
+  "billing.subscription_changed": (p, t) =>
+    t("activity.billing.subscription_changed", { status: asString(p.status) }),
+  "workspace.plan_changed": (p, t) =>
     typeof p.seats === "number"
-      ? `Workspace moved to the ${asString(p.plan)} plan, with ${p.seats} seats`
-      : `Workspace moved to the ${asString(p.plan)} plan, with unlimited seats`,
-  "member.profile_updated": (p) =>
-    `${asString(p.name, "A member")} updated their profile`,
-  "member.tour_finished": () => "Finished the first-visit tour",
-  "channel.templatesSynced": (p) =>
-    `Synced ${asCount(p.recorded)} WhatsApp templates, withdrawing ${asCount(p.withdrawn)}`,
-  "channel.templateMapped": (p) =>
-    `The "${asString(p.ruleKey, "unnamed")}" reminder was pointed at a WhatsApp template`,
-  "channel.templateUnmapped": (p) =>
-    `The "${asString(p.ruleKey, "unnamed")}" reminder no longer uses a WhatsApp template`,
-  "connection.revoked": () => "A connection to an external agent was ended",
-  "api_token.created": (p) =>
-    `An API token "${asString(p.name, "unnamed")}" was created for the ${asString(p.audience, "rest")} surface`,
-  "api_token.revoked": (p) =>
-    `The API token "${asString(p.name, "unnamed")}" was revoked`,
-  "device.approved": (p) =>
-    `${asString(p.clientName, "A terminal")} was authorised to sign in`,
-  "device.denied": (p) => `${asString(p.clientName, "A terminal")} was refused`,
-  "member.updated": (p) => `${asString(p.name, "A member")} was updated`,
-  "member.leaveSet": (p) =>
+      ? t("activity.workspace.plan_changed.seats", {
+          plan: asString(p.plan),
+          seats: String(p.seats),
+        })
+      : t("activity.workspace.plan_changed.unlimited", {
+          plan: asString(p.plan),
+        }),
+  "member.profile_updated": (p, t) =>
+    t("activity.member.profile_updated", {
+      name: asString(p.name, t("activity.fb.AMember")),
+    }),
+  "member.tour_finished": (_p, t) => t("activity.member.tour_finished"),
+  "channel.templatesSynced": (p, t) =>
+    t("activity.channel.templatesSynced", {
+      recorded: asCount(p.recorded),
+      withdrawn: asCount(p.withdrawn),
+    }),
+  "channel.templateMapped": (p, t) =>
+    t("activity.channel.templateMapped", {
+      rule: asString(p.ruleKey, t("activity.fb.unnamed")),
+    }),
+  "channel.templateUnmapped": (p, t) =>
+    t("activity.channel.templateUnmapped", {
+      rule: asString(p.ruleKey, t("activity.fb.unnamed")),
+    }),
+  "connection.revoked": (_p, t) => t("activity.connection.revoked"),
+  "api_token.created": (p, t) =>
+    t("activity.api_token.created", {
+      name: asString(p.name, t("activity.fb.unnamed")),
+      audience: asString(p.audience, t("activity.fb.rest")),
+    }),
+  "api_token.revoked": (p, t) =>
+    t("activity.api_token.revoked", {
+      name: asString(p.name, t("activity.fb.unnamed")),
+    }),
+  "device.approved": (p, t) =>
+    t("activity.device.approved", {
+      client: asString(p.clientName, t("activity.fb.ATerminal")),
+    }),
+  "device.denied": (p, t) =>
+    t("activity.device.denied", {
+      client: asString(p.clientName, t("activity.fb.ATerminal")),
+    }),
+  "member.updated": (p, t) =>
+    t("activity.member.updated", {
+      name: asString(p.name, t("activity.fb.AMember")),
+    }),
+  "member.leaveSet": (p, t) =>
     asCount(p.count) === 0
-      ? `${asString(p.name, "A member")} has no leave marked`
-      : `${asString(p.name, "A member")} marked their leave`,
-  "member.suspended": (p) => `${asString(p.name, "A member")} was suspended`,
-  "member.restored": (p) => `${asString(p.name, "A member")} was restored`,
-  "role.created": (p) => `Role "${asString(p.name, "a role")}" was added`,
-  "role.deleted": (p) => `Role "${asString(p.name, "a role")}" was removed`,
-  "role.permission_set": (p) =>
-    `What ${asString(p.role, "a role")} may do with ${asString(p.domain, "a domain")} was changed`,
-  "role.assigned": () => "A member was given a different role",
-  "member.administrator_set": (p) =>
+      ? t("activity.member.leaveSet.none", {
+          name: asString(p.name, t("activity.fb.AMember")),
+        })
+      : t("activity.member.leaveSet.marked", {
+          name: asString(p.name, t("activity.fb.AMember")),
+        }),
+  "member.suspended": (p, t) =>
+    t("activity.member.suspended", {
+      name: asString(p.name, t("activity.fb.AMember")),
+    }),
+  "member.restored": (p, t) =>
+    t("activity.member.restored", {
+      name: asString(p.name, t("activity.fb.AMember")),
+    }),
+  "role.created": (p, t) =>
+    t("activity.role.created", {
+      name: asString(p.name, t("activity.fb.aRole")),
+    }),
+  "role.deleted": (p, t) =>
+    t("activity.role.deleted", {
+      name: asString(p.name, t("activity.fb.aRole")),
+    }),
+  "role.permission_set": (p, t) =>
+    t("activity.role.permission_set", {
+      role: asString(p.role, t("activity.fb.aRole")),
+      domain: asString(p.domain, t("activity.fb.aDomain")),
+    }),
+  "role.assigned": (_p, t) => t("activity.role.assigned"),
+  "member.administrator_set": (p, t) =>
     p.administrator === true
-      ? `${asString(p.name, "A member")} became an administrator`
-      : `${asString(p.name, "A member")} is no longer an administrator`,
-  "member.converted_to_guest": (p) =>
-    `${asString(p.name, "A member")} was converted to a guest`,
-  "member.erased": () => "A member's data was erased",
-  "member.self_deleted": (p) => {
-    const parts = [
-      plural(asCount(p.goals), "goal"),
-      plural(asCount(p.keyResults), "key result"),
-      plural(asCount(p.reviews), "review"),
-    ].filter((part): part is string => part !== null);
-    if (parts.length === 0) {
-      return "A member deleted their account";
-    }
-    const list =
-      parts.length === 1
-        ? parts[0]
-        : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
-    const one =
-      asCount(p.goals) + asCount(p.keyResults) + asCount(p.reviews) === 1;
-    return `A member deleted their account. ${list} now ${one ? "needs" : "need"} an owner`;
-  },
-  "member.imported": (p) =>
+      ? t("activity.member.administrator_set.on", {
+          name: asString(p.name, t("activity.fb.AMember")),
+        })
+      : t("activity.member.administrator_set.off", {
+          name: asString(p.name, t("activity.fb.AMember")),
+        }),
+  "member.converted_to_guest": (p, t) =>
+    t("activity.member.converted_to_guest", {
+      name: asString(p.name, t("activity.fb.AMember")),
+    }),
+  "member.erased": (_p, t) => t("activity.member.erased"),
+  "member.self_deleted": (p, t) =>
+    (() => {
+      const parts = [
+        asCount(p.goals) > 0
+          ? t("activity.member.self_deleted.goals", { count: asCount(p.goals) })
+          : null,
+        asCount(p.keyResults) > 0
+          ? t("activity.member.self_deleted.keyResults", {
+              count: asCount(p.keyResults),
+            })
+          : null,
+        asCount(p.reviews) > 0
+          ? t("activity.member.self_deleted.reviews", {
+              count: asCount(p.reviews),
+            })
+          : null,
+      ].filter((part): part is string => part !== null);
+      if (parts.length === 0) {
+        return t("activity.member.self_deleted.none");
+      }
+      const list =
+        parts.length === 1
+          ? (parts[0] ?? "")
+          : `${parts.slice(0, -1).join(", ")}${t("activity.joinAnd")}${parts[parts.length - 1]}`;
+      return t("activity.member.self_deleted.owner", {
+        count: asCount(p.goals) + asCount(p.keyResults) + asCount(p.reviews),
+        list,
+      });
+    })(),
+  "member.imported": (p, t) =>
     p.matched === undefined
-      ? `${asString(p.name, "A member")} was imported`
-      : `${asString(p.name, "A member")} was already here and was matched to the import`,
-  "invitation.link_created": () => "An invitation link was created",
-  "invitation.link_revoked": () => "An invitation link was revoked",
-  "invitation.accepted": () => "An invitation was accepted",
-  "invitation.joined_by_trusted_domain": () =>
-    "Someone joined through a trusted email domain",
-  "member.joined_by_directory": (payload) =>
-    (payload as { via: string }).via === "sso"
-      ? "Someone joined by signing in through the identity provider"
-      : "The directory added someone",
-  "sso.connection_created": (p) =>
-    `Single sign-on through "${asString(p.name, "a provider")}" was added`,
-  "directory.token_created": () => "A directory-sync token was created",
-  "sso.connection_updated": (p) =>
-    `Single sign-on through "${asString(p.name, "a provider")}" was changed`,
-  "sso.connection_switched": (p) =>
+      ? t("activity.member.imported.new", {
+          name: asString(p.name, t("activity.fb.AMember")),
+        })
+      : t("activity.member.imported.matched", {
+          name: asString(p.name, t("activity.fb.AMember")),
+        }),
+  "invitation.link_created": (_p, t) => t("activity.invitation.link_created"),
+  "invitation.link_revoked": (_p, t) => t("activity.invitation.link_revoked"),
+  "invitation.accepted": (_p, t) => t("activity.invitation.accepted"),
+  "invitation.joined_by_trusted_domain": (_p, t) =>
+    t("activity.invitation.joined_by_trusted_domain"),
+  "member.joined_by_directory": (p, t) =>
+    asString(p.via) === "sso"
+      ? t("activity.member.joined_by_directory.sso")
+      : t("activity.member.joined_by_directory.directory"),
+  "sso.connection_created": (p, t) =>
+    t("activity.sso.connection_created", {
+      name: asString(p.name, t("activity.fb.aProvider")),
+    }),
+  "directory.token_created": (_p, t) => t("activity.directory.token_created"),
+  "sso.connection_updated": (p, t) =>
+    t("activity.sso.connection_updated", {
+      name: asString(p.name, t("activity.fb.aProvider")),
+    }),
+  "sso.connection_switched": (p, t) =>
     p.enabled === true
-      ? `Single sign-on through "${asString(p.name, "a provider")}" was turned on`
-      : `Single sign-on through "${asString(p.name, "a provider")}" was turned off`,
-  "sso.connection_removed": (p) =>
-    `Single sign-on through "${asString(p.name, "a provider")}" was removed`,
-  "sso.domain_verification_started": (p) =>
-    `Verification of ${asString(p.domain, "a domain")} for single sign-on was started`,
-  "sso.domain_checked": (p) =>
-    `The record for ${asString(p.domain, "a domain")} was checked`,
-  "sso.domain_verified": (p) =>
-    `${asString(p.domain, "A domain")} was verified for single sign-on`,
-  "sso.domain_check_failed": (p) =>
-    `The record for ${asString(p.domain, "a domain")} could not be found on its daily check`,
-  "sso.domain_check_recovered": (p) =>
-    `The record for ${asString(p.domain, "a domain")} is back`,
-  "sso.domain_unverified": (p) =>
-    `${asString(p.domain, "A domain")} lost its verification after repeated failed checks`,
-  "blob.prepared": () => "A file upload was started",
-  "blob.claimed": () => "A file was uploaded",
-  "blob.scanned": (payload) =>
-    (payload as { verdict: string }).verdict === "clean"
-      ? "A file passed its virus scan"
-      : "A file was held back by the virus scan",
-  "space.settingsChanged": (payload) =>
-    `${(payload as { name: string }).name} changed its own settings`,
-  "space.holidaysChanged": (payload) => {
-    const { name, count } = payload as { name: string; count: number };
-    return count === 0
-      ? `${name} cleared its holidays`
-      : count === 1
-        ? `${name} marked one holiday`
-        : `${name} marked ${count} holidays`;
-  },
-  "agent.autonomy_changed": (payload) => {
-    const { from, to } = payload as { from: string; to: string };
-    const words = (value: string) => value.replace(/_/g, " ");
-    return `An agent moved from ${words(from)} to ${words(to)}`;
-  },
-  "nudge.rule_changed": (payload) => {
-    const { ruleKey, configured } = payload as {
-      ruleKey: string;
-      configured: boolean;
-    };
-    return configured
-      ? `The ${ruleKey} rule was changed`
-      : `The ${ruleKey} rule went back to the canon`;
-  },
-  "blob.reaped": (payload) => {
-    const { discarded, bytesLeft } = payload as {
-      discarded: number;
-      bytesLeft: number;
-    };
-    if (discarded === 0) {
-      return "No abandoned uploads to clear";
-    }
-    const files = `${discarded} abandoned upload${discarded === 1 ? "" : "s"}`;
-    return bytesLeft === 0
-      ? `Cleared ${files}`
-      : `Cleared ${files}, and ${bytesLeft} left bytes behind`;
-  },
-  "channel.log_swept": (payload) => {
-    const { deleted, retentionDays } = payload as {
-      deleted: number;
-      retentionDays: number;
-    };
-    // Zero days is retention off, which is the default. Saying so is more
-    // use than "cleared 0 rows": one is a setting nobody has chosen, the
-    // other reads like a sweep that found nothing to do.
-    if (retentionDays === 0) {
-      return "Message log retention is off, so nothing was cleared";
-    }
-    if (deleted === 0) {
-      return `No message log rows older than ${retentionDays} days`;
-    }
-    return `Cleared ${deleted} message log row${deleted === 1 ? "" : "s"} older than ${retentionDays} days`;
-  },
-  "notification.read": () => "A notification was read",
-  "notification.snoozed": () => "A notification was snoozed",
-  "notification_settings.updated": () => "Notification settings were updated",
-  "subscription.added": () => "Someone subscribed",
-  "subscription.canceled": () => "Someone unsubscribed",
-  "workspace.general_settings_updated": (p) =>
-    `Workspace settings were updated (${
-      Array.isArray(p.keys) ? p.keys.join(", ") : "general"
-    })`,
-  "workspace.branding_updated": () => "Workspace branding was updated",
-  "workspace.settings_reset": (p) =>
-    `Workspace settings were reset to their defaults (${
-      Array.isArray(p.keys) ? p.keys.join(", ") : "general"
-    })`,
-  "ai.provider_config_updated": (p) =>
-    `${asString(p.provider, "A provider")}'s configuration was updated`,
-  "ai.workspace_credential_set": (p) =>
-    `A workspace key was set for ${asString(p.provider, "a provider")}`,
-  "ai.workspace_credential_removed": (p) =>
-    `The workspace key for ${asString(p.provider, "a provider")} was removed`,
-  "ai.workspace_credential_checked": (p) =>
-    `The workspace key for ${asString(p.provider, "a provider")} was tested: ${asString(p.status, "unknown")}`,
-  "ai.personal_credential_set": (p) =>
-    `A personal key was set for ${asString(p.provider, "a provider")}`,
-  "ai.personal_credential_removed": (p) =>
-    `A personal key for ${asString(p.provider, "a provider")} was removed`,
-  "ai.credentials_rotated": (p) =>
-    `${Number(p.rewrapped ?? 0)} of ${Number(p.examined ?? 0)} AI credential(s) were re-wrapped onto the current key`,
-  "ai.custom_model_added": () => "A custom model was added to the catalogue",
-  "ai.custom_model_updated": () => "A custom model was updated",
-  "ai.custom_model_removed": () =>
-    "A custom model was removed from the catalogue",
-  "ai.tier_policy_set": (p) =>
-    `The "${asString(p.tier, "a")}" tier was mapped to ${asString(p.provider)}/${asString(p.modelId)}`,
-  "ai.tier_policy_removed": (p) =>
-    `The "${asString(p.tier, "a")}" tier's policy was removed`,
-  "ai.feature_setting_updated": (p) =>
-    `"${asString(p.featureKey, "A feature")}" settings were updated`,
-  "ai.prompt_updated": (p) =>
-    `A new version of "${asString(p.promptKey, "a prompt")}" was saved`,
-  "ai.prompt_restored": (p) =>
-    `"${asString(p.promptKey, "A prompt")}" was restored to its default`,
-  "ai.usage_recorded": (p) =>
-    `An AI call ran against ${asString(p.provider, "a provider")}/${asString(p.modelId, "a model")}`,
-  "ai.budget_set": (p) =>
-    `An AI budget was set for the "${asString(p.scope, "workspace")}" scope`,
-  "ai.budget_removed": () => "An AI budget was removed",
-  "ai.privacy_updated": (p) =>
-    `AI privacy and egress settings were updated (${
-      Array.isArray(p.keys) ? p.keys.join(", ") : "privacy"
-    })`,
-  "ai.egress_withheld": (p) =>
+      ? t("activity.sso.connection_switched.on", {
+          name: asString(p.name, t("activity.fb.aProvider")),
+        })
+      : t("activity.sso.connection_switched.off", {
+          name: asString(p.name, t("activity.fb.aProvider")),
+        }),
+  "sso.connection_removed": (p, t) =>
+    t("activity.sso.connection_removed", {
+      name: asString(p.name, t("activity.fb.aProvider")),
+    }),
+  "sso.domain_verification_started": (p, t) =>
+    t("activity.sso.domain_verification_started", {
+      domain: asString(p.domain, t("activity.fb.aDomain")),
+    }),
+  "sso.domain_checked": (p, t) =>
+    t("activity.sso.domain_checked", {
+      domain: asString(p.domain, t("activity.fb.aDomain")),
+    }),
+  "sso.domain_verified": (p, t) =>
+    t("activity.sso.domain_verified", {
+      domain: asString(p.domain, t("activity.fb.ADomain")),
+    }),
+  "sso.domain_check_failed": (p, t) =>
+    t("activity.sso.domain_check_failed", {
+      domain: asString(p.domain, t("activity.fb.aDomain")),
+    }),
+  "sso.domain_check_recovered": (p, t) =>
+    t("activity.sso.domain_check_recovered", {
+      domain: asString(p.domain, t("activity.fb.aDomain")),
+    }),
+  "sso.domain_unverified": (p, t) =>
+    t("activity.sso.domain_unverified", {
+      domain: asString(p.domain, t("activity.fb.ADomain")),
+    }),
+  "blob.prepared": (_p, t) => t("activity.blob.prepared"),
+  "blob.claimed": (_p, t) => t("activity.blob.claimed"),
+  "blob.scanned": (p, t) =>
+    asString(p.verdict) === "clean"
+      ? t("activity.blob.scanned.clean")
+      : t("activity.blob.scanned.held"),
+  "space.settingsChanged": (p, t) =>
+    t("activity.space.settingsChanged", { name: asString(p.name) }),
+  "space.holidaysChanged": (p, t) =>
+    asCount(p.count) === 0
+      ? t("activity.space.holidaysChanged.none", { name: asString(p.name) })
+      : asCount(p.count) === 1
+        ? t("activity.space.holidaysChanged.one", { name: asString(p.name) })
+        : t("activity.space.holidaysChanged.many", {
+            name: asString(p.name),
+            n: asCount(p.count),
+          }),
+  "agent.autonomy_changed": (p, t) =>
+    t("activity.agent.autonomy_changed", {
+      from: asString(p.from).replace(/_/g, " "),
+      to: asString(p.to).replace(/_/g, " "),
+    }),
+  "nudge.rule_changed": (p, t) =>
+    p.configured
+      ? t("activity.nudge.rule_changed.changed", { rule: asString(p.ruleKey) })
+      : t("activity.nudge.rule_changed.reset", { rule: asString(p.ruleKey) }),
+  "blob.reaped": (p, t) =>
+    asCount(p.discarded) === 0
+      ? t("activity.blob.reaped.none")
+      : asCount(p.bytesLeft) === 0
+        ? t("activity.blob.reaped.cleared", {
+            files: t("activity.blob.reaped.files", {
+              count: asCount(p.discarded),
+            }),
+          })
+        : t("activity.blob.reaped.clearedLeft", {
+            files: t("activity.blob.reaped.files", {
+              count: asCount(p.discarded),
+            }),
+            bytes: asCount(p.bytesLeft),
+          }),
+  "channel.log_swept": (p, t) =>
+    asCount(p.retentionDays) === 0
+      ? t("activity.channel.log_swept.off")
+      : asCount(p.deleted) === 0
+        ? t("activity.channel.log_swept.none", {
+            days: asCount(p.retentionDays),
+          })
+        : t("activity.channel.log_swept.cleared", {
+            count: asCount(p.deleted),
+            days: asCount(p.retentionDays),
+          }),
+  "notification.read": (_p, t) => t("activity.notification.read"),
+  "notification.snoozed": (_p, t) => t("activity.notification.snoozed"),
+  "notification_settings.updated": (_p, t) =>
+    t("activity.notification_settings.updated"),
+  "subscription.added": (_p, t) => t("activity.subscription.added"),
+  "subscription.canceled": (_p, t) => t("activity.subscription.canceled"),
+  "workspace.general_settings_updated": (p, t) =>
+    t("activity.workspace.general_settings_updated", {
+      keys: Array.isArray(p.keys) ? p.keys.join(", ") : "general",
+    }),
+  "workspace.branding_updated": (_p, t) =>
+    t("activity.workspace.branding_updated"),
+  "workspace.settings_reset": (p, t) =>
+    t("activity.workspace.settings_reset", {
+      keys: Array.isArray(p.keys) ? p.keys.join(", ") : "general",
+    }),
+  "ai.provider_config_updated": (p, t) =>
+    t("activity.ai.provider_config_updated", {
+      provider: asString(p.provider, t("activity.fb.AProvider")),
+    }),
+  "ai.workspace_credential_set": (p, t) =>
+    t("activity.ai.workspace_credential_set", {
+      provider: asString(p.provider, t("activity.fb.aProvider")),
+    }),
+  "ai.workspace_credential_removed": (p, t) =>
+    t("activity.ai.workspace_credential_removed", {
+      provider: asString(p.provider, t("activity.fb.aProvider")),
+    }),
+  "ai.workspace_credential_checked": (p, t) =>
+    t("activity.ai.workspace_credential_checked", {
+      provider: asString(p.provider, t("activity.fb.aProvider")),
+      status: asString(p.status, t("activity.fb.unknown")),
+    }),
+  "ai.personal_credential_set": (p, t) =>
+    t("activity.ai.personal_credential_set", {
+      provider: asString(p.provider, t("activity.fb.aProvider")),
+    }),
+  "ai.personal_credential_removed": (p, t) =>
+    t("activity.ai.personal_credential_removed", {
+      provider: asString(p.provider, t("activity.fb.aProvider")),
+    }),
+  "ai.credentials_rotated": (p, t) =>
+    t("activity.ai.credentials_rotated", {
+      rewrapped: Number(p.rewrapped ?? 0),
+      examined: Number(p.examined ?? 0),
+    }),
+  "ai.custom_model_added": (_p, t) => t("activity.ai.custom_model_added"),
+  "ai.custom_model_updated": (_p, t) => t("activity.ai.custom_model_updated"),
+  "ai.custom_model_removed": (_p, t) => t("activity.ai.custom_model_removed"),
+  "ai.tier_policy_set": (p, t) =>
+    t("activity.ai.tier_policy_set", {
+      tier: asString(p.tier, t("activity.fb.a")),
+      provider: asString(p.provider),
+      model: asString(p.modelId),
+    }),
+  "ai.tier_policy_removed": (p, t) =>
+    t("activity.ai.tier_policy_removed", {
+      tier: asString(p.tier, t("activity.fb.a")),
+    }),
+  "ai.feature_setting_updated": (p, t) =>
+    t("activity.ai.feature_setting_updated", {
+      feature: asString(p.featureKey, t("activity.fb.AFeature")),
+    }),
+  "ai.prompt_updated": (p, t) =>
+    t("activity.ai.prompt_updated", {
+      prompt: asString(p.promptKey, t("activity.fb.aPrompt")),
+    }),
+  "ai.prompt_restored": (p, t) =>
+    t("activity.ai.prompt_restored", {
+      prompt: asString(p.promptKey, t("activity.fb.APrompt")),
+    }),
+  "ai.usage_recorded": (p, t) =>
+    t("activity.ai.usage_recorded", {
+      provider: asString(p.provider, t("activity.fb.aProvider")),
+      model: asString(p.modelId, t("activity.fb.aModel")),
+    }),
+  "ai.budget_set": (p, t) =>
+    t("activity.ai.budget_set", {
+      scope: asString(p.scope, t("activity.fb.workspace")),
+    }),
+  "ai.budget_removed": (_p, t) => t("activity.ai.budget_removed"),
+  "ai.privacy_updated": (p, t) =>
+    t("activity.ai.privacy_updated", {
+      keys: Array.isArray(p.keys) ? p.keys.join(", ") : "privacy",
+    }),
+  "ai.egress_withheld": (p, t) =>
     p.outcome === "redacted"
-      ? `Personal data was replaced before an AI request to ${asString(p.provider, "a provider")}`
-      : `An AI request to ${asString(p.provider, "a provider")} was withheld by the privacy settings`,
-  "connection.tool_calls_swept": (p) =>
-    `Removed ${asCount(p.deleted)} agent call record(s) older than ${asCount(p.retentionDays)} days`,
-  "connection.ended_by_admin": () =>
-    "An administrator ended a member's agent connection",
-  "agent.scope_refused": (p) =>
-    `An agent connection was refused ${asString(p.tool, "a tool")}: it needs ${asString(p.needed, "more")} scope`,
-  "agent.created": (p) =>
-    `Agent "${asString(p.name, "New agent")}" was created`,
-  "agent.enabled_changed": (p) =>
-    `An agent was turned ${p.enabled ? "on" : "off"}`,
-  "agent.instructions_saved": (p) =>
+      ? t("activity.ai.egress_withheld.redacted", {
+          provider: asString(p.provider, t("activity.fb.aProvider")),
+        })
+      : t("activity.ai.egress_withheld.withheld", {
+          provider: asString(p.provider, t("activity.fb.aProvider")),
+        }),
+  "connection.tool_calls_swept": (p, t) =>
+    t("activity.connection.tool_calls_swept", {
+      deleted: asCount(p.deleted),
+      days: asCount(p.retentionDays),
+    }),
+  "connection.ended_by_admin": (_p, t) =>
+    t("activity.connection.ended_by_admin"),
+  "agent.scope_refused": (p, t) =>
+    t("activity.agent.scope_refused", {
+      tool: asString(p.tool, t("activity.fb.aTool")),
+      needed: asString(p.needed, t("activity.fb.more")),
+    }),
+  "agent.created": (p, t) =>
+    t("activity.agent.created", {
+      name: asString(p.name, t("activity.fb.NewAgent")),
+    }),
+  "agent.enabled_changed": (p, t) =>
+    p.enabled
+      ? t("activity.agent.enabled_changed.on")
+      : t("activity.agent.enabled_changed.off"),
+  "agent.instructions_saved": (p, t) =>
     p.restoredFrom === undefined
-      ? `An agent's ${asString(p.stage, "")} instructions were saved as version ${String(p.version)}`
-      : `An agent's ${asString(p.stage, "")} instructions went back to version ${String(p.restoredFrom)}`,
-  "agent.scope_bound": (p) =>
-    `An agent was granted access to a ${asString(p.resourceType, "resource")}`,
-  "agent.run_started": () => "An agent run started",
-  "agent.run_task_processed": (p) =>
-    `An agent run's task ${Number(p.taskIndex ?? 0) + 1} was ${asString(p.outcome, "processed")}`,
-  "agent.run_cancelled": () => "An agent run was cancelled",
-  "agent.run_completed": () => "An agent run completed",
-  "agent.run_failed": (p) =>
-    `An agent run failed${p.error ? `: ${asString(p.error)}` : ""}`,
-  "proposed_change.bulk_applied": (p) =>
-    `${Number(p.appliedCount ?? 0)} proposed change(s) were applied`,
-  "proposed_change.bulk_dismissed": (p) =>
-    `${Number(p.dismissedCount ?? 0)} proposed change(s) were dismissed`,
-  "proposed_change.applied": () => "Applied an agent's proposed change",
-  "proposed_change.dismissed": () => "Dismissed an agent's proposed change",
-  "space.created": (p) =>
-    `Space "${asString(p.name, "New space")}" was created`,
-  "space.updated": (p) => `Space "${asString(p.name, "A space")}" was updated`,
-  "space.archived": (p) =>
-    `Space "${asString(p.name, "A space")}" was archived`,
-  "space.member_added": (p) =>
-    `${asString(p.name, "A member")} joined this space as ${asString(p.role, "a member")}`,
-  "space.member_removed": () => "A member was removed from this space",
-  "space.member_role_changed": (p) =>
-    `A member's role changed from ${asString(p.from, "member")} to ${asString(p.to, "member")}`,
-  "space.joined": () => "Someone joined this space",
-  "space.left": () => "Someone left this space",
-  "cycle.created": (p) =>
+      ? t("activity.agent.instructions_saved.saved", {
+          stage: asString(p.stage, ""),
+          version: String(p.version),
+        })
+      : t("activity.agent.instructions_saved.restored", {
+          stage: asString(p.stage, ""),
+          version: String(p.restoredFrom),
+        }),
+  "agent.scope_bound": (p, t) =>
+    t("activity.agent.scope_bound", {
+      resource: asString(p.resourceType, t("activity.fb.resource")),
+    }),
+  "agent.run_started": (_p, t) => t("activity.agent.run_started"),
+  "agent.run_task_processed": (p, t) =>
+    t("activity.agent.run_task_processed", {
+      index: Number(p.taskIndex ?? 0) + 1,
+      outcome: asString(p.outcome, t("activity.fb.processed")),
+    }),
+  "agent.run_cancelled": (_p, t) => t("activity.agent.run_cancelled"),
+  "agent.run_completed": (_p, t) => t("activity.agent.run_completed"),
+  "agent.run_failed": (p, t) =>
+    p.error
+      ? t("activity.agent.run_failed.reason", { error: asString(p.error) })
+      : t("activity.agent.run_failed.plain"),
+  "proposed_change.bulk_applied": (p, t) =>
+    t("activity.proposed_change.bulk_applied", {
+      n: Number(p.appliedCount ?? 0),
+    }),
+  "proposed_change.bulk_dismissed": (p, t) =>
+    t("activity.proposed_change.bulk_dismissed", {
+      n: Number(p.dismissedCount ?? 0),
+    }),
+  "proposed_change.applied": (_p, t) => t("activity.proposed_change.applied"),
+  "proposed_change.dismissed": (_p, t) =>
+    t("activity.proposed_change.dismissed"),
+  "space.created": (p, t) =>
+    t("activity.space.created", {
+      name: asString(p.name, t("activity.fb.NewSpace")),
+    }),
+  "space.updated": (p, t) =>
+    t("activity.space.updated", {
+      name: asString(p.name, t("activity.fb.ASpace")),
+    }),
+  "space.archived": (p, t) =>
+    t("activity.space.archived", {
+      name: asString(p.name, t("activity.fb.ASpace")),
+    }),
+  "space.member_added": (p, t, w) =>
+    t("activity.space.member_added", {
+      name: asString(p.name, t("activity.fb.AMember")),
+      role: w(
+        "activity.word.spaceRole",
+        asString(p.role, t("activity.fb.aMember")),
+      ),
+    }),
+  "space.member_removed": (_p, t) => t("activity.space.member_removed"),
+  "space.member_role_changed": (p, t, w) =>
+    t("activity.space.member_role_changed", {
+      from: w(
+        "activity.word.spaceRole",
+        asString(p.from, t("activity.fb.member")),
+      ),
+      to: w("activity.word.spaceRole", asString(p.to, t("activity.fb.member"))),
+    }),
+  "space.joined": (_p, t) => t("activity.space.joined"),
+  "space.left": (_p, t) => t("activity.space.left"),
+  "cycle.created": (p, t) =>
     p.inheritedFrom
-      ? `Cycle "${asString(p.name, "a new cycle")}" was created, inheriting from "${asString(p.inheritedFrom, "the cycle before")}"`
-      : `Cycle "${asString(p.name, "a new cycle")}" was created`,
-  "cycle.resolved": (p) =>
-    `Cycle "${asString(p.name, "the current cycle")}" was opened`,
-  "cycle.closing_started": (p) =>
+      ? t("activity.cycle.created.inherited", {
+          name: asString(p.name, t("activity.fb.aNewCycle")),
+          from: asString(p.inheritedFrom, t("activity.fb.theCycleBefore")),
+        })
+      : t("activity.cycle.created.plain", {
+          name: asString(p.name, t("activity.fb.aNewCycle")),
+        }),
+  "cycle.resolved": (p, t) =>
+    t("activity.cycle.resolved", {
+      name: asString(p.name, t("activity.fb.theCurrentCycle")),
+    }),
+  "cycle.closing_started": (p, t) =>
     p.by === "date"
-      ? `${asString(p.name, "The cycle")} ended and is closing: score it and close it`
-      : `${asString(p.name, "The cycle")} started closing early`,
-  "cycle.closing_undone": (p) =>
-    `${asString(p.name, "The cycle")} is no longer closing`,
-  "cycle.updated": (p) => `Cycle "${asString(p.name, "a cycle")}" was updated`,
-  "cycle.archived": (p) =>
-    `Cycle "${asString(p.name, "a cycle")}" was archived`,
-  "rhythm.updated": (p) =>
-    `Rhythm settings were updated (${Array.isArray(p.keys) ? p.keys.join(", ") : "thresholds"})`,
-  "practice.updated": (p) =>
-    `Practice settings were updated (${Array.isArray(p.keys) ? p.keys.join(", ") : "settings"})`,
-  "practice.profile_applied": (p) =>
-    `The practice profile changed from ${String(p.from ?? "")} to ${String(p.to ?? "")}`,
-  "cycle.pack_item_set": (p) =>
-    `Input pack item ${Number(p.itemKey ?? 0)} was marked ${p.gathered ? "gathered" : "missing"}`,
-  "cycle.pack_distributed": () => "The input pack was distributed",
-  "cycle.issue_added": (p) =>
-    `A strategic issue was added at impact ${Number(p.impact ?? 0)}`,
-  "cycle.issue_reranked": (p) =>
-    `A strategic issue was reranked to impact ${Number(p.impact ?? 0)}`,
-  "cycle.priority_added": (p) =>
+      ? t("activity.cycle.closing_started.date", {
+          name: asString(p.name, t("activity.fb.TheCycle")),
+        })
+      : t("activity.cycle.closing_started.early", {
+          name: asString(p.name, t("activity.fb.TheCycle")),
+        }),
+  "cycle.closing_undone": (p, t) =>
+    t("activity.cycle.closing_undone", {
+      name: asString(p.name, t("activity.fb.TheCycle")),
+    }),
+  "cycle.updated": (p, t) =>
+    t("activity.cycle.updated", {
+      name: asString(p.name, t("activity.fb.aCycle")),
+    }),
+  "cycle.archived": (p, t) =>
+    t("activity.cycle.archived", {
+      name: asString(p.name, t("activity.fb.aCycle")),
+    }),
+  "rhythm.updated": (p, t) =>
+    t("activity.rhythm.updated", {
+      keys: Array.isArray(p.keys) ? p.keys.join(", ") : "thresholds",
+    }),
+  "practice.updated": (p, t) =>
+    t("activity.practice.updated", {
+      keys: Array.isArray(p.keys) ? p.keys.join(", ") : "settings",
+    }),
+  "practice.profile_applied": (p, t) =>
+    t("activity.practice.profile_applied", {
+      from: String(p.from ?? ""),
+      to: String(p.to ?? ""),
+    }),
+  "cycle.pack_item_set": (p, t) =>
+    p.gathered
+      ? t("activity.cycle.pack_item_set.gathered", {
+          item: Number(p.itemKey ?? 0),
+        })
+      : t("activity.cycle.pack_item_set.missing", {
+          item: Number(p.itemKey ?? 0),
+        }),
+  "cycle.pack_distributed": (_p, t) => t("activity.cycle.pack_distributed"),
+  "cycle.issue_added": (p, t) =>
+    t("activity.cycle.issue_added", { impact: Number(p.impact ?? 0) }),
+  "cycle.issue_reranked": (p, t) =>
+    t("activity.cycle.issue_reranked", { impact: Number(p.impact ?? 0) }),
+  "cycle.priority_added": (p, t) =>
     p.promoted
-      ? "An issue was promoted into a priority"
-      : "A priority was added",
-  "cycle.revalidated": (p) =>
+      ? t("activity.cycle.priority_added.promoted")
+      : t("activity.cycle.priority_added.added"),
+  "cycle.revalidated": (p, t) =>
     p.changed
-      ? "The annual frame was revalidated with a change"
-      : "The annual frame was revalidated and holds",
-  "cycle.baseline_health_set": () => "Baseline health was recorded",
-  "cycle.capacity_recorded": () => "What was cut was recorded",
-  "cycle.focus_set": (p) =>
-    `Chose ${Number(p.count ?? 0)} of the year's key results to focus on`,
-  "cycle.calibrated": () => "The cycle was calibrated mid-flight",
-  "cycle.published": (p) =>
+      ? t("activity.cycle.revalidated.changed")
+      : t("activity.cycle.revalidated.holds"),
+  "cycle.baseline_health_set": (_p, t) =>
+    t("activity.cycle.baseline_health_set"),
+  "cycle.capacity_recorded": (_p, t) => t("activity.cycle.capacity_recorded"),
+  "cycle.focus_set": (p, t) =>
+    t("activity.cycle.focus_set", { n: Number(p.count ?? 0) }),
+  "cycle.calibrated": (_p, t) => t("activity.cycle.calibrated"),
+  "cycle.published": (p, t) =>
     p.published === "company"
-      ? `The company set of cycle "${asString(p.name, "a cycle")}" was published`
-      : `Cycle "${asString(p.name, "a cycle")}" was published`,
-  // One line per run, not per nudge. A feed with an entry for every message
-  // the product sent would bury everything a person actually did.
-  "nudges.run": (p) =>
-    `ran the nudge engine and recorded ${String(p.recorded)} nudge(s)`,
-  "nudge.snoozed": (p) => `snoozed a nudge until ${asString(p.until, "later")}`,
-  "notifications.drained": (p) =>
-    `sent ${String(p.claimed)} notification digest(s)`,
-  "frame.set": (p) =>
-    `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
-  "frame.revised": (p) =>
-    `The agreed annual frame for ${asString(p.yearLabel, "the year")} was revised: ${asString(p.reason, "no reason recorded")}`,
-  "goal.created": (p) =>
-    p.addedMidCycle
-      ? `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was added mid-cycle`
-      : `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was created`,
-  "goal.updated": (p) => `Goal "${asString(p.title, "a goal")}" was edited`,
-  "goal.draft_published": (p) =>
+      ? t("activity.cycle.published.company", {
+          name: asString(p.name, t("activity.fb.aCycle")),
+        })
+      : t("activity.cycle.published.plain", {
+          name: asString(p.name, t("activity.fb.aCycle")),
+        }),
+  "nudges.run": (p, t) =>
+    t("activity.nudges.run", { recorded: String(p.recorded) }),
+  "nudge.snoozed": (p, t) =>
+    t("activity.nudge.snoozed", {
+      until: asString(p.until, t("activity.fb.later")),
+    }),
+  "notifications.drained": (p, t) =>
+    t("activity.notifications.drained", { claimed: String(p.claimed) }),
+  "frame.set": (p, t) =>
+    t("activity.frame.set", {
+      year: asString(p.yearLabel, t("activity.fb.theYear")),
+    }),
+  "frame.revised": (p, t) =>
+    t("activity.frame.revised", {
+      year: asString(p.yearLabel, t("activity.fb.theYear")),
+      reason: asString(p.reason, t("activity.fb.noReasonRecorded")),
+    }),
+  "goal.created": (p, t, w) =>
+    p.addedMidCycle && typeof p.level === "string"
+      ? t("activity.goal.created.midCycleLevel", {
+          level: w("activity.word.level", asString(p.level)),
+          title: asString(p.title, t("activity.fb.aGoal")),
+        })
+      : p.addedMidCycle
+        ? t("activity.goal.created.midCycle", {
+            title: asString(p.title, t("activity.fb.aGoal")),
+          })
+        : typeof p.level === "string"
+          ? t("activity.goal.created.level", {
+              level: w("activity.word.level", asString(p.level)),
+              title: asString(p.title, t("activity.fb.aGoal")),
+            })
+          : t("activity.goal.created.plain", {
+              title: asString(p.title, t("activity.fb.aGoal")),
+            }),
+  "goal.updated": (p, t) =>
+    t("activity.goal.updated", {
+      title: asString(p.title, t("activity.fb.aGoal")),
+    }),
+  "goal.draft_published": (p, t) =>
     p.awaitingApproval
-      ? `The draft "${asString(p.title, "a goal")}" was published, and waits for its reviewer's approval`
-      : `The draft "${asString(p.title, "a goal")}" was published and is live`,
-  "goal.draft_approved": (p) =>
-    `The draft "${asString(p.title, "a goal")}" was approved and is live`,
-  "goal.closed": (p) =>
-    `The goal was closed as ${asString(p.successStatus, "closed")}, with ${CLOSE_DECISION_PHRASE[asString(p.closeDecision, "keep")] ?? "a decision to keep it"}`,
-  "goal.reopened": () => "The goal was reopened",
-  "goal.moved_space": (p) =>
-    `The goal moved from ${asString(p.fromSpace, "one space")} to ${asString(p.toSpace, "another")}`,
-  "goal.stopped": (p) =>
-    `The goal was stopped, as it no longer matters: ${asString(p.reason, "no reason given")}`,
-  "goal.deleted": (p) => `Removed the goal "${p.title}"`,
-  "goal.restored": (p) => `Goal "${asString(p.title, "a goal")}" was restored`,
-  "goal.role_reassigned": (p) =>
-    `The goal's ${asString(p.role, "role")} was reassigned`,
-  "goal.moved_to_cycle": (p) =>
-    `Goal "${asString(p.title, "a goal")}" was moved to another cycle`,
-  // Initiatives (P5-T10a). "Work" rather than "an initiative" where the title
-  // is missing, because a feed line has to read as a sentence either way.
-  "initiative.created": (p) =>
-    `Initiative "${asString(p.title, "some work")}" was created`,
-  "initiative.updated": () => "An initiative was edited",
-  "initiative.deleted": (p) =>
-    `Initiative "${asString(p.title, "some work")}" was removed`,
-  "initiative.restored": (p) =>
-    `Initiative "${asString(p.title, "some work")}" was restored`,
-  "initiative.linked": () =>
-    "An initiative was recorded as work that will move a key result",
-  "initiative.unlinked": () =>
-    "An initiative is no longer recorded against a key result",
-  // Exports (P5-T13).
-  "export.taken": (p) =>
-    `${Number(p.rowCount ?? 0)} ${asString(p.list, "rows")} were exported`,
-  // Imports (P6-T01a).
-  "import.started": (p) =>
-    `An import from ${asString(p.source, "a file")} started${
-      p.mode === "dry_run" ? " as a dry run" : ""
-    }`,
-  "import.finished": (p) =>
-    p.status === "completed"
-      ? `An import wrote ${Number(p.rowsWritten ?? 0)} rows and skipped ${Number(
-          p.rowsSkipped ?? 0,
-        )}`
-      : "An import failed",
-  // Archive import (P6-T05b).
-  "import.archive": (p) =>
+      ? t("activity.goal.draft_published.awaiting", {
+          title: asString(p.title, t("activity.fb.aGoal")),
+        })
+      : t("activity.goal.draft_published.live", {
+          title: asString(p.title, t("activity.fb.aGoal")),
+        }),
+  "goal.draft_approved": (p, t) =>
+    t("activity.goal.draft_approved", {
+      title: asString(p.title, t("activity.fb.aGoal")),
+    }),
+  "goal.closed": (p, t, w) =>
+    t("activity.goal.closed", {
+      status: asString(p.successStatus, t("activity.fb.closed")),
+      decision: w(
+        "activity.word.closeDecision",
+        asString(p.closeDecision, "keep"),
+      ),
+    }),
+  "goal.reopened": (_p, t) => t("activity.goal.reopened"),
+  "goal.moved_space": (p, t) =>
+    t("activity.goal.moved_space", {
+      from: asString(p.fromSpace, t("activity.fb.oneSpace")),
+      to: asString(p.toSpace, t("activity.fb.another")),
+    }),
+  "goal.stopped": (p, t) =>
+    t("activity.goal.stopped", {
+      reason: asString(p.reason, t("activity.fb.noReasonGiven")),
+    }),
+  "goal.deleted": (p, t) =>
+    t("activity.goal.deleted", { title: String(p.title) }),
+  "goal.restored": (p, t) =>
+    t("activity.goal.restored", {
+      title: asString(p.title, t("activity.fb.aGoal")),
+    }),
+  "goal.role_reassigned": (p, t, w) =>
+    t("activity.goal.role_reassigned", {
+      role: w(
+        "activity.word.goalRole",
+        asString(p.role, t("activity.fb.role")),
+      ),
+    }),
+  "goal.moved_to_cycle": (p, t) =>
+    t("activity.goal.moved_to_cycle", {
+      title: asString(p.title, t("activity.fb.aGoal")),
+    }),
+  "initiative.created": (p, t) =>
+    t("activity.initiative.created", {
+      title: asString(p.title, t("activity.fb.someWork")),
+    }),
+  "initiative.updated": (_p, t) => t("activity.initiative.updated"),
+  "initiative.deleted": (p, t) =>
+    t("activity.initiative.deleted", {
+      title: asString(p.title, t("activity.fb.someWork")),
+    }),
+  "initiative.restored": (p, t) =>
+    t("activity.initiative.restored", {
+      title: asString(p.title, t("activity.fb.someWork")),
+    }),
+  "initiative.linked": (_p, t) => t("activity.initiative.linked"),
+  "initiative.unlinked": (_p, t) => t("activity.initiative.unlinked"),
+  "export.taken": (p, t) =>
+    t("activity.export.taken", {
+      n: Number(p.rowCount ?? 0),
+      list: asString(p.list, t("activity.fb.rows")),
+    }),
+  "import.started": (p, t) =>
     p.mode === "dry_run"
-      ? "A workspace archive was previewed as a dry run"
-      : "A workspace archive was imported",
-  // Documents and attachments (P5-T12).
-  "document.drafted": (p) =>
-    `A document "${asString(p.title, "untitled")}" was started`,
-  "document.edited": () => "A document was edited",
-  "document.published": (p) =>
-    `Document "${asString(p.title, "untitled")}" was published as version ${Number(p.version ?? 1)}`,
-  "document.deleted": (p) =>
-    `Document "${asString(p.title, "untitled")}" was removed`,
-  "document.restored": (p) =>
-    `Document "${asString(p.title, "untitled")}" was restored`,
-  "attachment.added": () => "A file was attached",
-  "attachment.removed": () => "A file was detached",
-  // Tasks (P5-T11).
-  "task.created": (p) => `Task "${asString(p.title, "a task")}" was created`,
-  "task.updated": () => "A task was edited",
-  "task.moved": (p) =>
-    `A task moved to ${asString(p.status, "another column")}`,
-  "task.assigned": () => "A task was assigned",
-  "task.unassigned": () => "An assignment was removed from a task",
-  "task.checklist_changed": (p) =>
-    `A checklist line was ${asString(p.change, "changed")}`,
-  "task.deleted": (p) => `Task "${asString(p.title, "a task")}" was removed`,
-  "task.restored": (p) => `Task "${asString(p.title, "a task")}" was restored`,
-  "key_result.created": (p) =>
+      ? t("activity.import.started.dryRun", {
+          source: asString(p.source, t("activity.fb.aFile")),
+        })
+      : t("activity.import.started.plain", {
+          source: asString(p.source, t("activity.fb.aFile")),
+        }),
+  "import.finished": (p, t) =>
+    p.status === "completed"
+      ? t("activity.import.finished.completed", {
+          written: Number(p.rowsWritten ?? 0),
+          skipped: Number(p.rowsSkipped ?? 0),
+        })
+      : t("activity.import.finished.failed"),
+  "import.archive": (p, t) =>
+    p.mode === "dry_run"
+      ? t("activity.import.archive.dryRun")
+      : t("activity.import.archive.plain"),
+  "document.drafted": (p, t) =>
+    t("activity.document.drafted", {
+      title: asString(p.title, t("activity.fb.untitled")),
+    }),
+  "document.edited": (_p, t) => t("activity.document.edited"),
+  "document.published": (p, t) =>
+    t("activity.document.published", {
+      title: asString(p.title, t("activity.fb.untitled")),
+      version: Number(p.version ?? 1),
+    }),
+  "document.deleted": (p, t) =>
+    t("activity.document.deleted", {
+      title: asString(p.title, t("activity.fb.untitled")),
+    }),
+  "document.restored": (p, t) =>
+    t("activity.document.restored", {
+      title: asString(p.title, t("activity.fb.untitled")),
+    }),
+  "attachment.added": (_p, t) => t("activity.attachment.added"),
+  "attachment.removed": (_p, t) => t("activity.attachment.removed"),
+  "task.created": (p, t) =>
+    t("activity.task.created", {
+      title: asString(p.title, t("activity.fb.aTask")),
+    }),
+  "task.updated": (_p, t) => t("activity.task.updated"),
+  "task.moved": (p, t) =>
+    t("activity.task.moved", {
+      status: asString(p.status, t("activity.fb.anotherColumn")),
+    }),
+  "task.assigned": (_p, t) => t("activity.task.assigned"),
+  "task.unassigned": (_p, t) => t("activity.task.unassigned"),
+  "task.checklist_changed": (p, t) =>
+    t("activity.task.checklist_changed", {
+      change: asString(p.change, t("activity.fb.changed")),
+    }),
+  "task.deleted": (p, t) =>
+    t("activity.task.deleted", {
+      title: asString(p.title, t("activity.fb.aTask")),
+    }),
+  "task.restored": (p, t) =>
+    t("activity.task.restored", {
+      title: asString(p.title, t("activity.fb.aTask")),
+    }),
+  "key_result.created": (p, t) =>
     p.addedMidCycle
-      ? `Key result "${asString(p.title, "a key result")}" was added mid-cycle`
-      : `Key result "${asString(p.title, "a key result")}" was added`,
-  "key_result.updated": () => "A key result was edited",
-  "key_result.value_recorded": (p) =>
-    `A key result moved to ${Number(p.value ?? 0)}`,
-  // Out of ten, the way the list shows it by default; the feed has no
-  // workspace setting to hand.
-  "key_result.confidence_updated": (p) =>
-    `A key result's confidence was set to ${Math.round(Number(p.to ?? 0) * 10)} in 10`,
-  "key_result.removed": (p) =>
-    `Key result "${asString(p.title, "a key result")}" was removed`,
-  "key_result.target_changed": (p) =>
+      ? t("activity.key_result.created.midCycle", {
+          title: asString(p.title, t("activity.fb.aKeyResult")),
+        })
+      : t("activity.key_result.created.plain", {
+          title: asString(p.title, t("activity.fb.aKeyResult")),
+        }),
+  "key_result.updated": (_p, t) => t("activity.key_result.updated"),
+  "key_result.value_recorded": (p, t) =>
+    t("activity.key_result.value_recorded", { value: Number(p.value ?? 0) }),
+  "key_result.confidence_updated": (p, t) =>
+    t("activity.key_result.confidence_updated", {
+      value: Math.round(Number(p.to ?? 0) * 10),
+    }),
+  "key_result.removed": (p, t) =>
+    t("activity.key_result.removed", {
+      title: asString(p.title, t("activity.fb.aKeyResult")),
+    }),
+  "key_result.target_changed": (p, t) =>
     p.from === null
-      ? `A key result's target was set to ${String(p.to)}`
+      ? t("activity.key_result.target_changed.set", { to: String(p.to) })
       : p.eased
-        ? `A key result's target was eased from ${String(p.from)} to ${String(p.to)}`
-        : `A key result's target moved from ${String(p.from)} to ${String(p.to)}`,
-  "key_result.placed": () => "A key result was moved in its objective's order",
-  "goal.placed": () => "An objective was moved in its cycle's order",
-  "goal.kind_changed": (p) =>
-    `The objective is now ${asString(p.to, "a different kind")}, where it was ${asString(p.from, "another kind")}`,
-  "key_result.restored": (p) =>
-    `Key result "${asString(p.title, "a key result")}" was brought back`,
-  "key_result.kpi_linked": () =>
-    "A key result was linked to a KPI and now reads its value from it",
-  "key_result.kpi_unlinked": () =>
-    "A key result was unlinked from its KPI and keeps the last value it reported",
-  "check_in.draft_opened": (p) =>
+        ? t("activity.key_result.target_changed.eased", {
+            from: String(p.from),
+            to: String(p.to),
+          })
+        : t("activity.key_result.target_changed.moved", {
+            from: String(p.from),
+            to: String(p.to),
+          }),
+  "key_result.placed": (_p, t) => t("activity.key_result.placed"),
+  "goal.placed": (_p, t) => t("activity.goal.placed"),
+  "goal.kind_changed": (p, t) =>
+    t("activity.goal.kind_changed", {
+      to: asString(p.to, t("activity.fb.aDifferentKind")),
+      from: asString(p.from, t("activity.fb.anotherKind")),
+    }),
+  "key_result.restored": (p, t) =>
+    t("activity.key_result.restored", {
+      title: asString(p.title, t("activity.fb.aKeyResult")),
+    }),
+  "key_result.kpi_linked": (_p, t) => t("activity.key_result.kpi_linked"),
+  "key_result.kpi_unlinked": (_p, t) => t("activity.key_result.kpi_unlinked"),
+  "check_in.draft_opened": (p, t) =>
     p.reopened
-      ? "A draft check-in was reopened"
-      : "A draft check-in was started",
-  "check_in.published": (p) =>
-    `A check-in was published as ${asString(p.status, "on track").replace("_", " ")}`,
-  "check_in.edited": () => "A check-in was edited inside its window",
-  "check_in.deleted": (p) =>
+      ? t("activity.check_in.draft_opened.reopened")
+      : t("activity.check_in.draft_opened.started"),
+  "check_in.published": (p, t, w) =>
+    t("activity.check_in.published", {
+      status: w(
+        "activity.word.checkInStatus",
+        asString(p.status, t("activity.word.checkInStatus.on_track")),
+        asString(p.status, "on track").replace("_", " "),
+      ),
+    }),
+  "check_in.edited": (_p, t) => t("activity.check_in.edited"),
+  "check_in.deleted": (p, t) =>
     p.rolledBack
-      ? "The latest check-in was deleted and the goal rolled back to what it said before"
-      : "A check-in was deleted",
-  "check_in.acknowledged": (p) =>
+      ? t("activity.check_in.deleted.rolledBack")
+      : t("activity.check_in.deleted.plain"),
+  "check_in.acknowledged": (p, t) =>
     p.repeat
-      ? "A check-in was already acknowledged"
-      : typeof p.settledEarlier === "number" && p.settledEarlier > 0
-        ? `The reviewer acknowledged a check-in and the ${p.settledEarlier === 1 ? "earlier one" : `${p.settledEarlier} earlier ones`} still open`
-        : "The reviewer acknowledged a check-in",
-  "alignment.dependency_added": (p) =>
+      ? t("activity.check_in.acknowledged.repeat")
+      : typeof p.settledEarlier === "number" && p.settledEarlier === 1
+        ? t("activity.check_in.acknowledged.earlierOne")
+        : typeof p.settledEarlier === "number" && p.settledEarlier > 0
+          ? t("activity.check_in.acknowledged.earlierMany", {
+              n: String(p.settledEarlier),
+            })
+          : t("activity.check_in.acknowledged.plain"),
+  "alignment.dependency_added": (p, t) =>
     p.note
-      ? "Two goals were linked as depending on each other, with a note"
-      : "Two goals were linked as depending on each other",
-  "alignment.dependency_removed": () =>
-    "A dependency between two goals was removed",
-  "alignment.register_added": (p) =>
-    `A key result was recorded as depending on ${String(p.provider ?? "another team")}`,
-  "alignment.register_confirmed": () =>
-    "The providing team confirmed a dependency",
-  "alignment.register_risk_owned": () =>
-    "A risk owner was named for an unconfirmed dependency",
-  "alignment.register_escalated": () =>
-    "An unconfirmed dependency was escalated to the cycle's sponsor",
-  "alignment.register_provider_named": (p) =>
+      ? t("activity.alignment.dependency_added.note")
+      : t("activity.alignment.dependency_added.plain"),
+  "alignment.dependency_removed": (_p, t) =>
+    t("activity.alignment.dependency_removed"),
+  "alignment.register_added": (p, t) =>
+    t("activity.alignment.register_added", {
+      provider: String(p.provider ?? t("activity.fb.anotherTeam")),
+    }),
+  "alignment.register_confirmed": (_p, t) =>
+    t("activity.alignment.register_confirmed"),
+  "alignment.register_risk_owned": (_p, t) =>
+    t("activity.alignment.register_risk_owned"),
+  "alignment.register_escalated": (_p, t) =>
+    t("activity.alignment.register_escalated"),
+  "alignment.register_provider_named": (p, t) =>
     !p.named
-      ? "The key result that delivers a dependency was cleared"
+      ? t("activity.alignment.register_provider_named.cleared")
       : p.confirmationCleared
-        ? "A different key result was named to deliver a dependency, so the providing team confirms it again"
-        : "The key result that delivers a dependency was named",
-  "alignment.register_removed": () =>
-    "A dependency was removed from the register",
-  "alignment.finding_dismissed": (p) =>
-    `An alignment finding was dismissed (${String(p.ruleKey ?? "no rule")})`,
-  "alignment.finding_applied": () =>
-    "A relink finding was applied and the goal was re-parented",
-  "kpi.category_created": (p) =>
-    `A KPI category "${String(p.name ?? "")}" was added`,
-  "kpi.created": (p) =>
-    `A ${String(p.frequency ?? "")} KPI "${String(p.title ?? "")}" was added`,
-  "kpi.responded": (p) =>
+        ? t("activity.alignment.register_provider_named.changed")
+        : t("activity.alignment.register_provider_named.named"),
+  "alignment.register_removed": (_p, t) =>
+    t("activity.alignment.register_removed"),
+  "alignment.finding_dismissed": (p, t) =>
+    t("activity.alignment.finding_dismissed", {
+      rule: String(p.ruleKey ?? t("activity.fb.noRule")),
+    }),
+  "alignment.finding_applied": (_p, t) =>
+    t("activity.alignment.finding_applied"),
+  "kpi.category_created": (p, t) =>
+    t("activity.kpi.category_created", { name: String(p.name ?? "") }),
+  "kpi.created": (p, t) =>
+    t("activity.kpi.created", {
+      frequency: String(p.frequency ?? ""),
+      title: String(p.title ?? ""),
+    }),
+  "kpi.shared": (p, t, w) =>
+    t("activity.kpi.shared", {
+      level: w(
+        "activity.word.shareLevel",
+        asString(p.level, t("activity.fb.view")),
+      ),
+    }),
+  "kpi.unshared": (_p, t) => t("activity.kpi.unshared"),
+  "kpi.responded": (p, t) =>
     p.response === "fix_now"
-      ? "An unhealthy KPI is being fixed now, as a task with an owner and a date"
-      : "An unhealthy KPI was answered with a key result on an existing objective",
-  "kpi.value_recorded": (p) =>
+      ? t("activity.kpi.responded.fixNow")
+      : t("activity.kpi.responded.keyResult"),
+  "kpi.value_recorded": (p, t) =>
     p.created
-      ? `A value was recorded for the period beginning ${String(p.periodStart ?? "")}`
-      : `The value for the period beginning ${String(p.periodStart ?? "")} was updated`,
-  "kpi.value_removed": (p) =>
-    `The value for the period beginning ${String(p.periodStart ?? "")} was removed`,
-  "kpi.formula_set": (p) =>
-    `A KPI became calculated from ${Number(p.references ?? 0)} other measure(s)`,
-  "kpi.tree_created": (p) => `A KPI tree "${String(p.name ?? "")}" was named`,
-  "cycle.snapshotted": (p) =>
-    `A cycle's performance was recorded in ${Number(p.snapshots ?? 0)} snapshot(s)${
-      p.verdict ? `, reading ${String(p.verdict)}` : " and no verdict"
-    }`,
-  "cycle.fed_forward": (p) =>
-    `The next cycle inherited ${Number(p.priorScores ?? 0)} prior score(s) and ${Number(p.issues ?? 0)} carried issue(s)`,
-  "cycle.closed": (p) =>
-    `Cycle "${asString(p.name, "a cycle")}" was closed${
-      p.verdict ? `, reading ${String(p.verdict).replace(/_/g, " ")}` : ""
-    }${p.fedInto ? `, and fed "${String(p.fedInto)}"` : ""}`,
-  "kpi.updated": (p) =>
-    `A KPI was edited (${(p.fields as string[] | undefined)?.join(", ") ?? "no fields"})`,
-  "kpi.recovery_launched": (p) =>
-    `A recovery objective with ${Number(p.keyResults ?? 0)} key result(s) was launched`,
-  "check_in.vote_cast": (p) =>
-    p.changed ? "A confidence vote was changed" : "A confidence vote was cast",
-  "check_in.votes_revealed": (p) =>
-    `${Number(p.revealed ?? 0)} confidence vote(s) were revealed together`,
-  "cadence.staleness_swept": (p) =>
-    `${Number(p.flipped ?? 0)} goal(s) went past their grace window and now read outdated`,
-  // Comments and reactions (P3-T16)
-  "comment.created": (p) =>
-    `Commented on a ${asString(p.subjectType, "subject")}: ${asString(p.excerpt, "(empty)")}`,
-  "comment.updated": (p) =>
-    `Edited a comment on a ${asString(p.subjectType, "subject")}`,
-  "comment.deleted": (p) =>
-    `Deleted a comment on a ${asString(p.subjectType, "subject")}`,
-  "comment.filesResolved": (p) =>
-    `Attached ${Number(p.attachments ?? 0)} file(s) an imported comment held inline`,
-  "reaction.added": (p) =>
-    `Reacted ${asString(p.emoji)} on a ${asString(p.subjectType, "subject")}`,
-  "reaction.removed": (p) =>
-    `Removed ${asString(p.emoji)} reaction from a ${asString(p.subjectType, "subject")}`,
-  // Sessions (P4-T07a)
-  "session.created": (p) =>
-    `Created a ${asString(p.kind)} session: ${asString(p.title)}`,
-  "session.cycleBooked": (p) =>
-    `Booked ${Number(p.booked ?? 0)} session(s) for the whole cycle`,
-  "session.opened": (p) => `Opened the ${asString(p.kind)} session`,
-  "session.stageAdvanced": (p) =>
-    `Advanced to the ${asString(p.to, "next")} stage`,
-  "session.skipped": (p) => `Skipped the ${asString(p.kind)} session`,
-  "session.closed": (p) => `Closed the ${asString(p.kind)} session`,
-  // Confidence round (P4-T07b)
-  "session.voteCast": () => "Cast a confidence vote",
-  "session.votesRevealed": (p) =>
-    `Revealed ${asCount(p.count)} votes on a key result`,
-  "session.confidenceConfirmed": (p) =>
-    `Confirmed confidence at ${asCount(p.confidence)}`,
-  // Blockers (P4-T07c)
-  "session.winsNamed": (p) =>
+      ? t("activity.kpi.value_recorded.created", {
+          start: String(p.periodStart ?? ""),
+        })
+      : t("activity.kpi.value_recorded.updated", {
+          start: String(p.periodStart ?? ""),
+        }),
+  "kpi.value_removed": (p, t) =>
+    t("activity.kpi.value_removed", { start: String(p.periodStart ?? "") }),
+  "kpi.formula_set": (p, t) =>
+    t("activity.kpi.formula_set", { n: Number(p.references ?? 0) }),
+  "kpi.tree_created": (p, t) =>
+    t("activity.kpi.tree_created", { name: String(p.name ?? "") }),
+  "cycle.snapshotted": (p, t) =>
+    p.verdict
+      ? t("activity.cycle.snapshotted.verdict", {
+          n: Number(p.snapshots ?? 0),
+          verdict: String(p.verdict),
+        })
+      : t("activity.cycle.snapshotted.none", { n: Number(p.snapshots ?? 0) }),
+  "cycle.fed_forward": (p, t) =>
+    t("activity.cycle.fed_forward", {
+      scores: Number(p.priorScores ?? 0),
+      issues: Number(p.issues ?? 0),
+    }),
+  "cycle.closed": (p, t) =>
+    (() => {
+      const name = asString(p.name, t("activity.fb.aCycle"));
+      const verdict = p.verdict ? String(p.verdict).replace(/_/g, " ") : null;
+      const fed = p.fedInto ? String(p.fedInto) : null;
+      if (verdict && fed) {
+        return t("activity.cycle.closed.verdictFed", { name, verdict, fed });
+      }
+      if (verdict) {
+        return t("activity.cycle.closed.verdict", { name, verdict });
+      }
+      if (fed) {
+        return t("activity.cycle.closed.fed", { name, fed });
+      }
+      return t("activity.cycle.closed.plain", { name });
+    })(),
+  "kpi.updated": (p, t) =>
+    t("activity.kpi.updated", {
+      fields:
+        (p.fields as string[] | undefined)?.join(", ") ??
+        t("activity.fb.noFields"),
+    }),
+  "kpi.recovery_launched": (p, t) =>
+    t("activity.kpi.recovery_launched", { n: Number(p.keyResults ?? 0) }),
+  "check_in.vote_cast": (p, t) =>
+    p.changed
+      ? t("activity.check_in.vote_cast.changed")
+      : t("activity.check_in.vote_cast.cast"),
+  "check_in.votes_revealed": (p, t) =>
+    t("activity.check_in.votes_revealed", { n: Number(p.revealed ?? 0) }),
+  "cadence.staleness_swept": (p, t) =>
+    t("activity.cadence.staleness_swept", { n: Number(p.flipped ?? 0) }),
+  "comment.created": (p, t, w) =>
+    t("activity.comment.created", {
+      subject: w(
+        "activity.word.subject",
+        asString(p.subjectType, t("activity.fb.subject")),
+      ),
+      excerpt: asString(p.excerpt, t("activity.fb.empty1")),
+    }),
+  "comment.updated": (p, t, w) =>
+    t("activity.comment.updated", {
+      subject: w(
+        "activity.word.subject",
+        asString(p.subjectType, t("activity.fb.subject")),
+      ),
+    }),
+  "comment.deleted": (p, t, w) =>
+    t("activity.comment.deleted", {
+      subject: w(
+        "activity.word.subject",
+        asString(p.subjectType, t("activity.fb.subject")),
+      ),
+    }),
+  "comment.filesResolved": (p, t) =>
+    t("activity.comment.filesResolved", { n: Number(p.attachments ?? 0) }),
+  "reaction.added": (p, t, w) =>
+    t("activity.reaction.added", {
+      emoji: asString(p.emoji),
+      subject: w(
+        "activity.word.subject",
+        asString(p.subjectType, t("activity.fb.subject")),
+      ),
+    }),
+  "reaction.removed": (p, t, w) =>
+    t("activity.reaction.removed", {
+      emoji: asString(p.emoji),
+      subject: w(
+        "activity.word.subject",
+        asString(p.subjectType, t("activity.fb.subject")),
+      ),
+    }),
+  "session.created": (p, t) =>
+    t("activity.session.created", {
+      kind: asString(p.kind),
+      title: asString(p.title),
+    }),
+  "session.cycleBooked": (p, t) =>
+    t("activity.session.cycleBooked", { n: Number(p.booked ?? 0) }),
+  "session.opened": (p, t) =>
+    t("activity.session.opened", { kind: asString(p.kind) }),
+  "session.stageAdvanced": (p, t) =>
+    t("activity.session.stageAdvanced", {
+      stage: asString(p.to, t("activity.fb.next")),
+    }),
+  "session.skipped": (p, t) =>
+    t("activity.session.skipped", { kind: asString(p.kind) }),
+  "session.closed": (p, t) =>
+    t("activity.session.closed", { kind: asString(p.kind) }),
+  "session.voteCast": (_p, t) => t("activity.session.voteCast"),
+  "session.votesRevealed": (p, t) =>
+    t("activity.session.votesRevealed", { n: asCount(p.count) }),
+  "session.confidenceConfirmed": (p, t) =>
+    t("activity.session.confidenceConfirmed", { value: asCount(p.confidence) }),
+  "session.winsNamed": (p, t) =>
     asCount(p.count) === 1
-      ? "Named one win for the week"
-      : `Named ${asCount(p.count)} wins for the week`,
-  "session.nextActionSet": () => "Named the next action for a low score",
-  "session.blockerCreated": (p) => `Opened a ${asString(p.type)} blocker`,
-  "goal.blocker_raised": (p) => `Raised a ${asString(p.type)} blocker`,
-  "session.blockerResolved": (p) => `Resolved a ${asString(p.type)} blocker`,
-  "session.blockerReassigned": (p) =>
-    `A ${asString(p.type, "blocker")} blocker was handed to ${asString(p.ownerName, "somebody else")}`,
-  // Commitments, digest, streaks (P4-T08)
-  "session.commitmentsSet": (p) =>
-    `Set ${asCount(p.count)} commitments for this week`,
-  "session.commitmentsClosed": (p) =>
-    `Closed ${asCount(p.count)} commitments from last week`,
-  "session.coordinatorNoteSet": () => "Added a coordinator note to the digest",
-  "session.digestPosted": (p) => {
-    const named = (Array.isArray(p.channels) ? p.channels : []).map(
-      (channel) => (channel === "teams" ? "Teams" : "Slack"),
-    );
-    return named.length > 0
-      ? `Posted the week's digest to the channel on ${named.join(" and ")}`
-      : "Posted the week's digest";
-  },
-  "session.trendRecorded": (p) =>
-    `Recorded the trend for this objective as ${asString(p.trend, "unknown")}`,
-  "session.shiftsRecorded": () =>
-    "Noted the resource or priority shifts for this review",
-  "session.decisionRecorded": () => "Recorded a decision in the monthly review",
-  "session.minuteAdded": (p) =>
-    `Gave the ${asString(p.stageKey, "current")} stage another minute`,
-  "session.stageNoteSet": (p) =>
-    `Made a private note on the ${asString(p.stageKey, "current")} stage`,
-  "session.pulseGiven": () => "Gave their pulse for the cycle",
-  "session.keyResultScored": () => "Graded a key result in the review",
-  "session.objectiveScoreRevealed": () =>
-    "Revealed this objective's score in the review",
-  "session.micPassed": () => "Passed the mic in the review",
-  "session.narrativeWritten": () => "Wrote this objective's review narrative",
-  "session.kudosGiven": () => "Named somebody's effort in the review",
-  "session.retroNoteAdded": () => "Added a note to the review retro",
-  "session.retroNoteRemoved": () => "Removed a note from the review retro",
-  "session.retroVoteCast": () => "Voted in the review retro",
-  "session.managementAnswerRecorded": () =>
-    "Recorded a management retro answer",
-  "session.rootCauseNamed": () => "Named a root cause in the review",
-  "session.processHealthSubmitted": () =>
-    "Answered the review's process-health survey",
-  "session.diagnosticRead": () => "Read the review's rhythm diagnostic",
-  "session.objectiveDecided": () => "Closed this objective in the review",
-  "session.learningCaptured": () => "Captured a learning in the review",
-  "session.nextCycleDrafted": () => "Drafted an objective for the next cycle",
-  "session.actionAgreed": () => "Agreed an action in the review",
-  "session.actionCompleted": () => "Updated a review action",
-  // Written because the map is exhaustive over the catalogue, and never read:
-  // both kinds are in PRIVATE_ACTIVITY_KINDS, so no feed reaches them. Left as
-  // real sentences rather than empty strings, in case a member's own history
-  // screen ever wants them (P4-T14a-a).
-  "copilot.asked": () => "Asked the copilot a question",
-  "copilot.answered": () => "The copilot answered",
-  "copilot.stopped": () => "Stopped a copilot answer",
-  "copilot.proposed": () => "The copilot proposed a change",
-  "copilot.proposalApplied": () => "Applied a copilot proposal",
-  "copilot.proposalDismissed": () => "Dismissed a copilot proposal",
-  "copilot.proposalUndone": () => "Undid a copilot proposal",
-  "copilot.threadDeleted": () => "Deleted a copilot conversation",
-  "copilot.rated": () => "Rated a copilot answer",
-  "copilot.unrated": () => "Removed a rating of a copilot answer",
-  "webhook.created": (p) => `Added the webhook "${asString(p.name)}"`,
-  "webhook.updated": (p) => `Changed the webhook "${asString(p.name)}"`,
-  "webhook.secret_rotated": (p) =>
-    `Rotated the signing secret of the webhook "${asString(p.name)}"`,
-  "webhook.removed": (p) => `Removed the webhook "${asString(p.name)}"`,
-  "webhook.tested": (p) => `Sent a test to the webhook "${asString(p.name)}"`,
-  "webhook.redelivered": (p) =>
-    `Sent ${asString(p.event, "an event")} again to the webhook "${asString(p.name)}"`,
-  "webhook.turned_off": (p) =>
-    `The webhook "${asString(p.name)}" turned off after ${asCount(p.failures)} failed deliveries in a row`,
-  "channel.connected": (p) => `Connected ${p.provider}`,
-  "channel.disconnected": (p) => `Disconnected ${p.provider}`,
-  "channel.identity_linked": (p) => `Linked their ${p.provider} account`,
-  "channel.identity_unlinked": (p) => `Unlinked their ${p.provider} account`,
-  "channel.link_started": (p) => `Asked for a ${p.provider} linking code`,
-  // Named by what it is rather than by what it says. The body is not in the
-  // payload and this line is read by people who may be entitled to know a
-  // message went out without being entitled to read it.
-  "channel.message_queued": (p) =>
+      ? t("activity.session.winsNamed.one")
+      : t("activity.session.winsNamed.many", { n: asCount(p.count) }),
+  "session.nextActionSet": (_p, t) => t("activity.session.nextActionSet"),
+  "session.blockerCreated": (p, t) =>
+    t("activity.session.blockerCreated", { type: asString(p.type) }),
+  "goal.blocker_raised": (p, t) =>
+    t("activity.goal.blocker_raised", { type: asString(p.type) }),
+  "session.blockerResolved": (p, t) =>
+    t("activity.session.blockerResolved", { type: asString(p.type) }),
+  "session.blockerReassigned": (p, t) =>
+    t("activity.session.blockerReassigned", {
+      type: asString(p.type, t("activity.fb.blocker")),
+      owner: asString(p.ownerName, t("activity.fb.somebodyElse")),
+    }),
+  "session.commitmentsSet": (p, t) =>
+    t("activity.session.commitmentsSet", { n: asCount(p.count) }),
+  "session.commitmentsClosed": (p, t) =>
+    t("activity.session.commitmentsClosed", { n: asCount(p.count) }),
+  "session.coordinatorNoteSet": (_p, t) =>
+    t("activity.session.coordinatorNoteSet"),
+  "session.digestPosted": (p, t) =>
+    (() => {
+      const named = (Array.isArray(p.channels) ? p.channels : []).map(
+        (channel) => (channel === "teams" ? "Teams" : "Slack"),
+      );
+      return named.length > 0
+        ? t("activity.session.digestPosted.on", {
+            channels: named.join(t("activity.joinAnd")),
+          })
+        : t("activity.session.digestPosted.plain");
+    })(),
+  "session.trendRecorded": (p, t) =>
+    t("activity.session.trendRecorded", {
+      trend: asString(p.trend, t("activity.fb.unknown")),
+    }),
+  "session.shiftsRecorded": (_p, t) => t("activity.session.shiftsRecorded"),
+  "session.decisionRecorded": (_p, t) => t("activity.session.decisionRecorded"),
+  "session.minuteAdded": (p, t) =>
+    t("activity.session.minuteAdded", {
+      stage: asString(p.stageKey, t("activity.fb.current")),
+    }),
+  "session.stageNoteSet": (p, t) =>
+    t("activity.session.stageNoteSet", {
+      stage: asString(p.stageKey, t("activity.fb.current")),
+    }),
+  "session.pulseGiven": (_p, t) => t("activity.session.pulseGiven"),
+  "session.keyResultScored": (_p, t) => t("activity.session.keyResultScored"),
+  "session.objectiveScoreRevealed": (_p, t) =>
+    t("activity.session.objectiveScoreRevealed"),
+  "session.micPassed": (_p, t) => t("activity.session.micPassed"),
+  "session.narrativeWritten": (_p, t) => t("activity.session.narrativeWritten"),
+  "session.kudosGiven": (_p, t) => t("activity.session.kudosGiven"),
+  "session.retroNoteAdded": (_p, t) => t("activity.session.retroNoteAdded"),
+  "session.retroNoteRemoved": (_p, t) => t("activity.session.retroNoteRemoved"),
+  "session.retroVoteCast": (_p, t) => t("activity.session.retroVoteCast"),
+  "session.managementAnswerRecorded": (_p, t) =>
+    t("activity.session.managementAnswerRecorded"),
+  "session.rootCauseNamed": (_p, t) => t("activity.session.rootCauseNamed"),
+  "session.processHealthSubmitted": (_p, t) =>
+    t("activity.session.processHealthSubmitted"),
+  "session.diagnosticRead": (_p, t) => t("activity.session.diagnosticRead"),
+  "session.objectiveDecided": (_p, t) => t("activity.session.objectiveDecided"),
+  "session.learningCaptured": (_p, t) => t("activity.session.learningCaptured"),
+  "session.nextCycleDrafted": (_p, t) => t("activity.session.nextCycleDrafted"),
+  "session.actionAgreed": (_p, t) => t("activity.session.actionAgreed"),
+  "session.actionCompleted": (_p, t) => t("activity.session.actionCompleted"),
+  "copilot.asked": (_p, t) => t("activity.copilot.asked"),
+  "copilot.answered": (_p, t) => t("activity.copilot.answered"),
+  "copilot.stopped": (_p, t) => t("activity.copilot.stopped"),
+  "copilot.proposed": (_p, t) => t("activity.copilot.proposed"),
+  "copilot.proposalApplied": (_p, t) => t("activity.copilot.proposalApplied"),
+  "copilot.proposalDismissed": (_p, t) =>
+    t("activity.copilot.proposalDismissed"),
+  "copilot.proposalUndone": (_p, t) => t("activity.copilot.proposalUndone"),
+  "copilot.threadDeleted": (_p, t) => t("activity.copilot.threadDeleted"),
+  "copilot.rated": (_p, t) => t("activity.copilot.rated"),
+  "copilot.unrated": (_p, t) => t("activity.copilot.unrated"),
+  "webhook.created": (p, t) =>
+    t("activity.webhook.created", { name: asString(p.name) }),
+  "webhook.updated": (p, t) =>
+    t("activity.webhook.updated", { name: asString(p.name) }),
+  "webhook.secret_rotated": (p, t) =>
+    t("activity.webhook.secret_rotated", { name: asString(p.name) }),
+  "webhook.removed": (p, t) =>
+    t("activity.webhook.removed", { name: asString(p.name) }),
+  "webhook.tested": (p, t) =>
+    t("activity.webhook.tested", { name: asString(p.name) }),
+  "webhook.redelivered": (p, t) =>
+    t("activity.webhook.redelivered", {
+      event: asString(p.event, t("activity.fb.anEvent")),
+      name: asString(p.name),
+    }),
+  "webhook.turned_off": (p, t) =>
+    t("activity.webhook.turned_off", {
+      name: asString(p.name),
+      n: asCount(p.failures),
+    }),
+  "channel.connected": (p, t) =>
+    t("activity.channel.connected", { provider: String(p.provider) }),
+  "channel.disconnected": (p, t) =>
+    t("activity.channel.disconnected", { provider: String(p.provider) }),
+  "channel.identity_linked": (p, t) =>
+    t("activity.channel.identity_linked", { provider: String(p.provider) }),
+  "channel.identity_unlinked": (p, t) =>
+    t("activity.channel.identity_unlinked", { provider: String(p.provider) }),
+  "channel.link_started": (p, t) =>
+    t("activity.channel.link_started", { provider: String(p.provider) }),
+  "channel.message_queued": (p, t) =>
     p.duplicate
-      ? `A ${p.provider} message was already queued`
-      : `Queued a ${p.provider} message`,
+      ? t("activity.channel.message_queued.duplicate", {
+          provider: String(p.provider),
+        })
+      : t("activity.channel.message_queued.queued", {
+          provider: String(p.provider),
+        }),
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */
 export function renderActivity(
   kind: string,
   payload: Record<string, unknown>,
+  locale = "en",
 ): string {
   const renderer = (
     ACTIVITY_RENDERERS as Record<string, ActivityRenderer | undefined>
   )[kind];
-  return renderer ? renderer(payload) : kind;
+  if (!renderer) {
+    return kind;
+  }
+  const catalogue = getServerCatalogue(locale);
+  const t: ActivityTranslate = (key, values) =>
+    serverTranslate(locale, key, values);
+  const w: ActivityWord = (prefix, value, fallback) => {
+    const key = `${prefix}.${value}`;
+    return key in catalogue
+      ? serverTranslate(locale, key)
+      : (fallback ?? value);
+  };
+  return renderer(payload, t, w);
 }

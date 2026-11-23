@@ -5,6 +5,7 @@ import {
   readHostedAccess,
 } from "@openokr/core";
 import { AI_PROVIDER_KINDS, MODEL_TIERS } from "@openokr/db";
+import { intlTagFor } from "@openokr/formats";
 import {
   Button,
   Card,
@@ -146,7 +147,7 @@ export default async function AdminAIPage({
 }: {
   readonly searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
   const ratingsParams = ratingsQuery(await searchParams);
   // A value the schema adds before the catalogue knows it is shown as itself
   // rather than hidden.
@@ -463,22 +464,22 @@ export default async function AdminAIPage({
           action={addModel}
           list={
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-start text-xs">
                 <thead className="text-ink-3">
                   <tr>
-                    <th className="py-1 pr-3 font-semibold">
+                    <th className="py-1 pe-3 font-semibold">
                       {t("admin.ai.model")}
                     </th>
-                    <th className="py-1 pr-3 font-semibold">
+                    <th className="py-1 pe-3 font-semibold">
                       {t("admin.ai.provider")}
                     </th>
-                    <th className="py-1 pr-3 font-semibold">
+                    <th className="py-1 pe-3 font-semibold">
                       {t("admin.ai.context")}
                     </th>
-                    <th className="py-1 pr-3 font-semibold">
+                    <th className="py-1 pe-3 font-semibold">
                       {t("admin.ai.inOutPerM")}
                     </th>
-                    <th className="py-1 pr-3 font-semibold">
+                    <th className="py-1 pe-3 font-semibold">
                       {t("admin.ai.tiers")}
                     </th>
                     <th className="py-1 font-semibold">
@@ -492,22 +493,22 @@ export default async function AdminAIPage({
                       key={`${model.provider}:${model.modelId}`}
                       className="border-t border-line"
                     >
-                      <td className="py-1.5 pr-3 text-ink">
+                      <td className="py-1.5 pe-3 text-ink">
                         {model.displayName}
-                        <span className="ml-1.5 font-mono text-ink-3">
+                        <span className="ms-1.5 font-mono text-ink-3">
                           {model.modelId}
                         </span>
                       </td>
-                      <td className="py-1.5 pr-3">
+                      <td className="py-1.5 pe-3">
                         {providerWord(model.provider)}
                       </td>
-                      <td className="py-1.5 pr-3 tabular-nums">
-                        {model.contextWindow.toLocaleString("en-GB")}
+                      <td className="py-1.5 pe-3 tabular-nums">
+                        {model.contextWindow.toLocaleString(intlTagFor(locale))}
                       </td>
-                      <td className="py-1.5 pr-3 tabular-nums">
+                      <td className="py-1.5 pe-3 tabular-nums">
                         {model.costInPerMillion} / {model.costOutPerMillion}
                       </td>
-                      <td className="py-1.5 pr-3">
+                      <td className="py-1.5 pe-3">
                         {model.tiers.length === 0
                           ? "—"
                           : model.tiers

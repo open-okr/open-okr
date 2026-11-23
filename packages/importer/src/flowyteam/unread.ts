@@ -88,11 +88,6 @@ export const UNREAD_TABLES: readonly UnreadTable[] = [
       "Files attached to key result check-ins; not read yet, because only task files are copied so far.",
   },
   {
-    table: "indicator_accesses",
-    holds:
-      "Who else may see or update each KPI; not read yet, because turning these rows into KPI shares is an open decision.",
-  },
-  {
     table: "indicator_calculates",
     holds:
       "Which KPIs each calculated KPI is worked out from; not read, because the KPI domain rebuilds the same links from each indicator's own formula.",

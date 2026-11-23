@@ -54,7 +54,7 @@ export function Composer({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-end gap-1.5 rounded-xl border border-line-2 bg-surface py-1 pr-1 pl-1 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line">
+      <div className="flex items-end gap-1.5 rounded-xl border border-line-2 bg-surface py-1 pe-1 ps-1 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line">
         <TextArea
           label={t("copilot.copilotPanel.yourQuestion")}
           hideLabel

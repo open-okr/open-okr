@@ -62,4 +62,34 @@ describe("formatMeasure", () => {
     expect(formatMeasure(100000000, "")).toBe("100,000,000");
     expect(formatMeasure(42, "  ")).toBe("42");
   });
+
+  describe("locale-aware formatting (AC-32, languages §3)", () => {
+    it("does not group four-digit numbers in Spanish, but groups five digits (AC-32)", () => {
+      expect(formatMeasure(1234.56, null, "es")).toBe("1234,56");
+      expect(formatMeasure(12345.6, null, "es")).toBe("12.345,6");
+    });
+
+    it("does not group four-digit numbers in Italian, but groups five digits", () => {
+      expect(formatMeasure(1234.56, null, "it")).toBe("1234,56");
+      expect(formatMeasure(12345.6, null, "it")).toBe("12.345,6");
+    });
+
+    it("groups four-digit numbers with period in German", () => {
+      expect(formatMeasure(1234.56, null, "de")).toBe("1.234,56");
+      expect(formatMeasure(12345.6, null, "de")).toBe("12.345,6");
+    });
+
+    it("groups four-digit numbers with narrow no-break space in French", () => {
+      expect(formatMeasure(1234.56, null, "fr")).toBe("1\u202f234,56");
+      expect(formatMeasure(12345.6, null, "fr")).toBe("12\u202f345,6");
+    });
+
+    it("uses Latin digits with comma grouping in Arabic (ar-u-nu-latn)", () => {
+      expect(formatMeasure(1234.56, null, "ar")).toBe("1,234.56");
+    });
+
+    it("appends unit with locale formatting", () => {
+      expect(formatMeasure(100000000, "EUR", "de")).toBe("100.000.000 EUR");
+    });
+  });
 });

@@ -150,10 +150,7 @@ export async function WeeklyFigures({
                   ? t("weeklyFigures.oneWeekSoFar")
                   : t("weeklyFigures.ofTheLast", {
                       count: trend.length,
-                      weeks:
-                        weeks === 1
-                          ? t("common.count.weekOne", { count: weeks })
-                          : t("common.count.weekOther", { count: weeks }),
+                      weeks: t("common.count.week", { count: weeks }),
                     })}
               </p>
             </div>

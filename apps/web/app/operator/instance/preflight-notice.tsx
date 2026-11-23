@@ -31,7 +31,7 @@ export async function PreflightNotice({
       <h2 className="text-sm font-bold text-ink">
         {t("operator.instance.preflight.title")}
       </h2>
-      <ul className="mt-1.5 flex list-disc flex-col gap-1 pl-5 text-sm text-ink-2">
+      <ul className="mt-1.5 flex list-disc flex-col gap-1 ps-5 text-sm text-ink-2">
         {warnings.map((warning) => (
           <li data-testid={`cloud-preflight-${warning}`} key={warning}>
             {t(KEYS[warning])}

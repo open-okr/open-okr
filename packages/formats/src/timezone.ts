@@ -10,6 +10,7 @@
  */
 export function isKnownTimezone(timezone: string): boolean {
   try {
+    // machine use: validating timezone
     new Intl.DateTimeFormat("en-GB", { timeZone: timezone });
     return true;
   } catch {

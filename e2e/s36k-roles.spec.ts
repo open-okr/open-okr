@@ -110,7 +110,7 @@ test("every level select fits its widest choice, in English and Malay", async ()
 
   // Malay for this member, then back, so no later spec reads Malay labels.
   await goTo(page, "/account");
-  await page.getByTestId("language-ms").click();
+  await page.getByTestId("member-language").selectOption("ms");
   await expect(page.locator("html")).toHaveAttribute("lang", "ms", {
     timeout: 15_000,
   });
@@ -125,7 +125,7 @@ test("every level select fits its widest choice, in English and Malay", async ()
     expect(Math.min(...malay)).toBeGreaterThanOrEqual(0);
   } finally {
     await goTo(page, "/account");
-    await page.getByTestId("language-en").click();
+    await page.getByTestId("member-language").selectOption("en");
     await expect(page.locator("html")).toHaveAttribute("lang", "en", {
       timeout: 15_000,
     });

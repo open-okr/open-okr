@@ -1,6 +1,14 @@
-import { CATALOGUES, type MessageValues, translate } from "@openokr/ui";
+import { type Catalogue, type MessageValues, translate } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 import { resolveLocale } from "./locale";
 import { workspaceTerms } from "./workspace-presentation";
+
+/**
+ * Returns the synchronous catalogue for a locale on the server.
+ */
+export function getCatalogue(locale: string): Catalogue {
+  return CATALOGUES[locale as keyof typeof CATALOGUES] ?? CATALOGUES.en;
+}
 
 /**
  * The catalogue, for a server component (UIUX-PLAN §8, P6-G25).
@@ -30,7 +38,7 @@ export async function getTranslations(): Promise<{
   readonly locale: string;
 }> {
   const locale = await resolveLocale();
-  const catalogue = CATALOGUES[locale];
+  const catalogue = getCatalogue(locale);
   // The workspace's own words for the method's terms (M-14), which fill the
   // catalogue's term holes: "Add ambition" where it renamed the objective.
   // Empty on a signed-out screen, where the catalogue's own words stand.
@@ -40,7 +48,7 @@ export async function getTranslations(): Promise<{
   // entries a translator cannot reassemble.
   return {
     t: (key: string, values?: MessageValues) =>
-      translate(catalogue, key, values, renamed),
+      translate(catalogue, key, values, renamed, locale),
     locale,
   };
 }

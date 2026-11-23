@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { CATALOGUES, TranslationsProvider } from "@openokr/ui";
+import { TranslationsProvider } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -121,12 +122,12 @@ describe("the console", () => {
 
   test("says it in Malay too", () => {
     for (const key of [
-      "operator.workspaces.waitingOne",
-      "operator.workspaces.waitingOther",
+      "operator.workspaces.waiting.one",
+      "operator.workspaces.waiting.other",
       "operator.workspaces.adoptNow",
       "operator.workspaces.adoptedNone",
-      "operator.workspaces.adoptedOne",
-      "operator.workspaces.adoptedOther",
+      "operator.workspaces.adopted.one",
+      "operator.workspaces.adopted.other",
     ]) {
       expect(CATALOGUES.ms[key]).toBeTruthy();
       expect(CATALOGUES.ms[key]).not.toBe(CATALOGUES.en[key]);

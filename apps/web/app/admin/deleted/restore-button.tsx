@@ -67,7 +67,7 @@ export function RestoreButton({
         {pending ? t("admin.deleted.restoring") : t("admin.deleted.restore")}
       </Button>
       {problem ? (
-        <span role="alert" className="text-right text-xs text-bad">
+        <span role="alert" className="text-end text-xs text-bad">
           {problem}
         </span>
       ) : null}

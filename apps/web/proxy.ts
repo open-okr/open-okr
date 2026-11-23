@@ -148,6 +148,10 @@ const PUBLIC_PREFIXES = [
   "/agent-setup/",
 ];
 
+// Signed-out pages need the public CSS and pre-sliced web fonts.
+const WEB_FONT_ASSET =
+  /^\/fonts\/noto-sans-(?:arabic|sc)\/(?:fonts\.css|noto-sans-(?:arabic-arabic|sc-\d+)-wght-normal\.woff2)$/;
+
 /**
  * The one route whose form must be allowed to submit somewhere else
  * (screen S-40, P5-T08c).
@@ -281,7 +285,10 @@ function next(request: NextRequest): NextResponse {
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
-  if (PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+  if (
+    WEB_FONT_ASSET.test(pathname) ||
+    PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  ) {
     return next(request);
   }
 

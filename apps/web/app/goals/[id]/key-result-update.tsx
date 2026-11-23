@@ -122,7 +122,7 @@ export function KeyResultUpdate({
             each other read as one number (OKRGoal UX review, N7). The input
             keeps its own label for a screen reader, so this word is hidden
             from one. */}
-        <span className="flex items-center gap-1 border-l border-line pl-1.5">
+        <span className="flex items-center gap-1 border-s border-line ps-1.5">
           <span aria-hidden className="text-xs text-ink-3">
             {t("common.confidence")}
           </span>

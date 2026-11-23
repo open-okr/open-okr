@@ -1,5 +1,5 @@
 import { NOTIFICATION_REASONS, NUDGE_SUBJECT_TYPES } from "@openokr/db";
-import { CATALOGUES } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 import { describe, expect, test } from "vitest";
 import {
   LINKED_SUBJECT_TYPES,

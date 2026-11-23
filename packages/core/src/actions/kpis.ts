@@ -14,7 +14,10 @@
  */
 
 import {
+  accessBindings,
+  accessGroups,
   activeOnly,
+  auditEvents,
   goals,
   KPI_AGGREGATES,
   KPI_DIRECTION_VALUES,
@@ -24,6 +27,7 @@ import {
   keyResults,
   kpiCategories,
   kpiDependencies,
+  kpiRecords,
   kpis,
   kpiTrees,
   newId,
@@ -45,13 +49,26 @@ import {
   targetTypeOfDirection,
   thresholdsProblem,
 } from "@openokr/method";
-import { and, asc, eq, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
-import { ensureContext } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { getAccessScoped } from "../access/reads.ts";
+import {
+  getAccessScoped,
+  resolveMemberRoleLevel,
+  visibleResourceIds,
+} from "../access/reads.ts";
 import { bindAgentsToContextInTx } from "../agents/bindings.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
@@ -62,6 +79,15 @@ import {
   legacyColumns,
   legacyKey,
 } from "../imports/legacy.ts";
+import {
+  ensureKpiContextInTx,
+  rebindKpiOwnerInTx,
+  removeKpiShareInTx,
+  requireKpiAccess,
+  requireKpiRole,
+  setKpiShareInTx,
+  visibleKpiIds,
+} from "../kpis/access.ts";
 import {
   cascadeFromKpi,
   evaluateKpiForPeriod,
@@ -476,15 +502,13 @@ export const createKpi = defineWriteAction({
       // the column at its default and hoping they agree.
       await recomputeKpi(tx, workspaceId, id);
 
-      // A KPI that belongs to no space owns a context of its own, so the
-      // built-in agents can be bound to it by name (completeness review H-04).
-      // One in a space is in their sight through the space.
+      // Every KPI gets an access context (0.10.0 K2, KA-D1).
+      const contextId = await ensureKpiContextInTx(tx, {
+        workspaceId,
+        kpiId: id,
+      });
+      // The built-in agents are bound to spaceless KPIs only (KA-D9).
       if (!input.spaceId) {
-        const contextId = await ensureContext(tx, {
-          workspaceId,
-          resourceType: "kpi",
-          resourceId: id,
-        });
         await bindAgentsToContextInTx(tx, { workspaceId, contextId });
       }
 
@@ -494,6 +518,7 @@ export const createKpi = defineWriteAction({
           kind: "kpi.created" as const,
           subjectType: "workspace" as const,
           subjectId: workspaceId,
+          contextId,
           // The activity names the workspace, where the feed shows it. The
           // content is the KPI, so that is what retrieval embeds and search
           // indexes (plan A10); later KPI activities name the KPI themselves.
@@ -534,12 +559,20 @@ export const recordKpiValue = defineWriteAction({
   }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
+    subject: { type: "kpi", id: input.kpiId },
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(
         tx,
         workspaceId,
         context.actor.userId,
       );
+
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId,
+        kpiId: input.kpiId,
+        requires: ACCESS_LEVELS.edit,
+      });
 
       const [kpi] = await tx
         .select({
@@ -667,6 +700,34 @@ export const deleteKpiRecord = defineWriteAction({
         workspaceId,
         context.actor.userId,
       );
+
+      const [record] = await tx
+        .select({ kpiId: kpiRecords.kpiId })
+        .from(kpiRecords)
+        .where(
+          activeOnly(
+            kpiRecords,
+            eq(kpiRecords.workspaceId, workspaceId),
+            eq(kpiRecords.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!record) {
+        throw new OperationError("not_found", "No such KPI value.");
+      }
+
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId,
+        kpiId: record.kpiId,
+        requires: ACCESS_LEVELS.view,
+      });
+
+      await requireKpiRole(tx, {
+        workspaceId,
+        memberId,
+        requires: ACCESS_LEVELS.edit,
+      });
 
       const removed = await softDeleteKpiRecord(tx, workspaceId, input.id);
       if (!removed) {
@@ -860,8 +921,42 @@ export const readKpiGrid = defineReadAction({
           .orderBy(asc(kpis.position), asc(kpis.title));
 
         const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx, context.workspaceId, userId));
+
+        const visible = await visibleKpiIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          ids: kpiRows.map((k) => k.id),
+        });
+
+        const filteredKpis = kpiRows.filter((k) => visible.has(k.id));
+
+        const roleLevel = await resolveMemberRoleLevel(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          domain: "kpi",
+        });
+
+        const canEditKpi = (roleLevel ?? 0) >= ACCESS_LEVELS.edit;
+        const visibleCategoryIds = new Set(
+          filteredKpis
+            .map((k) => k.categoryId)
+            .filter((id): id is string => id !== null),
+        );
+
+        const filteredCategories = canEditKpi
+          ? categoryRows
+          : categoryRows.filter((c) => visibleCategoryIds.has(c.id));
+
+        const hasUncategorised = filteredKpis.some(
+          (k) => k.categoryId === null,
+        );
+        const includeUncategorised = canEditKpi || hasUncategorised;
+
         const out = [];
-        for (const kpi of kpiRows) {
+        for (const kpi of filteredKpis) {
           const corridor = corridorOf(kpi, workspace);
           const records = await loadKpiRecords(
             tx,
@@ -922,10 +1017,12 @@ export const readKpiGrid = defineReadAction({
         }
 
         return {
-          // A null id is the "uncategorised" group, which the grid renders last.
-          // Every KPI belongs to exactly one group, and a category nobody chose
-          // is still a group rather than a gap.
-          categories: [...categoryRows, { id: null, name: "Uncategorised" }],
+          categories: [
+            ...filteredCategories,
+            ...(includeUncategorised
+              ? [{ id: null, name: "Uncategorised" }]
+              : []),
+          ],
           kpis: out,
         };
       },
@@ -990,8 +1087,19 @@ export const listKpis = defineReadAction({
           .from(kpis)
           .where(activeOnly(kpis, eq(kpis.workspaceId, context.workspaceId)))
           .orderBy(asc(kpis.title), asc(kpis.id));
+
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx, context.workspaceId, userId));
+        const visible = await visibleKpiIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          ids: rows.map((r) => r.id),
+        });
+        const visibleRows = rows.filter((r) => visible.has(r.id));
+
         return {
-          kpis: rows.map((row) => ({
+          kpis: visibleRows.map((row) => ({
             ...row,
             achievementPct:
               row.achievementPct === null ? null : Number(row.achievementPct),
@@ -1024,12 +1132,20 @@ export const setKpiFormulaAction = defineWriteAction({
   }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
+    subject: { type: "kpi", id: input.kpiId },
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(
         tx,
         workspaceId,
         context.actor.userId,
       );
+
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId,
+        kpiId: input.kpiId,
+        requires: ACCESS_LEVELS.edit,
+      });
 
       const [kpi] = await tx
         .select({ id: kpis.id, frequency: kpis.frequency })
@@ -1052,6 +1168,15 @@ export const setKpiFormulaAction = defineWriteAction({
         input.kpiId,
         input.formula,
       );
+
+      for (const refId of references) {
+        await requireKpiAccess(tx, {
+          workspaceId,
+          memberId,
+          kpiId: refId,
+          requires: ACCESS_LEVELS.view,
+        });
+      }
 
       // Evaluated immediately, so the grid never shows a calculated KPI with a
       // formula and no value for the period the author was looking at.
@@ -1157,6 +1282,11 @@ export const updateKpi = defineWriteAction({
   }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
+    subject: { type: "kpi", id: input.kpiId },
+    requires:
+      input.ownerMemberId !== undefined
+        ? ACCESS_LEVELS.full
+        : ACCESS_LEVELS.edit,
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(
         tx,
@@ -1164,9 +1294,30 @@ export const updateKpi = defineWriteAction({
         context.actor.userId,
       );
 
+      const requiredLevel =
+        input.ownerMemberId !== undefined
+          ? ACCESS_LEVELS.full
+          : ACCESS_LEVELS.edit;
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId,
+        kpiId: input.kpiId,
+        requires: requiredLevel,
+      });
+
+      if (input.parentKpiId) {
+        await requireKpiAccess(tx, {
+          workspaceId,
+          memberId,
+          kpiId: input.parentKpiId,
+          requires: ACCESS_LEVELS.view,
+        });
+      }
+
       const [existing] = await tx
         .select({
           id: kpis.id,
+          ownerMemberId: kpis.ownerMemberId,
           ...KPI_RULE_COLUMNS,
         })
         .from(kpis)
@@ -1302,11 +1453,18 @@ export const updateKpi = defineWriteAction({
         set.tier = input.tier;
       }
       if (input.ownerMemberId !== undefined) {
-        set.ownerMemberId = await namedOwner(
-          tx,
+        const newOwner = await namedOwner(tx, workspaceId, input.ownerMemberId);
+        set.ownerMemberId = newOwner;
+        const contextId = await ensureKpiContextInTx(tx, {
           workspaceId,
-          input.ownerMemberId,
-        );
+          kpiId: input.kpiId,
+        });
+        await rebindKpiOwnerInTx(tx, {
+          workspaceId,
+          contextId,
+          from: existing.ownerMemberId,
+          to: newOwner,
+        });
       }
       if (input.targetDefault !== undefined) {
         set.targetDefault =
@@ -1393,7 +1551,24 @@ export const createKpiTree = defineWriteAction({
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
-      await actingMember(tx, workspaceId, context.actor.userId);
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      await requireKpiRole(tx, {
+        workspaceId,
+        memberId,
+        requires: ACCESS_LEVELS.edit,
+      });
+      if (input.rootKpiId) {
+        await requireKpiAccess(tx, {
+          workspaceId,
+          memberId,
+          kpiId: input.rootKpiId,
+          requires: ACCESS_LEVELS.view,
+        });
+      }
       const id = newId();
       // openokr:allow-mutation: the calling Operation's own transaction.
       await tx.insert(kpiTrees).values({
@@ -1470,6 +1645,17 @@ export const launchKpiRecovery = defineWriteAction({
         workspaceId,
         context.actor.userId,
       );
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId,
+        kpiId: input.kpiId,
+        requires: ACCESS_LEVELS.view,
+      });
+      await requireKpiRole(tx, {
+        workspaceId,
+        memberId,
+        requires: ACCESS_LEVELS.edit,
+      });
       const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
       const launched = await launchRecoveryInTx(tx, {
         workspaceId,
@@ -1549,6 +1735,17 @@ export const recordKpiResponse = defineWriteAction({
         workspaceId,
         context.actor.userId,
       );
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId,
+        kpiId: input.kpiId,
+        requires: ACCESS_LEVELS.view,
+      });
+      await requireKpiRole(tx, {
+        workspaceId,
+        memberId,
+        requires: ACCESS_LEVELS.edit,
+      });
       const [kpi] = await tx
         .select({ id: kpis.id, title: kpis.title })
         .from(kpis)
@@ -1825,20 +2022,24 @@ export const readRecoveryBoard = defineReadAction({
           )
           .orderBy(asc(kpis.title));
 
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx as OperationTx, context.workspaceId, userId));
+        const visible = await visibleKpiIds(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          ids: rows.map((r) => r.id),
+        });
+        const visibleRows = rows.filter((r) => visible.has(r.id));
+
         const responses = await kpiResponsesInTx(
           tx as OperationTx,
           context.workspaceId,
-          rows,
-          {
-            memberId: await actingMember(
-              tx as OperationTx,
-              context.workspaceId,
-              userId,
-            ),
-          },
+          visibleRows,
+          { memberId },
         );
         const counts = new Map<string, number>();
-        const goalIds = rows
+        const goalIds = visibleRows
           .map((row) => row.recoveryGoalId)
           .filter((id): id is string => id !== null);
         if (goalIds.length > 0) {
@@ -1859,7 +2060,7 @@ export const readRecoveryBoard = defineReadAction({
 
         const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         return {
-          cards: rows.map((row) => ({
+          cards: visibleRows.map((row) => ({
             kpiId: row.id,
             shortId: row.shortId,
             title: row.title,
@@ -1902,6 +2103,7 @@ export const readRecoveryBoard = defineReadAction({
 const kpiTreeNode = z.object({
   id: z.uuid(),
   parentKpiId: z.uuid().nullable(),
+  parentHidden: z.boolean().default(false),
   title: z.string(),
   unit: z.string().nullable(),
   indicatorType: z.string(),
@@ -2011,10 +2213,12 @@ function toTreeNode(
     readonly recoveryGoalClosedAt: Date | null;
     readonly recoveryProgress: string | null;
   },
+  parentHidden = false,
 ): TreeNode {
   return {
     id: row.id,
-    parentKpiId: row.parentKpiId,
+    parentKpiId: parentHidden ? null : row.parentKpiId,
+    parentHidden,
     title: row.title,
     unit: row.unit,
     indicatorType: row.indicatorType,
@@ -2029,7 +2233,7 @@ function toTreeNode(
     recoveryGoalId: row.recoveryGoalId,
     recoveryProgressPct: numberOrNull(row.recoveryProgress),
     link:
-      row.parentKpiId === null
+      parentHidden || row.parentKpiId === null
         ? null
         : formulaLinks.has(`${row.parentKpiId} ${row.id}`)
           ? "formula"
@@ -2089,16 +2293,42 @@ export const readKpiTree = defineReadAction({
           )
           .orderBy(asc(kpis.position), asc(kpis.title));
 
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx as OperationTx, context.workspaceId, userId));
+
+        const candidateIds = new Set<string>();
+        for (const row of rows) {
+          candidateIds.add(row.id);
+          if (row.parentKpiId) {
+            candidateIds.add(row.parentKpiId);
+          }
+        }
+
+        const visible = await visibleKpiIds(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          ids: [...candidateIds],
+        });
+
+        const visibleRows = rows.filter((row) => visible.has(row.id));
+
         const links = await formulaLinksInTx(
-          tx,
+          tx as OperationTx,
           context.workspaceId,
-          rows.flatMap((row) => (row.parentKpiId ? [row.parentKpiId] : [])),
+          visibleRows.flatMap((row) =>
+            row.parentKpiId ? [row.parentKpiId] : [],
+          ),
         );
         const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         return {
           trees,
           treeId,
-          nodes: rows.map((row) => toTreeNode(links, workspace, row)),
+          nodes: visibleRows.map((row) => {
+            const parentHidden =
+              row.parentKpiId !== null && !visible.has(row.parentKpiId);
+            return toTreeNode(links, workspace, row, parentHidden);
+          }),
         };
       },
     );
@@ -2192,10 +2422,26 @@ export const readSpaceKpiTrees = defineReadAction({
             asc(kpis.title),
           );
 
+        const candidateIds = new Set<string>();
+        for (const row of rows) {
+          candidateIds.add(row.id);
+          if (row.parentKpiId) {
+            candidateIds.add(row.parentKpiId);
+          }
+        }
+        const visible = await visibleKpiIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          ids: [...candidateIds],
+        });
+        const visibleRows = rows.filter((row) => visible.has(row.id));
+
         const links = await formulaLinksInTx(
           tx,
           context.workspaceId,
-          rows.flatMap((row) => (row.parentKpiId ? [row.parentKpiId] : [])),
+          visibleRows.flatMap((row) =>
+            row.parentKpiId ? [row.parentKpiId] : [],
+          ),
         );
         const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         // A tree that was deleted leaves its KPIs pointing at nothing live, so
@@ -2205,14 +2451,16 @@ export const readSpaceKpiTrees = defineReadAction({
           string | null,
           { id: string | null; name: string | null; nodes: TreeNode[] }
         >();
-        for (const row of rows) {
+        for (const row of visibleRows) {
           const key = row.treeName === null ? null : row.treeId;
           const group = groups.get(key) ?? {
             id: key,
             name: key === null ? null : row.treeName,
             nodes: [],
           };
-          group.nodes.push(toTreeNode(links, workspace, row));
+          const parentHidden =
+            row.parentKpiId !== null && !visible.has(row.parentKpiId);
+          group.nodes.push(toTreeNode(links, workspace, row, parentHidden));
           groups.set(key, group);
         }
         const unfiled = groups.get(null);
@@ -2306,6 +2554,16 @@ export const readKpiDetail = defineReadAction({
       drizzle(context.pool),
       { workspaceId: context.workspaceId, userId },
       async (tx) => {
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx as OperationTx, context.workspaceId, userId));
+        await requireKpiAccess(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          kpiId: input.kpiId,
+          requires: ACCESS_LEVELS.view,
+        });
+
         const [kpi] = await tx
           .select({
             id: kpis.id,
@@ -2425,6 +2683,43 @@ export const readKpiDetail = defineReadAction({
             ),
           );
 
+        // Filter relatives with visibleKpiIds
+        const relativeIds: string[] = [];
+        if (parent?.id) {
+          relativeIds.push(parent.id);
+        }
+        for (const child of children) {
+          relativeIds.push(child.id);
+        }
+        for (const cand of candidates) {
+          relativeIds.push(cand.id);
+        }
+        const visibleRelatives = await visibleKpiIds(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          ids: relativeIds,
+        });
+
+        const filteredParent =
+          parent && visibleRelatives.has(parent.id) ? parent : null;
+        const filteredChildren = children.filter((c) =>
+          visibleRelatives.has(c.id),
+        );
+        const filteredCandidates = candidates.filter((c) =>
+          visibleRelatives.has(c.id),
+        );
+
+        // Filter linked key results with visibleResourceIds on goal
+        const goalIds = linked.map((l) => l.goalId);
+        const visibleGoals = await visibleResourceIds(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "goal",
+          ids: goalIds,
+          requires: ACCESS_LEVELS.view,
+        });
+        const filteredLinked = linked.filter((l) => visibleGoals.has(l.goalId));
+
         const workspace = await workspaceKpiCorridor(tx, context.workspaceId);
         return {
           kpi: {
@@ -2466,8 +2761,8 @@ export const readKpiDetail = defineReadAction({
                 ? null
                 : Number(kpi.recoveryStartedPct),
           },
-          parent: parent ?? null,
-          children: children.map((child) => ({
+          parent: filteredParent ?? null,
+          children: filteredChildren.map((child) => ({
             ...child,
             achievementPct:
               child.achievementPct === null
@@ -2482,8 +2777,8 @@ export const readKpiDetail = defineReadAction({
               record.targetValue === null ? null : Number(record.targetValue),
             remark: record.remark,
           })),
-          candidates,
-          linkedKeyResults: linked,
+          candidates: filteredCandidates,
+          linkedKeyResults: filteredLinked,
         };
       },
     );
@@ -2525,6 +2820,16 @@ export const readRecoveryDraft = defineReadAction({
       drizzle(context.pool),
       { workspaceId: context.workspaceId, userId },
       async (tx) => {
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx as OperationTx, context.workspaceId, userId));
+        await requireKpiAccess(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          kpiId: input.kpiId,
+          requires: ACCESS_LEVELS.view,
+        });
+
         const rhythm = resolveRhythm(
           await readRhythmRow(tx, context.workspaceId),
         );
@@ -2545,4 +2850,559 @@ export const readRecoveryDraft = defineReadAction({
       },
     );
   },
+});
+
+export const shareKpi = defineWriteAction({
+  name: "kpis.share",
+  domain: "kpi",
+  agentSurface: false,
+  summary: "Shares a KPI with a workspace member at view or edit.",
+  input: z.object({
+    kpiId: z.uuid(),
+    memberId: z.uuid(),
+    level: z.enum(["view", "edit"]),
+  }),
+  output: z.object({
+    kpiId: z.uuid(),
+    memberId: z.uuid(),
+    level: z.enum(["view", "edit"]),
+    previousLevel: z.enum(["view", "edit"]).nullable(),
+    coveredByRole: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => ({
+    subject: { type: "kpi", id: input.kpiId },
+    async execute({ tx, workspaceId }) {
+      const actorMemberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+
+      const contextId = await ensureKpiContextInTx(tx, {
+        workspaceId,
+        kpiId: input.kpiId,
+      });
+
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId: actorMemberId,
+        kpiId: input.kpiId,
+        requires: ACCESS_LEVELS.full,
+      });
+
+      const [target] = await tx
+        .select({
+          id: workspaceMembers.id,
+          kind: workspaceMembers.kind,
+          status: workspaceMembers.status,
+        })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.memberId),
+          ),
+        )
+        .limit(1);
+
+      if (!target || target.status !== "active") {
+        throw new OperationError("not_found", "No such member.");
+      }
+      if (target.kind === "agent") {
+        throw new OperationError(
+          "forbidden",
+          "Agents cannot be granted individual KPI shares.",
+        );
+      }
+
+      const [kpi] = await tx
+        .select({ id: kpis.id, ownerMemberId: kpis.ownerMemberId })
+        .from(kpis)
+        .where(
+          activeOnly(
+            kpis,
+            eq(kpis.workspaceId, workspaceId),
+            eq(kpis.id, input.kpiId),
+          ),
+        )
+        .limit(1);
+
+      if (!kpi) {
+        throw new OperationError("not_found", "No such KPI.");
+      }
+      if (kpi.ownerMemberId === input.memberId) {
+        throw new OperationError("forbidden", "Member already owns this KPI.");
+      }
+
+      const roleLevel = await resolveMemberRoleLevel(tx, {
+        workspaceId,
+        memberId: input.memberId,
+        domain: "kpi",
+      });
+      const shareLevel =
+        input.level === "edit" ? ACCESS_LEVELS.edit : ACCESS_LEVELS.view;
+      const coveredByRole = roleLevel !== null && roleLevel >= shareLevel;
+
+      const { previous } = await setKpiShareInTx(tx, {
+        workspaceId,
+        contextId,
+        memberId: input.memberId,
+        level: shareLevel,
+      });
+
+      const previousLevel =
+        previous === ACCESS_LEVELS.edit
+          ? ("edit" as const)
+          : previous === ACCESS_LEVELS.view
+            ? ("view" as const)
+            : null;
+
+      return {
+        result: {
+          kpiId: input.kpiId,
+          memberId: input.memberId,
+          level: input.level,
+          previousLevel,
+          coveredByRole,
+        },
+        activity: {
+          kind: "kpi.shared" as const,
+          subjectType: "kpi" as const,
+          subjectId: input.kpiId,
+          payload: {
+            memberId: input.memberId,
+            level: input.level,
+          },
+        },
+        audit: {
+          action: "kpis.share",
+          targetType: "kpi",
+          targetId: input.kpiId,
+          payload: {
+            memberId: input.memberId,
+            level: input.level,
+            previousLevel,
+          },
+        },
+      };
+    },
+  }),
+});
+
+export const unshareKpi = defineWriteAction({
+  name: "kpis.unshare",
+  domain: "kpi",
+  agentSurface: false,
+  summary: "Removes an individual share from a KPI.",
+  input: z.object({
+    kpiId: z.uuid(),
+    memberId: z.uuid(),
+  }),
+  output: z.object({
+    kpiId: z.uuid(),
+    memberId: z.uuid(),
+    removed: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => ({
+    subject: { type: "kpi", id: input.kpiId },
+    async execute({ tx, workspaceId }) {
+      const actorMemberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+
+      const contextId = await ensureKpiContextInTx(tx, {
+        workspaceId,
+        kpiId: input.kpiId,
+      });
+
+      await requireKpiAccess(tx, {
+        workspaceId,
+        memberId: actorMemberId,
+        kpiId: input.kpiId,
+        requires: ACCESS_LEVELS.full,
+      });
+
+      const { previous, removed } = await removeKpiShareInTx(tx, {
+        workspaceId,
+        contextId,
+        memberId: input.memberId,
+      });
+
+      const previousLevel =
+        previous === ACCESS_LEVELS.edit
+          ? ("edit" as const)
+          : previous === ACCESS_LEVELS.view
+            ? ("view" as const)
+            : null;
+
+      return {
+        result: {
+          kpiId: input.kpiId,
+          memberId: input.memberId,
+          removed,
+        },
+        activity: {
+          kind: "kpi.unshared" as const,
+          subjectType: "kpi" as const,
+          subjectId: input.kpiId,
+          payload: {
+            memberId: input.memberId,
+          },
+        },
+        audit: {
+          action: "kpis.unshare",
+          targetType: "kpi",
+          targetId: input.kpiId,
+          payload: {
+            memberId: input.memberId,
+            previousLevel,
+          },
+        },
+      };
+    },
+  }),
+});
+
+export const readKpiShares = defineReadAction({
+  name: "kpis.shares",
+  summary: "Lists the owner and individual shares on a KPI.",
+  input: z.object({
+    kpiId: z.uuid(),
+  }),
+  output: z.object({
+    owner: z
+      .object({
+        memberId: z.uuid(),
+        name: z.string(),
+        kind: z.string(),
+      })
+      .nullable(),
+    shares: z.array(
+      z.object({
+        memberId: z.uuid(),
+        name: z.string(),
+        kind: z.enum(["human", "guest", "placeholder"]),
+        status: z.string(),
+        level: z.enum(["view", "edit"]),
+        sharedAt: z.string(),
+        roleLevel: z.number().nullable(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const memberId =
+          context.actor.memberId ??
+          (await actingMember(tx as OperationTx, context.workspaceId, userId));
+        const { contextId } = await requireKpiAccess(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          kpiId: input.kpiId,
+          requires: ACCESS_LEVELS.view,
+        });
+
+        const [kpi] = await tx
+          .select({
+            id: kpis.id,
+            ownerMemberId: kpis.ownerMemberId,
+          })
+          .from(kpis)
+          .where(
+            activeOnly(
+              kpis,
+              eq(kpis.workspaceId, context.workspaceId),
+              eq(kpis.id, input.kpiId),
+            ),
+          )
+          .limit(1);
+
+        if (!kpi) {
+          throw new OperationError("not_found", "No such KPI.");
+        }
+
+        let owner: { memberId: string; name: string; kind: string } | null =
+          null;
+        if (kpi.ownerMemberId) {
+          const [ownerMember] = await tx
+            .select({
+              id: workspaceMembers.id,
+              name: workspaceMembers.name,
+              kind: workspaceMembers.kind,
+            })
+            .from(workspaceMembers)
+            .where(
+              activeOnly(
+                workspaceMembers,
+                eq(workspaceMembers.workspaceId, context.workspaceId),
+                eq(workspaceMembers.id, kpi.ownerMemberId),
+              ),
+            )
+            .limit(1);
+          if (ownerMember) {
+            owner = {
+              memberId: ownerMember.id,
+              name: ownerMember.name,
+              kind: ownerMember.kind,
+            };
+          }
+        }
+
+        if (!contextId) {
+          return { owner, shares: [] };
+        }
+
+        const shareRows = await tx
+          .select({
+            bindingId: accessBindings.id,
+            level: accessBindings.level,
+            createdAt: accessBindings.createdAt,
+            memberId: workspaceMembers.id,
+            name: workspaceMembers.name,
+            kind: workspaceMembers.kind,
+            status: workspaceMembers.status,
+          })
+          .from(accessBindings)
+          .innerJoin(accessGroups, eq(accessGroups.id, accessBindings.groupId))
+          .innerJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, accessGroups.memberId),
+          )
+          .where(
+            activeOnly(
+              accessBindings,
+              eq(accessBindings.workspaceId, context.workspaceId),
+              eq(accessBindings.contextId, contextId),
+              eq(accessBindings.tag, "share"),
+            ),
+          )
+          .orderBy(accessBindings.createdAt);
+
+        const shares = await Promise.all(
+          shareRows.map(async (row) => {
+            const roleLevel = await resolveMemberRoleLevel(tx as OperationTx, {
+              workspaceId: context.workspaceId,
+              memberId: row.memberId,
+              domain: "kpi",
+            });
+            return {
+              memberId: row.memberId,
+              name: row.name,
+              kind: row.kind as "human" | "guest" | "placeholder",
+              status: row.status,
+              level:
+                row.level === ACCESS_LEVELS.edit
+                  ? ("edit" as const)
+                  : ("view" as const),
+              sharedAt: row.createdAt.toISOString(),
+              roleLevel,
+            };
+          }),
+        );
+
+        return { owner, shares };
+      },
+    );
+  },
+});
+
+export const importKpiShare = defineWriteAction({
+  name: "kpis.importShare",
+  domain: "kpi",
+  agentSurface: false,
+  summary: "Imports a KPI share from a legacy system idempotently.",
+  input: z.object({
+    kpiId: z.uuid(),
+    memberId: z.uuid(),
+    level: z.enum(["view", "edit"]),
+    legacy: legacyKey,
+  }),
+  output: z.object({
+    outcome: z.enum(["written", "raised", "unchanged", "revoked"]),
+    coveredByRole: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const contextId = await ensureKpiContextInTx(tx, {
+        workspaceId,
+        kpiId: input.kpiId,
+      });
+
+      const [target] = await tx
+        .select({
+          id: workspaceMembers.id,
+          kind: workspaceMembers.kind,
+          status: workspaceMembers.status,
+        })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.memberId),
+          ),
+        )
+        .limit(1);
+
+      if (!target || target.status !== "active") {
+        throw new OperationError("not_found", "No such member.");
+      }
+      if (target.kind === "agent") {
+        throw new OperationError(
+          "forbidden",
+          "Agents cannot be granted individual KPI shares.",
+        );
+      }
+
+      const [kpi] = await tx
+        .select({ id: kpis.id, ownerMemberId: kpis.ownerMemberId })
+        .from(kpis)
+        .where(
+          activeOnly(
+            kpis,
+            eq(kpis.workspaceId, workspaceId),
+            eq(kpis.id, input.kpiId),
+          ),
+        )
+        .limit(1);
+
+      if (!kpi) {
+        throw new OperationError("not_found", "No such KPI.");
+      }
+
+      const roleLevel = await resolveMemberRoleLevel(tx, {
+        workspaceId,
+        memberId: input.memberId,
+        domain: "kpi",
+      });
+      const shareLevel =
+        input.level === "edit" ? ACCESS_LEVELS.edit : ACCESS_LEVELS.view;
+      const coveredByRole = roleLevel !== null && roleLevel >= shareLevel;
+
+      if (kpi.ownerMemberId === input.memberId) {
+        return {
+          result: { outcome: "unchanged" as const, coveredByRole },
+          audit: {
+            action: "kpis.importShare",
+            targetType: "kpi",
+            targetId: input.kpiId,
+            payload: {
+              memberId: input.memberId,
+              level: input.level,
+              legacyType: input.legacy.type,
+              legacyId: input.legacy.id,
+              outcome: "unchanged",
+              coveredByRole,
+            },
+          },
+        };
+      }
+
+      const [priorAudit] = await tx
+        .select({ id: auditEvents.id })
+        .from(auditEvents)
+        .where(
+          and(
+            eq(auditEvents.workspaceId, workspaceId),
+            eq(auditEvents.targetType, "kpi"),
+            eq(auditEvents.targetId, input.kpiId),
+            eq(auditEvents.action, "kpis.importShare"),
+            sql`${auditEvents.payload}->>'legacyId' = ${String(input.legacy.id)}`,
+          ),
+        )
+        .limit(1);
+
+      const [existingBinding] = await tx
+        .select({
+          id: accessBindings.id,
+          level: accessBindings.level,
+        })
+        .from(accessBindings)
+        .innerJoin(accessGroups, eq(accessGroups.id, accessBindings.groupId))
+        .where(
+          activeOnly(
+            accessBindings,
+            eq(accessBindings.workspaceId, workspaceId),
+            eq(accessBindings.contextId, contextId),
+            eq(accessBindings.tag, "share"),
+            eq(accessGroups.memberId, input.memberId),
+          ),
+        )
+        .limit(1);
+
+      let outcome: "written" | "raised" | "unchanged" | "revoked";
+
+      if (!priorAudit) {
+        if (!existingBinding) {
+          outcome = "written";
+          await setKpiShareInTx(tx, {
+            workspaceId,
+            contextId,
+            memberId: input.memberId,
+            level: shareLevel,
+          });
+        } else if (existingBinding.level < shareLevel) {
+          outcome = "raised";
+          await setKpiShareInTx(tx, {
+            workspaceId,
+            contextId,
+            memberId: input.memberId,
+            level: shareLevel,
+          });
+        } else {
+          outcome = "unchanged";
+        }
+      } else {
+        if (existingBinding) {
+          outcome = "unchanged";
+        } else {
+          outcome = "revoked";
+        }
+      }
+
+      return {
+        result: { outcome, coveredByRole },
+        ...(outcome === "written" || outcome === "raised"
+          ? {
+              activity: {
+                kind: "kpi.shared" as const,
+                subjectType: "kpi" as const,
+                subjectId: input.kpiId,
+                payload: {
+                  memberId: input.memberId,
+                  level: input.level,
+                  imported: true,
+                },
+              },
+            }
+          : {}),
+        audit: {
+          action: "kpis.importShare",
+          targetType: "kpi",
+          targetId: input.kpiId,
+          payload: {
+            memberId: input.memberId,
+            level: input.level,
+            legacyType: input.legacy.type,
+            legacyId: input.legacy.id,
+            outcome,
+            coveredByRole,
+          },
+        },
+      };
+    },
+  }),
 });

@@ -133,7 +133,7 @@ function Frame({
       >
         {/* The sidebar: brandmark, the active row, and rows standing in for
             the rest of the navigation. */}
-        <div className="flex flex-col gap-2 border-r border-line bg-raised p-3">
+        <div className="flex flex-col gap-2 border-e border-line bg-raised p-3">
           <div className="flex min-w-0 items-center gap-2">
             {mirror.logoUrl ? (
               // biome-ignore lint/performance/noImgElement: a stored blob or an object URL, which next/image cannot load.

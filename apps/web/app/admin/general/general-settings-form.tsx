@@ -1,5 +1,6 @@
 "use client";
 
+import { isShippedLocale, LOCALES } from "@openokr/formats";
 import {
   Button,
   Card,
@@ -86,7 +87,7 @@ export function GeneralSettingsForm({
 
   const stored: Values = {
     timezone: typeof settings.timezone === "string" ? settings.timezone : null,
-    language: String(settings.language ?? "en"),
+    language: typeof settings.language === "string" ? settings.language : "",
     domains: trustedEmailDomains.join(","),
     secondFactor: settings.requireSecondFactor === true,
   };
@@ -192,13 +193,20 @@ export function GeneralSettingsForm({
               change({ language: event.currentTarget.value })
             }
           >
-            <option value="en">{t("appearance.english")}</option>
-            <option value="ms">{t("appearance.bahasaMelayu")}</option>
-            {settings.language &&
-            settings.language !== "en" &&
-            settings.language !== "ms" ? (
-              <option value={String(settings.language)}>
-                {String(settings.language)}
+            <option value="">
+              {t("admin.general.generalSettingsForm.followInstance")}
+            </option>
+            {LOCALES.filter((l) => l.shipped).map((l) => (
+              <option key={l.code} value={l.code}>
+                {t(l.endonymKey)}
+              </option>
+            ))}
+            {stored.language && !isShippedLocale(stored.language) ? (
+              // A disabled option stays visible without submitting the old code.
+              <option value={stored.language} disabled>
+                {t("admin.general.generalSettingsForm.unavailableLanguage", {
+                  code: stored.language,
+                })}
               </option>
             ) : null}
           </SelectInput>

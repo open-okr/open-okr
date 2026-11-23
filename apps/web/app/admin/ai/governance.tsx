@@ -14,6 +14,7 @@ import {
   BUDGET_PERIODS,
   MODEL_TIERS,
 } from "@openokr/db";
+import { intlTagFor } from "@openokr/formats";
 import {
   Button,
   Card,
@@ -173,7 +174,7 @@ async function EvaluationResults({
         tabIndex={0}
         aria-label={t("admin.ai.evaluation.title")}
         // Scrolls inside the card at about five rows.
-        className="relative flex max-h-[296px] flex-col gap-1.5 overflow-y-auto pr-1.5 overscroll-contain"
+        className="relative flex max-h-[296px] flex-col gap-1.5 overflow-y-auto pe-1.5 overscroll-contain"
       >
         {evaluations.map((row) => {
           const failed = row.fixtures - row.passed;
@@ -241,13 +242,20 @@ export async function UsageCard({
   readonly days: number;
   readonly evaluations: readonly PromptEvaluationRow[];
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  const intlTag = intlTagFor(locale);
 
   const figures: readonly (readonly [string, string])[] = [
-    ["Calls", usage.totalCalls.toLocaleString("en-GB")],
-    ["Tokens in", usage.totalInputTokens.toLocaleString("en-GB")],
-    ["Tokens out", usage.totalOutputTokens.toLocaleString("en-GB")],
-    ["Cost", `${usage.totalCost.toFixed(2)} USD`],
+    [t("admin.ai.governance.calls"), usage.totalCalls.toLocaleString(intlTag)],
+    [
+      t("admin.ai.governance.tokensIn"),
+      usage.totalInputTokens.toLocaleString(intlTag),
+    ],
+    [
+      t("admin.ai.governance.tokensOut"),
+      usage.totalOutputTokens.toLocaleString(intlTag),
+    ],
+    [t("admin.ai.governance.cost"), `${usage.totalCost.toFixed(2)} USD`],
   ];
   return (
     <Card>
@@ -334,19 +342,19 @@ export async function BudgetsCard({
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-start text-xs">
               <thead className="text-ink-3">
                 <tr>
-                  <th className="py-1 pr-3 font-semibold">
+                  <th className="py-1 pe-3 font-semibold">
                     {t("common.scope")}
                   </th>
-                  <th className="py-1 pr-3 font-semibold">
+                  <th className="py-1 pe-3 font-semibold">
                     {t("admin.ai.governance.metric")}
                   </th>
-                  <th className="py-1 pr-3 font-semibold">
+                  <th className="py-1 pe-3 font-semibold">
                     {t("common.period")}
                   </th>
-                  <th className="py-1 pr-3 font-semibold">
+                  <th className="py-1 pe-3 font-semibold">
                     {t("admin.ai.governance.limit")}
                   </th>
                   <th className="py-1 font-semibold" />
@@ -355,17 +363,17 @@ export async function BudgetsCard({
               <tbody className="text-ink-2">
                 {budgets.map((budget) => (
                   <tr key={budget.id} className="border-t border-line">
-                    <td className="py-1.5 pr-3 text-ink">
+                    <td className="py-1.5 pe-3 text-ink">
                       {budget.scope}
                       {budget.scopeRef ? (
-                        <span className="ml-1.5 text-ink-3">
+                        <span className="ms-1.5 text-ink-3">
                           {nameOf(budget.scope, budget.scopeRef)}
                         </span>
                       ) : null}
                     </td>
-                    <td className="py-1.5 pr-3">{budget.metric}</td>
-                    <td className="py-1.5 pr-3">{budget.period}</td>
-                    <td className="py-1.5 pr-3 tabular-nums">
+                    <td className="py-1.5 pe-3">{budget.metric}</td>
+                    <td className="py-1.5 pe-3">{budget.period}</td>
+                    <td className="py-1.5 pe-3 tabular-nums">
                       {budget.limitValue}
                     </td>
                     <td className="py-1.5">

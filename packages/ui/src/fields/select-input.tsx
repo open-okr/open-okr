@@ -6,11 +6,11 @@ import { cn } from "../lib/cn.ts";
 
 /**
  * The text field's skin, for the browser's own dropdown, with the chevron
- * drawn as the same distance from the right edge as the text is from the
- * left (`--select-chevron`). The browser's own sat in the corner.
+ * drawn as the same distance from the inline end as the text is from the
+ * inline start. The browser's own chevron sat in the corner.
  */
 export const SELECT_CLASS =
-  "h-7.5 w-full appearance-none rounded-control border border-line-2 bg-surface bg-(image:--select-chevron) bg-size-[12px] bg-position-[right_0.5rem_center] bg-no-repeat pr-7 pl-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line aria-[invalid=true]:border-bad-dot disabled:opacity-60";
+  "h-7.5 w-full appearance-none rounded-control border border-line-2 bg-surface bg-(image:--select-chevron) bg-size-[12px] bg-position-[var(--select-chevron-position)] bg-no-repeat pe-7 ps-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line aria-[invalid=true]:border-bad-dot disabled:opacity-60";
 
 export interface SelectInputProps extends ComponentProps<"select"> {
   /** The visible label, linked to the dropdown. */
@@ -83,9 +83,9 @@ export function SelectInput({
         aria-label={hideLabel ? label : select["aria-label"]}
         aria-invalid={error ? true : undefined}
         aria-describedby={described}
-        // The chevron's room comes last, so a caller's `px-1.5` narrows the
-        // left side without sliding the text under it.
-        className={cn(SELECT_CLASS, inputClassName, "pr-7")}
+        // Keep space at the inline end for the chevron when a caller narrows
+        // the field with horizontal padding.
+        className={cn(SELECT_CLASS, inputClassName, "pe-7")}
       >
         {children}
       </select>

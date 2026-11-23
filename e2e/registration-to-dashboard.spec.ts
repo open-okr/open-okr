@@ -211,14 +211,14 @@ test("hydrates, so a write happens without loading a new document", async () => 
   // page still standing afterwards without the browser fetching a document.
   // A picker since completeness review M-15, which offers the languages the
   // catalogue has rather than taking any text.
-  await page.getByLabel("Language").selectOption("en");
+  await page.getByTestId("general-defaults-card").getByLabel("Language").selectOption("en");
   // The defaults card's own save bar: every card on the page has one.
   await page
     .getByTestId("general-defaults-card")
     .getByRole("button", { name: "Save changes" })
     .click();
 
-  await expect(page.getByLabel("Language")).toBeVisible();
+  await expect(page.getByTestId("general-defaults-card").getByLabel("Language")).toBeVisible();
   expect(documentLoads).toBe(0);
 });
 
@@ -250,12 +250,12 @@ test("both seeded agents are in admin, with their schedules and an empty log", a
   await expect(champion.getByText("On the hour")).toBeVisible();
   // **Exact, so it means the chip.** The write policy tile reads "Propose",
   // and `getByText` is case-insensitive by default; the chip is lower case.
-  await expect(champion.getByText("propose", { exact: true })).toBeVisible();
+  await expect(champion.getByText("Propose", { exact: true })).toBeVisible();
 
   const coach = tabs.getByRole("tab", { name: /OKR Coach/ });
   await expect(coach).toHaveCount(1);
   await expect(coach.getByText("On every write")).toBeVisible();
-  await expect(coach.getByText("propose", { exact: true })).toBeVisible();
+  await expect(coach.getByText("Propose", { exact: true })).toBeVisible();
 
   // The run log is on the page whether or not the scheduler has already
   // run something. It used to assert "No run yet", which held only when no
@@ -295,7 +295,11 @@ test("an agent's write policy can be moved, and the workspace cannot be bound", 
 
   await page.getByRole("tab", { name: /OKR Coach/ }).click();
   const coach = page.getByRole("tabpanel", { name: /OKR Coach/ });
-  await expect(coach.getByText("propose", { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole("tab", { name: /OKR Coach/ })
+      .getByText("Propose", { exact: true }),
+  ).toBeVisible();
 
   // Into the sandbox, which commits nothing at all. Chosen rather than
   // scoped direct because widening asks for a confirmation and this test is
@@ -310,7 +314,7 @@ test("an agent's write policy can be moved, and the workspace cannot be bound", 
   await expect(
     page
       .getByRole("tab", { name: /OKR Coach/ })
-      .getByText("sandbox", { exact: true }),
+      .getByText("Sandbox", { exact: true }),
   ).toBeVisible();
 
   // The binder offers named things and not the workspace. CLAUDE.md's rule is
@@ -332,7 +336,7 @@ test("an agent's write policy can be moved, and the workspace cannot be bound", 
   await expect(
     page
       .getByRole("tab", { name: /OKR Coach/ })
-      .getByText("propose", { exact: true }),
+      .getByText("Propose", { exact: true }),
   ).toBeVisible({ timeout: 15_000 });
 });
 

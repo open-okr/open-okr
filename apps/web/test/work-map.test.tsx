@@ -1,4 +1,5 @@
-import { CATALOGUES, translate } from "@openokr/ui";
+import { translate } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 

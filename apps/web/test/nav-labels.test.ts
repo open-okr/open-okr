@@ -1,5 +1,6 @@
 import { MODULE_REGISTRY } from "@openokr/core";
-import { CATALOGUES, translate } from "@openokr/ui";
+import { translate } from "@openokr/ui";
+import { CATALOGUES } from "@openokr/ui/catalogues";
 import { describe, expect, test } from "vitest";
 import { builtinRoleLabel, navGroupLabel, navText } from "../lib/nav-groups.ts";
 

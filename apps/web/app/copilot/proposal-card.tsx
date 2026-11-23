@@ -216,7 +216,7 @@ export function ProposalCard({
             pending={busy && acting === `undo:${proposal.id}`}
             onClick={onUndo}
           >
-            <Undo2 className="size-4" />
+            <Undo2 className="size-4 rtl:-scale-x-100" />
             {t("copilot.copilotPanel.undo")}
           </Button>
         ) : null}
@@ -228,7 +228,7 @@ export function ProposalCard({
         {proposal.href ? (
           <Link
             href={proposal.href}
-            className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-text hover:underline"
+            className="ms-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-text hover:underline"
           >
             {t(OPEN_KEYS[proposal.action] ?? "copilot.copilotPanel.open.made")}
             <ArrowUpRight className="size-3.5" aria-hidden="true" />

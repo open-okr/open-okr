@@ -34,6 +34,7 @@ import { readRhythmRow } from "../cycles/service.ts";
 import { ADDRESS } from "../ids/address.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
 import { listGoals, readGoal } from "./goals.ts";
 
@@ -141,6 +142,7 @@ export const draftObjective = defineReadAction({
     >;
     try {
       drafted = await drafter.draftObjective({
+        locale: await resolveMemberLanguage(context),
         ambition: input.ambition,
         spaceName: null,
         existingTitles,
@@ -384,6 +386,7 @@ export const suggestParent = defineReadAction({
     >;
     try {
       suggested = await drafter.suggestParent({
+        locale: await resolveMemberLanguage(context),
         childTitle: child.title,
         childDescription: descriptionOf(child.description),
         candidates: candidates.map((goal) => ({

@@ -2,7 +2,6 @@
 
 import {
   applyEnforcement,
-  COMMITTED_FLOOR_TEXT,
   committedBelowFloor,
   evaluateKeyResults,
   evaluateObjective,
@@ -108,6 +107,7 @@ const viewOf = (
   status: verdict.status,
   prompt: verdict.prompt,
   condition: verdict.condition,
+  wordChecksSkipped: verdict.wordChecksSkipped,
   examples: examplesFor(verdict.id),
   offenders,
 });
@@ -253,9 +253,7 @@ export function DraftCoach({
           />
           {firing > 0 ? (
             <span className="inline-flex h-5 flex-none items-center rounded-full bg-bad-bg px-2 text-xs font-bold text-bad">
-              {firing === 1
-                ? t("cycle.draftCoach.rulesFiringOne", { count: firing })
-                : t("cycle.draftCoach.rulesFiringOther", { count: firing })}
+              {t("cycle.draftCoach.rulesFiring", { count: firing })}
             </span>
           ) : null}
         </span>
@@ -269,6 +267,10 @@ export function DraftCoach({
         counts={counts}
         bands={thresholds["quality.strengthScoreBands"]}
       />
+
+      {verdicts.some((verdict) => verdict.wordChecksSkipped) ? (
+        <p className="text-xs text-ink-3">{t("method.wordChecksSkipped")}</p>
+      ) : null}
 
       <div className="flex flex-wrap gap-1.5">
         {views
@@ -293,7 +295,7 @@ export function DraftCoach({
           data-testid="committed-floor"
           className="rounded-control bg-warn-bg px-2.5 py-1.5 text-xs text-warn"
         >
-          {COMMITTED_FLOOR_TEXT}
+          {t("method.coach.quality.committed_floor")}
         </p>
       ) : null}
 

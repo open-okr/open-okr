@@ -16,7 +16,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { faceForTrigger } from "../../../lib/agent-moods.ts";
 import { methodDocumentUrl } from "../../../lib/app-version";
-import { nameOf, TRIGGER_NAME_KEYS } from "../../../lib/identifier-names.ts";
+import {
+  nameOf,
+  QUALITY_STATUS_NAME_KEYS,
+  TRIGGER_NAME_KEYS,
+} from "../../../lib/identifier-names.ts";
+import {
+  methodConditionLabel,
+  methodConditionPrompt,
+  methodTitle,
+} from "../../../lib/method-words.ts";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 
@@ -93,7 +102,7 @@ export default async function RulePage({
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
             <h1 className="text-lg font-bold text-ink">
-              {check.id} · {check.title}
+              {check.id} · {methodTitle(t, check.id, check.title)}
             </h1>
             <p className="text-xs text-ink-3">{t(GROUP_LABEL[check.group])}</p>
             {/* This page is the rule in full as the product runs it. The
@@ -135,13 +144,20 @@ export default async function RulePage({
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <Chip tone={TONE[row.status]} dot>
-                    {row.status}
+                    {nameOf(QUALITY_STATUS_NAME_KEYS, row.status, t)}
                   </Chip>
                   <span className="text-sm font-semibold text-ink">
-                    {row.condition}
+                    {methodConditionLabel(t, check.id, row.condition)}
                   </span>
                 </div>
-                <p className="text-sm text-ink-2">{row.prompt}</p>
+                <p className="text-sm text-ink-2">
+                  {methodConditionPrompt(
+                    t,
+                    check.id,
+                    row.condition,
+                    row.prompt,
+                  )}
+                </p>
               </li>
             ))}
           </ul>

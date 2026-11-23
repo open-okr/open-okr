@@ -76,7 +76,7 @@ function NavigationPending({ href }: { readonly href: string | null }) {
       <span
         aria-hidden="true"
         data-testid="navigation-progress"
-        className="nav-progress pointer-events-none fixed left-0 top-0 z-50 h-0.5 bg-brand"
+        className="nav-progress pointer-events-none fixed start-0 top-0 z-50 h-0.5 bg-brand"
       />
       {stalled || offline ? (
         // A live region, so a screen reader hears it without moving focus.
@@ -85,7 +85,7 @@ function NavigationPending({ href }: { readonly href: string | null }) {
         <div
           role="alert"
           data-testid="navigation-stalled"
-          className="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-lg"
+          className="fixed start-0 end-0 bottom-4 z-50 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-lg"
         >
           <span>
             {offline

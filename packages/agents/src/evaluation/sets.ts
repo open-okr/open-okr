@@ -28,6 +28,8 @@ import {
   type GroundedQuestionContext,
   type ImportMappingContext,
   type KpiRequestContext,
+  LOCALES,
+  type LocaleCode,
   type MeasureContext,
   type ParentContext,
   type PlanRunContext,
@@ -45,6 +47,7 @@ import {
   type TrendContext,
 } from "@openokr/core";
 import { diagnosisFor, KEY_RESULT_CHECKS } from "@openokr/method";
+import { LOCALE_REPLIES, mapProse } from "./locale-replies.ts";
 import {
   DEFAULT_INPUT_BUDGET_TOKENS,
   type EvaluationSet,
@@ -57,9 +60,46 @@ type Capability = Exclude<keyof AgentDrafter, "spentUsd" | "identity">;
 
 interface FixtureSpec<C> {
   readonly name: string;
+  readonly locale?: LocaleCode;
   readonly context: C;
   readonly reply: string | readonly string[];
   readonly expected: unknown;
+}
+
+function localisedFixtures<C>(
+  capability: Capability,
+  fixtures: readonly FixtureSpec<C>[],
+): FixtureSpec<C>[] {
+  if (capability === "suggestMeasure" || capability === "chooseReads") {
+    return [];
+  }
+  const seed = fixtures[capability === "parseListFilter" ? 1 : 0];
+  if (!seed) {
+    throw new Error(`No reply to localise for ${capability}.`);
+  }
+
+  return LOCALES.map(({ code: locale }) => {
+    const prose = LOCALE_REPLIES[locale];
+    const grounded =
+      capability === "answerGrounded" || capability === "streamGrounded";
+    const answer = grounded ? `${prose} [1]` : prose;
+    const reply = grounded
+      ? capability === "streamGrounded"
+        ? [answer, "\nSOURCES: 1"]
+        : `${answer}\nSOURCES: 1`
+      : JSON.stringify(
+          mapProse(JSON.parse(seed.reply as string), () => answer),
+        );
+    return {
+      name: `${seed.name} (${locale})`,
+      context: Array.isArray(seed.context)
+        ? seed.context
+        : { ...seed.context, locale },
+      expected: mapProse(seed.expected, () => answer),
+      reply,
+      locale,
+    };
+  });
 }
 
 /** One set, typed by what its capability is given. */
@@ -71,6 +111,7 @@ function evaluationSet<C>(spec: {
     drafter: AgentDrafter,
     context: C,
     note: (text: string) => void,
+    locale?: LocaleCode,
   ) => Promise<unknown> | undefined;
   readonly fixtures: readonly FixtureSpec<C>[];
 }): EvaluationSet {
@@ -78,12 +119,16 @@ function evaluationSet<C>(spec: {
     capability: spec.capability,
     promptKey: spec.promptKey ?? null,
     inputBudgetTokens: spec.inputBudgetTokens ?? DEFAULT_INPUT_BUDGET_TOKENS,
-    fixtures: spec.fixtures.map((fixture) => ({
+    fixtures: [
+      ...spec.fixtures,
+      ...localisedFixtures(spec.capability, spec.fixtures),
+    ].map((fixture) => ({
       name: fixture.name,
       reply: fixture.reply,
       expected: fixture.expected,
+      ...(fixture.locale === undefined ? {} : { locale: fixture.locale }),
       run: (drafter, note) =>
-        missingAs(spec.call(drafter, fixture.context, note)),
+        missingAs(spec.call(drafter, fixture.context, note, fixture.locale)),
     })),
   };
 }
@@ -1579,7 +1624,8 @@ const FINDINGS = [
 const reviewAlignment = evaluationSet<readonly ReviewableGoal[]>({
   capability: "reviewAlignment",
   inputBudgetTokens: 4_000,
-  call: (drafter, context) => drafter.reviewAlignment?.(context),
+  call: (drafter, context, _note, locale) =>
+    drafter.reviewAlignment?.(context, { locale }),
   fixtures: [
     {
       name: "a department objective with no parent",

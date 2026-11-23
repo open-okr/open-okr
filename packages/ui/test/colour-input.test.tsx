@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { ColourInput } from "../src/fields/colour-input.tsx";
-import { CATALOGUES, translate } from "../src/i18n/catalogue.ts";
+import { translate } from "../src/i18n/catalogue.ts";
+import { CATALOGUES } from "../src/i18n/catalogues.ts";
 import { TranslationsProvider } from "../src/i18n/use-translations.tsx";
 
 /**

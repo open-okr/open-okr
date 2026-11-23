@@ -43,7 +43,7 @@ function OrgTree({
 }) {
   if (nodes.length === 0) return null;
   return (
-    <ul className={depth > 0 ? "ml-5 border-line border-l pl-3" : ""}>
+    <ul className={depth > 0 ? "ms-5 border-line border-s ps-3" : ""}>
       {nodes.map((node) => (
         <li key={node.id} className="py-1">
           <Link
@@ -53,7 +53,7 @@ function OrgTree({
             {node.name}
           </Link>
           {node.title ? (
-            <span className="ml-2 text-xs text-ink-3">{node.title}</span>
+            <span className="ms-2 text-xs text-ink-3">{node.title}</span>
           ) : null}
           {node.children.length > 0 ? (
             <OrgTree nodes={node.children} depth={depth + 1} />

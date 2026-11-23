@@ -103,15 +103,10 @@ export default async function SearchPage({
                 ? t("search.typeAPhrase")
                 : hits.length === 0
                   ? t("search.nothingMatches", { phrase })
-                  : hits.length === 1
-                    ? t("search.resultsForOne", {
-                        count: hits.length,
-                        phrase,
-                      })
-                    : t("search.resultsForOther", {
-                        count: hits.length,
-                        phrase,
-                      })}
+                  : t("search.resultsFor", {
+                      count: hits.length,
+                      phrase,
+                    })}
             </p>
           </div>
         </CardHeader>

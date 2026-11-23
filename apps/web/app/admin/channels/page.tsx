@@ -5,6 +5,7 @@ import {
   type BindingSource,
   callAction,
 } from "@openokr/core";
+import { intlTagFor } from "@openokr/formats";
 import { TRIGGER_CATALOGUE } from "@openokr/method";
 import {
   Button,
@@ -15,6 +16,12 @@ import {
   Chip,
 } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import {
+  CHANNEL_NAME_KEYS,
+  CHANNEL_STATE_NAME_KEYS,
+  MESSAGE_STATUS_NAME_KEYS,
+  nameOf,
+} from "../../../lib/identifier-names.ts";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
@@ -87,18 +94,19 @@ const STATE_TONE: Record<string, "ok" | "bad" | "neutral"> = {
   disabled: "neutral",
 };
 
-const when = (iso: string | null): string =>
-  iso
-    ? new Date(iso).toLocaleString("en-GB", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "never";
-
 export default async function ChannelsPage() {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  const intlTag = intlTagFor(locale);
+
+  const when = (iso: string | null): string =>
+    iso
+      ? new Date(iso).toLocaleString(intlTag, {
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : t("admin.channels.never");
 
   const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
@@ -224,7 +232,7 @@ export default async function ChannelsPage() {
                 <h2>{provider.label}</h2>
                 {connection ? (
                   <Chip tone={STATE_TONE[connection.state] ?? "neutral"}>
-                    {connection.state}
+                    {nameOf(CHANNEL_STATE_NAME_KEYS, connection.state, t)}
                   </Chip>
                 ) : (
                   <Chip tone="neutral">{t("admin.channels.notConnected")}</Chip>
@@ -340,7 +348,7 @@ export default async function ChannelsPage() {
                   // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
                   tabIndex={0}
                   aria-label={t("admin.channels.whatsappTemplates")}
-                  className="flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain"
+                  className="flex max-h-[296px] flex-col gap-2 overflow-y-auto pe-1.5 overscroll-contain"
                 >
                   {templates.map((template) => (
                     <li
@@ -366,13 +374,9 @@ export default async function ChannelsPage() {
                         </span>
                         {template.variables > 0 ? (
                           <Chip tone="neutral">
-                            {template.variables === 1
-                              ? t("common.count.variableOne", {
-                                  count: template.variables,
-                                })
-                              : t("common.count.variableOther", {
-                                  count: template.variables,
-                                })}
+                            {t("common.count.variable", {
+                              count: template.variables,
+                            })}
                           </Chip>
                         ) : null}
                       </span>
@@ -410,7 +414,7 @@ export default async function ChannelsPage() {
                   // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll region must be focusable to scroll by keyboard
                   tabIndex={0}
                   aria-label={t("admin.channels.whichTemplateAnswersWhich")}
-                  className="flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain"
+                  className="flex max-h-[296px] flex-col gap-2 overflow-y-auto pe-1.5 overscroll-contain"
                 >
                   {mappings.map((mapping) => (
                     <li
@@ -510,7 +514,7 @@ export default async function ChannelsPage() {
               tabIndex={0}
               aria-label={t("admin.channels.recentMessages")}
               // About seven rows, then it scrolls inside the card.
-              className="flex max-h-52 flex-col gap-1.5 overflow-y-auto pr-1.5 overscroll-contain"
+              className="flex max-h-52 flex-col gap-1.5 overflow-y-auto pe-1.5 overscroll-contain"
             >
               {messages.map((message, index) => (
                 <li
@@ -521,7 +525,9 @@ export default async function ChannelsPage() {
                   key={`${index}-${message.createdAt}-${message.provider}`}
                   className="flex flex-wrap items-center gap-2 text-xs"
                 >
-                  <Chip tone="neutral">{message.provider}</Chip>
+                  <Chip tone="neutral">
+                    {nameOf(CHANNEL_NAME_KEYS, message.provider, t)}
+                  </Chip>
                   <Chip
                     tone={
                       message.status === "sent"
@@ -531,7 +537,7 @@ export default async function ChannelsPage() {
                           : "neutral"
                     }
                   >
-                    {message.status}
+                    {nameOf(MESSAGE_STATUS_NAME_KEYS, message.status, t)}
                   </Chip>
                   <span className="text-ink-3">{when(message.createdAt)}</span>
                   {message.error ? (

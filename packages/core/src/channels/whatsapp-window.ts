@@ -11,7 +11,12 @@
  * ordinary body is sent and no template is involved at all, which keeps the
  * usual path free of a query for something it will not use.
  */
-import { activeOnly, channelIdentities, type WorkspaceTx } from "@openokr/db";
+import {
+  activeOnly,
+  channelIdentities,
+  type WorkspaceTx,
+  workspaceMembers,
+} from "@openokr/db";
 import { eq } from "drizzle-orm";
 import {
   type BindingFacts,
@@ -88,9 +93,22 @@ export async function whatsAppEnvelope(
     return { insideConversationWindow: true };
   }
 
+  const [member] = await tx
+    .select({ language: workspaceMembers.language })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.id, input.memberId),
+        eq(workspaceMembers.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+
   const mapping = await mappingFor(tx, {
     workspaceId: input.workspaceId,
     ruleKey: input.ruleKey,
+    locale: member?.language ?? undefined,
   });
   if (!mapping) {
     return { insideConversationWindow: false };

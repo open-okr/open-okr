@@ -118,8 +118,11 @@ export function GoalWrites({
               {t("goal.writes.explains")}
             </span>
           </span>
-          <span aria-hidden className="text-xs text-ink-3 group-open:rotate-90">
-            ›
+          <span
+            aria-hidden
+            className="text-xs text-ink-3 group-open:rotate-90 rtl:-scale-x-100 rtl:group-open:-rotate-90"
+          >
+            <span dir="ltr">›</span>
           </span>
         </summary>
         <CardBody className="flex flex-col gap-3.5">

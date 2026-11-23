@@ -110,7 +110,7 @@ export function TokenForm({
           </RefusedFields>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-3 border-line border-t px-3.5 py-2.5">
-          <div className="mr-auto min-w-0">{outcome}</div>
+          <div className="me-auto min-w-0">{outcome}</div>
           {submit}
         </div>
       </form>

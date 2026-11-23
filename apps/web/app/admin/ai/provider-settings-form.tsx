@@ -113,7 +113,7 @@ export function ProviderSettingsForm({
             </label>
             {/* Where the other half of this switch lives, since it is on the
                 member's own account rather than here (M-36). */}
-            <p className="pl-6 text-xs text-ink-3">
+            <p className="ps-6 text-xs text-ink-3">
               {t("admin.ai.membersStoreTheirs")}
             </p>
           </div>

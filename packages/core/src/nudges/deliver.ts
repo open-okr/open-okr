@@ -88,12 +88,18 @@ async function dailyDigestDraft(
     held: DigestContents["items"];
   };
 } | null> {
+  const recipientMail = await workspaceMailInTx(
+    tx,
+    input.workspaceId,
+    input.memberId,
+  );
   const contents = await digestItemsFor(tx, {
     workspaceId: input.workspaceId,
     memberId: input.memberId,
     unreadOnly: true,
     baseUrl: input.baseUrl,
     now: input.now,
+    locale: recipientMail.locale,
   });
   // What the weekly ceiling held back since the member's last summary, or in
   // the last week where there was none (§11, P9-T19a-c-b): "anything past

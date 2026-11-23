@@ -1,0 +1,51 @@
+/**
+ * The full message catalogues for testing, sync checks, and server components.
+ *
+ * This module imports all locale JSON files. It must NEVER be imported by
+ * client components or client provider bundles.
+ */
+import type { Catalogue, Locale } from "./catalogue.ts";
+import ar from "./messages/ar.json";
+import de from "./messages/de.json";
+import en from "./messages/en.json";
+import es from "./messages/es.json";
+import fr from "./messages/fr.json";
+import id from "./messages/id.json";
+import it from "./messages/it.json";
+import ms from "./messages/ms.json";
+import pt from "./messages/pt.json";
+import zhHans from "./messages/zh-Hans.json";
+
+/** Preview fixture for the layout before the Arabic catalogue ships (§9). */
+export const PSEUDO_RTL = {
+  dir: "rtl",
+  catalogue: Object.fromEntries(
+    Object.entries(en).map(([key, value]) => [key, `\u202e${value}\u202c`]),
+  ),
+} as const;
+
+export const CATALOGUES: Readonly<
+  Record<"en" | "ms" | "pseudo-rtl", Catalogue> &
+    Partial<Record<Locale, Catalogue>>
+> = {
+  en,
+  ms,
+  "zh-Hans": zhHans,
+  es,
+  ar,
+  de,
+  pt,
+  fr,
+  it,
+  id,
+  "pseudo-rtl": PSEUDO_RTL.catalogue,
+};
+
+/** Keys present in the source but missing from another locale's catalogue.
+ * Empty means every locale is at least "stubbed": present, not necessarily
+ * translated. */
+export function missingKeys(locale: Locale): readonly string[] {
+  const source = CATALOGUES.en;
+  const target = CATALOGUES[locale] ?? {};
+  return Object.keys(source).filter((key) => !(key in target));
+}

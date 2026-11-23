@@ -221,7 +221,7 @@ function DropLine({
   return (
     <span
       aria-hidden="true"
-      className={`pointer-events-none absolute inset-x-2 z-10 h-0.5 rounded-full bg-brand ${edge}`}
+      className={`pointer-events-none absolute start-2 end-2 z-10 h-0.5 rounded-full bg-brand ${edge}`}
     />
   );
 }
@@ -892,7 +892,7 @@ const ObjectiveCard = memo(function ObjectiveCard({
             // The column names over the rows, so "5 in 10" reads as a
             // confidence. On a phone only the count stays.
             <div
-              className={`grid gap-x-3.5 border-y border-line bg-bg py-1.5 pr-3.5 pl-3 text-[11.5px] font-semibold text-ink-3 md:pl-[42px] [&>span:not(:first-child)]:hidden md:[&>span:not(:first-child)]:block ${KEY_RESULT_GRID}`}
+              className={`grid gap-x-3.5 border-y border-line bg-bg py-1.5 pe-3.5 ps-3 text-[11.5px] font-semibold text-ink-3 md:ps-[42px] [&>span:not(:first-child)]:hidden md:[&>span:not(:first-child)]:block ${KEY_RESULT_GRID}`}
             >
               <span>
                 {t("okrList.keyResultsBand", { count: goal.keyResults.length })}
@@ -961,7 +961,7 @@ function Refused({ okr, id }: { readonly okr: RowWrite; readonly id: string }) {
     <div
       role="alert"
       data-testid="okr-refused"
-      className="flex flex-wrap items-center gap-2 border-b border-line bg-bad-bg px-3.5 py-1.5 pl-11 text-xs text-bad"
+      className="flex flex-wrap items-center gap-2 border-b border-line bg-bad-bg px-3.5 py-1.5 ps-11 text-xs text-bad"
     >
       <span className="min-w-0 flex-1">
         {t("okrList.notSaved", { error: okr.failed.error })}
@@ -1037,7 +1037,7 @@ function ObjectiveRow({
           the two rows' left edges disagree (Goals, 2 November 2026). */}
       <div
         data-keyboard-row
-        className="group relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 py-3 pr-3.5 pl-3 md:grid-cols-[1.5rem_minmax(0,1fr)_auto] md:pl-2.5"
+        className="group relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 py-3 pe-3.5 ps-3 md:grid-cols-[1.5rem_minmax(0,1fr)_auto] md:ps-2.5"
       >
         <span className="hidden h-6 items-center justify-center md:flex">
           {mover ? <Grip id={goal.id} mover={mover} /> : null}
@@ -1167,7 +1167,7 @@ function ObjectiveRow({
             <Avatar
               name={goal.champion.name}
               size="sm"
-              className="ml-0.5 size-4 text-[7px]"
+              className="ms-0.5 size-4 text-[7px]"
             />
             <MemberPicker
               value={goal.champion}
@@ -1187,7 +1187,7 @@ function ObjectiveRow({
                  * 0.7.0 O3). Short here; the drawer says it in full. */}
                 {reviewerIsChampion(goal.champion.id, goal.reviewer.id) ? (
                   <Chip
-                    className="ml-1 h-4.5 bg-warn-bg text-[11px] text-warn"
+                    className="ms-1 h-4.5 bg-warn-bg text-[11px] text-warn"
                     data-testid="reviewer-is-champion-chip"
                   >
                     {t("okrList.reviewerIsChampion")}
@@ -1222,7 +1222,7 @@ function ObjectiveRow({
             label={goal.title}
             className="h-2 flex-1"
           />
-          <span className="w-10 text-right text-[13px] font-bold tabular-nums text-ink">
+          <span className="w-10 text-end text-[13px] font-bold tabular-nums text-ink">
             {Math.round(goal.progressPct)}%
           </span>
         </div>
@@ -1293,7 +1293,7 @@ const KeyResultRow = memo(function KeyResultRow({
           confidence under it, then the progress across. */}
       <div
         data-keyboard-row
-        className={`group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1.5 border-b border-line py-2.5 pr-3.5 pl-3 hover:bg-bg md:pl-2.5 ${KEY_RESULT_GRID}`}
+        className={`group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1.5 border-b border-line py-2.5 pe-3.5 ps-3 hover:bg-bg md:ps-2.5 ${KEY_RESULT_GRID}`}
         {...moverHandlers(mover)}
       >
         <DropLine at={dropAt} />
@@ -1469,7 +1469,7 @@ const KeyResultRow = memo(function KeyResultRow({
             label={keyResult.title}
             className="h-1.5 flex-1"
           />
-          <span className="w-9 text-right text-xs font-semibold tabular-nums text-ink-2">
+          <span className="w-9 text-end text-xs font-semibold tabular-nums text-ink-2">
             {Math.round(keyResult.progressPct)}%
           </span>
         </div>
@@ -1543,9 +1543,9 @@ function Chevron({ open }: { readonly open: boolean }) {
       stroke="currentColor"
       strokeWidth="2.5"
       aria-hidden="true"
-      className={open ? "size-3" : "size-3 -rotate-90"}
+      className={open ? "size-3" : "size-3 rtl:-scale-x-100"}
     >
-      <path d="m6 9 6 6 6-6" />
+      <path d={open ? "m6 9 6 6 6-6" : "m9 6 6 6-6 6"} />
     </svg>
   );
 }
@@ -1682,7 +1682,7 @@ function RowActions({
   const icon =
     "flex size-6.5 items-center justify-center rounded-md text-ink-3 hover:bg-raised hover:text-ink";
   const item =
-    "flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-ink-2 outline-none data-[highlighted]:bg-brand-weak data-[highlighted]:text-brand-text";
+    "flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-start text-[12.5px] text-ink-2 outline-none data-[highlighted]:bg-brand-weak data-[highlighted]:text-brand-text";
 
   // Check in and open stay one press away; stopping and deleting, which
   // change the plan, wait behind the menu (Goals revamp, 2 November 2026).
@@ -1868,7 +1868,7 @@ function AddRow({
 
   // On a phone the key results have no grip column, so the add row
   // starts where their titles do.
-  const padding = indented ? "pl-3 md:pl-11" : "pl-3.5";
+  const padding = indented ? "ps-3 md:ps-11" : "ps-3.5";
 
   const close = () => {
     setTitle("");
@@ -1902,7 +1902,7 @@ function AddRow({
         type="button"
         disabled={disabled}
         onClick={() => setOpen(true)}
-        className={`flex w-full items-center gap-2 border-b border-line py-2 pr-3.5 text-left text-xs font-semibold text-brand-text hover:bg-brand-weak disabled:text-ink-4 ${padding}`}
+        className={`flex w-full items-center gap-2 border-b border-line py-2 pe-3.5 text-start text-xs font-semibold text-brand-text hover:bg-brand-weak disabled:text-ink-4 ${padding}`}
       >
         <span
           aria-hidden="true"
@@ -1917,7 +1917,7 @@ function AddRow({
 
   if (refusal) {
     return (
-      <div className={`border-b border-line py-2 pr-3.5 ${padding}`}>
+      <div className={`border-b border-line py-2 pe-3.5 ${padding}`}>
         <RestrictedWriting refusal={refusal} onClose={close} />
       </div>
     );
@@ -1925,7 +1925,7 @@ function AddRow({
 
   return (
     <div
-      className={`flex flex-col gap-1 border-b border-line py-2 pr-3.5 ${padding}`}
+      className={`flex flex-col gap-1 border-b border-line py-2 pe-3.5 ${padding}`}
     >
       <div className="flex items-center gap-2">
         <TextInput

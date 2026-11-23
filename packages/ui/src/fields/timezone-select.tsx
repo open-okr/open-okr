@@ -271,13 +271,13 @@ export function TimezoneSelect({
             aria-invalid={error ? true : undefined}
             className={cn(
               FIELD_CONTROL_CLASS,
-              "pr-8",
+              "pe-8",
               error ? "border-bad-dot" : null,
             )}
           />
           <ChevronDown
             aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 right-2 size-4 -translate-y-1/2 text-ink-3"
+            className="pointer-events-none absolute top-1/2 end-2 size-4 -translate-y-1/2 text-ink-3"
           />
         </div>
         <Combobox.Portal>

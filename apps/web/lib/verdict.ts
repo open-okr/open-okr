@@ -1,3 +1,5 @@
+import { nameOf, VERDICT_NAME_KEYS } from "./identifier-names.ts";
+
 /**
  * §3.4's portfolio verdict, as a chip tone and a label.
  *
@@ -23,5 +25,10 @@ export const verdictTone = (
           ? "bad"
           : "neutral";
 
-export const verdictLabel = (verdict: string | null): string =>
-  verdict === null ? "not scored" : verdict.replace(/_/g, " ");
+export const verdictLabel = (
+  verdict: string | null,
+  t: (key: string) => string,
+): string =>
+  verdict === null
+    ? t("cycle.reviewAndLearn.notScored")
+    : nameOf(VERDICT_NAME_KEYS, verdict, t);

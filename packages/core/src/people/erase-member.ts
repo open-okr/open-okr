@@ -154,6 +154,24 @@ export async function eraseMemberInTx(
   // which is the sentence the audit row will carry.
   const removed = await sweepPersonalData(tx, { workspaceId, memberId });
 
+  // Erasing a member soft-deletes their owner and share bindings on KPI contexts (KA-D13, 0.10.0 K6).
+  // openokr:allow-mutation: the calling Operation's own transaction.
+  await tx.execute(sql`
+    update access_bindings b
+       set deleted_at = now()
+      from access_groups g, access_contexts c
+     where b.group_id = g.id
+       and b.context_id = c.id
+       and b.workspace_id = ${workspaceId}
+       and g.workspace_id = ${workspaceId}
+       and c.workspace_id = ${workspaceId}
+       and g.kind = 'member'
+       and g.member_id = ${memberId}
+       and c.resource_type = 'kpi'
+       and b.tag in ('owner', 'share')
+       and b.deleted_at is null
+  `);
+
   // Their picture stops being shown to the workspace (completeness review
   // M-22). Clearing the column alone would leave the file readable by
   // everybody through the binding that made it an avatar.

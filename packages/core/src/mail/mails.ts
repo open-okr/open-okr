@@ -7,6 +7,7 @@
  * subject and both parts. None reads the database: the callers already hold
  * what a mail says, and a builder that only builds is one a test can call.
  */
+import { intlTagFor } from "@openokr/formats";
 import type { DigestItem } from "../notifications/templates.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
 import { type EmailBlock, renderEmail } from "./render.ts";
@@ -36,15 +37,12 @@ export function invitationMail(input: {
   const named = mail.name !== "";
   const workspace = named ? mail.name : input.instanceName;
   const date = input.expiresAt
-    ? input.expiresAt.toLocaleDateString(
-        mail.locale === "ms" ? "ms-MY" : "en-GB",
-        {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-          timeZone: "UTC",
-        },
-      )
+    ? input.expiresAt.toLocaleDateString(intlTagFor(mail.locale), {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      })
     : null;
   const { html, text } = renderEmail(
     workspaceFrame(
@@ -307,7 +305,7 @@ export function renderStoredEmail(input: {
 }
 
 const mailDate = (mail: WorkspaceMail, date: Date): string =>
-  date.toLocaleDateString(mail.locale === "ms" ? "ms-MY" : "en-GB", {
+  date.toLocaleDateString(intlTagFor(mail.locale), {
     day: "numeric",
     month: "long",
     year: "numeric",

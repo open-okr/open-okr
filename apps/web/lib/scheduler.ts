@@ -506,6 +506,7 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
 export function localHourIn(timezone: string, now: Date): number {
   try {
     return Number(
+      // machine use: extracting 24-hour hour number
       new Intl.DateTimeFormat("en-GB", {
         timeZone: timezone,
         hour: "numeric",

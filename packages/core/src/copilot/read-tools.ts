@@ -23,7 +23,6 @@
  */
 import {
   activeOnly,
-  type GoalHealth,
   type ToolCallOutcome,
   withWorkspace,
   workspaceMembers,
@@ -37,6 +36,7 @@ import { type ActionName, callAction } from "../actions/registry.ts";
 import { ScopeCeilingRefused } from "../actions/scope-ceiling.ts";
 import { toolNamed } from "../api/mcp/catalogue.ts";
 import { EmbeddingService } from "../embeddings/service.ts";
+import { serverTranslate } from "../i18n/catalogue.ts";
 import { OperationError } from "../operations/errors.ts";
 import { plainTextOfDocument } from "../rich-text/moving.ts";
 import type { RichTextDocument } from "../rich-text/schema.ts";
@@ -624,20 +624,6 @@ interface Group {
   readonly mark: number;
 }
 
-// Reuse the default interface wording for data that goes to the model.
-const HEALTH_WORDS: Readonly<
-  Record<GoalHealth, Record<MemberLanguage, string>>
-> = {
-  pending: { en: "No check-in yet", ms: "Belum dilapor" },
-  on_track: { en: "On track", ms: "Di landasan" },
-  caution: { en: "At risk", ms: "Berisiko" },
-  off_track: { en: "Off track", ms: "Tersasar" },
-  outdated: { en: "Outdated", ms: "Lapuk" },
-  achieved: { en: "Achieved", ms: "Tercapai" },
-  missed: { en: "Missed", ms: "Terlepas" },
-  abandoned: { en: "Abandoned", ms: "Ditinggalkan" },
-};
-
 function healthLabel(key: string, value: string, locale: MemberLanguage) {
   const isCheckInStatus =
     value === "on_track" || value === "caution" || value === "off_track";
@@ -645,9 +631,11 @@ function healthLabel(key: string, value: string, locale: MemberLanguage) {
     key === "health" ||
     (isCheckInStatus && (key === "status" || key === "reportedStatus"))
   ) {
-    return Object.hasOwn(HEALTH_WORDS, value)
-      ? HEALTH_WORDS[value as GoalHealth][locale]
-      : null;
+    try {
+      return serverTranslate(locale, `health.${value}`);
+    } catch {
+      return null;
+    }
   }
   return null;
 }

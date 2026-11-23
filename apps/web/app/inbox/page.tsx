@@ -202,7 +202,7 @@ export default async function InboxPage({
                 }
               >
                 {one.labelKey ? t(one.labelKey) : one.id}
-                <span className="ml-1 font-normal tabular-nums opacity-75">
+                <span className="ms-1 font-normal tabular-nums opacity-75">
                   {countFor(one.id)}
                 </span>
               </Link>
@@ -345,7 +345,7 @@ async function NotificationRow({
 
   return (
     // `group`, so resting anywhere on the row plays the sender's face.
-    <div className="group flex items-start gap-2.5 rounded-lg border border-line bg-surface px-3 py-2.5">
+    <div className="group flex flex-wrap items-start gap-2.5 rounded-lg border border-line bg-surface px-3 py-2.5">
       <span
         aria-hidden
         className={
@@ -354,7 +354,7 @@ async function NotificationRow({
             : "mt-1.5 size-2 flex-none rounded-full bg-transparent"
         }
       />
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <div className="flex min-w-0 flex-1 basis-48 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <Chip tone={reasonTone(row.reason)}>
             {REASON_LABEL_KEYS[row.reason]
@@ -391,7 +391,7 @@ async function NotificationRow({
           <p className="text-sm text-ink">{line}</p>
         )}
       </div>
-      <div className="flex flex-none items-center gap-1.5">
+      <div className="flex w-full flex-wrap items-center gap-1.5 ps-4.5 sm:w-auto sm:flex-none sm:ps-0">
         {row.readAt === null ? (
           <ActionForm action={markRead}>
             <input type="hidden" name="notificationId" value={row.id} />

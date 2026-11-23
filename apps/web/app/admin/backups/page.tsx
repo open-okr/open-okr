@@ -73,7 +73,7 @@ export default async function BackupsPage() {
               tabIndex={0}
               aria-label={t("admin.backups.historyTitle")}
               // Scrolls inside the card after about five rows.
-              className="flex max-h-[296px] flex-col divide-y divide-line overflow-y-auto pr-1.5 overscroll-contain"
+              className="flex max-h-[296px] flex-col divide-y divide-line overflow-y-auto pe-1.5 overscroll-contain"
               data-testid="archive-history"
             >
               {history.archives.map((archive) => (
@@ -113,7 +113,7 @@ export default async function BackupsPage() {
             </p>
           </div>
           <a
-            className={`ml-auto ${linkClass}`}
+            className={`ms-auto ${linkClass}`}
             href={docsUrl("docs/runbooks/migration-cutover.md")}
             rel="noreferrer"
             target="_blank"
@@ -138,7 +138,7 @@ export default async function BackupsPage() {
           {cloud ? (
             supportEmail ? (
               <a
-                className={`ml-auto ${linkClass}`}
+                className={`ms-auto ${linkClass}`}
                 href={`mailto:${supportEmail}`}
               >
                 {supportEmail}
@@ -146,7 +146,7 @@ export default async function BackupsPage() {
             ) : null
           ) : (
             <a
-              className={`ml-auto ${linkClass}`}
+              className={`ms-auto ${linkClass}`}
               href={docsUrl("docs/runbooks/restore.md")}
               rel="noreferrer"
               target="_blank"

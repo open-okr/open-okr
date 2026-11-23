@@ -173,7 +173,7 @@ export function NextActionPanel({
               {score.nextAction ? (
                 <p className="text-xs text-ink-2">
                   {score.nextAction.text}
-                  <span className="ml-1.5 text-ink-3">
+                  <span className="ms-1.5 text-ink-3">
                     {t("session.detail.nextActions.ownerAndDue", {
                       owner: score.nextAction.ownerName,
                       date: score.nextAction.dueOn,

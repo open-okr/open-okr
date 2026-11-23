@@ -52,7 +52,7 @@ export async function AppFooter({
       {instanceName === DEFAULT_INSTANCE_NAME ? null : (
         <span className="font-semibold text-ink-2">{instanceName}</span>
       )}
-      <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 md:ml-auto">
+      <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 md:ms-auto">
         {/* A phone has no ⌘ key, so the shortcuts are for wider screens. */}
         <span className="hidden items-center gap-1.5 md:inline-flex">
           <Kbd>⌘K</Kbd>

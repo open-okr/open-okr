@@ -428,7 +428,7 @@ export default async function SpacePage({
                     {row.state === "running" ? (
                       <Chip tone="brand">{t("common.inProgress")}</Chip>
                     ) : null}
-                    <span className="ml-auto flex-none text-xs font-semibold text-brand-text">
+                    <span className="ms-auto flex-none text-xs font-semibold text-brand-text">
                       {row.state === "running"
                         ? t("spaces.detail.rejoin")
                         : t("cycle.drafting.open")}

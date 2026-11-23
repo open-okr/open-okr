@@ -106,6 +106,7 @@ export async function timezoneForAccount(
 
 function knownZone(zone: string): boolean {
   try {
+    // machine use: validating timezone
     new Intl.DateTimeFormat("en-GB", { timeZone: zone });
     return true;
   } catch {

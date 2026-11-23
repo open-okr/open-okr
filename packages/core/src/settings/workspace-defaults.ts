@@ -13,6 +13,7 @@
  * workspace inherits that resolution rather than a value that can never see
  * `OPENOKR_DEFAULT_LANGUAGE`.
  */
+import type { WorkspaceTx } from "@openokr/db";
 import type { Pool } from "pg";
 import {
   environmentValue,
@@ -24,7 +25,7 @@ import { INSTANCE_DEFAULT_LANGUAGE } from "./registry.ts";
 const INSTANCE_LANGUAGE_KEY = "instance.language";
 
 export async function resolveInstanceDefaultLanguage(
-  pool: Pool,
+  source: Pool | WorkspaceTx,
 ): Promise<string> {
   const definition = getInstanceSetting(INSTANCE_LANGUAGE_KEY);
   const fallback =
@@ -32,7 +33,7 @@ export async function resolveInstanceDefaultLanguage(
   if (!definition) {
     return fallback;
   }
-  const stored = await readSetting(pool, definition.key);
+  const stored = await readSetting(source, definition.key);
   const environment = environmentValue(definition, process.env);
   return resolveSetting(stored, environment, fallback).value as string;
 }

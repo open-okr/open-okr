@@ -4,6 +4,7 @@ import type { QualityStatus } from "@openokr/method";
 import { Button, buttonVariants, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useState } from "react";
+import { methodTitle, methodVerdictWords } from "../../lib/method-words.ts";
 
 /**
  * One check's verdict, as a chip that opens into the rule card
@@ -32,6 +33,7 @@ export interface RuleVerdictView {
   readonly status: QualityStatus;
   readonly prompt: string;
   readonly condition: string;
+  readonly wordChecksSkipped?: true;
   /** §4.6's pair, where the check has one. Most do not. */
   readonly examples: readonly {
     readonly weak: string;
@@ -77,11 +79,11 @@ const DOT: Record<QualityStatus, string> = {
 };
 
 const LABEL: Record<QualityStatus, string> = {
-  pass: "PASS",
-  info: "NOTE",
-  warn: "WARN",
-  fail: "FAIL",
-  todo: "TO DO",
+  pass: "cycle.ruleVerdict.statusPass",
+  info: "cycle.ruleVerdict.statusNote",
+  warn: "cycle.ruleVerdict.statusWarn",
+  fail: "cycle.ruleVerdict.statusFail",
+  todo: "cycle.ruleVerdict.statusTodo",
 };
 
 export function RuleVerdict({
@@ -92,7 +94,8 @@ export function RuleVerdict({
   const { t } = useTranslations();
 
   const [open, setOpen] = useState(false);
-  const label = `${verdict.id} · ${verdict.title}`;
+  const label = `${verdict.id} · ${methodTitle(t, verdict.id, verdict.title)}`;
+  const words = methodVerdictWords(t, verdict);
 
   return (
     <div className="flex flex-col">
@@ -129,18 +132,18 @@ export function RuleVerdict({
             <span
               className={`inline-flex h-5 flex-none items-center rounded-[5px] px-2 text-xs font-extrabold tracking-wide ${CHIP[verdict.status]}`}
             >
-              {LABEL[verdict.status]}
+              {t(LABEL[verdict.status])}
             </span>
           </div>
 
           <div className="flex flex-col gap-2.5 p-4">
-            <p className="text-sm text-ink-2">{verdict.prompt}</p>
+            <p className="text-sm text-ink-2">{words.prompt}</p>
 
             <p className="text-xs text-ink-3">
               <span className="font-semibold text-ink-2">
                 {t("cycle.ruleVerdict.whatWasSeen")}{" "}
               </span>
-              {verdict.condition}
+              {words.condition}
               {verdict.offenders.length > 0
                 ? `: ${verdict.offenders.map((title) => `"${title}"`).join(", ")}`
                 : ""}
@@ -185,7 +188,7 @@ export function RuleVerdict({
               </Link>
               <Button
                 variant="ghost"
-                className="ml-auto"
+                className="ms-auto"
                 onClick={() => setOpen(false)}
               >
                 {t("common.dismiss")}
@@ -229,10 +232,14 @@ export function StrengthMeter({
   }
   const tone =
     score >= bands.green
-      ? { text: "text-ok", bar: "bg-ok", word: "Green" }
+      ? { text: "text-ok", bar: "bg-ok", word: "cycle.ruleVerdict.green" }
       : score < bands.red
-        ? { text: "text-bad", bar: "bg-bad", word: "Red" }
-        : { text: "text-warn", bar: "bg-warn", word: "Amber" };
+        ? { text: "text-bad", bar: "bg-bad", word: "cycle.ruleVerdict.red" }
+        : {
+            text: "text-warn",
+            bar: "bg-warn",
+            word: "cycle.ruleVerdict.amber",
+          };
 
   return (
     <div className="flex flex-col gap-1">
@@ -241,13 +248,13 @@ export function StrengthMeter({
           {score}%
         </span>
         <span className={`text-xs font-semibold ${tone.text}`}>
-          {tone.word}
+          {t(tone.word)}
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-raised">
         <div
           className={`h-full rounded-full ${tone.bar}`}
-          style={{ width: `${score}%` }}
+          style={{ width: `${score}%`, marginInlineEnd: "auto" }}
         />
       </div>
       <p className="text-xs text-ink-3">

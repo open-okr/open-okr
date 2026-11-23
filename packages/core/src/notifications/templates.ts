@@ -1,16 +1,9 @@
 /**
- * Per-reason mail templates (TECHNICAL-PLAN §4.11, P2-T06): HTML and plain
- * text for a single immediate notification, and a digest variant for a
- * batch. Pure string builders, no templating engine: CLAUDE.md's rich-text
- * rule ("a sanitising allow-list at every surface, including email") is
- * about content that came from a member; every value woven in here is a
- * title or a name already stored as plain text, not editor JSON, so there
- * is nothing to sanitise that the rich-text renderer owns.
- *
- * No development preview page is built: apps/web has no shell yet
- * (P2-T10), and a route rendering these two functions' own output would be
- * throwaway until it exists. Recorded in STATUS.md.
+ * Per-reason mail templates (TECHNICAL-PLAN §4.11, P2-T06, docs/design/languages.md §13):
+ * HTML and plain text for a single immediate notification, and a digest variant for a
+ * batch. Rendered in the recipient's resolved locale.
  */
+import { serverTranslate } from "../i18n/catalogue.ts";
 
 const escapeHtml = (value: string): string =>
   value
@@ -33,13 +26,18 @@ export interface MentionNotificationInput {
 
 export function renderMentionNotification(
   input: MentionNotificationInput,
+  locale = "en",
 ): MailContent {
-  const subject = `${input.actorName} mentioned you in "${input.subjectTitle}"`;
-  const text = `${input.actorName} mentioned you in "${input.subjectTitle}".\n\n${input.link}\n`;
+  const subject = serverTranslate(locale, "notification.mention.subject", {
+    actorName: input.actorName,
+    subjectTitle: input.subjectTitle,
+  });
+  const text = `${subject}.\n\n${input.link}\n`;
+  const openLabel = serverTranslate(locale, "notification.mention.action");
   const html =
     `<p>${escapeHtml(input.actorName)} mentioned you in ` +
     `&ldquo;${escapeHtml(input.subjectTitle)}&rdquo;.</p>` +
-    `<p><a href="${escapeHtml(input.link)}">Open it</a></p>`;
+    `<p><a href="${escapeHtml(input.link)}">${escapeHtml(openLabel)}</a></p>`;
   return { subject, text, html };
 }
 
@@ -61,9 +59,15 @@ export interface DigestInput {
  * either way, a list of items, and what decides which one a member gets is
  * the window that collected them, not the template.
  */
-export function renderDigest(input: DigestInput): MailContent {
+export function renderDigest(input: DigestInput, locale = "en"): MailContent {
   const count = input.items.length;
-  const subject = count === 1 ? "1 update" : `${count} updates`;
+  const subject = serverTranslate(
+    locale,
+    count === 1
+      ? "notification.digest.subject.one"
+      : "notification.digest.subject.other",
+    { count },
+  );
   const text = input.items
     .map((item) => `- ${item.summary}\n  ${item.link}`)
     .join("\n");

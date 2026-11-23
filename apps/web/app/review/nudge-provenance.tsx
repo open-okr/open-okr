@@ -1,5 +1,6 @@
 "use client";
 
+import { intlTagFor } from "@openokr/formats";
 import {
   guardPress,
   type MessageValues,
@@ -88,7 +89,7 @@ export function NudgeProvenance({
 }: {
   readonly nudges: readonly NudgeEntry[];
 }) {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
 
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -135,7 +136,9 @@ export function NudgeProvenance({
                   read as a broken page (OKRGoal UX review, T9). */}
               {nudge.sentAt
                 ? t("common.sent3", {
-                    sentAt: new Date(nudge.sentAt).toLocaleString(),
+                    sentAt: new Date(nudge.sentAt).toLocaleString(
+                      intlTagFor(locale),
+                    ),
                   })
                 : t("review.nudgeProvenance.notSentYet")}
             </p>

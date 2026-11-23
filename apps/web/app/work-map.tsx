@@ -230,7 +230,7 @@ export async function GoalTable({
         {nodes.length === 0 ? (
           empty
         ) : (
-          <table className="w-full border-collapse text-left">
+          <table className="w-full border-collapse text-start">
             <thead>
               <tr className="border-line border-b">
                 <th
@@ -265,7 +265,7 @@ export async function GoalTable({
                 </th>
                 <th
                   scope="col"
-                  className="px-3 py-2 text-right text-[10px] font-bold tracking-wider text-ink-4 uppercase"
+                  className="px-3 py-2 text-end text-[10px] font-bold tracking-wider text-ink-4 uppercase"
                 >
                   {t("common.champion")}
                 </th>
@@ -287,7 +287,7 @@ export async function GoalTable({
                       href={rowHref(node)}
                       className="flex items-center gap-2"
                       style={{
-                        paddingLeft: `${Math.max(node.depth - 1, 0) * 18}px`,
+                        paddingInlineStart: `${Math.max(node.depth - 1, 0) * 18}px`,
                       }}
                     >
                       {/* An elbow to the parent, as the KPI trees draw it,
@@ -296,7 +296,7 @@ export async function GoalTable({
                       {node.depth > 0 ? (
                         <span
                           aria-hidden="true"
-                          className="-mt-3 ml-1 h-5 w-3.5 flex-none rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-2"
+                          className="-mt-3 ms-1 h-5 w-3.5 flex-none rounded-es-md border-b-[1.5px] border-s-[1.5px] border-line-2"
                         />
                       ) : null}
                       <RowKindChip
@@ -338,7 +338,7 @@ export async function GoalTable({
                         label={node.title}
                         className="h-1.5 w-20 lg:w-28"
                       />
-                      <span className="w-9 text-right text-xs font-semibold tabular-nums text-ink-3">
+                      <span className="w-9 text-end text-xs font-semibold tabular-nums text-ink-3">
                         {Math.round(node.progressPct)}%
                       </span>
                     </span>

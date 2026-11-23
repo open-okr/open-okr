@@ -101,7 +101,7 @@ test("a run started over the API is carried by the relay, and stops with its rea
     .filter({ hasText: "Steps done" });
   await expect(async () => {
     await goTo(page, "/admin/agents");
-    await expect(run.getByText("cancelled", { exact: true })).toBeVisible({
+    await expect(run.getByText("Cancelled", { exact: true })).toBeVisible({
       timeout: 2_000,
     });
   }).toPass({ timeout: 45_000 });
@@ -174,7 +174,7 @@ test("the agents screen shows a run start and stop without a reload", async () =
   expect(started.status()).toBe(200);
 
   // No goTo from here: the stream is the only thing that can move the page.
-  await expect(run.getByText("cancelled", { exact: true })).toBeVisible({
+  await expect(run.getByText("Cancelled", { exact: true })).toBeVisible({
     timeout: 45_000,
   });
   await expect(run).toContainText("no AI provider is configured");

@@ -160,3 +160,32 @@ export async function inferVersion(source: Source): Promise<SourceVersion> {
     migrationCount: Number(counted[0]?.n ?? 0),
   };
 }
+
+export interface IndicatorAccessesColumns {
+  readonly hasId: boolean;
+  readonly hasDeletedAt: boolean;
+  readonly hasDepartmentId: boolean;
+  readonly hasPermissions: boolean;
+  readonly hasViewOptions: boolean;
+  readonly hasOccurance: boolean;
+}
+
+export async function introspectIndicatorAccesses(
+  source: Source,
+): Promise<IndicatorAccessesColumns> {
+  const rows = await source.query<{ COLUMN_NAME: string }>(
+    `select column_name as COLUMN_NAME
+       from information_schema.columns
+      where table_schema = ? and table_name = 'indicator_accesses'`,
+    [source.database],
+  );
+  const cols = new Set(rows.map((r) => r.COLUMN_NAME.toLowerCase()));
+  return {
+    hasId: cols.has("id"),
+    hasDeletedAt: cols.has("deleted_at"),
+    hasDepartmentId: cols.has("department_id"),
+    hasPermissions: cols.has("permissions"),
+    hasViewOptions: cols.has("view_options"),
+    hasOccurance: cols.has("occurance"),
+  };
+}

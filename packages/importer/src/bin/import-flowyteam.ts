@@ -58,6 +58,7 @@ async function main(): Promise<void> {
       url: args.source,
       companyId: args.company,
       write: args.write,
+      acceptBroaderVisibility: args.acceptBroaderVisibility,
       // The instance's own byte store, which is where a copied file lands. Only
       // the driver, not `createAdapters`: an importer has no use for a job
       // queue or a realtime listener, and starting them would leave two

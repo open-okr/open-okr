@@ -21,6 +21,7 @@ export function localTimeIn(
   timeZone: string,
 ): { hour: number; minute: number } {
   try {
+    // machine use: extracting time parts
     const parts = new Intl.DateTimeFormat("en-GB", {
       timeZone,
       hour: "2-digit",

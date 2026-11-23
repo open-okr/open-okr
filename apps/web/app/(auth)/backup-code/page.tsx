@@ -2,10 +2,10 @@
 
 import { Button, CodeInput, useTranslations } from "@openokr/ui";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { AuthCard } from "../auth-card";
+import { pathAfterSignIn } from "../sign-in/deletion-actions";
 
 /**
  * The way back in when the authenticator is gone (screen S-35). Without
@@ -14,7 +14,6 @@ import { AuthCard } from "../auth-card";
 export default function BackupCodePage() {
   const { t } = useTranslations();
 
-  const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [code, setCode] = useState("");
@@ -35,7 +34,9 @@ export default function BackupCodePage() {
       setError(t("auth.backupCode.notRecognised"));
       return;
     }
-    router.push("/");
+    // A full load, not router.push: the root layout holds <html lang dir> and
+    // the catalogue, and a soft navigation keeps the signed-out one.
+    window.location.assign(await pathAfterSignIn());
   };
 
   return (

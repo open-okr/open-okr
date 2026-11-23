@@ -132,7 +132,7 @@ export function Avatar({
 
 export function AvatarStack({ children }: { readonly children: ReactNode }) {
   return (
-    <div className="flex [&>*]:-ml-1.5 [&>*]:shadow-[0_0_0_2px_var(--color-surface)] [&>*:first-child]:ml-0">
+    <div className="flex [&>*]:-ms-1.5 [&>*]:shadow-[0_0_0_2px_var(--color-surface)] [&>*:first-child]:ms-0">
       {children}
     </div>
   );

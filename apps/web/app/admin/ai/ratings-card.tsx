@@ -106,7 +106,7 @@ export async function RatingsCard({
             tabIndex={0}
             aria-label={t("admin.ai.ratings.title")}
             // Scrolls inside the card at about five rows.
-            className="relative flex max-h-[296px] flex-col gap-2 overflow-y-auto pr-1.5 overscroll-contain"
+            className="relative flex max-h-[296px] flex-col gap-2 overflow-y-auto pe-1.5 overscroll-contain"
           >
             {rows.map((row) => (
               <li

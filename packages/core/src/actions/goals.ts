@@ -99,6 +99,7 @@ import { richTextSchema } from "../rich-text/field-schema.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { recomputeAlignmentFor, scopesHangingFrom } from "./alignment.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -2345,7 +2346,7 @@ export const createKeyResult = defineWriteAction({
       // KPI's reading wins over a typed current value; with nothing recorded
       // yet, the key result starts at its own baseline like any other.
       const kpi = input.kpiId
-        ? await readLinkableKpi(tx, workspaceId, input.kpiId)
+        ? await readLinkableKpi(tx, workspaceId, input.kpiId, memberId)
         : null;
       const currentValue = kpi?.reading ?? input.currentValue;
 
@@ -2932,7 +2933,7 @@ export const linkKeyResultKpi = defineWriteAction({
           "This goal is closed, so its key results take no new values. Reopen it first to link a KPI.",
         );
       }
-      const kpi = await readLinkableKpi(tx, workspaceId, input.kpiId);
+      const kpi = await readLinkableKpi(tx, workspaceId, input.kpiId, memberId);
 
       await linkKpiInTx(tx, {
         workspaceId,
@@ -3324,6 +3325,7 @@ export const rewriteKeyResult = defineReadAction({
       return null;
     }
 
+    const locale = await resolveMemberLanguage(context);
     return withContext(
       drizzle(context.pool),
       { workspaceId: context.workspaceId, userId },
@@ -3400,6 +3402,7 @@ export const rewriteKeyResult = defineReadAction({
         try {
           suggestion =
             (await drafter.rewriteForRule?.({
+              locale,
               text: row.title,
               ruleId: check.id,
               // The catalogue's own words for the failing condition, so the

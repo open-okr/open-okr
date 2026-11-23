@@ -188,7 +188,7 @@ test("the Champion and the Coach run, deterministically", async () => {
 
   await page.getByRole("button", { name: "Nudge queue" }).click();
   const champion = latest("OKR Champion", "Every hour");
-  await expect(champion.getByText("completed", { exact: true })).toBeVisible({
+  await expect(champion.getByText("Completed", { exact: true })).toBeVisible({
     timeout: 15_000,
   });
   // Its log says what it decided: how many it delivered and how many it held,
@@ -197,7 +197,7 @@ test("the Champion and the Coach run, deterministically", async () => {
 
   await page.getByRole("button", { name: "Quality pass" }).click();
   const coach = latest("OKR Coach", "The nightly quality sweep");
-  await expect(coach.getByText("completed", { exact: true })).toBeVisible({
+  await expect(coach.getByText("Completed", { exact: true })).toBeVisible({
     timeout: 15_000,
   });
   await expect(coach).toContainText("held with a reason");

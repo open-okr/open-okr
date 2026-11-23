@@ -87,12 +87,9 @@ export function MyWeek({
                         ? null
                         : goal.daysPastDue > 0
                           ? t("checkIn.overdueBy", {
-                              days:
-                                goal.daysPastDue === 1
-                                  ? t("common.count.dayOne", { count: 1 })
-                                  : t("common.count.dayOther", {
-                                      count: goal.daysPastDue,
-                                    }),
+                              days: t("common.count.day", {
+                                count: goal.daysPastDue,
+                              }),
                             })
                           : t("checkIn.dueOn", {
                               date: dueDayLabel(

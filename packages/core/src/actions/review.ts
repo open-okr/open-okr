@@ -33,6 +33,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import type { MessageValues } from "@openokr/formats";
 import { and, asc, eq, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -47,6 +48,7 @@ import {
 } from "../check-ins/acknowledgement-owed.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { getServerCatalogue, serverTranslate } from "../i18n/catalogue.ts";
 import { resolveRhythmWithLadders } from "../nudges/ladders.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import {
@@ -68,6 +70,7 @@ import {
   proposalRecipients,
 } from "../review/proposals.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
+import { resolveMemberLanguage } from "../settings/member-language.ts";
 import { defineReadAction } from "./define.ts";
 
 const obligationSchema = z.object({
@@ -198,6 +201,18 @@ export const reviewInbox = defineReadAction({
     if (!userId) {
       throw new OperationError("not_found", "No such workspace.");
     }
+    // The words are built here, so they are built in the requester's
+    // language, like the export headers (languages.md §13). Resolved before
+    // the transaction because it reads through other actions.
+    const locale = await resolveMemberLanguage(context);
+    const t = (key: string, values?: MessageValues) =>
+      serverTranslate(locale, key, values);
+    // A stored code's name, or the code itself when the catalogue has none.
+    const catalogue = getServerCatalogue(locale);
+    const word = (prefix: string, value: string) =>
+      `${prefix}.${value}` in catalogue
+        ? serverTranslate(locale, `${prefix}.${value}`)
+        : value.replace(/_/g, " ");
     return withContext(
       db,
       { workspaceId: context.workspaceId, userId },
@@ -257,13 +272,16 @@ export const reviewInbox = defineReadAction({
             id: `check_in:${goal.id}`,
             kind: "check_in",
             group: groupFor(days),
-            title: `Post your check-in on "${goal.title}"`,
-            meta: `Champion · ${goal.level} · ${goal.health.replace("_", " ")}`,
-            dueLabel: dueLabelFor(days, dueOn),
+            title: t("reviewInbox.title.checkIn", { goal: goal.title }),
+            meta: t("reviewInbox.meta.checkIn", {
+              level: word("activity.word.level", goal.level),
+              health: word("health", goal.health),
+            }),
+            dueLabel: dueLabelFor(days, dueOn, locale),
             dueOn,
             daysPastDue: days,
             href: `/check-in?goal=${goal.id}`,
-            actionLabel: "Check in",
+            actionLabel: t("reviewInbox.action.checkIn"),
             subjectId: goal.id,
             checkInId: null,
             proposal: null,
@@ -329,22 +347,20 @@ export const reviewInbox = defineReadAction({
             id: `acknowledgement:${row.id}`,
             kind: "acknowledgement",
             group: acknowledgementGroup(age, escalateAfter),
-            title: `Acknowledge the check-in on "${row.goalTitle}"`,
+            title: t("reviewInbox.title.acknowledge", { goal: row.goalTitle }),
             meta: [
-              "Reviewer",
+              t("reviewInbox.word.reviewer"),
               row.authorName,
-              publishedAgo(age),
+              publishedAgo(age, locale),
               ...(row.earlier > 0
-                ? [
-                    `covers ${row.earlier} earlier ${row.earlier === 1 ? "check-in" : "check-ins"}`,
-                  ]
+                ? [t("reviewInbox.meta.covers", { count: row.earlier })]
                 : []),
             ].join(" · "),
-            dueLabel: acknowledgementDueLabel(age, escalateAfter),
+            dueLabel: acknowledgementDueLabel(age, escalateAfter, locale),
             dueOn: dueLocalDate(row.publishedAt, timeZone),
             daysPastDue: age,
             href: `/check-in?goal=${row.goalId}`,
-            actionLabel: "Acknowledge",
+            actionLabel: t("reviewInbox.action.acknowledge"),
             subjectId: row.goalId,
             checkInId: row.id,
             proposal: null,
@@ -415,13 +431,16 @@ export const reviewInbox = defineReadAction({
             id: `task:${row.id}`,
             kind: "task",
             group: groupFor(days),
-            title: `Finish "${row.title}"`,
-            meta: `Assigned · ${row.spaceName} · ${row.status.replace("_", " ")}`,
-            dueLabel: dueLabelFor(days, row.dueOn),
+            title: t("reviewInbox.title.task", { task: row.title }),
+            meta: t("reviewInbox.meta.task", {
+              space: row.spaceName,
+              status: word("reviewInbox.word.taskStatus", row.status),
+            }),
+            dueLabel: dueLabelFor(days, row.dueOn, locale),
             dueOn: row.dueOn,
             daysPastDue: days,
             href: `/tasks/${row.id}`,
-            actionLabel: "Open the task",
+            actionLabel: t("reviewInbox.action.openTask"),
             subjectId: row.id,
             checkInId: null,
             proposal: null,
@@ -480,15 +499,25 @@ export const reviewInbox = defineReadAction({
             id: `blocker:${row.id}`,
             kind: "blocker",
             group: groupFor(days),
-            title: `Clear the blocker on "${row.goalTitle ?? "a key result"}"`,
-            meta: `${escalated ? "Escalated to you" : "Owner"} · ${row.type.replace(/_/g, " ")}${
+            title: t("reviewInbox.title.blocker", {
+              goal: row.goalTitle ?? t("reviewInbox.word.aKeyResult"),
+            }),
+            meta: `${
+              escalated
+                ? t("reviewInbox.word.escalatedToYou")
+                : t("reviewInbox.word.owner")
+            } · ${word("reviewInbox.word.blockerType", row.type)}${
               row.description ? ` · ${row.description}` : ""
             }`,
-            dueLabel: dueLabelFor(days, dueLocalDate(row.dueAt, timeZone)),
+            dueLabel: dueLabelFor(
+              days,
+              dueLocalDate(row.dueAt, timeZone),
+              locale,
+            ),
             dueOn: dueLocalDate(row.dueAt, timeZone),
             daysPastDue: days,
             href: `/goals/${row.goalId}`,
-            actionLabel: "Open the blocker",
+            actionLabel: t("reviewInbox.action.openBlocker"),
             subjectId: row.goalId,
             checkInId: null,
             proposal: null,
@@ -542,18 +571,28 @@ export const reviewInbox = defineReadAction({
             continue;
           }
           const provider =
-            row.providerSpaceName ?? row.providerText ?? "another team";
+            row.providerSpaceName ??
+            row.providerText ??
+            t("reviewInbox.word.anotherTeam");
           obligations.push({
             id: `dependency:${row.id}`,
             kind: "dependency",
             group: "today",
-            title: `Decide the dependency of "${row.keyResultTitle}" on ${provider}`,
-            meta: `Escalated to you as sponsor · ${row.goalTitle}`,
-            dueLabel: `Escalated ${dueLocalDate(row.escalatedAt, timeZone) ?? "today"}`,
+            title: t("reviewInbox.title.dependency", {
+              keyResult: row.keyResultTitle,
+              provider,
+            }),
+            meta: t("reviewInbox.meta.dependency", { goal: row.goalTitle }),
+            dueLabel: (() => {
+              const escalatedOn = dueLocalDate(row.escalatedAt, timeZone);
+              return escalatedOn === null
+                ? t("reviewInbox.due.escalatedToday")
+                : t("reviewInbox.due.escalatedOn", { date: escalatedOn });
+            })(),
             dueOn: null,
             daysPastDue: null,
             href: "/cycle?phase=5",
-            actionLabel: "Open the register",
+            actionLabel: t("reviewInbox.action.openRegister"),
             subjectId: row.goalId,
             checkInId: null,
             proposal: null,
@@ -612,14 +651,17 @@ export const reviewInbox = defineReadAction({
             kind: "commitment",
             group: groupFor(days),
             title: row.text,
-            meta: `Committed · ${row.spaceName} · week of ${row.weekStart}`,
-            dueLabel: dueLabelFor(days, dueOn),
+            meta: t("reviewInbox.meta.commitment", {
+              space: row.spaceName,
+              week: row.weekStart,
+            }),
+            dueLabel: dueLabelFor(days, dueOn, locale),
             dueOn,
             daysPastDue: days,
             href: row.sessionId
               ? `/session/${row.sessionId}`
               : `/spaces/${row.spaceId}`,
-            actionLabel: "Open the session",
+            actionLabel: t("reviewInbox.action.openSession"),
             subjectId: row.spaceId,
             checkInId: null,
             proposal: null,
@@ -676,16 +718,24 @@ export const reviewInbox = defineReadAction({
             id: `session:${row.id}`,
             kind: "session",
             group: groupFor(days),
-            title: `Run the ${row.kind} session${row.title ? `: ${row.title}` : ""}`,
-            meta: `Facilitator · ${row.spaceName}`,
+            title: row.title
+              ? t("reviewInbox.title.sessionNamed", {
+                  kind: word("reviewInbox.word.sessionKind", row.kind),
+                  title: row.title,
+                })
+              : t("reviewInbox.title.session", {
+                  kind: word("reviewInbox.word.sessionKind", row.kind),
+                }),
+            meta: t("reviewInbox.meta.session", { space: row.spaceName }),
             dueLabel: dueLabelFor(
               days,
               dueLocalDate(row.scheduledFor, timeZone),
+              locale,
             ),
             dueOn: dueLocalDate(row.scheduledFor, timeZone),
             daysPastDue: days,
             href: `/session/${row.id}`,
-            actionLabel: "Open the session",
+            actionLabel: t("reviewInbox.action.openSession"),
             subjectId: row.spaceId,
             checkInId: null,
             proposal: null,
@@ -794,15 +844,17 @@ export const reviewInbox = defineReadAction({
               row.action,
               row.goalTitle ?? row.kpiTitle ?? row.sessionTitle ?? null,
             ),
-            meta: `Agent proposal · ${publishedAgo(age)}`,
-            dueLabel: acknowledgementDueLabel(age, escalateAfter),
+            meta: t("reviewInbox.meta.proposal", {
+              published: publishedAgo(age, locale),
+            }),
+            dueLabel: acknowledgementDueLabel(age, escalateAfter, locale),
             dueOn: dueLocalDate(row.createdAt, timeZone),
             daysPastDue: age,
             // The row itself, on the one screen every member can open. It is
             // decided there, so a link from anywhere else (a message, the
             // command line) lands on the decision rather than beside it.
             href: `/review#proposal-${row.id}`,
-            actionLabel: "Review the proposal",
+            actionLabel: t("reviewInbox.action.reviewProposal"),
             subjectId: row.subjectId ?? context.workspaceId,
             checkInId: null,
             proposal: {

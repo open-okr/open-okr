@@ -1,5 +1,11 @@
 import { PACKAGE_NAME as DB } from "@openokr/db";
 import { PACKAGE_NAME as FORMATS } from "@openokr/formats";
+
+export {
+  catalogueWithLocalePlurals,
+  messageHasLetters,
+} from "@openokr/formats";
+
 import { PACKAGE_NAME as METHOD } from "@openokr/method";
 
 export const PACKAGE_NAME = "@openokr/core";
@@ -152,6 +158,7 @@ export type {
   ThreadSummary,
   TrendContext,
   TrendPoint,
+  WritingLocale,
 } from "./agents/drafter.ts";
 export { PROPOSAL_DROP_REASONS } from "./agents/drafter.ts";
 export {
@@ -959,6 +966,7 @@ export { myExportBlob } from "./exports/collect.ts";
 // The shape the relay host fills in. A type, so nothing of the worker itself
 // reaches a caller that only needs to describe its own storage function.
 export type { PutFile } from "./exports/worker.ts";
+export { getServerCatalogue, serverTranslate } from "./i18n/catalogue.ts";
 export {
   assertLegacyKeyFree,
   findLegacyRowInTx,
@@ -1055,6 +1063,8 @@ export {
   type TrustedDomainOffer,
   trustedDomainOffers,
 } from "./invitations/trusted-domain.ts";
+export { resolveKpiGridAccess } from "./kpis/access.ts";
+export { accountMailLocale, resetPasswordMail } from "./mail/account.ts";
 export {
   type EmailBlock,
   type EmailFrame,
@@ -1334,7 +1344,12 @@ export {
   type StatusHue,
   statusHueOf,
 } from "./settings/brand-colour.ts";
-export { resolveMemberLanguage } from "./settings/member-language.ts";
+export {
+  LOCALES,
+  type LocaleCode,
+  languageName,
+  resolveMemberLanguage,
+} from "./settings/member-language.ts";
 export {
   AI_CONTEXT_EGRESS_LEVELS,
   type AIContextEgressLevel,

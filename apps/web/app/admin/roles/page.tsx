@@ -1,5 +1,6 @@
 import { callAction } from "@openokr/core";
 import { ROLE_DOMAINS } from "@openokr/db";
+import { intlTagFor } from "@openokr/formats";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
@@ -32,7 +33,7 @@ export const generateMetadata = pageTitle("pageTitle.adminRoles");
  * has never had one.
  */
 export default async function RolesPage() {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -78,7 +79,9 @@ export default async function RolesPage() {
                 name: member.name,
                 roleId: member.roleId,
               }))
-              .sort((one, other) => one.name.localeCompare(other.name))}
+              .sort((one, other) =>
+                one.name.localeCompare(other.name, intlTagFor(locale)),
+              )}
             roles={roles.map((role) => ({ id: role.id, name: role.name }))}
           />
         </CardBody>

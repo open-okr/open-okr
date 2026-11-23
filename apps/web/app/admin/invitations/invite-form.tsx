@@ -81,7 +81,7 @@ export function InviteForm({
         </RefusedFields>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-3 border-line border-t px-3.5 py-2.5">
-        <div className="mr-auto min-w-0">
+        <div className="me-auto min-w-0">
           {!state?.link && state?.error ? (
             <p
               role="alert"

@@ -79,7 +79,7 @@ export default async function MinutesPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
@@ -133,6 +133,7 @@ export default async function MinutesPage({
           <Link
             className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-2"
             href={`/session/${id}/minutes/pdf`}
+            target={locale === "ar" ? "_blank" : undefined}
           >
             {t("session.detail.minutes.downloadPdf")}
           </Link>

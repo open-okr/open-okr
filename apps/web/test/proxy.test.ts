@@ -134,6 +134,20 @@ describe("proxy", () => {
     }
   });
 
+  it("serves the sign-in page's vendored font assets without a session", () => {
+    for (const path of [
+      "/fonts/noto-sans-arabic/fonts.css",
+      "/fonts/noto-sans-arabic/noto-sans-arabic-arabic-wght-normal.woff2",
+      "/fonts/noto-sans-sc/fonts.css",
+      "/fonts/noto-sans-sc/noto-sans-sc-4-wght-normal.woff2",
+    ]) {
+      expect(proxy(request(path)).headers.get("location")).toBeNull();
+    }
+    expect(proxy(request("/fonts/pdf/NotoSansSC-Regular.otf")).status).toBe(
+      307,
+    );
+  });
+
   it("leaves an invitation reachable, because the invitee has no account", () => {
     // **The one dead end this gate created.** `/join` was behind the session
     // cookie until P6-G06b, so every invitee was sent to sign in, which is the

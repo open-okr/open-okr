@@ -46,6 +46,8 @@ export interface DigestItemsInput {
   readonly unreadOnly?: boolean;
   /** The instance's own address, for the links. */
   readonly baseUrl: string;
+  /** The recipient's language for the activity sentences. Defaults to English. */
+  readonly locale?: string;
   /** Defaults to now. Overridden by tests. */
   readonly now?: Date;
   /** The ceiling on one digest. A hundred lines is not a summary. */
@@ -151,7 +153,7 @@ export async function digestItemsFor(
       continue;
     }
     items.push({
-      summary: summaryFor(row),
+      summary: summaryFor(row, input.locale),
       reason: row.reason,
       actorName: row.actorName ?? null,
       // The inbox is the fallback target, not the workspace root: a line whose
@@ -168,14 +170,17 @@ export async function digestItemsFor(
 }
 
 /** One line's words: the activity's own sentence, or the rule that fired. */
-function summaryFor(row: {
-  readonly activityKind: string | null;
-  readonly activityPayload: Record<string, unknown> | null;
-  readonly ruleKey: string | null;
-  readonly reason: string;
-}): string {
+function summaryFor(
+  row: {
+    readonly activityKind: string | null;
+    readonly activityPayload: Record<string, unknown> | null;
+    readonly ruleKey: string | null;
+    readonly reason: string;
+  },
+  locale?: string,
+): string {
   if (row.activityKind) {
-    return renderActivity(row.activityKind, row.activityPayload ?? {});
+    return renderActivity(row.activityKind, row.activityPayload ?? {}, locale);
   }
   if (row.ruleKey) {
     // The condition METHOD.md states, not a sentence invented here. Per-rule

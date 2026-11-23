@@ -174,14 +174,9 @@ export default async function InitiativesPage({
                     ? t("initiatives.noInitiativeMatches")
                     : t("initiatives.noWorkRecordedYet")
                   : t("initiatives.eachOneWorkSomebodyOwns", {
-                      initiatives:
-                        initiatives.length === 1
-                          ? t("common.count.initiativeOne", {
-                              count: initiatives.length,
-                            })
-                          : t("common.count.initiativeOther", {
-                              count: initiatives.length,
-                            }),
+                      initiatives: t("common.count.initiative", {
+                        count: initiatives.length,
+                      }),
                     })}
               </p>
             </div>
@@ -467,10 +462,7 @@ function metaLine(
       ? t("initiatives.metaNotBehindAKeyResult", base)
       : t("initiatives.metaWindowNotBehindAKeyResult", { ...base, window });
   }
-  const keyResults =
-    count === 1
-      ? t("common.count.keyResultOne", { count })
-      : t("common.count.keyResultOther", { count });
+  const keyResults = t("common.count.keyResult", { count });
   return window === ""
     ? t("initiatives.metaKeyResults", { ...base, keyResults })
     : t("initiatives.metaWindowKeyResults", { ...base, window, keyResults });

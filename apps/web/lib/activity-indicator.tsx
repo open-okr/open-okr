@@ -77,13 +77,13 @@ export function ActivityIndicator() {
       <span
         aria-hidden="true"
         data-testid="activity-progress"
-        className="nav-progress pointer-events-none fixed left-0 top-0 z-50 h-0.5 bg-brand"
+        className="nav-progress pointer-events-none fixed start-0 top-0 z-50 h-0.5 bg-brand"
       />
       {stalled || offline ? (
         <div
           role="alert"
           data-testid="activity-stalled"
-          className="fixed inset-x-0 bottom-4 z-50 mx-auto w-fit max-w-[calc(100%-2rem)] rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-lg"
+          className="fixed start-0 end-0 bottom-4 z-50 mx-auto w-fit max-w-[calc(100%-2rem)] rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-lg"
         >
           {offline ? t("shell.activity.offline") : t("shell.activity.stalled")}
         </div>
