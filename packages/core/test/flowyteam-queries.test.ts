@@ -87,6 +87,48 @@ describe("the FlowyTeam query catalogue", () => {
     );
   });
 
+  it("orders every statement FlowyTeam pages, ending on a unique key", () => {
+    // FlowyTeam pages a statement with no `limit` by offset, 2,000 rows a
+    // page (flowyteam-connect F5). Without a total order a row can move
+    // between pages and be read twice or not at all.
+    const uniqueOtherwise: Readonly<Record<string, string>> = {
+      // Unique within one schema and one table.
+      "schema.tables": "table_name",
+      "schema.indicatorAccessesColumns": "column_name",
+      "unread.columns": "column_name",
+      // `distinct` makes the one column unique.
+      "kpis.recordPeriods": "period_key",
+      // Only sent to an instance whose indicator_accesses has no id at all,
+      // so no unique key exists to end on.
+      "kpiShares.accessesLiveNoId": "ia.user_id",
+      "kpiShares.accessesAllNoId": "ia.user_id",
+    };
+    const missing: string[] = [];
+    for (const [name, query] of entries) {
+      const sql = query.sql.replace(/\s+/g, " ").trim();
+      if (query.scope === "mysql-only" || /\blimit\b/i.test(sql)) {
+        continue;
+      }
+      const singleAggregate =
+        /^select (count|sum)\s*\(/i.test(sql) && !/\bgroup by\b/i.test(sql);
+      const byPrimaryKey = /\bwhere (\w+\.)?id = (\?|:company)(?!\w)/i.test(
+        sql,
+      );
+      if (singleAggregate || byPrimaryKey) {
+        continue;
+      }
+      const order = /\border by (.+)$/i.exec(sql)?.[1];
+      const last = order?.split(",").at(-1)?.trim();
+      const ok =
+        last !== undefined &&
+        (/^(\w+\.)?id$/.test(last) || uniqueOtherwise[name] === last);
+      if (!ok) {
+        missing.push(name);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
   it("derives a version that is stable and moves with the SQL", () => {
     const first = flowyteamQueryCatalogue();
     expect(flowyteamQueryCatalogue().version).toBe(first.version);

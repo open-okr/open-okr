@@ -25,6 +25,12 @@ export interface Source {
   readonly database: string;
   /** The address with any password removed, for the report and the log. */
   readonly describe: string;
+  /**
+   * False when the source cannot read across companies: FlowyTeam's export,
+   * where a token holds one company and the `mysql-only` entries are refused.
+   * Absent means true, which is the MySQL source.
+   */
+  readonly acrossCompanies?: boolean;
   close(): Promise<void>;
 }
 

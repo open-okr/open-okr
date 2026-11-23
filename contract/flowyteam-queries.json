@@ -1,14 +1,14 @@
 {
-  "version": "c892480ae89ae5fe7f31fa8353f61565c8794f66f445ec68eb8d490b0a68c468",
+  "version": "75cb709bc643960743f5b711f1342295fc7f73af0828086442e934bb833767c8",
   "entries": [
     {
       "name": "checkIns.keyResultsByCheckIn",
-      "sql": "select key_result_id, current_value, confidence, remarks\n           from key_result_checkins\n          where company_id = :company and checkin_id = ?",
+      "sql": "select key_result_id, current_value, confidence, remarks\n           from key_result_checkins\n          where company_id = :company and checkin_id = ?\n          order by id",
       "scope": "company"
     },
     {
       "name": "checkIns.keyResultsByPeriod",
-      "sql": "select k.key_result_id, k.current_value, k.confidence, k.remarks\n           from key_result_checkins k\n           join key_results r on r.id = k.key_result_id\n          where k.company_id = :company and r.objective_id = ?\n            and k.start_date = ? and k.end_date = ?",
+      "sql": "select k.key_result_id, k.current_value, k.confidence, k.remarks\n           from key_result_checkins k\n           join key_results r on r.id = k.key_result_id\n          where k.company_id = :company and r.objective_id = ?\n            and k.start_date = ? and k.end_date = ?\n          order by k.id",
       "scope": "company"
     },
     {
@@ -23,7 +23,7 @@
     },
     {
       "name": "collaboration.taskAccesses",
-      "sql": "select task_id, user_id\n       from tasks_accesses\n      where company_id = :company\n      order by task_id, user_id",
+      "sql": "select task_id, user_id\n       from tasks_accesses\n      where company_id = :company\n      order by task_id, user_id, id",
       "scope": "company"
     },
     {
@@ -213,12 +213,12 @@
     },
     {
       "name": "organisation.users",
-      "sql": "select u.id, u.name, u.email, u.timezone, u.status,\n            d.name as title\n       from users u\n       left join employee_details e\n         on e.user_id = u.id and e.company_id = u.company_id and e.deleted_at is null\n       left join designations d on d.id = e.designation_id\n      where u.company_id = :company\n      order by u.id",
+      "sql": "select u.id, u.name, u.email, u.timezone, u.status,\n            d.name as title\n       from users u\n       left join employee_details e\n         on e.user_id = u.id and e.company_id = u.company_id and e.deleted_at is null\n       left join designations d on d.id = e.designation_id\n      where u.company_id = :company\n      order by u.id, e.id",
       "scope": "company"
     },
     {
       "name": "schema.indicatorAccessesColumns",
-      "sql": "select column_name as COLUMN_NAME\n       from information_schema.columns\n      where table_schema = ? and table_name = 'indicator_accesses'",
+      "sql": "select column_name as COLUMN_NAME\n       from information_schema.columns\n      where table_schema = ? and table_name = 'indicator_accesses'\n      order by column_name",
       "scope": "schema"
     },
     {
@@ -233,7 +233,7 @@
     },
     {
       "name": "schema.tables",
-      "sql": "select table_name as TABLE_NAME from information_schema.tables where table_schema = ?",
+      "sql": "select table_name as TABLE_NAME from information_schema.tables where table_schema = ? order by table_name",
       "scope": "schema"
     },
     {
@@ -248,7 +248,7 @@
     },
     {
       "name": "unread.columns",
-      "sql": "select table_name as TABLE_NAME, column_name as COLUMN_NAME\n       from information_schema.columns\n      where table_schema = ? and table_name in (?)",
+      "sql": "select table_name as TABLE_NAME, column_name as COLUMN_NAME\n       from information_schema.columns\n      where table_schema = ? and table_name in (?)\n      order by table_name, column_name",
       "scope": "schema"
     },
     {
@@ -403,7 +403,7 @@
     },
     {
       "name": "work.boardColumns",
-      "sql": "select id, slug from taskboard_columns where company_id = :company",
+      "sql": "select id, slug from taskboard_columns where company_id = :company order by id",
       "scope": "company"
     },
     {

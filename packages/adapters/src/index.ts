@@ -107,6 +107,16 @@ export {
   type NodeDnsResolverOptions,
 } from "./drivers/dns/node.ts";
 export {
+  coerceExportValue,
+  createHttpFlowyteamFiles,
+  createHttpFlowyteamSource,
+  type FetchedFlowyteamFile,
+  FlowyteamExportError,
+  type HttpFlowyteamFilesOptions,
+  type HttpFlowyteamSource,
+  type HttpFlowyteamSourceOptions,
+} from "./drivers/flowyteam/export.ts";
+export {
   createHttpFlowyteamGateway,
   type HttpFlowyteamGatewayOptions,
 } from "./drivers/flowyteam/http.ts";
@@ -233,6 +243,7 @@ export type {
 export type {
   FlowyteamAnswer,
   FlowyteamClientCredentials,
+  FlowyteamExportColumn,
   FlowyteamFailure,
   FlowyteamGateway,
 } from "./ports/flowyteam.ts";

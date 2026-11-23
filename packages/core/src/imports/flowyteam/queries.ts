@@ -78,13 +78,14 @@ const STATIC = {
   // Structure
   "schema.tables": q(
     "schema",
-    "select table_name as TABLE_NAME from information_schema.tables where table_schema = ?",
+    "select table_name as TABLE_NAME from information_schema.tables where table_schema = ? order by table_name",
   ),
   "schema.indicatorAccessesColumns": q(
     "schema",
     `select column_name as COLUMN_NAME
        from information_schema.columns
-      where table_schema = ? and table_name = 'indicator_accesses'`,
+      where table_schema = ? and table_name = 'indicator_accesses'
+      order by column_name`,
   ),
   "schema.latestMigration": q(
     "schema",
@@ -95,7 +96,8 @@ const STATIC = {
     "schema",
     `select table_name as TABLE_NAME, column_name as COLUMN_NAME
        from information_schema.columns
-      where table_schema = ? and table_name in (?)`,
+      where table_schema = ? and table_name in (?)
+      order by table_name, column_name`,
   ),
 
   // Across companies
@@ -131,7 +133,7 @@ const STATIC = {
          on e.user_id = u.id and e.company_id = u.company_id and e.deleted_at is null
        left join designations d on d.id = e.designation_id
       where u.company_id = :company
-      order by u.id`,
+      order by u.id, e.id`,
   ),
   "organisation.teams": q(
     "company",
@@ -211,7 +213,8 @@ const STATIC = {
     "company",
     `select key_result_id, current_value, confidence, remarks
            from key_result_checkins
-          where company_id = :company and checkin_id = ?`,
+          where company_id = :company and checkin_id = ?
+          order by id`,
   ),
   "checkIns.keyResultsByPeriod": q(
     "company",
@@ -219,7 +222,8 @@ const STATIC = {
            from key_result_checkins k
            join key_results r on r.id = k.key_result_id
           where k.company_id = :company and r.objective_id = ?
-            and k.start_date = ? and k.end_date = ?`,
+            and k.start_date = ? and k.end_date = ?
+          order by k.id`,
   ),
   "checkIns.reviews": q(
     "company",
@@ -312,7 +316,7 @@ const STATIC = {
   ),
   "work.boardColumns": q(
     "company",
-    "select id, slug from taskboard_columns where company_id = :company",
+    "select id, slug from taskboard_columns where company_id = :company order by id",
   ),
   "work.subTasks": q(
     "company",
@@ -345,7 +349,7 @@ const STATIC = {
     `select task_id, user_id
        from tasks_accesses
       where company_id = :company
-      order by task_id, user_id`,
+      order by task_id, user_id, id`,
   ),
   "files.taskFiles": q(
     "company",

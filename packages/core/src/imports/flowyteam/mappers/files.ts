@@ -146,6 +146,7 @@ async function importTaskFiles(options: MapperOptions): Promise<{
     }
 
     const found = await options.files.find({
+      id: row.id,
       taskId: row.task_id,
       filename: filename || row.hashname,
       hashname: row.hashname,
@@ -157,9 +158,11 @@ async function importTaskFiles(options: MapperOptions): Promise<{
       }
       tally.skip(
         source,
-        found.tried.length === 0
-          ? `"${filename}" has a name on disk this will not follow: ${row.hashname}.`
-          : `"${filename}" was not under --files-root. Looked at ${found.tried.length} paths, the first being ${found.tried[0]}.`,
+        found.reason !== undefined
+          ? `"${filename}" ${found.reason}`
+          : found.tried.length === 0
+            ? `"${filename}" has a name on disk this will not follow: ${row.hashname}.`
+            : `"${filename}" was not under --files-root. Looked at ${found.tried.length} paths, the first being ${found.tried[0]}.`,
       );
       continue;
     }

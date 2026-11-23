@@ -60,3 +60,9 @@ export interface FlowyteamGateway {
     },
   ): Promise<FlowyteamAnswer<null>>;
 }
+
+/** One column of an export answer, as PHP's PDO names its type (F5). */
+export interface FlowyteamExportColumn {
+  readonly name: string;
+  readonly native_type: string | null;
+}

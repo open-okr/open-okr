@@ -64,8 +64,8 @@ export async function requireCompany(
   source: Source,
   companyId: number | undefined,
 ): Promise<Company> {
-  const total = await countCompanies(source);
   if (companyId === undefined) {
+    const total = await countCompanies(source);
     const listed = await listCompanies(source);
     const lines = listed
       .map((company) => `  ${company.id}  ${company.name}`)
@@ -84,6 +84,9 @@ export async function requireCompany(
   );
   const found = rows[0];
   if (!found) {
+    // Counted only here and above: over FlowyTeam's export a token sees one
+    // company and `companies.count` is not offered (flowyteam-connect §2.1).
+    const total = await countCompanies(source);
     throw new SourceError(
       `${source.describe} has no company ${companyId}. It holds ${total}; run without --company to see them.`,
     );

@@ -120,6 +120,12 @@ export async function countUnread(
       continue;
     }
     const { name, company, scope } = countStatement(entry, own, columns);
+    if (!company && source.acrossCompanies === false) {
+      // A count across every company is not this token's to read. The table
+      // holds nothing tied to one company on this instance, so no company row
+      // goes unreported.
+      continue;
+    }
     const rows = await source.read<{ n: number | string }>(
       name,
       [],

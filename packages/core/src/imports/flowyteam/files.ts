@@ -12,6 +12,8 @@ import { createHash } from "node:crypto";
 import { extname } from "node:path";
 
 export interface SourceFile {
+  /** The `task_files` row, which is how FlowyTeam's file endpoint names it. */
+  readonly id?: number;
   readonly taskId: number;
   /** The name somebody uploaded it under. */
   readonly filename: string;
@@ -30,6 +32,12 @@ export interface FoundFile {
 export interface NotFound {
   /** Every path that was tried, relative to the root. */
   readonly tried: readonly string[];
+  /**
+   * Why it could not be read, for a reader with no paths to list: FlowyTeam's
+   * file endpoint refusing it, or the file being over the size limit.
+   * Completes the sentence `"<filename>" ...` in the report.
+   */
+  readonly reason?: string;
 }
 
 /**
@@ -149,4 +157,41 @@ export function filenameForInline(
       ([, type]) => type === contentType,
     )?.[0] ?? ".bin";
   return `comment-${commentId}-image-${index}${extension}`;
+}
+
+/** One file fetched from FlowyTeam's file endpoint, or why not. */
+export type FetchedSourceFile =
+  | { readonly ok: true; readonly bytes: Buffer }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * A reader over FlowyTeam's file endpoint (flowyteam-connect Q7).
+ *
+ * The fetch itself is the adapters driver's, passed in, because the outbound
+ * guard lives there. Content type and digest come from here, so a file read
+ * over HTTP is stored exactly as the same file read from `--files-root`.
+ */
+export function fetchedFileReader(
+  fetchFile: (taskFileId: number) => Promise<FetchedSourceFile>,
+): SourceFileReader {
+  return {
+    async find(file) {
+      if (file.id === undefined) {
+        return {
+          tried: [],
+          reason: "has no task file id to ask FlowyTeam for.",
+        };
+      }
+      const fetched = await fetchFile(file.id);
+      if (!fetched.ok) {
+        return { tried: [], reason: fetched.reason };
+      }
+      return {
+        bytes: fetched.bytes,
+        digest: digestOf(fetched.bytes),
+        contentType: contentTypeFor(file.filename),
+        at: `files/${file.id}`,
+      };
+    },
+  };
 }
