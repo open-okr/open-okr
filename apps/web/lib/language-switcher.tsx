@@ -45,12 +45,16 @@ export function LanguageSwitcher({
 
   return (
     <Menu.Root>
+      {/* The name comes from the content, not aria-label, so the visible code
+       * is part of it (WCAG 2.5.3, axe label-content-name-mismatch). */}
       <Menu.Trigger
-        aria-label={t("admin.general.generalSettingsForm.language")}
         data-testid="topbar-language"
         className="inline-flex h-7.5 cursor-pointer items-center gap-1.5 rounded-control border border-line bg-surface px-2 text-sm text-ink-2 transition-colors duration-fast ease-out hover:border-line-2 outline-offset-2 focus-visible:outline-2 focus-visible:outline-brand"
       >
         <Languages className="size-4" aria-hidden="true" />
+        <span className="sr-only">
+          {t("admin.general.generalSettingsForm.language")}{" "}
+        </span>
         <span className="hidden uppercase sm:inline">{locale}</span>
       </Menu.Trigger>
       <Menu.Portal>
