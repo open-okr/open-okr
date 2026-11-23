@@ -24,10 +24,16 @@ export function NavLink({
   href,
   className,
   title,
+  "aria-current": ariaCurrent,
   children,
 }: ComponentProps<typeof Link>) {
   return (
-    <Link href={href} className={className} title={title}>
+    <Link
+      href={href}
+      className={className}
+      title={title}
+      aria-current={ariaCurrent}
+    >
       {children}
       <NavigationPending href={typeof href === "string" ? href : null} />
     </Link>

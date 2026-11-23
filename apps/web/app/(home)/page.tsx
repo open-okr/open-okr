@@ -105,6 +105,9 @@ export default async function HomePage({
 
   return (
     <div className="flex w-full flex-col gap-3.5">
+      {/* The page's one h1, first in reading order. The work map's own label
+          below is a plain paragraph on this page. */}
+      <h1 className="sr-only">{t("workMapHeader.workMap")}</h1>
       {/* Completeness review M-34: the workspaces this member's domain
           admits, drawn only when there are some. */}
       <TrustedDomainOffers

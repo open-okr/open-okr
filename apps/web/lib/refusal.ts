@@ -33,6 +33,24 @@ export function refusalOf(error: unknown): string | null {
 /** The translator a server action already holds from `getTranslations`. */
 type Translate = (key: string, values?: MessageValues) => string;
 
+/**
+ * The engine's access refusal names the action ("tasks.delete needs a higher
+ * access level than you hold."), which is not for a person to read and is
+ * English in every language. Only that exact shape is replaced; a `forbidden`
+ * that wrote a sentence of its own keeps it.
+ */
+const ACCESS_REFUSAL = /\bneeds a higher access level than you hold\.$/;
+
+/** An `OperationError`'s sentence for the screen, in the reader's language. */
+export function operationMessage(
+  error: OperationError,
+  t: Translate | undefined,
+): string {
+  return t && error.code === "forbidden" && ACCESS_REFUSAL.test(error.message)
+    ? t("refusal.forbidden")
+    : error.message;
+}
+
 /** One refused field, as a Zod issue carries it. Read by shape, as above. */
 interface Issue {
   readonly code?: unknown;
@@ -110,12 +128,11 @@ export function refusalFields(
 } | null {
   const named = (path: string) => renamed?.[path] ?? path;
   if (error instanceof OperationError) {
+    const message = operationMessage(error, t);
     return {
-      message: error.message,
+      message,
       fields:
-        error.field === undefined
-          ? {}
-          : { [named(error.field)]: error.message },
+        error.field === undefined ? {} : { [named(error.field)]: message },
     };
   }
   if (

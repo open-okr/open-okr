@@ -367,6 +367,22 @@ export function CommandPalette({
         : pending
           ? t("search.palette.looking")
           : t("search.palette.nothingMatches");
+  // The one live region. It says "Looking…" while a query is out and a count
+  // (or the nothing-matches line) once it has settled, so a screen reader
+  // hears one message per settled query rather than one per keystroke.
+  const resultCount = groups
+    .filter((group) => group.id !== "actions")
+    .reduce((sum, group) => sum + group.rows.length, 0);
+  const announcement =
+    phrase === ""
+      ? ""
+      : pending
+        ? t("search.palette.looking")
+        : failed || answer.error
+          ? ""
+          : resultCount > 0
+            ? t("search.palette.resultCount", { count: resultCount })
+            : t("search.palette.nothingMatches");
   let index = -1;
 
   return (
@@ -501,6 +517,9 @@ export function CommandPalette({
           })}
         </div>
 
+        <p role="status" aria-live="polite" className="sr-only">
+          {announcement}
+        </p>
         <div className="max-h-80 overflow-y-auto">
           {error ? (
             <p role="alert" className="px-3 py-3 text-sm text-bad">
@@ -509,9 +528,7 @@ export function CommandPalette({
           ) : note ? (
             // Above the actions rather than instead of them: a phrase that
             // matched nothing still has somewhere to go, and says so first.
-            <p role="status" className="px-3 pt-3 pb-1 text-sm text-ink-3">
-              {note}
-            </p>
+            <p className="px-3 pt-3 pb-1 text-sm text-ink-3">{note}</p>
           ) : null}
 
           {rows.length > 0 ? (
@@ -606,7 +623,7 @@ export function CommandPalette({
             {t("search.palette.hintClose")}
           </span>
           {pending && found ? (
-            <span role="status" className="ms-auto">
+            <span aria-hidden="true" className="ms-auto">
               {t("search.palette.looking")}
             </span>
           ) : null}
