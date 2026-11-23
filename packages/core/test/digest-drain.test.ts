@@ -357,6 +357,44 @@ describe("digestItemsFor", () => {
     expect(contents.items[0]?.summary).toBe("A reminder is waiting for you.");
   });
 
+  it("says when a trigger fired in the reader's language", async () => {
+    // languages.md §13, 0.10.1: the digest's rule line comes from the server
+    // catalogue, and its English equals packages/method (method:check).
+    const batchId = await openBatch(1);
+    const sessionId = "55555555-5555-4555-8555-555555555555";
+    const wb = await workerDb();
+    const nudge = await wb.admin.query<{ id: string }>(
+      `insert into nudges
+         (id, workspace_id, rule_key, kind, channel, recipient_member_id,
+          escalation_step, subject_type, subject_id, scheduled_for)
+       values (gen_random_uuid(), $1, 'checkin.due', 'rhythm', 'email', $2, 0,
+               'session', $3, now())
+       returning id`,
+      [workspaceId, ownerMemberId, sessionId],
+    );
+    await wb.admin.query(
+      `insert into notifications
+         (id, workspace_id, recipient_member_id, batch_id, nudge_id, reason,
+          channel)
+       values (gen_random_uuid(), $1, $2, $3, $4, 'check_in', 'email')`,
+      [workspaceId, ownerMemberId, batchId, nudge.rows[0]?.id],
+    );
+
+    const read = (locale?: string) =>
+      withTx((tx) =>
+        digestItemsFor(tx, {
+          workspaceId,
+          memberId: ownerMemberId,
+          batchId,
+          baseUrl: BASE,
+          locale,
+        }),
+      );
+
+    expect((await read()).items[0]?.summary).toBe("On anchor day");
+    expect((await read("ms")).items[0]?.summary).toBe("Pada hari rujukan");
+  });
+
   it("caps the list and says how many it left", async () => {
     const batchId = await openBatch(1);
     for (let index = 0; index < 23; index++) {

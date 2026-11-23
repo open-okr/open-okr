@@ -71,6 +71,27 @@ describe("minutes PDF localisation (languages §13, AC-28)", () => {
     expect(text).not.toContain("2026-06-17");
   });
 
+  test("writes the method's root causes and retro questions in the requester's language", () => {
+    const text = minutesToMarkdown(
+      {
+        ...minutes,
+        management: [
+          { question: "Where did alignment break down?", body: "Sales" },
+        ],
+        rootCauses: [
+          {
+            keyResultTitle: "Churn",
+            cause: "Blocked by a dependency",
+            detail: null,
+          },
+        ],
+      },
+      "ms",
+    );
+    expect(text).toContain("- Di manakah penjajaran terputus?\n  Sales");
+    expect(text).toContain("- Churn: Disekat oleh kebergantungan");
+  });
+
   test("numbers pages in the requester's language", async () => {
     await renderMinutesPdf("# Quarterly review", "ms");
     const tree = pdf.renderToBuffer.mock.calls[0]?.[0];

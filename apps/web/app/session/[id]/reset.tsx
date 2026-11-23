@@ -31,6 +31,7 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { closeDecisionMeaning } from "../../../lib/method-texts.ts";
 import { decideObjectiveAction } from "./actions";
 
 /**
@@ -140,7 +141,9 @@ function ObjectiveRow({
       </span>
 
       {objective.meaning === null ? null : (
-        <span className="text-xs text-ink-3">{objective.meaning}</span>
+        <span className="text-xs text-ink-3">
+          {closeDecisionMeaning(t, objective.decision ?? "", objective.meaning)}
+        </span>
       )}
 
       {canDecide ? (

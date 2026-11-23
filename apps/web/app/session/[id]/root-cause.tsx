@@ -31,6 +31,7 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { rootCause } from "../../../lib/method-texts.ts";
 import { setRootCauseAction } from "./actions";
 
 interface MissedKeyResult {
@@ -242,9 +243,9 @@ function MissedRow({
         </>
       ) : keyResult.causeLabel === null ? null : (
         <span className="text-xs text-ink-3">
-          {keyResult.causeLabel}
+          {rootCause(t, keyResult.causeKey ?? 0, keyResult.causeLabel)}
           {keyResult.secondaryCauseLabel
-            ? `; ${keyResult.secondaryCauseLabel}`
+            ? `; ${rootCause(t, keyResult.secondaryCauseKey ?? 0, keyResult.secondaryCauseLabel)}`
             : ""}
           {keyResult.detail ? `. ${keyResult.detail}` : ""}
         </span>
@@ -300,7 +301,9 @@ export function RootCausePanel({
                 key={keyResult.keyResultId}
                 sessionId={sessionId}
                 keyResult={keyResult}
-                causes={rootCauses.causes}
+                causes={rootCauses.causes.map((cause, index) =>
+                  rootCause(t, index + 1, cause),
+                )}
                 otherKey={rootCauses.otherKey}
                 canName={canName}
                 onProblem={setProblem}

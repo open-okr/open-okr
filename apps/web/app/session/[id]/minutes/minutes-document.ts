@@ -1,7 +1,11 @@
 import { serverTranslate } from "@openokr/core";
 import { intlTagFor, type MessageValues } from "@openokr/formats";
 import { dayLabel } from "../../../../lib/day-label";
-import { processHealthStatementText } from "../../../../lib/method-texts.ts";
+import {
+  managementRetroQuestionText,
+  processHealthStatementText,
+  rootCauseText,
+} from "../../../../lib/method-texts.ts";
 
 /**
  * The minutes as one plain-text document (METHOD.md §8.10, P4-T12-a).
@@ -108,6 +112,8 @@ function section(heading: string, lines: readonly string[]): string[] {
 export function minutesToMarkdown(minutes: Minutes, locale?: string): string {
   const t = (key: string, values?: MessageValues) =>
     serverTranslate(locale ?? "en", `minutes.${key}`, values);
+  // The method's own words, from the same server catalogue (D5b).
+  const server = (key: string) => serverTranslate(locale ?? "en", key);
   const numberFormat = (digits: number) =>
     new Intl.NumberFormat(intlTagFor(locale), {
       minimumFractionDigits: digits,
@@ -205,24 +211,22 @@ export function minutesToMarkdown(minutes: Minutes, locale?: string): string {
       // null rather than an empty list, so this cannot render a heading over
       // nothing and imply the stage was skipped.
       (minutes.management ?? []).map(
-        (row) => `- ${row.question}\n  ${row.body}`,
+        (row) =>
+          `- ${managementRetroQuestionText(server, row.question)}\n  ${row.body}`,
       ),
     ),
     ...section(
       t("rootCauses"),
       minutes.rootCauses.map(
         (row) =>
-          `- ${row.keyResultTitle}: ${row.cause}${row.detail ? ` — ${row.detail}` : ""}`,
+          `- ${row.keyResultTitle}: ${rootCauseText(server, row.cause)}${row.detail ? ` — ${row.detail}` : ""}`,
       ),
     ),
     ...section(
       t("processHealth"),
       minutes.processHealth.map(
         (row) =>
-          `- ${number(row.average, 1)} · ${processHealthStatementText(
-            (key) => serverTranslate(locale ?? "en", key),
-            row.statement,
-          )}`,
+          `- ${number(row.average, 1)} · ${processHealthStatementText(server, row.statement)}`,
       ),
     ),
     ...section(

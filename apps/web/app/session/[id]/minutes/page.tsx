@@ -18,7 +18,11 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../../lib/access";
 import { assistOffered } from "../../../../lib/assists";
 import { getPool } from "../../../../lib/auth";
-import { processHealthStatementText } from "../../../../lib/method-texts.ts";
+import {
+  managementRetroQuestionText,
+  processHealthStatementText,
+  rootCauseText,
+} from "../../../../lib/method-texts.ts";
 import { itemTitle } from "../../../../lib/page-title.ts";
 import { getTranslations } from "../../../../lib/translations";
 import { requireWorkspace } from "../../../../lib/workspace";
@@ -331,7 +335,9 @@ export default async function MinutesPage({
             <ul className="flex flex-col gap-1.5">
               {(minutes.management ?? []).map((row) => (
                 <li key={row.question} className="flex flex-col text-sm">
-                  <span className="text-ink-3">{row.question}</span>
+                  <span className="text-ink-3">
+                    {managementRetroQuestionText(t, row.question)}
+                  </span>
                   <span className="text-ink">{row.body}</span>
                 </li>
               ))}
@@ -346,7 +352,9 @@ export default async function MinutesPage({
               {minutes.rootCauses.map((row) => (
                 <li key={row.keyResultTitle} className="text-sm text-ink">
                   <span className="text-ink-2">{row.keyResultTitle}</span>{" "}
-                  <span className="font-medium">{row.cause}</span>
+                  <span className="font-medium">
+                    {rootCauseText(t, row.cause)}
+                  </span>
                   {row.detail ? (
                     <span className="text-ink-3"> — {row.detail}</span>
                   ) : null}
