@@ -234,7 +234,11 @@ test("acceptance: what was opened is listed first, and a tab narrows to one kind
   await expect(
     dialog
       .getByTestId("palette-results")
-      .or(dialog.getByText(/^Nothing matches\./)),
+      .or(
+        dialog.locator("p:not([role=status])", {
+          hasText: /^Nothing matches\./,
+        }),
+      ),
   ).toBeVisible({ timeout: 15_000 });
   await expect(
     page.getByTestId("palette-results").filter({ hasText: goalTitle }),
