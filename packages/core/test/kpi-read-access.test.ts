@@ -507,6 +507,16 @@ describe("KPI read access enforcement", () => {
       return ctx!.id;
     });
 
+    // Only an unhealthy KPI is due, as in AC-19. Without this the sweep
+    // returned nothing either side of the unbinding and the test proved
+    // nothing (CodeQL #107 found the unused first result).
+    await withTx(async (tx) => {
+      await tx
+        .update(kpisTable)
+        .set({ state: "unhealthy" })
+        .where(eq(kpisTable.id, kpiCId));
+    });
+
     // Agent scope sees KPI-C
     const scope: AgentScope = { memberId: agentMemberId };
     let due = await withTx(async (tx) => {
@@ -519,6 +529,7 @@ describe("KPI read access enforcement", () => {
         scope,
       });
     });
+    expect(due.some((d) => d.subjectId === kpiCId)).toBe(true);
     // Now unbind agent from space S
     await withTx(async (tx) => {
       await tx
