@@ -18,9 +18,18 @@
  * need the session setting applied, and one forgotten hand-out is a writable
  * session. One connection is applied once, and an import reads sequentially in
  * dependency order anyway.
+ *
+ * **The `Source` interface lives in core** (`packages/core/src/imports/flowyteam`)
+ * with the engine, so the web application can run the engine without this
+ * client. This file is the MySQL implementation of it.
  */
 
-import { FLOWYTEAM_QUERIES, type FlowyteamQueryName } from "@openokr/core";
+import {
+  FLOWYTEAM_QUERIES,
+  type FlowyteamQueryName,
+  type Source,
+  SourceError,
+} from "@openokr/core";
 
 // openokr:allow-vendor-sdk: the MySQL client is the one pre-approved importer
 // dependency (CLAUDE.md, TECHNICAL-PLAN §1). It is here rather than behind a
@@ -28,28 +37,6 @@ import { FLOWYTEAM_QUERIES, type FlowyteamQueryName } from "@openokr/core";
 // has: nothing but this importer ever opens a FlowyTeam database, and a port
 // would be an abstraction over exactly one caller.
 import mysql from "mysql2/promise";
-
-/** What the connector hands the introspection and the mappers. */
-export interface Source {
-  /**
-   * One named read from the catalogue. `values` fill the positional `?`, and
-   * `company` fills `:company`, which an entry that has one refuses to run
-   * without.
-   */
-  read<T = Record<string, unknown>>(
-    name: FlowyteamQueryName,
-    values?: readonly unknown[],
-    company?: number | string,
-  ): Promise<T[]>;
-  /** The database name the URL selected, for the report. */
-  readonly database: string;
-  /** The address with any password removed, for the report and the log. */
-  readonly describe: string;
-  close(): Promise<void>;
-}
-
-/** A refusal by the source itself, as opposed to something going wrong. */
-export class SourceError extends Error {}
 
 /**
  * The statements this importer sends, and nothing else.

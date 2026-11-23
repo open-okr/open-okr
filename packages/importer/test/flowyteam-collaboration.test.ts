@@ -9,12 +9,12 @@
  * the second pass run. And that a watcher whose member is a placeholder is
  * reported rather than counted as a subscription that does not exist.
  */
-import { provisionWorkspaceForUser } from "@openokr/core";
+import { provisionWorkspaceForUser, type Source } from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { runFlowyteamImport } from "../src/flowyteam/run.ts";
-import { openSource, type Source } from "../src/flowyteam/source.ts";
+import { openSource } from "../src/flowyteam/source.ts";
 import {
   available,
   SEEDED,

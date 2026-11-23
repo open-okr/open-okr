@@ -7,13 +7,14 @@
  * everything else rather than nothing. The second is not hypothetical: a live
  * FlowyTeam this connector was written against has no discussion tables.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CORE_TABLES, introspect } from "../src/flowyteam/introspect.ts";
 import {
-  openSource,
+  CORE_TABLES,
+  introspect,
   type Source,
   SourceError,
-} from "../src/flowyteam/source.ts";
+} from "@openokr/core";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { openSource } from "../src/flowyteam/source.ts";
 import {
   available,
   type SeededSource,

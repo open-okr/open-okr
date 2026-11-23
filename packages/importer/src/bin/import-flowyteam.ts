@@ -28,11 +28,13 @@
  */
 import { LocalDiskStorage } from "@openokr/adapters";
 import { loadEnv } from "@openokr/config";
-import { resolveImportTarget } from "@openokr/core";
+import {
+  renderFlowyteamReport as render,
+  resolveImportTarget,
+} from "@openokr/core";
 import { Pool } from "pg";
 import { UsageError } from "../cli.ts";
 import { FLOWYTEAM_USAGE, parseFlowyteamArgs } from "../flowyteam/cli.ts";
-import { render } from "../flowyteam/report.ts";
 import { runFlowyteamImport } from "../flowyteam/run.ts";
 
 async function main(): Promise<void> {

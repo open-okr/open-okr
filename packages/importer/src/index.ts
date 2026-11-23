@@ -9,7 +9,9 @@
  * the report as lines a person reads, and the entry point that opens a pool.
  * The FlowyTeam connector joins it at P6-T02, with the one pre-approved MySQL
  * dependency, which is the other reason the engine moved: a web application has
- * no business carrying a MySQL client in its dependency graph.
+ * no business carrying a MySQL client in its dependency graph. Its engine moved
+ * to `packages/core/src/imports/flowyteam` for the same reason (flowyteam-connect
+ * card C2); the MySQL source and the command line stay here.
  */
 import { PACKAGE_NAME as CORE } from "@openokr/core";
 
@@ -31,45 +33,6 @@ export {
   parseFlowyteamArgs,
 } from "./flowyteam/cli.ts";
 export {
-  type Company,
-  type CompanyCounts,
-  countCompanies,
-  countFor,
-  listCompanies,
-  requireCompany,
-  SUMMARY_TABLES,
-} from "./flowyteam/companies.ts";
-export {
-  CORE_TABLES,
-  EXPECTED_TABLES,
-  type Introspection,
-  inferVersion,
-  introspect,
-  type SourceVersion,
-} from "./flowyteam/introspect.ts";
-export {
-  LEGACY_TABLES,
-  LEGACY_TYPE,
-  legacyIdFor,
-  legacyKeyFor,
-  parseLegacyId,
-  type SourceTable,
-} from "./flowyteam/legacy.ts";
-export {
-  buildReport,
-  type FlowyteamReport,
-  NOT_IMPORTED,
-  render as renderFlowyteamReport,
-} from "./flowyteam/report.ts";
-export {
-  companyAlreadyImported,
-  type FlowyteamRunOptions,
-  type FlowyteamRunResult,
-  guardCompany,
-  type PriorRun,
-  runFlowyteamImport,
-} from "./flowyteam/run.ts";
-export {
   type Address,
   assertRead,
   type OpenOptions,
@@ -77,12 +40,4 @@ export {
   openSource,
   parseUrl,
   READ_ONLY_ERROR,
-  type Source,
-  SourceError,
 } from "./flowyteam/source.ts";
-export {
-  countUnread,
-  UNREAD_TABLES,
-  type UnreadCount,
-  type UnreadTable,
-} from "./flowyteam/unread.ts";

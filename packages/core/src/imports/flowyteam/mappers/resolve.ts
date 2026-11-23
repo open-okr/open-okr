@@ -13,8 +13,10 @@
  * and a decision for the caller, so this returns undefined and the mapper says
  * what it means in that domain's own words.
  */
-import { findExisting, type LegacyTableName } from "@openokr/core";
+
 import type { Pool } from "pg";
+import { findExisting } from "../../legacy-lookup.ts";
+import type { LegacyTableName } from "../../templates/index.ts";
 import { LEGACY_TYPE, legacyIdFor, type SourceTable } from "../legacy.ts";
 
 /** Which target table each source table's rows were written into. */

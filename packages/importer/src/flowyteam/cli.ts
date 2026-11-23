@@ -5,8 +5,8 @@
  * two commands share no flag but `--workspace` and `--as`, and a parser that
  * served both would spend most of itself deciding which command it was in.
  */
+import { DOMAIN_KEYS, selectDomains, UnknownDomainError } from "@openokr/core";
 import { UsageError } from "../cli.ts";
-import { DOMAIN_KEYS, selectDomains, UnknownDomainError } from "./domains.ts";
 
 export interface FlowyteamArgs {
   readonly source: string;

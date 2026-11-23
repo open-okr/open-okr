@@ -551,9 +551,6 @@ importers:
       '@openokr/core':
         specifier: workspace:*
         version: link:../core
-      '@openokr/method':
-        specifier: workspace:*
-        version: link:../method
       mysql2:
         specifier: ^3.24.6
         version: 3.24.6(@types/node@26.6.6)

@@ -20,30 +20,16 @@
  * out of it: a hashed name from a database is caller-supplied input, and
  * `..` in one would otherwise walk the filesystem.
  */
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { extname, isAbsolute, relative, resolve } from "node:path";
-
-export interface SourceFile {
-  readonly taskId: number;
-  /** The name somebody uploaded it under. */
-  readonly filename: string;
-  /** The name on disk, which is what makes it findable. */
-  readonly hashname: string | null;
-}
-
-export interface FoundFile {
-  readonly bytes: Buffer;
-  readonly digest: string;
-  readonly contentType: string;
-  /** Where it was found, relative to the root, for the report. */
-  readonly at: string;
-}
-
-export interface NotFound {
-  /** Every path that was tried, relative to the root. */
-  readonly tried: readonly string[];
-}
+import { isAbsolute, relative, resolve } from "node:path";
+import {
+  contentTypeFor,
+  digestOf,
+  type FoundFile,
+  type NotFound,
+  type SourceFile,
+  type SourceFileReader,
+} from "@openokr/core";
 
 /**
  * The relative shapes a Laravel task upload takes, in the order they are
@@ -63,48 +49,10 @@ const LAYOUTS: readonly string[] = [
   "user-uploads/task-files/%t/%h",
 ];
 
-/**
- * Content types by extension.
- *
- * Not sniffed from the bytes: sniffing needs a library, which CLAUDE.md
- * requires asking about, and a wrong answer here is a wrong `content_type`
- * on a stored blob rather than a security decision. The upload validator in
- * `packages/core` is what refuses a type this product will not hold.
- */
-const CONTENT_TYPES: Readonly<Record<string, string>> = {
-  ".pdf": "application/pdf",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-  ".svg": "image/svg+xml",
-  ".txt": "text/plain",
-  ".csv": "text/csv",
-  ".md": "text/markdown",
-  ".json": "application/json",
-  ".xml": "application/xml",
-  ".zip": "application/zip",
-  ".doc": "application/msword",
-  ".docx":
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ".xls": "application/vnd.ms-excel",
-  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  ".ppt": "application/vnd.ms-powerpoint",
-  ".pptx":
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  ".mp4": "video/mp4",
-  ".mp3": "audio/mpeg",
-};
-
-export function contentTypeFor(filename: string): string {
-  return (
-    CONTENT_TYPES[extname(filename).toLowerCase()] ?? "application/octet-stream"
-  );
+/** The engine's file reader over `--files-root`. */
+export function filesRootReader(root: string): SourceFileReader {
+  return { find: (file) => findSourceFile(root, file) };
 }
-
-export const digestOf = (bytes: Buffer): string =>
-  createHash("sha256").update(bytes).digest("hex");
 
 /**
  * The file's bytes, or every path that was looked at.
@@ -155,9 +103,6 @@ export async function findSourceFile(
   return { tried };
 }
 
-export const isFound = (result: FoundFile | NotFound): result is FoundFile =>
-  "bytes" in result;
-
 /** A name that is one path segment and nothing clever. */
 function isSafeName(name: string): boolean {
   if (name.includes("/") || name.includes("\\") || name.includes("\0")) {
@@ -169,55 +114,4 @@ function isSafeName(name: string): boolean {
 function inside(root: string, candidate: string): boolean {
   const away = relative(root, candidate);
   return away !== "" && !away.startsWith("..") && !isAbsolute(away);
-}
-
-/**
- * A data URI's bytes, for an image sitting inline in a comment.
- *
- * These bytes **are** in the database: 64 comments on the instance measured
- * hold one, some of them megabytes of base64 in a `text` column. So this is
- * the one file path that works with nothing but a MySQL connection.
- *
- * Returns nothing for anything that is not a data URI this can decode, which
- * includes an `<img src="https://…">` pointing at somebody else's server:
- * fetching that would be the importer reaching onto the network, which it does
- * not do.
- */
-export function decodeDataUri(
-  src: string,
-): { bytes: Buffer; contentType: string; digest: string } | undefined {
-  const match = /^data:([a-z0-9.+-]+\/[a-z0-9.+-]+)?(;[^,]*)?,(.*)$/is.exec(
-    src.trim(),
-  );
-  if (!match) {
-    return undefined;
-  }
-  const contentType = (match[1] ?? "application/octet-stream").toLowerCase();
-  const parameters = (match[2] ?? "").toLowerCase();
-  const payload = match[3] ?? "";
-  let bytes: Buffer;
-  try {
-    bytes = parameters.includes("base64")
-      ? Buffer.from(payload, "base64")
-      : Buffer.from(decodeURIComponent(payload), "utf8");
-  } catch {
-    return undefined;
-  }
-  if (bytes.byteLength === 0) {
-    return undefined;
-  }
-  return { bytes, contentType, digest: digestOf(bytes) };
-}
-
-/** A filename for an inline image, which arrives with none. */
-export function filenameForInline(
-  commentId: number,
-  index: number,
-  contentType: string,
-): string {
-  const extension =
-    Object.entries(CONTENT_TYPES).find(
-      ([, type]) => type === contentType,
-    )?.[0] ?? ".bin";
-  return `comment-${commentId}-image-${index}${extension}`;
 }

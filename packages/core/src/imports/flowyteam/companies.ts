@@ -23,7 +23,7 @@
 import {
   FLOWYTEAM_SUMMARY_TABLES,
   type FlowyteamSummaryTable,
-} from "@openokr/core";
+} from "./queries.ts";
 import type { Source } from "./source.ts";
 import { SourceError } from "./source.ts";
 

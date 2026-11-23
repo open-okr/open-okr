@@ -7,21 +7,20 @@
  * says nothing was skipped when something was, an identifier that collides
  * between two source tables.
  */
-import { describe, expect, it } from "vitest";
-import { UsageError } from "../src/cli.ts";
-import { parseFlowyteamArgs } from "../src/flowyteam/cli.ts";
 import {
+  buildReport,
+  DomainTally,
+  describeDomain,
   LEGACY_TABLES,
   LEGACY_TYPE,
   legacyIdFor,
   legacyKeyFor,
   parseLegacyId,
-} from "../src/flowyteam/legacy.ts";
-import {
-  DomainTally,
-  describeDomain,
-} from "../src/flowyteam/mappers/reconcile.ts";
-import { buildReport, render } from "../src/flowyteam/report.ts";
+  renderFlowyteamReport as render,
+} from "@openokr/core";
+import { describe, expect, it } from "vitest";
+import { UsageError } from "../src/cli.ts";
+import { parseFlowyteamArgs } from "../src/flowyteam/cli.ts";
 
 const REQUIRED = [
   "--source",

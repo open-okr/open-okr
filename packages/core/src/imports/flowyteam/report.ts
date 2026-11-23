@@ -20,7 +20,7 @@ import { describeDomain } from "./mappers/reconcile.ts";
 import type { UnreadCount } from "./unread.ts";
 
 /** What §7.2 records as out of scope, so the report says it rather than a plan. */
-export const NOT_IMPORTED = [
+const NOT_IMPORTED = [
   "webhooks and Zapier resthooks",
   "the universal search cache",
   "notification rows",

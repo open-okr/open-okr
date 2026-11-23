@@ -8,12 +8,12 @@
  * second pass earning its place. And that a second run changes nothing, which
  * is what makes a migration something a person can rehearse.
  */
-import { provisionWorkspaceForUser } from "@openokr/core";
+import { provisionWorkspaceForUser, type Source } from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { runFlowyteamImport } from "../src/flowyteam/run.ts";
-import { openSource, type Source } from "../src/flowyteam/source.ts";
+import { openSource } from "../src/flowyteam/source.ts";
 import {
   available,
   SEEDED,

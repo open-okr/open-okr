@@ -6,15 +6,16 @@
  * out of a workspace. Proved against a real server with two companies in it,
  * because a count that ignored `company_id` would pass every fake.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  companyAlreadyImported,
   countCompanies,
   countFor,
   listCompanies,
   requireCompany,
-} from "../src/flowyteam/companies.ts";
-import { companyAlreadyImported } from "../src/flowyteam/run.ts";
-import { openSource, type Source } from "../src/flowyteam/source.ts";
+  type Source,
+} from "@openokr/core";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { openSource } from "../src/flowyteam/source.ts";
 import {
   available,
   SEEDED,

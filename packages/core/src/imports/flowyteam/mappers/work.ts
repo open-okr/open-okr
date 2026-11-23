@@ -24,11 +24,9 @@
  * source system's ordering is its own and this product's spacing is sparse; the
  * completion figure is the engine's, from the tasks that actually imported.
  */
-import {
-  type ActionCallContext,
-  callAction,
-  richTextFromPlainText,
-} from "@openokr/core";
+import type { ActionCallContext } from "../../../actions/define.ts";
+import { callAction } from "../../../actions/registry.ts";
+import { richTextFromPlainText } from "../../../rich-text/from-text.ts";
 import { legacyKeyFor } from "../legacy.ts";
 import type { Source } from "../source.ts";
 import { type DomainReconciliation, DomainTally } from "./reconcile.ts";

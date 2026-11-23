@@ -19,7 +19,7 @@
  * **`kpi_trees` stays empty on purpose.** FlowyTeam has no named driver tree,
  * and building one from the parent chain would name something nobody chose.
  */
-import { type ActionCallContext, callAction } from "@openokr/core";
+
 import {
   cascadeOrder,
   type DependencyEdge,
@@ -28,6 +28,8 @@ import {
   type KpiFrequency,
   normalisePeriod,
 } from "@openokr/method";
+import type { ActionCallContext } from "../../../actions/define.ts";
+import { callAction } from "../../../actions/registry.ts";
 import { legacyIdFor, legacyKeyFor } from "../legacy.ts";
 import type { Source } from "../source.ts";
 import {

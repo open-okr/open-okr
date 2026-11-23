@@ -30,7 +30,7 @@ import {
   FLOWYTEAM_UNREAD_TABLES,
   type FlowyteamQueryName,
   type FlowyteamUnreadTable,
-} from "@openokr/core";
+} from "./queries.ts";
 import type { Source } from "./source.ts";
 
 export interface UnreadTable {

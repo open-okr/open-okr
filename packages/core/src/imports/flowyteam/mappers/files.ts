@@ -27,18 +27,16 @@
  * claim, in that order, so a run that dies between them leaves a `pending`
  * row the orphan sweep collects rather than an `ok` row with no file.
  */
-import type { FileStorage } from "@openokr/adapters";
+import type { ActionCallContext } from "../../../actions/define.ts";
+import { callAction } from "../../../actions/registry.ts";
+import { richTextFromHtml } from "../../../rich-text/from-html.ts";
+import type { RichTextNode } from "../../../rich-text/schema.ts";
 import {
-  type ActionCallContext,
-  callAction,
-  type RichTextNode,
-  richTextFromHtml,
-} from "@openokr/core";
-import {
+  type BlobStorage,
   decodeDataUri,
   filenameForInline,
-  findSourceFile,
   isFound,
+  type SourceFileReader,
 } from "../files.ts";
 import { legacyKeyFor } from "../legacy.ts";
 import type { Source } from "../source.ts";
@@ -58,9 +56,9 @@ interface MapperOptions {
   readonly actingMemberId: string;
   readonly write: boolean;
   /** Where this instance keeps its own bytes. Absent in a dry run. */
-  readonly storage?: FileStorage;
-  /** The source's storage directory, from `--files-root`. */
-  readonly filesRoot?: string;
+  readonly storage?: BlobStorage;
+  /** Reads the source's files, from `--files-root` on the command line. */
+  readonly files?: SourceFileReader;
 }
 
 export async function importFiles(
@@ -138,7 +136,7 @@ async function importTaskFiles(options: MapperOptions): Promise<{
     }
 
     local += 1;
-    if (!options.filesRoot) {
+    if (!options.files) {
       missing += 1;
       tally.skip(
         source,
@@ -147,7 +145,7 @@ async function importTaskFiles(options: MapperOptions): Promise<{
       continue;
     }
 
-    const found = await findSourceFile(options.filesRoot, {
+    const found = await options.files.find({
       taskId: row.task_id,
       filename: filename || row.hashname,
       hashname: row.hashname,
@@ -208,7 +206,7 @@ async function importTaskFiles(options: MapperOptions): Promise<{
   const notes: string[] = [];
   if (missing > 0) {
     notes.push(
-      options.filesRoot
+      options.files
         ? `${missing} of ${local} files were not found under --files-root. Every one is named in the files domain. The paths looked at were ${[...triedPaths].slice(0, 4).join(", ")} and others of the same shape, so a root one directory too high or too low is the usual cause.`
         : `${local} files live on the FlowyTeam server's own disk and a read-only MySQL connection cannot reach them. Every one is named in the files domain. Run again with --files-root pointing at that server's storage directory to copy them.`,
     );

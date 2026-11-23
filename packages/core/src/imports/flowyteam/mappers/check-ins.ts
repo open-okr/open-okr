@@ -18,12 +18,11 @@
  * confidence vote with a synchronised reveal is an OpenOKR concept; the source
  * has one confidence per check-in and no notion of a room voting.
  */
-import {
-  type ActionCallContext,
-  callAction,
-  richTextFromPlainText,
-} from "@openokr/core";
+
 import { confidenceBand, type ResolvedThresholds } from "@openokr/method";
+import type { ActionCallContext } from "../../../actions/define.ts";
+import { callAction } from "../../../actions/registry.ts";
+import { richTextFromPlainText } from "../../../rich-text/from-text.ts";
 import { legacyKeyFor } from "../legacy.ts";
 import type { Source } from "../source.ts";
 import { sourceInstant } from "../time.ts";

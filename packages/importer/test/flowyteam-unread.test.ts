@@ -14,11 +14,16 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { FLOWYTEAM_QUERIES } from "@openokr/core";
+import {
+  CORE_TABLES,
+  countUnread,
+  EXPECTED_TABLES,
+  FLOWYTEAM_QUERIES,
+  type Source,
+  UNREAD_TABLES,
+} from "@openokr/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CORE_TABLES, EXPECTED_TABLES } from "../src/flowyteam/introspect.ts";
-import { openSource, type Source } from "../src/flowyteam/source.ts";
-import { countUnread, UNREAD_TABLES } from "../src/flowyteam/unread.ts";
+import { openSource } from "../src/flowyteam/source.ts";
 import {
   available,
   SEEDED,
@@ -62,7 +67,12 @@ const COMPANY_SEVEN = [
  * The connector's own source is still scanned for anything written inline.
  */
 function tablesTheCodeReads(): ReadonlySet<string> {
-  const root = fileURLToPath(new URL("../src/flowyteam", import.meta.url));
+  // The engine moved to core (flowyteam-connect C2); the MySQL source and the
+  // command line stayed here. Both are scanned, the catalogue itself is not.
+  const roots = [
+    fileURLToPath(new URL("../src/flowyteam", import.meta.url)),
+    fileURLToPath(new URL("../../core/src/imports/flowyteam", import.meta.url)),
+  ];
   const read = new Set<string>();
   for (const [name, entry] of Object.entries(FLOWYTEAM_QUERIES)) {
     if (name.startsWith("unread.") && name !== "unread.columns") {
@@ -77,18 +87,24 @@ function tablesTheCodeReads(): ReadonlySet<string> {
       read.add((match[1] as string).toLowerCase());
     }
   }
-  for (const entry of readdirSync(root, { recursive: true })) {
-    const file = String(entry);
-    if (!file.endsWith(".ts") || file === "unread.ts") {
-      continue;
-    }
-    const code = readFileSync(join(root, file), "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
-    for (const match of code.matchAll(
-      /\b(?:from|join)\s+`?([a-z_][a-z0-9_]*)`?/gi,
-    )) {
-      read.add((match[1] as string).toLowerCase());
+  for (const root of roots) {
+    for (const entry of readdirSync(root, { recursive: true })) {
+      const file = String(entry);
+      if (
+        !file.endsWith(".ts") ||
+        file === "unread.ts" ||
+        file === "queries.ts"
+      ) {
+        continue;
+      }
+      const code = readFileSync(join(root, file), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      for (const match of code.matchAll(
+        /\b(?:from|join)\s+`?([a-z_][a-z0-9_]*)`?/gi,
+      )) {
+        read.add((match[1] as string).toLowerCase());
+      }
     }
   }
   return read;

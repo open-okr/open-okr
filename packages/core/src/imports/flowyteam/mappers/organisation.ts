@@ -12,12 +12,9 @@
  * skipped by name. A person with no address becomes no member at all, because a
  * placeholder that cannot ever be claimed is a row nobody can act on.
  */
-import {
-  type ActionCallContext,
-  callAction,
-  cyclePeriodFor,
-  parseLocalDate,
-} from "@openokr/core";
+import type { ActionCallContext } from "../../../actions/define.ts";
+import { callAction } from "../../../actions/registry.ts";
+import { cyclePeriodFor, parseLocalDate } from "../../../cycles/generation.ts";
 import { legacyKeyFor } from "../legacy.ts";
 import type { Source } from "../source.ts";
 import { type DomainReconciliation, DomainTally } from "./reconcile.ts";

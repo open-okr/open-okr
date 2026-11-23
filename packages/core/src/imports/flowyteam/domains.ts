@@ -25,8 +25,8 @@
  * - a comment hangs on a task and a watcher watches one;
  * - an attachment hangs on a task and an inline image rewrites a comment.
  */
-import type { FileStorage } from "@openokr/adapters";
-import type { ActionCallContext } from "@openokr/core";
+import type { ActionCallContext } from "../../actions/define.ts";
+import type { BlobStorage, SourceFileReader } from "./files.ts";
 import { importCheckIns } from "./mappers/check-ins.ts";
 import { importCollaboration } from "./mappers/collaboration.ts";
 import { importFiles } from "./mappers/files.ts";
@@ -62,9 +62,9 @@ interface MapperContext {
   readonly actingMemberId: string;
   readonly write: boolean;
   /** Where this instance keeps its own bytes. Absent in a dry run. */
-  readonly storage?: FileStorage;
-  /** The source's storage directory, from `--files-root`. */
-  readonly filesRoot?: string;
+  readonly storage?: BlobStorage;
+  /** Reads the source's files, from `--files-root` on the command line. */
+  readonly files?: SourceFileReader;
 }
 
 interface ImportDomain {

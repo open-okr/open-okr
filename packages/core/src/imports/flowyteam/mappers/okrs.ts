@@ -20,11 +20,9 @@
  * recomputed one, the recomputed one wins and the difference is reported: it is
  * the one number a migration is most often asked about afterwards.
  */
-import {
-  type ActionCallContext,
-  callAction,
-  richTextFromPlainText,
-} from "@openokr/core";
+import type { ActionCallContext } from "../../../actions/define.ts";
+import { callAction } from "../../../actions/registry.ts";
+import { richTextFromPlainText } from "../../../rich-text/from-text.ts";
 import { legacyKeyFor } from "../legacy.ts";
 import type { Source } from "../source.ts";
 import { type DomainReconciliation, DomainTally } from "./reconcile.ts";

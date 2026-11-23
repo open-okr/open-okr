@@ -4,11 +4,9 @@
  * Maps `indicator_accesses` rows to `kpi` context `share` bindings through
  * `kpis.importShare`.
  */
-import {
-  ACCESS_LEVELS,
-  type ActionCallContext,
-  callAction,
-} from "@openokr/core";
+import { ACCESS_LEVELS } from "../../../access/levels.ts";
+import type { ActionCallContext } from "../../../actions/define.ts";
+import { callAction } from "../../../actions/registry.ts";
 import { introspectIndicatorAccesses } from "../introspect.ts";
 import type { Source } from "../source.ts";
 import { type DomainReconciliation, DomainTally } from "./reconcile.ts";

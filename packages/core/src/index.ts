@@ -968,6 +968,58 @@ export { myExportBlob } from "./exports/collect.ts";
 // reaches a caller that only needs to describe its own storage function.
 export type { PutFile } from "./exports/worker.ts";
 export { getServerCatalogue, serverTranslate } from "./i18n/catalogue.ts";
+// The FlowyTeam engine (flowyteam-connect card C2). Here rather than in
+// packages/importer for the reason the spreadsheet engine is: the web
+// application and the scheduler run it, and neither may carry the MySQL client.
+// The importer keeps the MySQL source and the command line.
+export {
+  type Company,
+  type CompanyCounts,
+  countCompanies,
+  countFor,
+  listCompanies,
+  requireCompany,
+  SUMMARY_TABLES,
+} from "./imports/flowyteam/companies.ts";
+export {
+  DOMAIN_KEYS,
+  selectDomains,
+  UnknownDomainError,
+} from "./imports/flowyteam/domains.ts";
+export {
+  type BlobStorage,
+  contentTypeFor,
+  decodeDataUri,
+  digestOf,
+  type FoundFile,
+  filenameForInline,
+  isFound,
+  type NotFound,
+  type SourceFile,
+  type SourceFileReader,
+} from "./imports/flowyteam/files.ts";
+export {
+  CORE_TABLES,
+  EXPECTED_TABLES,
+  type Introspection,
+  introspect,
+} from "./imports/flowyteam/introspect.ts";
+export {
+  LEGACY_TABLES,
+  LEGACY_TYPE,
+  legacyIdFor,
+  legacyKeyFor,
+  parseLegacyId,
+  type SourceTable,
+} from "./imports/flowyteam/legacy.ts";
+export {
+  parseFormulaTokens,
+  resolveFormulaReferences,
+} from "./imports/flowyteam/mappers/formula.ts";
+export {
+  DomainTally,
+  describeDomain,
+} from "./imports/flowyteam/mappers/reconcile.ts";
 export {
   FLOWYTEAM_QUERIES,
   FLOWYTEAM_SUMMARY_TABLES,
@@ -981,6 +1033,20 @@ export {
   type FlowyteamUnreadTable,
   flowyteamQueryCatalogue,
 } from "./imports/flowyteam/queries.ts";
+export {
+  buildReport,
+  type FlowyteamReport,
+  render as renderFlowyteamReport,
+} from "./imports/flowyteam/report.ts";
+export {
+  companyAlreadyImported,
+  type FlowyteamEngineOptions,
+  type FlowyteamRunResult,
+  runFlowyteamEngine,
+} from "./imports/flowyteam/run.ts";
+export { type Source, SourceError } from "./imports/flowyteam/source.ts";
+export { sourceInstant } from "./imports/flowyteam/time.ts";
+export { countUnread, UNREAD_TABLES } from "./imports/flowyteam/unread.ts";
 export {
   assertLegacyKeyFree,
   findLegacyRowInTx,

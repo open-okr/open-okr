@@ -8,6 +8,7 @@
  * database is genuinely writable by an administrator, so a passing run cannot be
  * a database that refuses everybody.
  */
+import { type Source, SourceError } from "@openokr/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   assertRead,
@@ -15,8 +16,6 @@ import {
   openSource,
   parseUrl,
   READ_ONLY_ERROR,
-  type Source,
-  SourceError,
 } from "../src/flowyteam/source.ts";
 import {
   available,

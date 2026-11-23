@@ -32,11 +32,9 @@
  * watch when the account is claimed, which is the open question this row
  * raises rather than answers.
  */
-import {
-  type ActionCallContext,
-  callAction,
-  richTextFromHtml,
-} from "@openokr/core";
+import type { ActionCallContext } from "../../../actions/define.ts";
+import { callAction } from "../../../actions/registry.ts";
+import { richTextFromHtml } from "../../../rich-text/from-html.ts";
 import { legacyKeyFor } from "../legacy.ts";
 import type { Source } from "../source.ts";
 import { sourceInstant } from "../time.ts";

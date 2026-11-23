@@ -6,12 +6,16 @@
  * own value, which is the one claim a parser test cannot make: it needs the
  * records loaded, the formula stored as a tree and the engine run over both.
  */
-import { callAction, provisionWorkspaceForUser } from "@openokr/core";
+import {
+  callAction,
+  provisionWorkspaceForUser,
+  type Source,
+} from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { runFlowyteamImport } from "../src/flowyteam/run.ts";
-import { openSource, type Source } from "../src/flowyteam/source.ts";
+import { openSource } from "../src/flowyteam/source.ts";
 import {
   available,
   SEEDED,

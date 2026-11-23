@@ -77,7 +77,7 @@ export const EXPECTED_TABLES: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-export interface SourceVersion {
+interface SourceVersion {
   /** The newest applied migration's name, which is the version in practice. */
   readonly latestMigration: string;
   /** Its date prefix, `YYYY_MM_DD`, or null for a name that has none. */
@@ -138,7 +138,7 @@ export async function introspect(source: Source): Promise<Introspection> {
  * an older date prefix still ran last, and what this answers is "how far has
  * this instance been migrated", not "which file sorts highest".
  */
-export async function inferVersion(source: Source): Promise<SourceVersion> {
+async function inferVersion(source: Source): Promise<SourceVersion> {
   const rows = await source.read<{ migration: string }>(
     "schema.latestMigration",
   );

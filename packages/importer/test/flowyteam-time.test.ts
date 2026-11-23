@@ -1,5 +1,5 @@
+import { sourceInstant } from "@openokr/core";
 import { describe, expect, it } from "vitest";
-import { sourceInstant } from "../src/flowyteam/time.ts";
 
 /**
  * The seven-hour bug (P6-T04b).
