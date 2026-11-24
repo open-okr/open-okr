@@ -1,5 +1,13 @@
 # @openokr/formats
 
+## 0.10.0
+
+### Patch Changes
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`43e2bfe`](https://github.com/open-okr/open-okr/commit/43e2bfe2d579f4f8ef64983a672cf9ca3d0462e4) Thanks [@agungksidik](https://github.com/agungksidik)! - Count messages pick their plural form with the language's own rules.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`afcc3ac`](https://github.com/open-okr/open-okr/commit/afcc3acf134bbe3a782c9fbd3369c74e41090c02) Thanks [@agungksidik](https://github.com/agungksidik)! - Dates, times and numbers follow the reader's language everywhere.
+
 ## 0.9.1
 
 No changes in this release.

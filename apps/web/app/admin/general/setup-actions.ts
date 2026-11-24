@@ -4,6 +4,8 @@ import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getPool } from "../../../lib/auth";
+import { operationMessage } from "../../../lib/refusal";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import type { WriteState } from "../../cycle/write-state.ts";
 
@@ -31,7 +33,7 @@ export async function reopenSetup(
     );
   } catch (error) {
     if (error instanceof OperationError) {
-      return { error: error.message };
+      return { error: operationMessage(error, (await getTranslations()).t) };
     }
     throw error;
   }

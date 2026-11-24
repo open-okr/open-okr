@@ -13,6 +13,7 @@ import { isBlankDocument } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { getInstanceName } from "../../../lib/instance-name";
+import { operationMessage } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
@@ -737,7 +738,7 @@ export async function postDigestAction(
     };
   } catch (error) {
     if (error instanceof OperationError) {
-      return { error: error.message };
+      return { error: operationMessage(error, (await getTranslations()).t) };
     }
     const { t } = await getTranslations();
     return { error: t("session.detail.digest.postFailed") };
@@ -856,7 +857,7 @@ export async function saveMinutesWriteUpAction(
     return { documentId: created.id };
   } catch (error) {
     if (error instanceof OperationError) {
-      return { error: error.message };
+      return { error: operationMessage(error, (await getTranslations()).t) };
     }
     return { error: t("session.detail.thatDidNotSave") };
   }

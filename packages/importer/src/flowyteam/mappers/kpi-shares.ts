@@ -9,11 +9,11 @@ import {
   type ActionCallContext,
   callAction,
 } from "@openokr/core";
-import type { Pool } from "pg";
 import { introspectIndicatorAccesses } from "../introspect.ts";
 import type { Source } from "../source.ts";
 import { type DomainReconciliation, DomainTally } from "./reconcile.ts";
 import type { Resolver } from "./resolve.ts";
+import { withWorkspaceQuery } from "./workspace-query.ts";
 
 export interface KpiSharesResult {
   readonly domains: readonly DomainReconciliation[];
@@ -48,24 +48,34 @@ interface FlaggedIndicator {
   readonly named_people: number;
 }
 
-async function withWorkspaceQuery<T extends Record<string, unknown>>(
-  pool: Pool,
-  workspaceId: string,
-  sql: string,
-  params: unknown[] = [],
-): Promise<T[]> {
-  const client = await pool.connect();
-  try {
-    await client.query("begin");
-    await client.query("select set_config('app.workspace_id', $1, true)", [
-      workspaceId,
-    ]);
-    const result = await client.query<T>(sql, params);
-    await client.query("commit");
-    return result.rows;
-  } finally {
-    client.release();
+/** What a dry run resolves to, as `resolve.ts` plans it. */
+const PLANNED = "planned-by-a-dry-run";
+
+/**
+ * The source user who will own a KPI a dry run has only planned, read the way
+ * `kpis.ts` reads it. A source id rather than a target one, because in a dry
+ * run every planned member resolves to the same placeholder. Undefined for a
+ * KPI owned by a space, the workspace, or an owner that no longer exists.
+ */
+async function plannedOwnerUser(
+  options: MapperOptions,
+  indicatorId: number,
+): Promise<number | undefined> {
+  const [indicator] = await options.source.query<{
+    model_id: number | null;
+    model_type: string | null;
+  }>("select model_id, model_type from indicators where id = ?", [indicatorId]);
+  if (
+    indicator?.model_type !== "App\\Models\\EmployeeDetails" ||
+    !indicator.model_id
+  ) {
+    return undefined;
   }
+  const [employee] = await options.source.query<{ user_id: number | null }>(
+    "select user_id from employee_details where id = ? and deleted_at is null",
+    [indicator.model_id],
+  );
+  return employee?.user_id ?? undefined;
 }
 
 export async function importKpiShares(
@@ -121,6 +131,9 @@ export async function importKpiShares(
     [options.context.workspaceId],
   );
   const activeHumanMemberCount = Number(humanMemberRows[0]?.n ?? 0);
+
+  // What this dry run would already have written, by KPI and person.
+  const plannedPairs = new Map<string, number>();
 
   // 3. Process each row
   for (const row of rows) {
@@ -206,10 +219,36 @@ export async function importKpiShares(
     const shareLevel =
       level === "edit" ? ACCESS_LEVELS.edit : ACCESS_LEVELS.view;
 
-    if (
-      !options.write &&
-      (kpiId === "planned-by-a-dry-run" || memberId === "planned-by-a-dry-run")
-    ) {
+    // **The dry run counts what the write would, including this run's own
+    // earlier rows.** Two source rows naming the same person on the same KPI
+    // are one share: the write's second call finds the first one's binding and
+    // reports it unchanged, or raised when it asks for more. And a share with
+    // the KPI's own owner changes nothing, whether or not the KPI exists yet.
+    // By source ids: in a dry run every planned KPI and member resolves to the
+    // same placeholder, which would make every planned pair look like one.
+    const pair = `${row.indicator_id}|${row.user_id}`;
+    if (!options.write && (kpiId === PLANNED || memberId === PLANNED)) {
+      if (
+        kpiId === PLANNED &&
+        (await plannedOwnerUser(options, row.indicator_id)) === row.user_id
+      ) {
+        unchanged += 1;
+        tally.wrote(false);
+        continue;
+      }
+      const earlier = plannedPairs.get(pair);
+      if (earlier !== undefined) {
+        if (earlier >= shareLevel) {
+          unchanged += 1;
+          tally.wrote(false);
+        } else {
+          raised += 1;
+          plannedPairs.set(pair, shareLevel);
+          tally.wrote(true);
+        }
+        continue;
+      }
+      plannedPairs.set(pair, shareLevel);
       if (level === "view") {
         writtenAtView += 1;
       } else {
@@ -315,6 +354,19 @@ export async function importKpiShares(
         continue;
       }
 
+      const earlier = plannedPairs.get(pair);
+      if (earlier !== undefined) {
+        if (earlier >= shareLevel) {
+          unchanged += 1;
+          tally.wrote(false);
+        } else {
+          raised += 1;
+          plannedPairs.set(pair, shareLevel);
+          tally.wrote(true);
+        }
+        continue;
+      }
+
       // Audit check
       const auditRows = await withWorkspaceQuery<{ id: string }>(
         options.context.pool,
@@ -350,6 +402,7 @@ export async function importKpiShares(
 
       if (auditRows.length === 0) {
         if (bindingRows.length === 0) {
+          plannedPairs.set(pair, shareLevel);
           if (level === "view") {
             writtenAtView += 1;
           } else {
@@ -357,6 +410,7 @@ export async function importKpiShares(
           }
           tally.wrote(true);
         } else if ((bindingRows[0]?.level ?? 0) < shareLevel) {
+          plannedPairs.set(pair, shareLevel);
           raised += 1;
           tally.wrote(true);
         } else {

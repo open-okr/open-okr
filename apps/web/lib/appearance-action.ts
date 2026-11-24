@@ -17,6 +17,8 @@ import { callAction, OperationError } from "@openokr/core";
 import type { ShippedLocaleCode } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { getPool } from "./pool";
+import { operationMessage } from "./refusal";
+import { getTranslations } from "./translations";
 import {
   clearVisitorLanguageCookie,
   setVisitorLanguageCookie,
@@ -44,7 +46,7 @@ export async function setAppearance(input: {
     );
   } catch (error) {
     if (error instanceof OperationError) {
-      return { error: error.message };
+      return { error: operationMessage(error, (await getTranslations()).t) };
     }
     throw error;
   }

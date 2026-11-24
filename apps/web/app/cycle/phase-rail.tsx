@@ -1,7 +1,7 @@
-import { PHASE_GUIDANCE } from "@openokr/method";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { Check } from "lucide-react";
 import Link from "next/link";
+import { phaseOutput, phaseTitle } from "../../lib/method-texts.ts";
 import { phaseProgress } from "../../lib/phase-progress.ts";
 import { getTranslations } from "../../lib/translations";
 import { phaseHref } from "./cycle-href.ts";
@@ -97,9 +97,6 @@ export async function PhaseRail({
       </CardHeader>
       <CardBody className="flex flex-col gap-1 p-2">
         {phases.map((entry) => {
-          const guidance = PHASE_GUIDANCE.find(
-            (item) => item.phase === entry.phase,
-          );
           const current = entry.phase === currentPhase;
           const { met, total } = entry.conditions;
           return (
@@ -122,12 +119,12 @@ export async function PhaseRail({
                       : "text-sm font-semibold text-ink"
                   }
                 >
-                  {entry.phase} · {entry.title}
+                  {entry.phase} · {phaseTitle(t, entry.phase)}
                 </span>
                 <span className="text-xs text-ink-3">
                   {entry.state === "not_applicable"
                     ? t("cycle.phaseRail.annualCyclesOnly")
-                    : (guidance?.output ?? "")}
+                    : phaseOutput(t, entry.phase)}
                 </span>
                 {current && total > 0 ? (
                   <span className="flex items-center gap-2">

@@ -1,6 +1,7 @@
 import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
-import { PHASE_TITLES, phaseWorkAllowed } from "@openokr/method";
+import { phaseWorkAllowed } from "@openokr/method";
 import { getPool } from "./auth";
+import { phaseTitle } from "./method-texts.ts";
 
 /**
  * What the strip under the topbar says (UIUX-PLAN.md §3: "When a cycle is in
@@ -96,7 +97,7 @@ export async function loadCycleStrip(
     return {
       phaseLabel: t("common.phase3", {
         phase: workflow.phase,
-        phaseTitle: PHASE_TITLES[workflow.phase] ?? "",
+        phaseTitle: phaseTitle(t, workflow.phase),
       }),
       blocking: blocking ?? null,
       dueInDays: workflow.daysToDeadline,

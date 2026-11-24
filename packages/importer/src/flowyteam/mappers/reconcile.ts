@@ -29,6 +29,17 @@ export interface DomainReconciliation {
   readonly created: number;
   /** Rows an earlier run had already written, found by their legacy key. */
   readonly matched: number;
+  /**
+   * Rows folded into another row of the same period rather than written on
+   * their own: a source holding four records in one week of a weekly KPI. Each
+   * combination is a flag naming every source id, so nothing is lost silently.
+   */
+  readonly combined: number;
+  /**
+   * Rows whose value is derived, so the target works it out again instead of
+   * copying it: a calculated KPI's recorded values. Flagged once per subject.
+   */
+  readonly recomputed: number;
   /** Rows that did not import, each with the reason. */
   readonly skipped: readonly SkippedRow[];
   /**
@@ -59,6 +70,8 @@ export class DomainTally {
   private read = 0;
   private created = 0;
   private matched = 0;
+  private combined = 0;
+  private recomputed = 0;
   private readonly skipped: SkippedRow[] = [];
   private readonly flags: SkippedRow[] = [];
 
@@ -78,6 +91,16 @@ export class DomainTally {
     }
   }
 
+  /** Rows whose values went into another row of the same period. */
+  combinedInto(count = 1): void {
+    this.combined += count;
+  }
+
+  /** The row's value is derived and the target computes it again. */
+  recomputedHere(): void {
+    this.recomputed += 1;
+  }
+
   skip(source: string, reason: string): void {
     this.skipped.push({ source, reason });
   }
@@ -93,13 +116,17 @@ export class DomainTally {
       read: this.read,
       created: this.created,
       matched: this.matched,
+      combined: this.combined,
+      recomputed: this.recomputed,
       skipped: this.skipped,
       flags: this.flags,
       // Clean means nothing was lost, not that nothing needs attention. A
       // domain with flags is still clean: every row is here. A domain with one
       // skip is not, however good the reason.
       clean:
-        this.skipped.length === 0 && this.created + this.matched === this.read,
+        this.skipped.length === 0 &&
+        this.created + this.matched + this.combined + this.recomputed ===
+          this.read,
     };
   }
 }
@@ -111,6 +138,12 @@ export function describeDomain(domain: DomainReconciliation): string {
     `${domain.created} created`,
     `${domain.matched} already here`,
   ];
+  if (domain.combined > 0) {
+    parts.push(`${domain.combined} combined into another record`);
+  }
+  if (domain.recomputed > 0) {
+    parts.push(`${domain.recomputed} recomputed from a formula`);
+  }
   if (domain.skipped.length > 0) {
     parts.push(`${domain.skipped.length} skipped`);
   }

@@ -13,6 +13,7 @@ import {
 } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { TRIGGER_NAME_KEYS } from "../../../lib/identifier-names.ts";
+import { triggerFires, triggerRecipient } from "../../../lib/method-texts.ts";
 import { setNudgeRuleAction, setQuietModeAction } from "./rule-actions";
 
 /**
@@ -283,7 +284,8 @@ function Rule({
             )}
           </span>
           <span className="text-xs text-ink-3">
-            {rule.fires}. {rule.recipient}.
+            {triggerFires(t, rule.key, rule.fires)}.{" "}
+            {triggerRecipient(t, rule.key, rule.recipient)}.
           </span>
         </span>
         <span className="col-span-12 flex items-center gap-2 text-xs text-ink-3 md:col-span-4 md:justify-end">

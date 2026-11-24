@@ -6,6 +6,7 @@
 #   ./lean-dev.sh status           what runs and what it costs
 #   ./lean-dev.sh clean            delete build caches (.turbo/cache, .next, test-results)
 # Env: FORCE=1 starts despite a red preflight. QOS=background is gentler still (slower compiles).
+#      HEAP_MB sets the Node heap cap (default 2048, or 6144 on a Mac with 16 GB or more).
 # macOS only: it relies on taskpolicy and memory_pressure. Elsewhere use `pnpm dev`.
 # Postgres must answer on localhost:5432; a Homebrew postgresql@17 is started if it does not.
 [ "$(uname)" = Darwin ] || { echo "lean-dev.sh is macOS only. Use pnpm dev."; exit 1; }
@@ -15,7 +16,7 @@ LOG=$STATE/dev.log
 mkdir -p "$STATE"
 [ -d /opt/homebrew/opt/postgresql@17/bin ] && export PATH=/opt/homebrew/opt/postgresql@17/bin:$PATH
 
-swap_pct() { sysctl vm.swapusage | awk '{t=$4; u=$7; sub("M","",t); sub("M","",u); if (t>0) printf "%d", u*100/t; else print 0}'; }
+swap_pct() { sysctl vm.swapusage | awk '{t=$4; u=$7; sub("M","",t); sub("M","",u); if (t+0>0) printf "%d", u*100/t; else print 0}'; }
 free_pct() { memory_pressure | awk -F': ' '/free percentage/ {sub("%","",$2); print $2}'; }
 web_pids() { pgrep -f "$REPO/apps/web/node_modules/.bin/../next/dist/bin/next dev|next-server" ; }
 rss_mb() { ps -o rss= -p "$(web_pids | tr '\n' ',' | sed 's/,$//')" 2>/dev/null | awk '{s+=$1} END {printf "%d", s/1024}'; }
@@ -46,13 +47,17 @@ case "$1" in
     cd "$REPO/apps/web" || exit 6
     # Straight to next, without the pnpm and turbo wrappers: two fewer Node processes.
     # taskpolicy: CPU and disk yield to the apps you are using.
-    NODE_OPTIONS=--max-old-space-size=2048 nohup taskpolicy -c "${QOS:-utility}" ./node_modules/.bin/next dev --port 3000 > "$LOG" 2>&1 &
+    # Heap cap by machine: 2 GB keeps an 8 GB Mac usable; on 16 GB or more that cap
+    # made next dev restart itself mid-session, so it gets 6 GB. HEAP_MB overrides.
+    ram_gb=$(( $(sysctl -n hw.memsize) / 1073741824 ))
+    if [ "$ram_gb" -ge 16 ]; then heap=${HEAP_MB:-6144}; else heap=${HEAP_MB:-2048}; fi
+    NODE_OPTIONS=--max-old-space-size=$heap nohup taskpolicy -c "${QOS:-utility}" ./node_modules/.bin/next dev --port 3000 > "$LOG" 2>&1 &
     echo $! > "$STATE/pid"
     for i in $(seq 1 90); do grep -q "Ready in" "$LOG" && break; sleep 1; done
     grep -q "Ready in" "$LOG" || { echo "did not start, see $LOG"; tail -5 "$LOG"; exit 7; }
     ( sleep $((minutes * 60)); "$0" stop >/dev/null 2>&1 ) > /dev/null 2>&1 &
     echo $! > "$STATE/watchdog"
-    echo "dev ready on http://localhost:3000 (QoS ${QOS:-utility}, heap cap 2 GB, stops itself in ${minutes} min). Log: $LOG"
+    echo "dev ready on http://localhost:3000 (QoS ${QOS:-utility}, heap cap ${heap} MB, stops itself in ${minutes} min). Log: $LOG"
     ;;
   stop)
     [ -f "$STATE/watchdog" ] && kill "$(cat "$STATE/watchdog")" 2>/dev/null; rm -f "$STATE/watchdog"

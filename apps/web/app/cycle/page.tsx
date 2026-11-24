@@ -5,7 +5,6 @@ import {
   defaultPractice,
   KEY_RESULT_CHECKS,
   OBJECTIVE_CHECKS,
-  PHASE_TITLES,
   phaseWorkAllowed,
   type ResolvedPractice,
   type ResolvedThresholds,
@@ -20,6 +19,7 @@ import { CopyLink } from "../../lib/copy-link.tsx";
 import { reviewMinutesFor } from "../../lib/cycle-review-minutes.ts";
 import { DecisionText } from "../../lib/decision-text.tsx";
 import { readKpiOptions } from "../../lib/kpi-options.ts";
+import { phaseTitle } from "../../lib/method-texts.ts";
 import { pageTitle } from "../../lib/page-title.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { shortLinkPath, withQuery } from "../../lib/short-links.ts";
@@ -510,7 +510,7 @@ export default async function CyclePage({
                 <h1 className="text-base font-bold text-ink">
                   {t("common.phase", {
                     viewing,
-                    viewing2: PHASE_TITLES[viewing] ?? "",
+                    viewing2: phaseTitle(t, viewing),
                   })}
                 </h1>
                 <p className="flex flex-wrap items-center gap-1.5 text-xs text-ink-3">

@@ -1,5 +1,130 @@
 # @openokr/web
 
+## 0.10.0
+
+### Minor Changes
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`e7b8026`](https://github.com/open-okr/open-okr/commit/e7b80262f46e6f5010b2ba53fcd9c6a528ed7a0d) Thanks [@agungksidik](https://github.com/agungksidik)! - The KPI page shows who a KPI is shared with and lets its owner share it.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`21f2ff0`](https://github.com/open-okr/open-okr/commit/21f2ff0d86483c6bd5ad701a6dc5cc4b9e45e7bd) Thanks [@agungksidik](https://github.com/agungksidik)! - The coach skips English word checks on Chinese and Arabic text, says so, and shows its rules in the reader's language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`c1cd1c4`](https://github.com/open-okr/open-okr/commit/c1cd1c47a14e844d1686c7856f444f7cb02c95e0) Thanks [@agungksidik](https://github.com/agungksidik)! - Simplified Chinese is available as an interface language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`5641130`](https://github.com/open-okr/open-okr/commit/56411306b4b80572480e1c911fd229174ed1540c) Thanks [@agungksidik](https://github.com/agungksidik)! - Spanish is available as an interface language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`0a4f9d0`](https://github.com/open-okr/open-okr/commit/0a4f9d03acef73c707093910fd3bc174c85cb678) Thanks [@agungksidik](https://github.com/agungksidik)! - Portuguese (Brazil) is available as an interface language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`09adaca`](https://github.com/open-okr/open-okr/commit/09adacaf82896f5569512ef1152ac497806c9e70) Thanks [@agungksidik](https://github.com/agungksidik)! - Arabic is available as an interface language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`8a00967`](https://github.com/open-okr/open-okr/commit/8a009674b49b6d97e69b34f347958d69b2223dda) Thanks [@agungksidik](https://github.com/agungksidik)! - German is available as an interface language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`6fbba1e`](https://github.com/open-okr/open-okr/commit/6fbba1ea9dac74ee7e90f9219396fe5004d23bf4) Thanks [@agungksidik](https://github.com/agungksidik)! - French is available as an interface language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`8208530`](https://github.com/open-okr/open-okr/commit/8208530d535d423cb12bfc0bfe79beb39287e37e) Thanks [@agungksidik](https://github.com/agungksidik)! - Italian is available as an interface language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`06b40b1`](https://github.com/open-okr/open-okr/commit/06b40b1ce9b22435ea13417a63e288ff3f08e18f) Thanks [@agungksidik](https://github.com/agungksidik)! - Indonesian is available as an interface language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`b64c0ea`](https://github.com/open-okr/open-okr/commit/b64c0ea637c1c7c26a5fafd11bd6a86ecf21006c) Thanks [@agungksidik](https://github.com/agungksidik)! - Members and workspaces can store any of the ten interface languages.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`0ac0204`](https://github.com/open-okr/open-okr/commit/0ac0204c8e60611c9165f671d111ed331ec08cd9) Thanks [@agungksidik](https://github.com/agungksidik)! - Members can follow the workspace language, admins set the instance language, and visitors choose a language before signing in.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`6f96b4b`](https://github.com/open-okr/open-okr/commit/6f96b4b815c0cce015e415f6ac7da0018958f325) Thanks [@agungksidik](https://github.com/agungksidik)! - The topbar has a language switcher. It saves the choice on the member, the same setting as the one under Your account, and "Follow workspace" goes back to the workspace language. Choosing Arabic turns the page right to left.
+
+### Patch Changes
+
+- [#224](https://github.com/open-okr/open-okr/pull/224) [`bae909c`](https://github.com/open-okr/open-okr/commit/bae909cf0374d94f2b1ca77724b8e02aff64bc60) Thanks [@agungksidik](https://github.com/agungksidik)! - Screen readers now hear which navigation item is the current page, the primary navigation's name in the reader's language, one heading 1 on Home before the section headings, and the command palette's result count once a search settles. An access refusal reads as a plain sentence in the reader's language instead of naming the internal action.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`f5b2ae9`](https://github.com/open-okr/open-okr/commit/f5b2ae982773a27d48e8483580c48d992bd12e82) Thanks [@agungksidik](https://github.com/agungksidik)! - Show activity summaries in the reader's language on the activity feed, the inbox, goal pages and profiles.
+
+- [#229](https://github.com/open-okr/open-okr/pull/229) [`ca761c6`](https://github.com/open-okr/open-okr/commit/ca761c6521aa20f181fd79b1be93aae8e2a9c531) Thanks [@agungksidik](https://github.com/agungksidik)! - Method phases, phase outputs, publish gate titles, session agenda stages, process-health statements in the minutes and the nudge rules' firing and recipient text now show in the reader's language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`dcf91d8`](https://github.com/open-okr/open-okr/commit/dcf91d835eb37d34000dc2de228554bb41d1f7c0) Thanks [@agungksidik](https://github.com/agungksidik)! - Fix `openokr erase` failing inside the image: the command loads the settings registry, which needs the formats and method packages that the migrator layer did not ship.
+
+- [#229](https://github.com/open-okr/open-okr/pull/229) [`d761201`](https://github.com/open-okr/open-okr/commit/d761201bea4e3d09d92487998f4fd3d2548bc310) Thanks [@agungksidik](https://github.com/agungksidik)! - The most common "No such ..." refusals and a few others now show in the reader's language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`366f7bc`](https://github.com/open-okr/open-okr/commit/366f7bc8d788b2702b437f465071cf4802351fa8) Thanks [@agungksidik](https://github.com/agungksidik)! - Keep inbox rows readable on a phone: the text gets its own line and the row actions wrap below it.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`356a362`](https://github.com/open-okr/open-okr/commit/356a3628e6b4897683f237ee86c20b2125befc59) Thanks [@agungksidik](https://github.com/agungksidik)! - Access bindings accept the owner and share tags used by per-KPI access.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`6352556`](https://github.com/open-okr/open-okr/commit/63525564572542f699c86b1f3afdcdbf2b3e5a80) Thanks [@agungksidik](https://github.com/agungksidik)! - A guest sees only the KPIs shared with them, on every screen, search, export, copilot and MCP path.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`36e111d`](https://github.com/open-okr/open-okr/commit/36e111ddfb45eea2a7d19eb53a04f885d94b05bd) Thanks [@agungksidik](https://github.com/agungksidik)! - The screen-reader name of the Command key in shortcut hints is now translated.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`109e2f4`](https://github.com/open-okr/open-okr/commit/109e2f4bce366ee62b79eb1295bd6030e8cff38f) Thanks [@agungksidik](https://github.com/agungksidik)! - Fix shortcut hints failing to render on server-rendered pages after the Command key name was translated.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`ba96217`](https://github.com/open-okr/open-okr/commit/ba9621728a94972f8aa53f529a87aae046bc93c2) Thanks [@agungksidik](https://github.com/agungksidik)! - The suppression reasons and channel names on the nudge volume page are now translated.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`160753f`](https://github.com/open-okr/open-okr/commit/160753f0548e34d2c0e1ff83f4b386edf2097483) Thanks [@agungksidik](https://github.com/agungksidik)! - Show quality rule titles, conditions and prompts from the language catalogue on the rule page and the goals chips.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`7c7cb9b`](https://github.com/open-okr/open-okr/commit/7c7cb9b7f9ddd38146d369fd36bde8e6f6734db7) Thanks [@agungksidik](https://github.com/agungksidik)! - Add the plural-form key the mail word catalogue checks expect for the review inbox "other" blocker type.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`e90e812`](https://github.com/open-okr/open-okr/commit/e90e8123179ee6ee48d3e0cf7a4749384fb4c8e6) Thanks [@agungksidik](https://github.com/agungksidik)! - Text fixed by the release checks is available in every interface language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`2f67bfb`](https://github.com/open-okr/open-okr/commit/2f67bfbf7b2f99f894361a6c66d93414c3f52a85) Thanks [@agungksidik](https://github.com/agungksidik)! - Stored codes such as goal levels, KPI states, verdicts, run and channel statuses now show translated names instead of raw values.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`bfa0371`](https://github.com/open-okr/open-okr/commit/bfa0371482005c4fc460a044c5c70fb88d531b17) Thanks [@agungksidik](https://github.com/agungksidik)! - Review inbox titles, due labels, weekday names and action buttons now appear in the member's language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`d34200a`](https://github.com/open-okr/open-okr/commit/d34200ad05c80e4a61ac51021d72da7cd0425432) Thanks [@agungksidik](https://github.com/agungksidik)! - Fix the quarterly review screen failing to render when a stage gap sentence takes no count.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`1891107`](https://github.com/open-okr/open-okr/commit/18911079b3ee39084e01fd796ff0dc75ccc44b47) Thanks [@agungksidik](https://github.com/agungksidik)! - Language resolution falls back to the instance default before English.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`0bde36d`](https://github.com/open-okr/open-okr/commit/0bde36d51f17ff983a41bd6791435ebe9e731f03) Thanks [@agungksidik](https://github.com/agungksidik)! - The layout supports right-to-left languages.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`fd29619`](https://github.com/open-okr/open-okr/commit/fd29619a1f32e8128cedd2fd022f5930b9c55ae0) Thanks [@agungksidik](https://github.com/agungksidik)! - Shared components lay out correctly right to left.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`cf9f39f`](https://github.com/open-okr/open-okr/commit/cf9f39ff1350de08387518cf211ead5afa7b7f69) Thanks [@agungksidik](https://github.com/agungksidik)! - Screens A to K lay out correctly right to left.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`b807391`](https://github.com/open-okr/open-okr/commit/b80739112773550d917463fa053d476325af83b5) Thanks [@agungksidik](https://github.com/agungksidik)! - Every screen lays out correctly right to left.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`c9016fd`](https://github.com/open-okr/open-okr/commit/c9016fd3d9aac70a33856ca76967e711f315d769) Thanks [@agungksidik](https://github.com/agungksidik)! - Arrow keys and charts follow the reading direction.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`f2a2104`](https://github.com/open-okr/open-okr/commit/f2a2104519160b8fbbd484515d9a6d1786297a55) Thanks [@agungksidik](https://github.com/agungksidik)! - Arabic and Simplified Chinese text render with bundled fonts, offline.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`e65f3f5`](https://github.com/open-okr/open-okr/commit/e65f3f5f806f88c16b2113d12e6591bb43ee24f9) Thanks [@agungksidik](https://github.com/agungksidik)! - The minutes PDF is in the requester's language, including Chinese and Arabic.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`5476f5c`](https://github.com/open-okr/open-okr/commit/5476f5c48ebda4b5ad2b32cfddfb7b76bce6f2c0) Thanks [@agungksidik](https://github.com/agungksidik)! - Export headers are in the requester's language; values stay machine-readable.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`071b7f3`](https://github.com/open-okr/open-okr/commit/071b7f3e1f1f5cf8ca374dbc885f5ee94eb65bb4) Thanks [@agungksidik](https://github.com/agungksidik)! - The copilot and every writing assist answer in the member's language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`d61f5a2`](https://github.com/open-okr/open-okr/commit/d61f5a2786785f1d8ea6225cb7978cb6a0a1641b) Thanks [@agungksidik](https://github.com/agungksidik)! - Account mail uses the language of the page it was requested from.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`b670f40`](https://github.com/open-okr/open-okr/commit/b670f4010063c825a048778befc2725f276bcee0) Thanks [@agungksidik](https://github.com/agungksidik)! - Malay covers the new interface text.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`78084c7`](https://github.com/open-okr/open-okr/commit/78084c792ad6a1b6a8702945cf958a017fd142a2) Thanks [@agungksidik](https://github.com/agungksidik)! - Browsers download only the catalogue of the language they use.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`43e2bfe`](https://github.com/open-okr/open-okr/commit/43e2bfe2d579f4f8ef64983a672cf9ca3d0462e4) Thanks [@agungksidik](https://github.com/agungksidik)! - Count messages pick their plural form with the language's own rules.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`afcc3ac`](https://github.com/open-okr/open-okr/commit/afcc3acf134bbe3a782c9fbd3369c74e41090c02) Thanks [@agungksidik](https://github.com/agungksidik)! - Dates, times and numbers follow the reader's language everywhere.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`4e6d0f3`](https://github.com/open-okr/open-okr/commit/4e6d0f3bfe10d255fe2d2fcf7cee3e9a1e31e4e1) Thanks [@agungksidik](https://github.com/agungksidik)! - The scorecard CSV export now has column headers in the member's language.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`ac43039`](https://github.com/open-okr/open-okr/commit/ac43039b9a80f5ea0189d3ec88ea3e13620ab7da) Thanks [@agungksidik](https://github.com/agungksidik)! - Let the scorecard results table scroll sideways on a phone instead of being cut off.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`60ed959`](https://github.com/open-okr/open-okr/commit/60ed9595d842d0c4abf7950ab153fca199f1d8bc) Thanks [@agungksidik](https://github.com/agungksidik)! - A language chosen on the sign-in page now becomes the member's language when the sign-in succeeds, and the whole app opens in it. Changing the language inside the app keeps the sign-in page in step.
+
+- [#224](https://github.com/open-okr/open-okr/pull/224) [`9910527`](https://github.com/open-okr/open-okr/commit/991052751255ceda8aa8ca99da982dfea396e1b8) Thanks [@agungksidik](https://github.com/agungksidik)! - The sign-in page reads top to bottom: email, password, forgot password, sign in, passkey. Create account and the language select share the last row, and choosing a language applies it at once.
+
+- [#223](https://github.com/open-okr/open-okr/pull/223) [`314188f`](https://github.com/open-okr/open-okr/commit/314188f20c7083ea0a2b5b6879c17cc3f61657fa) Thanks [@agungksidik](https://github.com/agungksidik)! - A guest who can see no KPI in a space now reads "No KPIs here that you can see." on the space home.
+- Updated dependencies [[`bae909c`](https://github.com/open-okr/open-okr/commit/bae909cf0374d94f2b1ca77724b8e02aff64bc60), `53cea96`, [`a9a048e`](https://github.com/open-okr/open-okr/commit/a9a048ea2ab6f7548a44d9376f18baaa4338fba3), [`6352556`](https://github.com/open-okr/open-okr/commit/63525564572542f699c86b1f3afdcdbf2b3e5a80), [`fdf0695`](https://github.com/open-okr/open-okr/commit/fdf069573c55c0f070aa00649125fecc347fe184), [`00423dc`](https://github.com/open-okr/open-okr/commit/00423dc550b3c7d033813228d477df5dd929c789), [`5557516`](https://github.com/open-okr/open-okr/commit/5557516aee0ac8cb18e96600cdbb80ac8cc359d5), [`e7b8026`](https://github.com/open-okr/open-okr/commit/e7b80262f46e6f5010b2ba53fcd9c6a528ed7a0d), [`bfa0371`](https://github.com/open-okr/open-okr/commit/bfa0371482005c4fc460a044c5c70fb88d531b17), [`c9016fd`](https://github.com/open-okr/open-okr/commit/c9016fd3d9aac70a33856ca76967e711f315d769), [`78084c7`](https://github.com/open-okr/open-okr/commit/78084c792ad6a1b6a8702945cf958a017fd142a2), [`43e2bfe`](https://github.com/open-okr/open-okr/commit/43e2bfe2d579f4f8ef64983a672cf9ca3d0462e4), [`e6b38cb`](https://github.com/open-okr/open-okr/commit/e6b38cbc07f99f238d25c8470180c4b3067af100), [`afcc3ac`](https://github.com/open-okr/open-okr/commit/afcc3acf134bbe3a782c9fbd3369c74e41090c02), [`6f96b4b`](https://github.com/open-okr/open-okr/commit/6f96b4b815c0cce015e415f6ac7da0018958f325)]:
+  - @openokr/ui@0.10.0
+  - @openokr/core@0.10.0
+  - @openokr/method@0.10.0
+  - @openokr/formats@0.10.0
+  - @openokr/agents@0.10.0
+  - @openokr/adapters@0.10.0
+  - @openokr/config@0.10.0
+
+### Known issues
+
+Found during the 0.10.0 release checks and left for a later release (`docs/audits/release-0.10.0-checks.md`):
+
+- Some method text is still English in every language: root causes, the management retro questions, what each close decision means, phase guidance, trigger text in the email digest and trigger names in rule previews.
+- Run-log messages stored as text stay as they were stored.
+- The 31 most frequent server refusals are translated. Less common ones still show in English, and about 46 screens still show a server message as written.
+- The translations added late in this release (method texts and refusals) were written without a native-speaker review.
+- The screen-reader run for this release was an automated accessibility-tree check, not a person listening with VoiceOver or NVDA.
+- The FlowyTeam importer folds several values of a count KPI in one period into the number of values. No tested data had such a case; confirm it before relying on it.
+
 ## 0.9.1
 
 ### Patch Changes

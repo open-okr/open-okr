@@ -1174,6 +1174,66 @@ for (const rule of TRIGGER_CATALOGUE) {
 for (const line of COACH_LINES) {
   compareMessage(englishServer, `method.coach.${line.ruleKey}`, coachSentence(line));
 }
+// The method's other words a screen shows (languages.md §13, D5b): phases,
+// phase outputs, gates, agenda stages, process-health statements, and when a
+// trigger fires and who hears it. Checked both ways: every package entry has
+// its key with the same English, and no key under these prefixes names an
+// entry the package does not have.
+const methodTexts = new Map<string, string>();
+for (const entry of PHASE_GUIDANCE) {
+  methodTexts.set(`method.phase.${entry.phase}.title`, entry.title);
+  methodTexts.set(`method.phase.${entry.phase}.output`, entry.output);
+}
+GATE_TITLES.forEach((title, index) => {
+  methodTexts.set(`method.gate.${index + 1}.title`, title);
+});
+for (const step of WEEKLY_STEPS) {
+  methodTexts.set(`method.weeklyStep.${step.step}.title`, step.title);
+  methodTexts.set(`method.weeklyStep.${step.step}.purpose`, step.purpose);
+}
+for (const stage of REVIEW_STAGES) {
+  methodTexts.set(`method.reviewStage.${stage.stage}.title`, stage.title);
+  methodTexts.set(`method.reviewStage.${stage.stage}.purpose`, stage.purpose);
+}
+PROCESS_HEALTH_STATEMENTS.forEach((statement, index) => {
+  methodTexts.set(`method.processHealth.${index + 1}`, statement);
+});
+for (const rule of TRIGGER_CATALOGUE) {
+  methodTexts.set(`method.trigger.${rule.key}.fires`, rule.fires);
+  methodTexts.set(`method.trigger.${rule.key}.recipient`, rule.recipient);
+}
+const METHOD_TEXT_PREFIXES = [
+  "method.phase.",
+  "method.gate.",
+  "method.weeklyStep.",
+  "method.reviewStage.",
+  "method.processHealth.",
+  "method.trigger.",
+];
+for (const [key, text] of methodTexts) {
+  compareMessage(englishUI, key, text);
+}
+// The minutes document is rendered from the server catalogue, which holds the
+// statements only.
+PROCESS_HEALTH_STATEMENTS.forEach((statement, index) => {
+  compareMessage(englishServer, `method.processHealth.${index + 1}`, statement);
+});
+for (const [name, catalogue] of [
+  ["packages/ui", englishUI],
+  ["packages/core", englishServer],
+] as const) {
+  for (const key of Object.keys(catalogue)) {
+    if (
+      METHOD_TEXT_PREFIXES.some((prefix) => key.startsWith(prefix)) &&
+      !methodTexts.has(key)
+    ) {
+      fail(
+        "method message",
+        `${key} in ${name} names nothing in packages/method; remove it or add the entry to the package`,
+      );
+    }
+  }
+}
 compareMessage(englishUI, "method.coach.quality.committed_floor", COMMITTED_FLOOR_TEXT);
 compareMessage(englishUI, "method.wordChecksSkipped", WORD_CHECKS_SKIPPED_NOTICE);
 if (!method.includes(`"${WORD_CHECKS_SKIPPED_NOTICE}"`)) {

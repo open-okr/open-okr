@@ -35,6 +35,10 @@ import {
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
+import {
+  reviewStagePurpose,
+  reviewStageTitle,
+} from "../../../lib/method-texts.ts";
 import { addMinuteAction, setStageNoteAction } from "./actions";
 
 /** Catalogue keys, so the words are the reader's language. */
@@ -54,7 +58,7 @@ function clock(seconds: number): string {
 
 export function QuarterlyReview({
   sessionId,
-  stages,
+  stages: methodStages,
   stageHasPanel,
   stageKeys,
   currentStageKey,
@@ -94,6 +98,13 @@ export function QuarterlyReview({
   readonly completion: Readonly<Record<string, boolean | null>>;
 }) {
   const { t } = useTranslations();
+  // The method's words in the reader's language (A-7, D5b); the minutes and
+  // the order stay the package's.
+  const stages = methodStages.map((stage) => ({
+    ...stage,
+    title: reviewStageTitle(t, stage.stage),
+    purpose: reviewStagePurpose(t, stage.stage),
+  }));
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();

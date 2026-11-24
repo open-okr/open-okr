@@ -50,6 +50,11 @@ import {
   nameOf,
   SESSION_KIND_NAME_KEYS,
 } from "../../../lib/identifier-names.ts";
+import {
+  reviewStageTitle,
+  weeklyStepPurpose,
+  weeklyStepTitle,
+} from "../../../lib/method-texts.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { shortLinkPath } from "../../../lib/short-links.ts";
@@ -784,11 +789,11 @@ export default async function SessionPage({ params }: SessionPageProps) {
             sessionRow.kind === "weekly"
               ? WEEKLY_STEPS.map((step: WeeklyStep, index: number) => ({
                   key: WEEKLY_STAGE_KEYS[index] ?? "",
-                  title: step.title,
+                  title: weeklyStepTitle(t, step.step),
                 }))
               : reviewAgenda.map((stage) => ({
                   key: REVIEW_STAGE_KEYS[stage.stage - 1] ?? "",
-                  title: stage.title,
+                  title: reviewStageTitle(t, stage.stage),
                 }))
           }
         />
@@ -880,9 +885,11 @@ export default async function SessionPage({ params }: SessionPageProps) {
                     </span>
                     <div>
                       <p className="text-sm font-medium text-ink">
-                        {step.title}
+                        {weeklyStepTitle(t, step.step)}
                       </p>
-                      <p className="text-xs text-ink-2">{step.purpose}</p>
+                      <p className="text-xs text-ink-2">
+                        {weeklyStepPurpose(t, step.step)}
+                      </p>
                     </div>
                   </li>
                 );

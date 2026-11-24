@@ -11,6 +11,8 @@
 
 import { callAction, OperationError } from "@openokr/core";
 import { getPool } from "./pool";
+import { operationMessage } from "./refusal";
+import { getTranslations } from "./translations";
 import type { WatchState } from "./watch-control.tsx";
 import { requireWorkspace } from "./workspace";
 
@@ -35,7 +37,7 @@ export async function setWatching(input: {
     return state;
   } catch (error) {
     if (error instanceof OperationError) {
-      return { error: error.message };
+      return { error: operationMessage(error, (await getTranslations()).t) };
     }
     throw error;
   }

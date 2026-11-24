@@ -6,6 +6,7 @@ import { useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { methodDocumentUrl } from "./app-version";
+import { triggerFires, triggerRecipient } from "./method-texts.ts";
 import { methodConditionLabel, methodTitle } from "./method-words.ts";
 
 /** Catalogue keys for what kind of rule it is, one per kind. */
@@ -89,10 +90,18 @@ export function RulePreview({
               </div>
             ) : null}
             {rule.fires ? (
-              <p>{t("rulePreview.fires", { fires: rule.fires })}</p>
+              <p>
+                {t("rulePreview.fires", {
+                  fires: triggerFires(t, rule.key, rule.fires),
+                })}
+              </p>
             ) : null}
             {rule.recipient ? (
-              <p>{t("rulePreview.recipient", { recipient: rule.recipient })}</p>
+              <p>
+                {t("rulePreview.recipient", {
+                  recipient: triggerRecipient(t, rule.key, rule.recipient),
+                })}
+              </p>
             ) : null}
             {anchor ? (
               <a
