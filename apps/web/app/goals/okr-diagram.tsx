@@ -793,7 +793,8 @@ function LiveDiagram({
               // a key the canvas would otherwise listen for.
               deleteKeyCode={null}
               fitView
-              fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+              // A percentage, because React Flow 13 reads a bare number as pixels.
+              fitViewOptions={{ padding: "6.5%", maxZoom: 1 }}
               // Low enough that thirty company objectives side by side still fit,
               // so every card the budget opens with is drawn rather than cut off.
               minZoom={0.05}
