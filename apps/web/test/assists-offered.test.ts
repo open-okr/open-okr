@@ -299,7 +299,8 @@ describe("creating what a person kept from a decomposition", () => {
     expect(created.initiatives).toBe(1);
     expect(created.tasks).toBe(1);
     expect(created.refused).toEqual([
-      'goals.detail.decompose.refused {"title":"Refused","reason":"No such space."}',
+      // The refusal reason is said in the reader's language (error map).
+      'goals.detail.decompose.refused {"title":"Refused","reason":"error.noSuchSpace"}',
     ]);
     // An empty description is no description, not an empty document.
     expect(callAction.mock.calls[2]?.[2]).not.toHaveProperty("description");

@@ -3,6 +3,7 @@
 import { loadEnv } from "@openokr/config";
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { getPool } from "../../../lib/pool";
 import { refusedByField } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
@@ -83,7 +84,7 @@ async function refused(
   return {
     error:
       error instanceof Error
-        ? error.message
+        ? translateErrorMessage(error.message, t)
         : t("admin.agents.proposalQueue.somethingWentWrong"),
   };
 }

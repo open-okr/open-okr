@@ -43,6 +43,7 @@ import {
 } from "@openokr/core";
 import {
   type AgentRun,
+  type AgentRunLogCode,
   type AgentRunLogEntry,
   activeOnly,
   agentRuns,
@@ -216,9 +217,26 @@ interface Halt {
   readonly status: "cancelled" | "failed";
   readonly kind: AgentRunLogEntry["kind"];
   readonly reason: HaltReason;
-  readonly message: string;
+  readonly line: LogLine;
   readonly error?: string;
 }
+
+/**
+ * One log line as it is stored: the English sentence, and the code and values
+ * the screen renders in the reader's language
+ * (docs/design/agent-run-log-language.md §3).
+ */
+interface LogLine {
+  readonly message: string;
+  readonly code: AgentRunLogCode;
+  readonly values?: Readonly<Record<string, string | number>>;
+}
+
+const line = (
+  code: AgentRunLogCode,
+  message: string,
+  values?: Readonly<Record<string, string | number>>,
+): LogLine => (values ? { message, code, values } : { message, code });
 
 /**
  * Processes exactly one task from a `running` run: the stop checks, the
@@ -313,7 +331,7 @@ export async function processNextTask(
             at: now.toISOString(),
             taskIndex: run.currentTaskIndex,
             kind: stop.kind,
-            message: stop.message,
+            ...stop.line,
           };
           const log = [...run.log, logEntry];
           await tx
@@ -379,7 +397,7 @@ export async function processNextTask(
             status: "cancelled",
             kind: "denied",
             reason: "agent_disabled",
-            message: "Stopped: this agent was turned off.",
+            line: line("agentDisabled", "Stopped: this agent was turned off."),
           });
         }
 
@@ -391,7 +409,9 @@ export async function processNextTask(
             status: "cancelled",
             kind: "denied",
             reason: "ai_unavailable",
-            message: `Stopped: ${refusal}`,
+            line: line("aiUnavailable", `Stopped: ${refusal}`, {
+              reason: refusal,
+            }),
           });
         }
 
@@ -404,7 +424,11 @@ export async function processNextTask(
             status: "cancelled",
             kind: "denied",
             reason: "cost_cap",
-            message: `Stopped: the cost cap for one run is ${capUsd} US dollars and this run has spent ${spentUsd}.`,
+            line: line(
+              "costCap",
+              `Stopped: the cost cap for one run is ${capUsd} US dollars and this run has spent ${spentUsd}.`,
+              { cap: capUsd, spent: spentUsd },
+            ),
           });
         }
 
@@ -416,7 +440,9 @@ export async function processNextTask(
             status: "failed",
             kind: "error",
             reason: "budget",
-            message: `Halted: ${workspaceCap.reason}`,
+            line: line("workspaceBudget", `Halted: ${workspaceCap.reason}`, {
+              reason: workspaceCap.reason ?? "",
+            }),
             ...(workspaceCap.reason ? { error: workspaceCap.reason } : {}),
           });
         }
@@ -429,7 +455,9 @@ export async function processNextTask(
             status: "failed",
             kind: "error",
             reason: "budget",
-            message: `Halted: ${agentCap.reason}`,
+            line: line("agentBudget", `Halted: ${agentCap.reason}`, {
+              reason: agentCap.reason ?? "",
+            }),
             ...(agentCap.reason ? { error: agentCap.reason } : {}),
           });
         }
@@ -438,7 +466,7 @@ export async function processNextTask(
         const taskIndex = run.currentTaskIndex;
         const definition = task ? getAction(task.action) : undefined;
         let kind: AgentRunLogEntry["kind"];
-        let message: string;
+        let entry: LogLine;
 
         /**
          * Calls the task's action as the agent, through the same `can()` a
@@ -453,8 +481,8 @@ export async function processNextTask(
         const asAgent = async (
           action: string,
           taskInput: Record<string, unknown>,
-          done: string,
-        ): Promise<[AgentRunLogEntry["kind"], string]> => {
+          done: LogLine,
+        ): Promise<[AgentRunLogEntry["kind"], LogLine]> => {
           try {
             await callAction(
               {
@@ -467,25 +495,41 @@ export async function processNextTask(
             );
             return ["applied", done];
           } catch (error) {
-            return ["error", `"${action}" failed: ${(error as Error).message}`];
+            const why = (error as Error).message;
+            return [
+              "error",
+              line("failed", `"${action}" failed: ${why}`, {
+                action,
+                error: why,
+              }),
+            ];
           }
         };
 
         if (!task) {
           kind = "error";
-          message = "No task at the current index.";
+          entry = line("noTask", "No task at the current index.");
         } else if (!definition) {
           // `agents.startRun` refuses an action the registry does not have,
           // so this is a run written before that check, or an action removed
           // since. Logged rather than proposed: a proposal nobody could ever
           // apply is noise in the one queue a person has to read.
           kind = "error";
-          message = `No action is called "${task.action}".`;
+          entry = line(
+            "unknownAction",
+            `No action is called "${task.action}".`,
+            {
+              action: task.action,
+            },
+          );
         } else if (
           await isDeniedByBindings(tx, workspaceId, agent.memberId, task)
         ) {
           kind = "denied";
-          message = `Denied "${task.action}": ${DENIED_MESSAGE}`;
+          entry = line("denied", `Denied "${task.action}": ${DENIED_MESSAGE}`, {
+            action: task.action,
+            why: DENIED_MESSAGE,
+          });
         } else if (definition.safety === "read") {
           // **A read is not a write, so no write policy applies to it**
           // (M-11). "Propose turns every write into a proposal" (AI-NATIVE-PLAN
@@ -495,14 +539,18 @@ export async function processNextTask(
           // own bindings are what limit what it can see. Most reads still
           // resolve their caller by user id and refuse an agent outright,
           // which fails closed: such a task is logged as an error.
-          [kind, message] = await asAgent(
+          [kind, entry] = await asAgent(
             task.action,
             task.input,
-            `Read "${task.action}".`,
+            line("read", `Read "${task.action}".`, { action: task.action }),
           );
         } else if (agent.autonomy === "sandbox") {
           kind = "simulated";
-          message = `Simulated "${task.action}" — sandbox mode commits nothing.`;
+          entry = line(
+            "simulated",
+            `Simulated "${task.action}" — sandbox mode commits nothing.`,
+            { action: task.action },
+          );
         } else if (agent.autonomy === "propose") {
           // openokr:allow-mutation: this is the operation's own execute, on
           // the transaction runOperation opened. The proposal is the actual
@@ -517,15 +565,19 @@ export async function processNextTask(
             subjectId: task.subjectId ?? null,
           });
           kind = "proposed";
-          message = `Proposed "${task.action}" for review.`;
+          entry = line("proposed", `Proposed "${task.action}" for review.`, {
+            action: task.action,
+          });
         } else {
           // `scoped_direct`, the per-agent opt-in an administrator sets with
           // `agents.setAutonomy`. Still inside the agent's bindings, and
           // still fully audited as the agent.
-          [kind, message] = await asAgent(
+          [kind, entry] = await asAgent(
             task.action,
             task.input,
-            `Applied "${task.action}".`,
+            line("applied", `Applied "${task.action}".`, {
+              action: task.action,
+            }),
           );
         }
 
@@ -533,7 +585,7 @@ export async function processNextTask(
           at: now.toISOString(),
           taskIndex,
           kind,
-          message,
+          ...entry,
         };
         const log = [...run.log, logEntry];
         const nextIndex = taskIndex + 1;

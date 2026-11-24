@@ -4,7 +4,10 @@ import { OperationError } from "@openokr/core";
 import { translate } from "@openokr/ui";
 import { CATALOGUES } from "@openokr/ui/catalogues";
 import { describe, expect, it } from "vitest";
-import { ERROR_MESSAGE_KEYS } from "../lib/error-messages.ts";
+import {
+  ERROR_MESSAGE_KEYS,
+  translateErrorMessage,
+} from "../lib/error-messages.ts";
 import { operationMessage, refusalOf } from "../lib/refusal.ts";
 
 const tIn = (locale: keyof typeof CATALOGUES) => (key: string) =>
@@ -27,6 +30,18 @@ describe("operationMessage", () => {
     const error = new OperationError("not_found", "No such goal.");
     expect(operationMessage(error, undefined)).toBe("No such goal.");
     expect(refusalOf(error)).toBe("No such goal.");
+  });
+
+  it("translates a plain Error's sentence by exact match", () => {
+    expect(
+      translateErrorMessage("This goal is already closed.", tIn("de")),
+    ).toBe("Dieses Ziel ist bereits abgeschlossen.");
+    expect(translateErrorMessage("12 seats are in use.", tIn("de"))).toBe(
+      "12 seats are in use.",
+    );
+    expect(translateErrorMessage("No such goal.", undefined)).toBe(
+      "No such goal.",
+    );
   });
 
   it("has an English catalogue value equal to each listed sentence", () => {

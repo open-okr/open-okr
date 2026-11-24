@@ -125,6 +125,7 @@ async function dailyDigestDraft(
     memberId: input.memberId,
     since: last?.sentAt ?? new Date(input.now.getTime() - 7 * 86_400_000),
     baseUrl: input.baseUrl,
+    locale: recipientMail.locale,
   });
   if (contents.items.length === 0 && held.items.length === 0) {
     return null;

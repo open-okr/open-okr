@@ -1,11 +1,19 @@
-import { PROCESS_HEALTH_STATEMENTS } from "@openokr/method";
 import {
+  MANAGEMENT_RETRO_QUESTIONS,
+  PROCESS_HEALTH_STATEMENTS,
+  ROOT_CAUSES,
+} from "@openokr/method";
+import {
+  CLOSE_DECISION_KEYS,
   GATE_TITLE_KEYS,
+  MANAGEMENT_RETRO_KEYS,
+  PHASE_GUIDANCE_KEYS,
   PHASE_OUTPUT_KEYS,
   PHASE_TITLE_KEYS,
   PROCESS_HEALTH_KEYS,
   REVIEW_STAGE_PURPOSE_KEYS,
   REVIEW_STAGE_TITLE_KEYS,
+  ROOT_CAUSE_KEYS,
   TRIGGER_FIRES_KEYS,
   TRIGGER_RECIPIENT_KEYS,
   WEEKLY_STEP_PURPOSE_KEYS,
@@ -109,4 +117,61 @@ export function triggerRecipient(
   fallback: string,
 ): string {
   return from(t, TRIGGER_RECIPIENT_KEYS, ruleKey, fallback);
+}
+
+/**
+ * A phase's §9 guidance, sentence by sentence. `fallback` is the package's
+ * English, used whole when the map does not know the phase.
+ */
+export function phaseGuidance(
+  t: Translate,
+  phase: number,
+  fallback: readonly string[],
+): readonly string[] {
+  const keys = PHASE_GUIDANCE_KEYS[phase];
+  return keys === undefined || keys.length !== fallback.length
+    ? fallback
+    : keys.map((key) => t(key));
+}
+
+/** Root cause 1 to 9 (§8.4). `fallback` is the package's English. */
+export function rootCause(
+  t: Translate,
+  causeKey: number,
+  fallback: string,
+): string {
+  return from(t, ROOT_CAUSE_KEYS, causeKey, fallback);
+}
+
+/** A cause that arrives as English text only, as the minutes carry it. */
+export function rootCauseText(t: Translate, cause: string): string {
+  const index = ROOT_CAUSES.indexOf(cause);
+  return index < 0 ? cause : rootCause(t, index + 1, cause);
+}
+
+/** Management retro question 1 to 4 (§8.7). */
+export function managementRetroQuestion(
+  t: Translate,
+  questionKey: number,
+  fallback: string,
+): string {
+  return from(t, MANAGEMENT_RETRO_KEYS, questionKey, fallback);
+}
+
+/** A question that arrives as English text only, as the minutes carry it. */
+export function managementRetroQuestionText(
+  t: Translate,
+  question: string,
+): string {
+  const index = MANAGEMENT_RETRO_QUESTIONS.indexOf(question);
+  return index < 0 ? question : managementRetroQuestion(t, index + 1, question);
+}
+
+/** What a close decision means (§8.8), by its stored word. */
+export function closeDecisionMeaning(
+  t: Translate,
+  decision: string,
+  fallback: string,
+): string {
+  return from(t, CLOSE_DECISION_KEYS, decision, fallback);
 }

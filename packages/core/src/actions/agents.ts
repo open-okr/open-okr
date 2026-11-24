@@ -21,6 +21,7 @@
 import {
   AGENT_AUTONOMIES,
   AGENT_KINDS,
+  AGENT_RUN_LOG_CODES,
   AGENT_SCHEDULES,
   type AgentRunLogEntry,
   type AgentTask,
@@ -424,6 +425,21 @@ export const bindAgentScope = defineWriteAction({
   }),
 });
 
+/**
+ * One line of a run's log as stored (docs/design/agent-run-log-language.md).
+ * `message` is the English sentence; `code` and `values` are what a screen
+ * renders in the reader's language, absent on lines written before 0.10.1
+ * and on the Coach's and the Champion's own lines.
+ */
+const logEntryOutput = z.object({
+  at: z.string(),
+  taskIndex: z.number().int(),
+  kind: z.string(),
+  message: z.string(),
+  code: z.enum(AGENT_RUN_LOG_CODES).optional(),
+  values: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+});
+
 const runOutput = z.object({
   id: z.uuid(),
   agentId: z.uuid(),
@@ -433,10 +449,8 @@ const runOutput = z.object({
   taskCount: z.number().int(),
   log: z.array(
     z.object({
-      at: z.string(),
-      taskIndex: z.number().int(),
+      ...logEntryOutput.shape,
       kind: z.enum(["denied", "simulated", "proposed", "applied", "error"]),
-      message: z.string(),
     }),
   ),
   cost: z.number(),
@@ -1403,14 +1417,7 @@ export const listAgentRuns = defineReadAction({
        */
       currentTaskIndex: z.number().int(),
       taskCount: z.number().int(),
-      log: z.array(
-        z.object({
-          at: z.string(),
-          taskIndex: z.number().int(),
-          kind: z.string(),
-          message: z.string(),
-        }),
-      ),
+      log: z.array(logEntryOutput),
       cost: z.number(),
       error: z.string().nullable(),
       startedAt: z.string().nullable(),

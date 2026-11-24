@@ -31,6 +31,7 @@ import type {
 import { hostOf } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { testWorkspaceKey } from "../../../lib/ai-key-test";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { getPool } from "../../../lib/pool";
 import { refusedByField } from "../../../lib/refusal";
 import { getKeyRing } from "../../../lib/secrets";
@@ -84,7 +85,7 @@ async function refused(
     ok: false,
     message:
       error instanceof Error
-        ? error.message
+        ? translateErrorMessage(error.message, t)
         : t("admin.agents.proposalQueue.somethingWentWrong"),
   };
 }

@@ -150,6 +150,13 @@ describe("sandbox mode", () => {
     expect(result.finished).toBe(true);
     expect(result.status).toBe("completed");
     expect(result.logEntry.kind).toBe("simulated");
+    // The line is a code the screen translates, beside the English sentence
+    // the audit trail and API clients keep reading (agent-run-log-language §3).
+    expect(result.logEntry.code).toBe("simulated");
+    expect(result.logEntry.values).toEqual({ action: "spaces.update" });
+    expect(result.logEntry.message).toBe(
+      'Simulated "spaces.update" \u2014 sandbox mode commits nothing.',
+    );
     expect(await spaceName()).toBe(originalName);
 
     const proposals = await wb.admin.query(
@@ -176,6 +183,11 @@ describe("propose mode", () => {
       RUN_OPTIONS,
     );
     expect(result.logEntry.kind).toBe("proposed");
+    expect(result.logEntry.code).toBe("proposed");
+    expect(result.logEntry.values).toEqual({ action: "spaces.update" });
+    expect(result.logEntry.message).toBe(
+      'Proposed "spaces.update" for review.',
+    );
     expect(await spaceName()).toBe(originalName);
 
     const proposals = await callAction(ownerContext(), "proposals.list", {
@@ -216,6 +228,9 @@ describe("scoped_direct mode", () => {
       RUN_OPTIONS,
     );
     expect(result.logEntry.kind).toBe("applied");
+    expect(result.logEntry.code).toBe("applied");
+    expect(result.logEntry.values).toEqual({ action: "spaces.update" });
+    expect(result.logEntry.message).toBe('Applied "spaces.update".');
     expect(await spaceName()).toBe("Direct name");
 
     const audit = await wb.admin.query(
@@ -242,6 +257,12 @@ describe("scoped_direct mode", () => {
       RUN_OPTIONS,
     );
     expect(result.logEntry.kind).toBe("error");
+    expect(result.logEntry.code).toBe("failed");
+    // `error` is the refusal's own sentence, which the screen looks up in the
+    // same map it uses for every other refusal.
+    const error = String(result.logEntry.values?.error);
+    expect(result.logEntry.values?.action).toBe("spaces.update");
+    expect(result.logEntry.message).toBe(`"spaces.update" failed: ${error}`);
     expect(result.finished).toBe(true);
   });
 });
@@ -264,6 +285,14 @@ describe("bindings", () => {
       RUN_OPTIONS,
     );
     expect(result.logEntry.kind).toBe("denied");
+    expect(result.logEntry.code).toBe("denied");
+    expect(result.logEntry.values).toEqual({
+      action: "spaces.update",
+      why: "No such resource, or this agent has no access to it.",
+    });
+    expect(result.logEntry.message).toBe(
+      'Denied "spaces.update": No such resource, or this agent has no access to it.',
+    );
     expect(await spaceName()).toBe(originalName);
   });
 });
@@ -331,6 +360,10 @@ describe("the cost cap", () => {
     expect(halted.status).toBe("failed");
     expect(halted.logEntry.kind).toBe("error");
     expect(halted.logEntry.message).toMatch(/halted/i);
+    expect(halted.logEntry.code).toBe("workspaceBudget");
+    expect(halted.logEntry.message).toBe(
+      `Halted: ${String(halted.logEntry.values?.reason)}`,
+    );
 
     // The second task never ran, and the first one's work stands: a halt is
     // not a rollback of what was already done under budget.

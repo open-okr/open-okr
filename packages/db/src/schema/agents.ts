@@ -95,11 +95,40 @@ export interface AgentTask {
   readonly subjectId?: string;
 }
 
+/**
+ * What a run's log line says, as a code the screen renders in the reader's
+ * language (`agents.runLog.<code>`, docs/design/agent-run-log-language.md).
+ */
+export const AGENT_RUN_LOG_CODES = [
+  "agentDisabled",
+  "aiUnavailable",
+  "costCap",
+  "workspaceBudget",
+  "agentBudget",
+  "noTask",
+  "unknownAction",
+  "denied",
+  "simulated",
+  "proposed",
+  "read",
+  "applied",
+  "failed",
+] as const;
+export type AgentRunLogCode = (typeof AGENT_RUN_LOG_CODES)[number];
+
 export interface AgentRunLogEntry {
   readonly at: string;
   readonly taskIndex: number;
   readonly kind: "denied" | "simulated" | "proposed" | "applied" | "error";
+  /** English, always written: the audit trail and API clients read it. */
   readonly message: string;
+  /**
+   * Absent on entries written before 0.10.1, and on the Coach's and the
+   * Champion's own lines; a reader then shows `message`. Additive inside
+   * `jsonb`, so no migration and a previous release ignores both.
+   */
+  readonly code?: AgentRunLogCode;
+  readonly values?: Readonly<Record<string, string | number>>;
 }
 
 export const agentRuns = pgTable("agent_runs", {

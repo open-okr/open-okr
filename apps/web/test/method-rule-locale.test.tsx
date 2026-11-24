@@ -1,9 +1,12 @@
 import {
+  CLOSE_DECISION_MEANINGS,
   GATE_TITLES,
+  MANAGEMENT_RETRO_QUESTIONS,
   OBJECTIVE_CHECKS,
   PHASE_GUIDANCE,
   PROCESS_HEALTH_STATEMENTS,
   REVIEW_STAGES,
+  ROOT_CAUSES,
   TRIGGER_CATALOGUE,
   WEEKLY_STEPS,
 } from "@openokr/method";
@@ -11,14 +14,21 @@ import { translate } from "@openokr/ui";
 import { CATALOGUES } from "@openokr/ui/catalogues";
 import { renderToReadableStream } from "react-dom/server";
 import { expect, it, vi } from "vitest";
+import { TRIGGER_NAME_KEYS } from "../lib/identifier-names.ts";
 import {
+  closeDecisionMeaning,
   gateTitle,
+  managementRetroQuestion,
+  managementRetroQuestionText,
+  phaseGuidance,
   phaseOutput,
   phaseTitle,
   processHealthStatement,
   processHealthStatementText,
   reviewStagePurpose,
   reviewStageTitle,
+  rootCause,
+  rootCauseText,
   triggerFires,
   triggerRecipient,
   weeklyStepPurpose,
@@ -103,4 +113,52 @@ it("shows the Malay phase, gate, stage, statement and trigger words", () => {
   );
   expect(triggerRecipient(t, "checkin.due", "Owner")).toBe("Pemilik");
   expect(triggerFires(t, "no.such.rule", "As written")).toBe("As written");
+});
+
+it("keys every root cause, retro question, close meaning, guidance line and trigger name", () => {
+  // 0.10.1: what D5b left English, held to the package the same way.
+  const en = (key: string) => translate(CATALOGUES.en, key);
+  ROOT_CAUSES.forEach((cause, index) => {
+    expect(rootCause(en, index + 1, "")).toBe(cause);
+  });
+  MANAGEMENT_RETRO_QUESTIONS.forEach((question, index) => {
+    expect(managementRetroQuestion(en, index + 1, "")).toBe(question);
+  });
+  for (const [decision, meaning] of Object.entries(CLOSE_DECISION_MEANINGS)) {
+    expect(closeDecisionMeaning(en, decision, "")).toBe(meaning);
+  }
+  for (const entry of PHASE_GUIDANCE) {
+    expect(
+      phaseGuidance(
+        en,
+        entry.phase,
+        entry.guidance.map(() => ""),
+      ),
+    ).toEqual(entry.guidance);
+  }
+  for (const rule of TRIGGER_CATALOGUE) {
+    const key = TRIGGER_NAME_KEYS[rule.key];
+    expect(key && en(key)).toBe(rule.title);
+  }
+});
+
+it("shows the Malay root causes, retro questions, close meanings and guidance", () => {
+  expect(rootCause(t, 3, "Blocked by a dependency")).toBe(
+    "Disekat oleh kebergantungan",
+  );
+  expect(rootCauseText(t, ROOT_CAUSES[0] ?? "")).toBe(
+    "Cita-cita ditetapkan terlalu tinggi",
+  );
+  expect(rootCauseText(t, "Not a cause")).toBe("Not a cause");
+  expect(
+    managementRetroQuestionText(t, MANAGEMENT_RETRO_QUESTIONS[3] ?? ""),
+  ).toBe("Di manakah penjajaran terputus?");
+  expect(closeDecisionMeaning(t, "achieved", "Done. Close it")).toBe(
+    "Selesai. Tutupnya",
+  );
+  expect(closeDecisionMeaning(t, "unknown", "As written")).toBe("As written");
+  expect(phaseGuidance(t, 2, ["", "", ""])[0]).toBe(
+    "Pastikan pemarkahan berasaskan fakta",
+  );
+  expect(phaseGuidance(t, 99, ["As written"])).toEqual(["As written"]);
 });

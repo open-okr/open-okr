@@ -1,5 +1,6 @@
 import { guidanceForPhase, HORIZONS } from "@openokr/method";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
+import { phaseGuidance, phaseOutput } from "../../lib/method-texts.ts";
 import { getTranslations } from "../../lib/translations";
 
 /**
@@ -39,7 +40,7 @@ export async function GuidanceRail({
                 {t("cycle.guidanceRail.keyOutput")}
               </h3>
               <p className="border-brand-line border-s-2 ps-2.5 text-sm text-ink italic">
-                {guidance.output}
+                {phaseOutput(t, phase) || guidance.output}
               </p>
             </section>
             <section className="flex flex-col gap-1.5">
@@ -47,7 +48,7 @@ export async function GuidanceRail({
                 {t("cycle.guidanceRail.watchFor")}
               </h3>
               <ul className="flex list-disc flex-col gap-1.5 ps-4 text-sm text-ink-2">
-                {guidance.guidance.map((line) => (
+                {phaseGuidance(t, phase, guidance.guidance).map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>

@@ -29,6 +29,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { peopleOptions } from "../../../lib/entity-options.ts";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { processHealthStatement } from "../../../lib/method-texts.ts";
 import { addActionAction, submitProcessHealthAction } from "./actions";
 
@@ -90,7 +91,7 @@ export function ProcessHealthPanel({
       } catch (error) {
         setProblem(
           error instanceof Error
-            ? error.message
+            ? translateErrorMessage(error.message, t)
             : t("session.detail.thatDidNotSave"),
         );
       }
@@ -268,7 +269,7 @@ export function ProcessHealthPanel({
                       } catch (error) {
                         setProblem(
                           error instanceof Error
-                            ? error.message
+                            ? translateErrorMessage(error.message, t)
                             : t("session.detail.thatDidNotSave"),
                         );
                       }
