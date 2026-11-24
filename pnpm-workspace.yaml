@@ -113,7 +113,7 @@ catalog:
   # D1 approved dagre beside it for the layout, and it is not here: alignment
   # gives every objective one parent, so the tree is laid out in the list's
   # own order without a graph library (okr-layout.ts says why).
-  "@xyflow/react": ^12.12.1
+  "@xyflow/react": ^13.0.2
 
 minimumReleaseAgeExclude:
   - '@next/env@16.3.0'
