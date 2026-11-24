@@ -10,6 +10,7 @@ import { trigger } from "@openokr/method";
 import { and, asc, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { renderActivity } from "../activities/renderers.ts";
+import { serverTranslate } from "../i18n/catalogue.ts";
 import { subjectUrl } from "./links.ts";
 import type { DigestItem } from "./templates.ts";
 import { readerMaySeeSubject } from "./visibility.ts";
@@ -187,9 +188,20 @@ function summaryFor(
     // recipient-facing wording belongs to that document and nowhere else, which
     // is the same reason `draftFor` in nudges/deliver.ts is one line for every
     // rule.
-    return trigger(row.ruleKey)?.fires ?? `Reminder: ${row.ruleKey}`;
+    return firesIn(row.ruleKey, locale) ?? `Reminder: ${row.ruleKey}`;
   }
   return REASON_SUMMARIES[row.reason] ?? "Something happened here.";
+}
+
+/**
+ * When a trigger fires, in the recipient's language (languages.md §13, D5b).
+ * The catalogue key exists only for a rule the package defines, and
+ * `pnpm method:check` holds its English equal to the package's.
+ */
+function firesIn(ruleKey: string, locale?: string): string | undefined {
+  return trigger(ruleKey) === undefined
+    ? undefined
+    : serverTranslate(locale ?? "en", `method.trigger.${ruleKey}.fires`);
 }
 
 /**
@@ -240,6 +252,7 @@ export async function heldByCeilingFor(
     readonly since: Date;
     readonly baseUrl: string;
     readonly limit?: number;
+    readonly locale?: string;
   },
 ): Promise<DigestContents> {
   const limit = input.limit ?? DIGEST_ITEM_LIMIT;
@@ -289,7 +302,7 @@ export async function heldByCeilingFor(
       continue;
     }
     items.push({
-      summary: `${trigger(row.ruleKey)?.fires ?? row.ruleKey} (${row.ruleKey})`,
+      summary: `${firesIn(row.ruleKey, input.locale) ?? row.ruleKey} (${row.ruleKey})`,
       link:
         subjectUrl(input.baseUrl, row.subjectType, row.subjectId) ??
         subjectUrl(input.baseUrl, "workspace", input.workspaceId) ??

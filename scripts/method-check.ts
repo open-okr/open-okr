@@ -1183,6 +1183,21 @@ const methodTexts = new Map<string, string>();
 for (const entry of PHASE_GUIDANCE) {
   methodTexts.set(`method.phase.${entry.phase}.title`, entry.title);
   methodTexts.set(`method.phase.${entry.phase}.output`, entry.output);
+  entry.guidance.forEach((sentence, index) => {
+    methodTexts.set(`method.phase.${entry.phase}.guidance.${index + 1}`, sentence);
+  });
+}
+// 0.10.1: the words D5b left English. Root causes, management retro
+// questions, close-decision meanings and phase guidance on screens; root
+// causes, questions and trigger fires in the minutes and the email digest.
+ROOT_CAUSES.forEach((cause, index) => {
+  methodTexts.set(`method.rootCause.${index + 1}`, cause);
+});
+MANAGEMENT_RETRO_QUESTIONS.forEach((question, index) => {
+  methodTexts.set(`method.managementRetro.${index + 1}`, question);
+});
+for (const [decision, meaning] of Object.entries(CLOSE_DECISION_MEANINGS)) {
+  methodTexts.set(`method.closeDecision.${decision}`, meaning);
 }
 GATE_TITLES.forEach((title, index) => {
   methodTexts.set(`method.gate.${index + 1}.title`, title);
@@ -1209,6 +1224,9 @@ const METHOD_TEXT_PREFIXES = [
   "method.reviewStage.",
   "method.processHealth.",
   "method.trigger.",
+  "method.rootCause.",
+  "method.managementRetro.",
+  "method.closeDecision.",
 ];
 for (const [key, text] of methodTexts) {
   compareMessage(englishUI, key, text);
@@ -1218,6 +1236,17 @@ for (const [key, text] of methodTexts) {
 PROCESS_HEALTH_STATEMENTS.forEach((statement, index) => {
   compareMessage(englishServer, `method.processHealth.${index + 1}`, statement);
 });
+// So do the minutes' root causes and management questions, and the email
+// digest's trigger lines.
+ROOT_CAUSES.forEach((cause, index) => {
+  compareMessage(englishServer, `method.rootCause.${index + 1}`, cause);
+});
+MANAGEMENT_RETRO_QUESTIONS.forEach((question, index) => {
+  compareMessage(englishServer, `method.managementRetro.${index + 1}`, question);
+});
+for (const rule of TRIGGER_CATALOGUE) {
+  compareMessage(englishServer, `method.trigger.${rule.key}.fires`, rule.fires);
+}
 for (const [name, catalogue] of [
   ["packages/ui", englishUI],
   ["packages/core", englishServer],

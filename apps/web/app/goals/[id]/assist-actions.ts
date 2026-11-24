@@ -21,6 +21,7 @@ import { isBlankDocument } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { assistContext } from "../../../lib/assists";
 import { getPool } from "../../../lib/auth";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { DESCRIPTION_MAX_CHARACTERS } from "./decompose-limits.ts";
@@ -122,7 +123,7 @@ export async function createDecomposedWorkAction(input: {
   };
   const reason = (error: unknown) =>
     error instanceof OperationError
-      ? error.message
+      ? translateErrorMessage(error.message, t)
       : t("goals.detail.decompose.somethingWentWrong");
 
   let initiatives = 0;

@@ -24,6 +24,7 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { givePulseAction } from "./actions";
 
 const PULSES = [1, 2, 3, 4, 5] as const;
@@ -77,7 +78,7 @@ export function RoomPulsePanel({
       } catch (error) {
         setProblem(
           error instanceof Error
-            ? error.message
+            ? translateErrorMessage(error.message, t)
             : t("session.detail.thatDidNotSave"),
         );
       }

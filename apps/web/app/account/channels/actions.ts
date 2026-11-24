@@ -2,6 +2,7 @@
 
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { getInstanceName } from "../../../lib/instance-name";
 import { getPool } from "../../../lib/pool";
 import { quietHoursFromForm } from "../../../lib/quiet-hours";
@@ -60,7 +61,7 @@ export async function startLink(
       code: null,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
@@ -82,7 +83,7 @@ export async function unlink(
       code: null,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
@@ -144,7 +145,7 @@ export async function saveDelivery(
       code: null,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("account.apiTokens.actions.thatDidNotWork"),
     };
   }
@@ -207,7 +208,7 @@ export async function saveCadence(
       code: null,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("session.detail.thatDidNotSave"),
     };
   }

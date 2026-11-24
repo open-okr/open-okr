@@ -6,6 +6,7 @@ import { useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { methodDocumentUrl } from "./app-version";
+import { TRIGGER_NAME_KEYS } from "./identifier-names.ts";
 import { triggerFires, triggerRecipient } from "./method-texts.ts";
 import { methodConditionLabel, methodTitle } from "./method-words.ts";
 
@@ -17,6 +18,16 @@ const KIND_LABELS = {
   cycle: "rulePreview.cycle",
   trigger: "rulePreview.trigger",
 } as const;
+
+/** A trigger's title in the reader's language, the package's when unknown. */
+function triggerName(
+  t: (key: string) => string,
+  ruleKey: string,
+  fallback: string,
+): string {
+  const key = TRIGGER_NAME_KEYS[ruleKey];
+  return key === undefined ? fallback : t(key);
+}
 
 /**
  * A link to a rule's own page that previews the rule on hover (UIUX-PLAN §4,
@@ -55,7 +66,7 @@ export function RulePreview({
   const anchor = rule.section ? methodSectionAnchor(rule.section) : null;
   const name =
     rule.kind === "trigger"
-      ? rule.name
+      ? triggerName(t, rule.key, rule.name)
       : `${rule.key} ${methodTitle(t, rule.key, rule.name.slice(rule.key.length + 1))}`;
 
   return (

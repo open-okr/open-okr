@@ -45,6 +45,7 @@ import {
   deliveryReading,
   type ProviderKeyResult,
 } from "../../../lib/dependency-delivery.ts";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import {
   recordDecisionAction,
   setShiftsAction,
@@ -193,7 +194,7 @@ export function MonthlyReview({
         } catch (error) {
           setProblem(
             error instanceof Error
-              ? error.message
+              ? translateErrorMessage(error.message, t)
               : t("session.detail.thatDidNotSave"),
           );
         }

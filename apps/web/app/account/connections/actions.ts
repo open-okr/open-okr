@@ -2,6 +2,7 @@
 
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -43,7 +44,7 @@ export async function revoke(
       ok: false,
       message:
         error instanceof Error
-          ? error.message
+          ? translateErrorMessage(error.message, t)
           : t("account.connections.actions.couldNotBeRevoked"),
     };
   }

@@ -209,3 +209,81 @@ export const TRIGGER_RECIPIENT_KEYS: Readonly<Record<string, string>> = {
   "quality.review_requested":
     "method.trigger.quality.review_requested.recipient",
 };
+
+/** §8.4 root causes, by cause 1 to 9. */
+export const ROOT_CAUSE_KEYS: Readonly<Record<number, string>> = {
+  1: "method.rootCause.1",
+  2: "method.rootCause.2",
+  3: "method.rootCause.3",
+  4: "method.rootCause.4",
+  5: "method.rootCause.5",
+  6: "method.rootCause.6",
+  7: "method.rootCause.7",
+  8: "method.rootCause.8",
+  9: "method.rootCause.9",
+};
+
+/** §8.7 management retro questions, by question 1 to 4. */
+export const MANAGEMENT_RETRO_KEYS: Readonly<Record<number, string>> = {
+  1: "method.managementRetro.1",
+  2: "method.managementRetro.2",
+  3: "method.managementRetro.3",
+  4: "method.managementRetro.4",
+};
+
+/** §8.8 what each close decision means, by decision. */
+export const CLOSE_DECISION_KEYS: Readonly<Record<string, string>> = {
+  achieved: "method.closeDecision.achieved",
+  keep: "method.closeDecision.keep",
+  modify: "method.closeDecision.modify",
+  defer: "method.closeDecision.defer",
+  abandon: "method.closeDecision.abandon",
+};
+
+/** §9 facilitator guidance, by phase 0 to 7, sentence by sentence. */
+export const PHASE_GUIDANCE_KEYS: Readonly<Record<number, readonly string[]>> =
+  {
+    0: [
+      "method.phase.0.guidance.1",
+      "method.phase.0.guidance.2",
+      "method.phase.0.guidance.3",
+    ],
+    1: [
+      "method.phase.1.guidance.1",
+      "method.phase.1.guidance.2",
+      "method.phase.1.guidance.3",
+    ],
+    2: [
+      "method.phase.2.guidance.1",
+      "method.phase.2.guidance.2",
+      "method.phase.2.guidance.3",
+    ],
+    3: [
+      "method.phase.3.guidance.1",
+      "method.phase.3.guidance.2",
+      "method.phase.3.guidance.3",
+      "method.phase.3.guidance.4",
+    ],
+    4: [
+      "method.phase.4.guidance.1",
+      "method.phase.4.guidance.2",
+      "method.phase.4.guidance.3",
+    ],
+    5: [
+      "method.phase.5.guidance.1",
+      "method.phase.5.guidance.2",
+      "method.phase.5.guidance.3",
+    ],
+    6: [
+      "method.phase.6.guidance.1",
+      "method.phase.6.guidance.2",
+      "method.phase.6.guidance.3",
+      "method.phase.6.guidance.4",
+    ],
+    7: [
+      "method.phase.7.guidance.1",
+      "method.phase.7.guidance.2",
+      "method.phase.7.guidance.3",
+      "method.phase.7.guidance.4",
+    ],
+  };

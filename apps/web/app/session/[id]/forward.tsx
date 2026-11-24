@@ -44,6 +44,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { peopleOptions } from "../../../lib/entity-options.ts";
+import { translateErrorMessage } from "../../../lib/error-messages";
 import {
   addActionAction,
   captureLearningAction,
@@ -117,7 +118,7 @@ export function ForwardPanel({
         } catch (error) {
           setProblem(
             error instanceof Error
-              ? error.message
+              ? translateErrorMessage(error.message, t)
               : t("session.detail.thatDidNotSave"),
           );
         }

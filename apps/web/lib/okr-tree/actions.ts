@@ -24,6 +24,7 @@ import {
 import { isBlankDocument } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../auth";
+import { translateErrorMessage } from "../error-messages";
 import { getTranslations } from "../translations";
 import { requireWorkspace } from "../workspace";
 import type {
@@ -442,11 +443,12 @@ export async function runOkrMutation(
     return { ok: true, goal };
   } catch (error) {
     if (error instanceof OperationError) {
+      const { t } = await getTranslations();
       if (error.code === "conflict" && error.details) {
         const details = error.details as Partial<OkrConflict>;
         return {
           ok: false,
-          error: error.message,
+          error: translateErrorMessage(error.message, t),
           conflict: {
             current: details.current ?? {},
             changedBy: details.changedBy ?? null,
@@ -454,7 +456,7 @@ export async function runOkrMutation(
           },
         };
       }
-      return { ok: false, error: error.message };
+      return { ok: false, error: translateErrorMessage(error.message, t) };
     }
     throw error;
   }

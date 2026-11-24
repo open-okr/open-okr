@@ -31,6 +31,8 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { translateErrorMessage } from "../../../lib/error-messages";
+import { managementRetroQuestion } from "../../../lib/method-texts.ts";
 import { setManagementAnswerAction } from "./actions";
 
 interface ManagementQuestion {
@@ -62,6 +64,11 @@ function QuestionRow({
   readonly onProblem: (message: string | null) => void;
 }) {
   const { t } = useTranslations();
+  const asked = managementRetroQuestion(
+    t,
+    question.questionKey,
+    question.question,
+  );
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -82,7 +89,7 @@ function QuestionRow({
       } catch (error) {
         onProblem(
           error instanceof Error
-            ? error.message
+            ? translateErrorMessage(error.message, t)
             : t("session.detail.thatDidNotSave"),
         );
       }
@@ -95,7 +102,7 @@ function QuestionRow({
         <span className="text-xs font-semibold text-ink-3">
           {question.questionKey}
         </span>
-        <span className="flex-1 text-sm text-ink">{question.question}</span>
+        <span className="flex-1 text-sm text-ink">{asked}</span>
         {question.body === null ? (
           <Chip tone="warn">
             {t("session.detail.managementRetro.unanswered")}
@@ -143,7 +150,7 @@ function QuestionRow({
           {/* Rich text since guided-inputs change 11b, up to the server's
               2000 (sessions.setManagementAnswer). */}
           <RichTextEditor
-            label={question.question}
+            label={asked}
             variant="compact"
             content={question.bodyDocument}
             editable={!pending}
