@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "catalog:",
-    "@aws-sdk/client-s3": "^3.1169.0",
-    "@aws-sdk/s3-request-presigner": "^3.1169.0",
+    "@aws-sdk/client-s3": "^3.1175.0",
+    "@aws-sdk/s3-request-presigner": "^3.1175.0",
     "@google/genai": "catalog:",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@openokr/config": "workspace:*",
@@ -28,7 +28,7 @@
     "pg": "catalog:",
     "pg-boss": "catalog:",
     "sharp": "catalog:",
-    "stripe": "23.1.0",
+    "stripe": "23.2.0",
     "ws": "catalog:"
   },
   "devDependencies": {

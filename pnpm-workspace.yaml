@@ -38,14 +38,14 @@ catalog:
   pg-boss: ^12.38.2
   ws: ^8.23.0
   "@types/ws": ^8.18.2
-  better-auth: ^1.7.25
-  "@better-auth/passkey": ^1.7.25
-  "@better-auth/sso": ^1.7.25
+  better-auth: ^1.7.27
+  "@better-auth/passkey": ^1.7.27
+  "@better-auth/sso": ^1.7.27
   samlify: ^2.15.1
   # The SMTP client, approved in P1-T09. MIT-0, and it carries no runtime
   # dependencies of its own. Confined to packages/adapters like every vendor
   # SDK, behind the Mailer port.
-  nodemailer: ^10.5.0
+  nodemailer: ^10.6.1
   "@types/nodemailer": ^8.0.2
   # Image re-encoding and thumbnails (completeness review M-24), approved by
   # the human on 28 September 2026. Apache-2.0, and its prebuilt libvips
@@ -62,9 +62,9 @@ catalog:
   # openrouter, ollama and openai-compatible: all three speak the same
   # OpenAI-shaped chat completions API, just a different base URL and key,
   # so one client covers four of the six real drivers.
-  "@anthropic-ai/sdk": ^1.8.0
-  openai: ^7.57.0
-  "@google/genai": ^3.3.0
+  "@anthropic-ai/sdk": ^1.12.0
+  openai: ^7.62.0
+  "@google/genai": ^3.6.1
   # The design system (P2-T10), approved by the human alongside P2-T11's
   # TipTap. CLAUDE.md's locked stack already names Tailwind, Base UI and
   # SmoothUI on Motion; these are the concrete packages that stack resolves
@@ -78,16 +78,16 @@ catalog:
   postcss: ^8.5.33
   "@base-ui-components/react": 1.0.0-rc.0
   motion: ^14.14.0
-  lucide-react: ^1.73.0
+  lucide-react: ^1.77.0
   clsx: ^2.1.1
-  tailwind-merge: ^3.7.0
+  tailwind-merge: ^3.7.1
   class-variance-authority: ^0.7.1
   # The persisted client cache (P2-T10 item 9), part of the locked stack's
   # "TanStack Query, Table and Virtual" line — its own persistence add-ons,
   # not a new stack decision.
-  "@tanstack/react-query": ^5.107.1
-  "@tanstack/react-query-persist-client": ^5.107.1
-  "@tanstack/query-sync-storage-persister": ^5.107.1
+  "@tanstack/react-query": ^5.108.2
+  "@tanstack/react-query-persist-client": ^5.108.2
+  "@tanstack/query-sync-storage-persister": ^5.108.2
   # Test tooling for P2-T10's own required "keyboard and focus component
   # tests" and accessibility checks (UIUX-PLAN.md §9) — inferred from the
   # human's UI-dependency approval rather than asked separately, because
@@ -100,13 +100,13 @@ catalog:
   # design-system deps. Every @tiptap/* package in v3 peer-pins its
   # siblings to the exact same version string, not a range, so all four
   # pin identically rather than each getting its own `^` range.
-  "@tiptap/core": 3.34.0
-  "@tiptap/pm": 3.34.0
-  "@tiptap/react": 3.34.0
-  "@tiptap/starter-kit": 3.34.0
-  "@tiptap/extension-table": 3.34.0
-  "@tiptap/extension-mention": 3.34.0
-  "@tiptap/suggestion": 3.34.0
+  "@tiptap/core": 3.35.0
+  "@tiptap/pm": 3.35.0
+  "@tiptap/react": 3.35.0
+  "@tiptap/starter-kit": 3.35.0
+  "@tiptap/extension-table": 3.35.0
+  "@tiptap/extension-mention": 3.35.0
+  "@tiptap/suggestion": 3.35.0
   # The OKR diagram (P9-T09a), approved by Akmal on 2 October 2026 as
   # decision D1 of the Phase 9 design gate. MIT, bundled at build time, so an
   # air-gapped install is unaffected; its own dependencies are MIT and ISC.
