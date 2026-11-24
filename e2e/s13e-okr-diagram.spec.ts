@@ -183,6 +183,26 @@ test("the diagram draws the cycle, and an objective aligned to a key result hang
     page.getByTestId(`rf__edge-align:${teamId}`),
   ).toHaveAttribute("aria-label", `${TEAM} aligns to ${COMPANY}`);
 
+  // It opens with room around it. React Flow 13 reads a bare number as pixels
+  // where 12 read a fraction, so the same setting put cards on the canvas edge.
+  const canvas = await diagram().locator(".react-flow").boundingBox();
+  const boxes = await Promise.all(
+    (await diagram().locator(".react-flow__node").all()).map((node) =>
+      node.boundingBox(),
+    ),
+  );
+  expect(canvas).not.toBeNull();
+  expect(boxes.length).toBeGreaterThan(0);
+  for (const box of boxes) {
+    if (!canvas || !box) {
+      throw new Error("the canvas and every card it draws have a box");
+    }
+    expect(box.x - canvas.x).toBeGreaterThan(10);
+    expect(box.y - canvas.y).toBeGreaterThan(10);
+    expect(canvas.x + canvas.width - box.x - box.width).toBeGreaterThan(10);
+    expect(canvas.y + canvas.height - box.y - box.height).toBeGreaterThan(10);
+  }
+
   const scan = await new AxeBuilder({ page })
     .include('[data-testid="okr-diagram"]')
     .analyze();
