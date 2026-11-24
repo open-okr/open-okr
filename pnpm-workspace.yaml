@@ -28,7 +28,7 @@ catalog:
   # tree read it from 5.9 under this name, so nothing else can pick it up by
   # accident. Same package, same licence.
   typescript5: npm:typescript@5.9.3
-  vitest: 5.1.0
+  vitest: 5.1.1
   "@types/node": 26.6.6
   # 0.45.2 is the first release past GHSA-gpj5-g38j-94v9 (SQL injection via
   # improperly escaped identifiers).
@@ -95,7 +95,7 @@ catalog:
   # Dev-only, never shipped.
   jsdom: ^31.0.1
   "@testing-library/react": ^16.3.3
-  "@testing-library/user-event": ^14.6.10
+  "@testing-library/user-event": ^14.6.13
   # The rich text editor (P2-T11), approved by the human alongside P2-T10's
   # design-system deps. Every @tiptap/* package in v3 peer-pins its
   # siblings to the exact same version string, not a range, so all four
