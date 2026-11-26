@@ -337,17 +337,21 @@ async function importCycles(
     options.companyId,
   );
 
-  // **The periods a dry run has to refuse the way the write does.** The
-  // product holds one cycle per period, so a source cycle falling in a period
-  // the workspace already has (the current quarter a new workspace makes for
-  // itself, most often) or one an earlier row of this run took is refused by
-  // `cycles.create`. Read once, so the preview names the same rows.
-  const taken = new Set<string>();
-  if (!options.write) {
-    const existing = await callAction(options.context, "cycles.list", {});
-    for (const cycle of existing) {
-      taken.add(`${cycle.mode}|${cycle.startsOn}`);
-    }
+  // **The cycles a source cycle can land on.** The product holds one cycle
+  // per period, so a source cycle falling in a period the workspace already
+  // has (the current quarter a new workspace makes for itself, most often) or
+  // one an earlier row of this run took is mapped onto that cycle rather than
+  // skipped. Skipping left its objectives with no cycle, so they never showed
+  // on Goals for that quarter. Read once, in both runs, so the preview names
+  // the same rows the write does. The existing cycle is never renamed, moved
+  // or given a legacy key.
+  const byPeriod = new Map<string, { id: string; name: string }>();
+  const existing = await callAction(options.context, "cycles.list", {});
+  for (const cycle of existing) {
+    byPeriod.set(`${cycle.mode}|${cycle.startsOn}`, {
+      id: cycle.id,
+      name: cycle.name,
+    });
   }
 
   for (const row of rows) {
@@ -379,32 +383,38 @@ async function importCycles(
       continue;
     }
 
-    if (!options.write) {
-      const already = await options.resolver.resolve(
-        "performance_cycles",
-        row.id,
-      );
-      if (already !== undefined) {
-        tally.wrote(false);
-        continue;
-      }
-      const period = cyclePeriodFor(
-        cadence as "annual" | "semiannual" | "quarterly" | "monthly",
-        parseLocalDate(String(row.started_at).slice(0, 10)),
-      );
-      const key = `${period.mode}|${period.startsOn}`;
-      if (taken.has(key)) {
-        // The sentence `cycles.create` refuses with, so both runs read alike.
-        tally.skip(source, `${period.name} already exists in this workspace.`);
-        continue;
-      }
-      taken.add(key);
-      options.resolver.plan("performance_cycles", row.id);
-      tally.wrote(true);
+    const already = await options.resolver.resolve(
+      "performance_cycles",
+      row.id,
+    );
+    if (already !== undefined) {
+      tally.wrote(false);
       continue;
     }
-    if (await options.resolver.resolve("performance_cycles", row.id)) {
+    const period = cyclePeriodFor(
+      cadence as "annual" | "semiannual" | "quarterly" | "monthly",
+      parseLocalDate(String(row.started_at).slice(0, 10)),
+    );
+    const key = `${period.mode}|${period.startsOn}`;
+    const target = byPeriod.get(key);
+    if (target) {
+      if (options.write) {
+        options.resolver.remember("performance_cycles", row.id, target.id);
+      } else {
+        options.resolver.plan("performance_cycles", row.id);
+      }
       tally.wrote(false);
+      tally.flag(
+        source,
+        `FlowyTeam cycle "${row.name ?? period.name}" (${source}) was imported into the existing cycle "${target.name}".`,
+      );
+      continue;
+    }
+
+    if (!options.write) {
+      options.resolver.plan("performance_cycles", row.id);
+      byPeriod.set(key, { id: "planned", name: period.name });
+      tally.wrote(true);
       continue;
     }
 
@@ -417,11 +427,12 @@ async function importCycles(
         legacy: legacyKeyFor("performance_cycles", row.id),
       });
       options.resolver.remember("performance_cycles", row.id, created.id);
+      byPeriod.set(key, {
+        id: created.id,
+        name: row.name ? String(row.name).slice(0, 120) : period.name,
+      });
       tally.wrote(true);
     } catch (error) {
-      // Two source cycles falling in one period. The product holds one cycle
-      // per period by design, so the second is a report row rather than a
-      // second cycle with the same dates.
       tally.skip(source, messageOf(error));
     }
   }

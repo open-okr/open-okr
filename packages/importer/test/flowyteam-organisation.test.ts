@@ -154,7 +154,7 @@ describe.skipIf(!runnable)("importing one company's organisation", () => {
     ).toContain("did not import");
   });
 
-  it("keeps the cycle the source named, and refuses the four it cannot map", async () => {
+  it("keeps the cycle the source named, refuses the three it cannot map, and folds the fifth into the first", async () => {
     const { report } = await run(true);
 
     expect(domain(report, "cycles")?.created).toBe(1);
@@ -164,8 +164,13 @@ describe.skipIf(!runnable)("importing one company's organisation", () => {
     expect(reasons).toContain("Planning module");
     expect(reasons).toContain("no cadence that short");
     expect(reasons).toContain("before it starts");
-    // Two source cycles in one quarter: the product holds one cycle per period.
-    expect(reasons).toContain("already exists");
+    // Two source cycles in one quarter: the product holds one cycle per period,
+    // so the second maps onto the first and the report says so.
+    expect(reasons).not.toContain("already exists");
+    expect(domain(report, "cycles")?.matched).toBe(1);
+    expect(domain(report, "cycles")?.flags.map((row) => row.reason)).toEqual([
+      'FlowyTeam cycle "FY26 Q1b" (performance_cycles:5) was imported into the existing cycle "FY26 Q1".',
+    ]);
 
     const named = await count(
       `select count(*)::int as n from cycles where name = 'FY26 Q1'`,
@@ -190,7 +195,7 @@ describe.skipIf(!runnable)("importing one company's organisation", () => {
     expect(report.written).toBe(0);
     // **No domain here reconciles clean, and that is right.** This source was
     // seeded with a person who has no address, a team with no name, a team
-    // whose leader belongs to another company, and four cycles that cannot
+    // whose leader belongs to another company, and three cycles that cannot
     // map. Every one of those is a skip, and a skip means "look at this". A
     // company with tidy data reconciles clean; this one is deliberately not.
     expect(report.reconciliation.every((one) => one.clean)).toBe(false);

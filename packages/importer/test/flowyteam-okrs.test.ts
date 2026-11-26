@@ -8,7 +8,11 @@
  * second pass earning its place. And that a second run changes nothing, which
  * is what makes a migration something a person can rehearse.
  */
-import { provisionWorkspaceForUser, type Source } from "@openokr/core";
+import {
+  callAction,
+  provisionWorkspaceForUser,
+  type Source,
+} from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
@@ -165,6 +169,53 @@ describe.skipIf(!runnable)("importing one company's OKRs", () => {
     );
     expect(row?.cycle_id).toBeNull();
     expect(row?.timeframe?.startsOn).toBe("2026-01-12");
+  });
+
+  it("Given the workspace already has the source cycle's quarter, when imported, then the objectives land in that cycle and the dry run agrees", async () => {
+    const existing = await callAction(
+      { pool, workspaceId, actor: { kind: "human", userId: OWNER } },
+      "cycles.create",
+      { on: "2026-01-05", cadence: "quarterly", firstCycle: false },
+    );
+
+    const dry = await run(false);
+    expect(
+      (domain(dry.report, "cycles")?.skipped ?? []).filter((s) =>
+        s.reason.includes("already exists in this workspace"),
+      ),
+    ).toEqual([]);
+    expect(domain(dry.report, "cycles")?.created).toBe(0);
+    expect(domain(dry.report, "cycles")?.flags.map((f) => f.reason)).toContain(
+      `FlowyTeam cycle "FY26 Q1" (performance_cycles:1) was imported into the existing cycle "${existing.name}".`,
+    );
+    expect(
+      domain(dry.report, "objectives")?.skipped.map((row) => row.reason),
+    ).not.toContain(
+      "This objective is in a cycle that did not import and carries no dates of its own.",
+    );
+
+    const real = await run(true);
+    expect(
+      (domain(real.report, "cycles")?.skipped ?? []).filter((s) =>
+        s.reason.includes("already exists in this workspace"),
+      ),
+    ).toEqual([]);
+    expect(domain(real.report, "objectives")?.created).toBe(
+      domain(dry.report, "objectives")?.created,
+    );
+    const [row] = await rows<{ cycle_id: string | null; timeframe: unknown }>(
+      `select cycle_id, timeframe from goals where legacy_id = 'objectives:1'`,
+    );
+    expect(row?.cycle_id).toBe(existing.id);
+    expect(row?.timeframe).toBeNull();
+    // The existing cycle is neither renamed nor given a legacy key.
+    const [cycle] = await rows<{ name: string; legacy_id: string | null }>(
+      `select name, legacy_id from cycles where id = '${existing.id}'`,
+    );
+    expect(cycle).toEqual({ name: existing.name, legacy_id: null });
+
+    const again = await run(true);
+    expect(domain(again.report, "objectives")?.created).toBe(0);
   });
 
   it("infers a direction per key result, and defaults the indicator type", async () => {
