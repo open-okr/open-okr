@@ -53,14 +53,15 @@ async function refused(
   };
 }
 
-export async function previewFlowyteamAction(): Promise<
-  FlowyteamAnswer<{ runId: string }>
-> {
+/** `only` is left out when every domain is chosen, so the run is the default one. */
+export async function previewFlowyteamAction(
+  only?: readonly string[],
+): Promise<FlowyteamAnswer<{ runId: string }>> {
   try {
     const answer = await callAction(
       await context(),
       "imports.flowyteamPreview",
-      {},
+      only && only.length > 0 ? { only: [...only] } : {},
     );
     revalidatePath("/admin/imports");
     return { ok: true, value: { runId: answer.runId } };
@@ -71,10 +72,12 @@ export async function previewFlowyteamAction(): Promise<
 
 export async function runFlowyteamAction(
   acceptBroaderVisibility: boolean,
+  only?: readonly string[],
 ): Promise<FlowyteamAnswer<{ runId: string }>> {
   try {
     const answer = await callAction(await context(), "imports.flowyteamRun", {
       acceptBroaderVisibility: acceptBroaderVisibility === true,
+      ...(only && only.length > 0 ? { only: [...only] } : {}),
     });
     revalidatePath("/admin/imports");
     return { ok: true, value: { runId: answer.runId } };

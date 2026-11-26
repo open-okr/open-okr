@@ -6655,7 +6655,14 @@
       "path": "/imports/flowyteamPreview",
       "scope": "write",
       "summary": "Starts a dry run of the FlowyTeam import in the background. Writes nothing but the run's own row.",
-      "flags": [],
+      "flags": [
+        {
+          "name": "only",
+          "field": "only",
+          "type": "array",
+          "required": false
+        }
+      ],
       "pages": false
     },
     {
@@ -6670,6 +6677,12 @@
           "name": "accept-broader-visibility",
           "field": "acceptBroaderVisibility",
           "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "only",
+          "field": "only",
+          "type": "array",
           "required": false
         }
       ],

@@ -48,6 +48,9 @@ import {
   previewFlowyteamAction,
   runFlowyteamAction,
 } from "./flowyteam-actions.ts";
+import { onlyOf, toggleDomain } from "./flowyteam-choose.ts";
+// Types only: the view imports @openokr/core, which must stay out of the
+// browser bundle.
 import type {
   FlowyteamCardView,
   FlowyteamPhase,
@@ -370,6 +373,10 @@ export function FlowyteamCard(props: FlowyteamCardProps) {
     total: number;
   } | null>(null);
   const [accepted, setAccepted] = useState(false);
+  // The kinds of data ticked on the Choose step, all of them to begin with.
+  const [chosen, setChosen] = useState<ReadonlySet<string>>(
+    () => new Set(props.domains.map((domain) => domain.key)),
+  );
   const [backToChoose, setBackToChoose] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
@@ -466,11 +473,15 @@ export function FlowyteamCard(props: FlowyteamCardProps) {
     });
   }
 
-  const preview = (name: string) =>
-    press(name, previewFlowyteamAction, () => {
-      setBackToChoose(false);
-      setAccepted(false);
-    });
+  const preview = (name: string, only?: readonly string[]) =>
+    press(
+      name,
+      () => previewFlowyteamAction(only),
+      () => {
+        setBackToChoose(false);
+        setAccepted(false);
+      },
+    );
 
   const header = (
     <CardHeader className="flex-wrap justify-between">
@@ -696,9 +707,15 @@ export function FlowyteamCard(props: FlowyteamCardProps) {
         {connected && phase.kind === "choose" && !inviting ? (
           <ChooseStep
             domains={props.domains}
+            chosen={chosen}
+            onToggle={(key, on) =>
+              setChosen((current) =>
+                toggleDomain(props.domains, current, key, on),
+              )
+            }
             pending={spinning("preview")}
             disabled={!props.backgroundWork}
-            onPreview={() => preview("preview")}
+            onPreview={() => preview("preview", onlyOf(props.domains, chosen))}
           />
         ) : null}
 
@@ -713,6 +730,7 @@ export function FlowyteamCard(props: FlowyteamCardProps) {
         {connected && phase.kind === "preview" && !inviting ? (
           <PreviewStep
             preview={phase.preview}
+            domains={props.domains}
             readAt={date(phase.preview.readAt)}
             accepted={accepted}
             onAccept={setAccepted}
@@ -722,7 +740,11 @@ export function FlowyteamCard(props: FlowyteamCardProps) {
             onImport={() =>
               press(
                 "import",
-                () => runFlowyteamAction(accepted),
+                () =>
+                  runFlowyteamAction(
+                    accepted,
+                    onlyOf(props.domains, phase.preview.selected),
+                  ),
                 () => undefined,
               )
             }
@@ -762,7 +784,12 @@ export function FlowyteamCard(props: FlowyteamCardProps) {
                 variant="primary"
                 pending={spinning("importNew")}
                 disabled={!props.backgroundWork}
-                onClick={() => preview("importNew")}
+                onClick={() =>
+                  preview(
+                    "importNew",
+                    onlyOf(props.domains, view.lastImport?.selected ?? []),
+                  )
+                }
                 data-testid="flowyteam-import-new"
               >
                 {t("admin.imports.flowyteam.importNewData")}
@@ -777,11 +804,15 @@ export function FlowyteamCard(props: FlowyteamCardProps) {
 
 function ChooseStep({
   domains,
+  chosen,
+  onToggle,
   pending,
   disabled,
   onPreview,
 }: {
   domains: FlowyteamCardProps["domains"];
+  chosen: ReadonlySet<string>;
+  onToggle: (key: string, on: boolean) => void;
   pending: boolean;
   disabled: boolean;
   onPreview: () => void;
@@ -798,7 +829,13 @@ function ChooseStep({
             key={domain.key}
             className="flex items-start gap-2.5 text-sm text-ink-2"
           >
-            <input type="checkbox" checked disabled readOnly className="mt-1" />
+            <input
+              type="checkbox"
+              checked={chosen.has(domain.key)}
+              onChange={(event) => onToggle(domain.key, event.target.checked)}
+              className="mt-1"
+              data-testid={`flowyteam-domain-${domain.key}`}
+            />
             <span>
               <span className="font-medium text-ink">
                 {domainLabel(t, domain.key)}
@@ -821,17 +858,19 @@ function ChooseStep({
           </label>
         ))}
       </fieldset>
-      <p className="text-xs text-ink-3">
-        {t("admin.imports.flowyteam.everythingComes")}
-      </p>
       <Footer>
-        <span className="text-xs text-ink-3">
-          {t("admin.imports.flowyteam.previewHint")}
+        <span
+          className="text-xs text-ink-3"
+          data-testid={chosen.size === 0 ? "flowyteam-none-ticked" : undefined}
+        >
+          {chosen.size === 0
+            ? t("admin.imports.flowyteam.nothingTicked")
+            : t("admin.imports.flowyteam.previewHint")}
         </span>
         <Button
           variant="primary"
           pending={pending}
-          disabled={disabled}
+          disabled={disabled || chosen.size === 0}
           onClick={onPreview}
           data-testid="flowyteam-run-preview"
         >
@@ -887,6 +926,7 @@ function Running({
 
 function PreviewStep({
   preview,
+  domains,
   readAt,
   accepted,
   onAccept,
@@ -896,6 +936,7 @@ function PreviewStep({
   onImport,
 }: {
   preview: PreviewView;
+  domains: FlowyteamCardProps["domains"];
   readAt: string;
   accepted: boolean;
   onAccept: (value: boolean) => void;
@@ -906,6 +947,8 @@ function PreviewStep({
 }) {
   const { t } = useTranslations();
   const restricted = preview.restricted.length;
+  // Said only when the preview covered less than everything.
+  const partial = onlyOf(domains, preview.selected) !== undefined;
   const blocked = restricted > 0 && !accepted;
   // A domain FlowyTeam holds nothing for is noise in a table of twenty rows.
   const shownDomains = preview.domains.filter(
@@ -925,6 +968,15 @@ function PreviewStep({
           {t("admin.imports.flowyteam.readAt", { when: readAt })}
         </span>
       </div>
+      {partial ? (
+        <p className="text-xs text-ink-2" data-testid="flowyteam-bringing">
+          {t("admin.imports.flowyteam.bringingAcross", {
+            domains: preview.selected
+              .map((key) => domainLabel(t, key))
+              .join(", "),
+          })}
+        </p>
+      ) : null}
 
       {shownDomains.length === 0 ? (
         <p

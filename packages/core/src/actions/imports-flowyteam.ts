@@ -45,6 +45,7 @@ import {
   sameState,
   sealConnectState,
 } from "../imports/flowyteam/connection.ts";
+import { DOMAIN_KEYS } from "../imports/flowyteam/domains.ts";
 import {
   backgroundJobsRun,
   FLOWYTEAM_IMPORT_TOPIC,
@@ -483,10 +484,27 @@ function importRefusal(
 /** A run left `running` longer than this is not counted as one in progress. */
 const RUNNING_WINDOW_MS = 2 * 60 * 60 * 1000;
 
+/**
+ * The domains a browser run is limited to, the card's version of `--only`.
+ * Absent means every domain. An unknown key is a validation error here rather
+ * than a smaller import, the same choice `selectDomains` makes for the flag.
+ */
+const onlyInput = z
+  .array(
+    z.string().refine((key) => DOMAIN_KEYS.includes(key), {
+      message: "Not a FlowyTeam import domain.",
+    }),
+  )
+  .min(1)
+  .optional();
+
 function enqueueImport(write: boolean) {
   return (
     context: ActionCallContext,
-    input: { readonly acceptBroaderVisibility?: boolean },
+    input: {
+      readonly acceptBroaderVisibility?: boolean;
+      readonly only?: readonly string[] | undefined;
+    },
   ) => ({
     async execute({
       tx,
@@ -561,6 +579,8 @@ function enqueueImport(write: boolean) {
         }
       }
 
+      const only = input.only ? [...new Set(input.only)] : undefined;
+      const onlyFields = only ? { only } : {};
       const userId = context.actor.userId;
       const memberId = await actingMemberId(tx, workspaceId, userId);
       // openokr:allow-mutation: inside this operation's own transaction.
@@ -573,7 +593,12 @@ function enqueueImport(write: boolean) {
           mode: write ? "real" : "dry_run",
           status: "running",
           filename: `FlowyTeam export: ${connection.companyName}`.slice(0, 400),
-          report: { source: FLOWYTEAM_SOURCE, via: "export", companyId },
+          report: {
+            source: FLOWYTEAM_SOURCE,
+            via: "export",
+            companyId,
+            ...onlyFields,
+          },
           requestedById: memberId,
         })
         .returning({ id: importRuns.id });
@@ -593,6 +618,7 @@ function enqueueImport(write: boolean) {
             source: FLOWYTEAM_SOURCE,
             companyId: connection.companyId,
             runId: run.id,
+            ...onlyFields,
             ...(write
               ? {
                   acceptBroaderVisibility:
@@ -612,6 +638,7 @@ function enqueueImport(write: boolean) {
               userId,
               write,
               acceptBroaderVisibility: input.acceptBroaderVisibility === true,
+              ...onlyFields,
             },
             idempotencyKey: `${FLOWYTEAM_IMPORT_TOPIC}:${run.id}`,
           },
@@ -626,7 +653,10 @@ export const flowyteamPreview = defineWriteAction({
   agentSurface: false,
   summary:
     "Starts a dry run of the FlowyTeam import in the background. Writes nothing but the run's own row.",
-  input: z.object({}),
+  input: z.object({
+    /** Limits the run to these domains, with what they need added. Absent means all. */
+    only: onlyInput,
+  }),
   output: z.object({ runId: z.uuid() }),
   access: ACCESS_LEVELS.full,
   operation: (context, input) => enqueueImport(false)(context, input),
@@ -640,6 +670,8 @@ export const flowyteamRun = defineWriteAction({
   input: z.object({
     /** Required when the latest preview named KPIs that will become more visible. */
     acceptBroaderVisibility: z.boolean().default(false),
+    /** Limits the run to these domains, with what they need added. Absent means all. */
+    only: onlyInput,
   }),
   output: z.object({ runId: z.uuid() }),
   access: ACCESS_LEVELS.full,

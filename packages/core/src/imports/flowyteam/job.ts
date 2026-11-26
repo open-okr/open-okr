@@ -64,6 +64,8 @@ export interface FlowyteamImportJob {
   readonly userId: string;
   readonly write: boolean;
   readonly acceptBroaderVisibility: boolean;
+  /** The domains the run is limited to; absent means all of them. */
+  readonly only?: readonly string[];
   /** A follow-up job's first domain. */
   readonly startAt?: string;
   readonly carried?: FlowyteamCarried;
@@ -90,6 +92,11 @@ export function parseFlowyteamImportJob(
     userId,
     write,
     acceptBroaderVisibility: payload.acceptBroaderVisibility === true,
+    ...(Array.isArray(payload.only) &&
+    payload.only.length > 0 &&
+    payload.only.every((key) => typeof key === "string")
+      ? { only: payload.only as string[] }
+      : {}),
     ...(typeof payload.startAt === "string"
       ? { startAt: payload.startAt }
       : {}),
@@ -260,6 +267,7 @@ export async function runFlowyteamImportJob(
       source,
       write: job.write,
       acceptBroaderVisibility: job.acceptBroaderVisibility,
+      ...(job.only ? { only: job.only } : {}),
       runId: job.runId,
       via: "export",
       ...(deps.storage ? { storage: deps.storage } : {}),

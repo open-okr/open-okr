@@ -273,6 +273,23 @@ describe.skipIf(!runnable)("FlowyTeam import as a background job", () => {
     expect(connection.lastReadAt).not.toBeNull();
   });
 
+  it("limits a preview to the chosen domains, with what they need (C6)", async () => {
+    await expect(
+      call("imports.flowyteamPreview", { only: ["not-a-domain"] }),
+    ).rejects.toThrow();
+    const { runId } = (await call("imports.flowyteamPreview", {
+      only: ["objectives", "objectives"],
+    })) as { runId: string };
+    expect((await runRow(runId)).report.only).toEqual(["objectives"]);
+    await relay();
+    expect(queued[0]?.payload.only).toEqual(["objectives"]);
+    const [outcome] = await work();
+    expect(outcome?.kind).toBe("completed");
+    const report = (await runRow(runId)).report;
+    expect(report.selected).toEqual(["organisation", "objectives"]);
+    expect(report.addedForDependencies).toEqual(["organisation"]);
+  });
+
   it("refuses the import without the tick when the preview named restricted KPIs (AC 4)", async () => {
     // One KPI shared with a named person, which a workspace role broadens.
     await seeded.run(

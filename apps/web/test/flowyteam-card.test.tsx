@@ -31,8 +31,9 @@ const runFlowyteamAction = vi.fn();
 const disconnectFlowyteamAction = vi.fn();
 const inviteFlowyteamPeopleAction = vi.fn();
 vi.mock("../app/admin/imports/flowyteam-actions.ts", () => ({
-  previewFlowyteamAction: () => previewFlowyteamAction(),
-  runFlowyteamAction: (accept: boolean) => runFlowyteamAction(accept),
+  previewFlowyteamAction: (only?: string[]) => previewFlowyteamAction(only),
+  runFlowyteamAction: (accept: boolean, only?: string[]) =>
+    runFlowyteamAction(accept, only),
   disconnectFlowyteamAction: () => disconnectFlowyteamAction(),
   inviteFlowyteamPeopleAction: (ids: string[]) =>
     inviteFlowyteamPeopleAction(ids),
@@ -347,7 +348,7 @@ describe("the card", () => {
     });
     expect(importButton.disabled).toBe(false);
     await act(async () => importButton.click());
-    expect(runFlowyteamAction).toHaveBeenCalledWith(true);
+    expect(runFlowyteamAction).toHaveBeenCalledWith(true, undefined);
   });
 
   it("says a refusal in the reader's words", async () => {
@@ -754,5 +755,140 @@ describe("the preview", () => {
     );
     expect(some).toContain("1 of them has an invitation.");
     expect(some).not.toContain("Nobody");
+  });
+});
+
+describe("choosing the kinds of data (C6)", () => {
+  const FOUR = [
+    { key: "organisation", requires: [] },
+    { key: "objectives", requires: ["organisation"] },
+    { key: "kpis", requires: ["organisation"] },
+    { key: "kpi-shares", requires: ["kpis"] },
+  ];
+  const box = (key: string) =>
+    byTestId(`flowyteam-domain-${key}`) as HTMLInputElement;
+  const click = (key: string) => act(async () => box(key).click());
+  const ticked = () => FOUR.filter((d) => box(d.key).checked).map((d) => d.key);
+
+  it("starts with everything ticked and enabled, and sends no list for all of it", async () => {
+    previewFlowyteamAction.mockResolvedValue({
+      ok: true,
+      value: { runId: "r" },
+    });
+    render(props({ domains: FOUR }));
+    expect(ticked()).toHaveLength(4);
+    expect(FOUR.every((d) => !box(d.key).disabled)).toBe(true);
+    await act(async () => byTestId("flowyteam-run-preview")?.click());
+    expect(previewFlowyteamAction).toHaveBeenCalledWith(undefined);
+  });
+
+  it("unticking a domain also unticks what needs it, and ticking brings back what it needs", async () => {
+    render(props({ domains: FOUR }));
+    await click("kpis");
+    expect(ticked()).toEqual(["organisation", "objectives"]);
+    await click("organisation");
+    expect(ticked()).toEqual([]);
+    await click("kpi-shares");
+    expect(ticked()).toEqual(["organisation", "kpis", "kpi-shares"]);
+  });
+
+  it("passes the ticked keys as only", async () => {
+    previewFlowyteamAction.mockResolvedValue({
+      ok: true,
+      value: { runId: "r" },
+    });
+    render(props({ domains: FOUR }));
+    await click("kpis");
+    await act(async () => byTestId("flowyteam-run-preview")?.click());
+    expect(previewFlowyteamAction).toHaveBeenCalledWith([
+      "organisation",
+      "objectives",
+    ]);
+  });
+
+  it("disables Run preview with a hint when nothing is ticked", async () => {
+    render(props({ domains: FOUR }));
+    await click("organisation");
+    expect(ticked()).toEqual([]);
+    expect(
+      (byTestId("flowyteam-run-preview") as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(byTestId("flowyteam-none-ticked")?.textContent).toBe(
+      en("admin.imports.flowyteam.nothingTicked"),
+    );
+  });
+
+  const partialPreview = (selected: string[], over: Partial<Run> = {}) =>
+    run({
+      report: { reconciliation: [], notes: [], selected },
+      ...over,
+    });
+
+  it("says what a partial preview brings, and imports exactly that", async () => {
+    runFlowyteamAction.mockResolvedValue({ ok: true, value: { runId: "r" } });
+    render(
+      props({
+        domains: FOUR,
+        view: flowyteamCardView([
+          partialPreview(["organisation", "objectives"]),
+        ]),
+      }),
+    );
+    expect(byTestId("flowyteam-bringing")?.textContent).toBe(
+      en("admin.imports.flowyteam.bringingAcross", {
+        domains: `${en("admin.imports.flowyteam.domain.organisation")}, ${en("admin.imports.flowyteam.domain.objectives")}`,
+      }),
+    );
+    await act(async () => byTestId("flowyteam-import")?.click());
+    expect(runFlowyteamAction).toHaveBeenCalledWith(false, [
+      "organisation",
+      "objectives",
+    ]);
+  });
+
+  it("says nothing extra when the preview covered everything", () => {
+    render(
+      props({
+        domains: FOUR,
+        view: flowyteamCardView([partialPreview(FOUR.map((d) => d.key))]),
+      }),
+    );
+    expect(byTestId("flowyteam-bringing")).toBeNull();
+  });
+
+  it("Import new data repeats the last import's choice, and nothing when it was everything", async () => {
+    previewFlowyteamAction.mockResolvedValue({
+      ok: true,
+      value: { runId: "r" },
+    });
+    const imported = (selected: string[]) =>
+      run({
+        id: "run-2",
+        mode: "real",
+        rowsWritten: 9,
+        startedAt: "2026-11-23T10:00:00.000Z",
+        report: { selected },
+      });
+    render(
+      props({
+        domains: FOUR,
+        view: flowyteamCardView([imported(["organisation", "kpis"])]),
+      }),
+    );
+    await act(async () => byTestId("flowyteam-import-new")?.click());
+    expect(previewFlowyteamAction).toHaveBeenLastCalledWith([
+      "organisation",
+      "kpis",
+    ]);
+    act(() => root.unmount());
+    root = createRoot(container);
+    render(
+      props({
+        domains: FOUR,
+        view: flowyteamCardView([imported(FOUR.map((d) => d.key))]),
+      }),
+    );
+    await act(async () => byTestId("flowyteam-import-new")?.click());
+    expect(previewFlowyteamAction).toHaveBeenLastCalledWith(undefined);
   });
 });

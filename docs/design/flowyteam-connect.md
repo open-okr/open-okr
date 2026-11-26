@@ -73,12 +73,22 @@ Prototype of both sides, clickable: [flowyteam-connect-prototype.html](flowyteam
 | Decision | Built |
 |---|---|
 | Screen | `apps/web/app/admin/imports/flowyteam-card.tsx`. The step comes from the server (`flowyteam-view.ts`) from the browser runs: a running run is Preview or Import in progress, a finished preview newer than the last import is the Preview step, a finished import is the linked state. A failed run is said above the next step |
-| Choose | Drawn as the list of domains with their dependencies, all ticked and locked. `imports.flowyteamPreview` and `imports.flowyteamRun` take no domain list, so the browser brings everything across; choosing fewer stays on the command line (`--only`) until card C6 |
+| Choose | Drawn as the list of domains with their dependencies, all ticked. Superseded by card C6 below: the boxes can be unticked |
 | Progress | `GET /api/imports/flowyteam/live`, authorised by `imports.flowyteamConnection`, forwards the job's progress and end events with the run id, the domain and its position only. The card also re-reads every 15 seconds while a run is in progress, in case the stream does not reach the browser |
 | Q6 | FlowyTeam's last sign-in date is not in the catalogue, so the invite step lists everyone with a filter and Select all shown, and says why. Nothing is sent until Send; "Not now" closes the step |
 | Refusals | Every `reason` word (connect, callback, preview, run, job failure) maps to a catalogue key in `apps/web/lib/flowyteam-messages.ts`; a test fails when the domain gains a reason with no key |
 | Off | With `imports.flowyteam.baseUrl` set to `off` the card shows only the command-line pointer (`pnpm import:flowyteam`); empty is FlowyTeam's cloud (§4.4) |
 | Below `full` | The `/admin` layout already refuses anybody below `full`, so the card never draws for them; a refused action says `reason.forbidden` |
+
+**As built (C6).**
+
+| Decision | Built |
+|---|---|
+| Action input | `imports.flowyteamPreview` and `imports.flowyteamRun` take an optional `only`: one or more keys from `DOMAIN_KEYS`, duplicates dropped. An unknown key or an empty list is a validation error. Absent means every domain, as before |
+| Where it is kept | In the audit payload, the outbox payload and the run row's first report (`only`), which the engine's finished report replaces with `selected`. `parseFlowyteamImportJob` reads it back (an array of strings, else absent) and passes it to the engine, and the follow-up job carries it. The finished report records `selected` and `addedForDependencies` as for `--only` |
+| Choose | Every domain starts ticked and can be unticked. Unticking a domain also unticks every domain that needs it, and ticking one also ticks what it needs. With none ticked, Run preview is disabled and a hint says to tick one. The card sends `only` only when fewer than all domains are ticked |
+| Preview | When the report's `selected` is not every domain the step says "Bringing across: ..." with the names. Import sends `only` equal to that `selected`, so the import runs what was previewed |
+| Import new data | Repeats the `selected` of the last completed real import, so a partial import stays partial. When that was every domain, no `only` is sent |
 
 ### 2.1 The catalogue format (C1)
 
@@ -123,8 +133,8 @@ Admin (OKRGoal)        OKRGoal server                  FlowyTeam
 | `imports.flowyteamConnect` | `full` on imports | Starts authorisation: returns the FlowyTeam URL and the sealed state (`state`, PKCE verifier, workspace, member, client, 10 minutes). The route `POST /admin/imports/flowyteam/connect` keeps it in an httpOnly SameSite=Lax cookie and redirects |
 | `imports.flowyteamFinishConnect`, called by the route `/admin/imports/flowyteam/callback` | `full`, session + `state` cookie | Checks the state (sealed, unexpired, same value, same workspace, same member) before any network call, exchanges the code, reads `companies.byId`, then one Operation seals the token and writes the connection with the company id and name FlowyTeam returns, plus the audit row. A replaced connection is closed and its token revoked through the outbox |
 | `imports.flowyteamConnection` | `full` | The card's read: whether this instance offers connecting, and the live connection (`connected` or `revoked`). Never the token |
-| `imports.flowyteamPreview` | `full` | Enqueues a dry run; refuses when the workspace already holds another company (today's rule) |
-| `imports.flowyteamRun` | `full` | Enqueues the write. Requires `acceptBroaderVisibility` when the preview named restricted KPIs (today's `--accept-broader-visibility`) |
+| `imports.flowyteamPreview` | `full` | Enqueues a dry run; refuses when the workspace already holds another company (today's rule). Optional `only`: a list of domain keys, as `--only` takes (C6) |
+| `imports.flowyteamRun` | `full` | Enqueues the write. Requires `acceptBroaderVisibility` when the preview named restricted KPIs (today's `--accept-broader-visibility`). Optional `only`, as on the preview (C6) |
 | `imports.flowyteamDisconnect` | `full` | Marks the connection revoked and disconnected (soft delete), keeps imported data and the company link. An outbox row (`imports.flowyteamRevoke`) revokes the token at FlowyTeam (RFC 7009, `POST <baseUrl>/oauth/revoke`) through the outbound guard and then clears it from the row; no answer is retried, a refusal or 404 is not |
 | `imports.flowyteamPeople` | `full` | The invite step's list (C5): members a FlowyTeam import wrote with no account (`kind` placeholder, `placeholder_email` set), and whether an unused personal invitation to each address is open. The step invites through `invitations.createPersonalLink`, one per ticked person, and the server reads the addresses again so the browser names members, never addresses |
 | `imports.listRuns` | existing | Returns `via`: `export` for a browser run. As built, the source stays `flowyteam` (no migration of the `import_runs.source` check); the report and the filename carry `via` |
@@ -216,7 +226,7 @@ As in the prototype: a "From FlowyTeam" card above the spreadsheet card with fiv
 | C3 | OpenOKR | Migration `import_connections` with row-level security; connect, callback and disconnect | Design approved |
 | C4 | OpenOKR | HTTP source driver, preview and run jobs, progress | C2, C3, F1 to F5 |
 | C5 | OpenOKR | S-36 card, invite step, catalogue strings, end-to-end spec against a FlowyTeam stub | C4 |
-| C6 | OpenOKR | Follow-up: an optional `only` list on `imports.flowyteamPreview` and `imports.flowyteamRun` (and the job payload), so the Choose step can untick domains as `--only` does. Until then Choose shows every domain ticked and locked (owner decision, 23 November 2026) | C5 |
+| C6 | OpenOKR | Built: an optional `only` list on `imports.flowyteamPreview` and `imports.flowyteamRun` (and the job payload), so the Choose step can untick domains as `--only` does | C5 |
 | F1 to F8 | FlowyTeam | Section 6 | C1 (the catalogue file) |
 
 C1 and C2 change nothing a running instance does and can ship first.

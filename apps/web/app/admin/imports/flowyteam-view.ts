@@ -56,6 +56,8 @@ export interface PreviewView {
   readonly runId: string;
   readonly readAt: string | null;
   readonly domains: readonly DomainRow[];
+  /** The domain keys this run covered, prerequisites included. Empty when the report names none. */
+  readonly selected: readonly string[];
   /** Rows the import would add. */
   readonly toAdd: number;
   readonly skipped: number;
@@ -75,6 +77,8 @@ interface FinishedView {
   readonly finishedAt: string | null;
   readonly written: number;
   readonly skipped: number;
+  /** The domain keys that import covered, so a later one can repeat the choice. */
+  readonly selected: readonly string[];
 }
 
 export type FlowyteamPhase =
@@ -182,6 +186,7 @@ function previewOf(run: RunRow): PreviewView {
     runId: run.id,
     readAt: run.finishedAt,
     domains,
+    selected: list(report.selected).map(str).filter(Boolean),
     toAdd: domains.reduce((sum, row) => sum + row.created, 0),
     skipped: domains.reduce((sum, row) => sum + row.skipped, 0),
     restricted,
@@ -207,6 +212,7 @@ function finishedOf(run: RunRow): FinishedView {
     finishedAt: run.finishedAt,
     written: run.rowsWritten,
     skipped: run.rowsSkipped,
+    selected: list(record(run.report).selected).map(str).filter(Boolean),
   };
 }
 

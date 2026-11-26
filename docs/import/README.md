@@ -233,9 +233,10 @@ points to the command line instead.
 
 | Step | What happens |
 |---|---|
-| Preview | A dry run in the background, over FlowyTeam's read-only export. Its report is the one `pnpm import:flowyteam` prints without `--write` |
-| Import | The real run. When the preview named KPIs that may become more visible, the admin has to accept that first, as `--accept-broader-visibility` does |
-| Import new data | The same run again. It adds what is new and changes nothing already imported |
+| Choose | Every kind of data is ticked. Unticking one also unticks what needs it, as `--only` adds what a domain needs. At least one stays ticked |
+| Preview | A dry run in the background, over FlowyTeam's read-only export. Its report is the one `pnpm import:flowyteam` prints without `--write`. When fewer kinds of data were chosen, it says which |
+| Import | The real run, for exactly the kinds of data the preview covered. When the preview named KPIs that may become more visible, the admin has to accept that first, as `--accept-broader-visibility` does |
+| Import new data | The same run again, for the kinds of data the last import covered. It adds what is new and changes nothing already imported |
 
 Both run as background jobs, so the scheduler has to run somewhere: with
 `OPENOKR_SCHEDULER=off` on every process they are refused. The run appears in
