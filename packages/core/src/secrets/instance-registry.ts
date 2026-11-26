@@ -549,7 +549,7 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     fallback: "",
     environment: "OPENOKR_FLOWYTEAM_URL",
     summary:
-      "The FlowyTeam a workspace may connect to and import from. Empty means https://app.flowyteam.com on the managed cloud and no connect step on a self-hosted instance, which imports with the command line instead.",
+      "The FlowyTeam a workspace may connect to and import from. Empty means FlowyTeam's cloud, https://flowyteam.com, on every instance. `off` hides the connect step, for an air-gapped instance, which imports with the command line instead.",
   },
   {
     key: "imports.flowyteam.clientId",

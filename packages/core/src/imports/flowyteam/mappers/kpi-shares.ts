@@ -13,6 +13,38 @@ import { type DomainReconciliation, DomainTally } from "./reconcile.ts";
 import type { Resolver } from "./resolve.ts";
 import { withWorkspaceQuery } from "./workspace-query.ts";
 
+/** Title line of the dry-run KPI shares block (read back by the web card). */
+export const KPI_SHARES_NOTE_TITLE = "KPI shares (indicator_accesses)";
+
+/**
+ * The numeric rows of that block, in print order. `pad` is the number of
+ * spaces between the label and the count, kept so the command line output does
+ * not change. The web card parses the block back with these labels.
+ */
+export const KPI_SHARES_NOTE_ROWS = [
+  { key: "rowsRead", label: "Rows read", pad: 25 },
+  { key: "writtenAtView", label: "Would write at view", pad: 15 },
+  { key: "writtenAtEdit", label: "Would write at edit", pad: 15 },
+  { key: "raised", label: "Would raise a manual share", pad: 9 },
+  { key: "unchanged", label: "Unchanged (owner or same level)", pad: 4 },
+  { key: "coveredByRole", label: "Covered by current role (info)", pad: 4 },
+  {
+    key: "takesEffectWhenClaimed",
+    label: "Takes effect when claimed (info)",
+    pad: 2,
+  },
+  { key: "revoked", label: "Revoked after an earlier import", pad: 4 },
+  { key: "kpiNotImported", label: "KPI not imported", pad: 19 },
+  { key: "personNotImported", label: "Person not imported", pad: 16 },
+  { key: "teamSharesNotCarried", label: "Team share not carried over", pad: 8 },
+] as const;
+
+export type KpiSharesNoteRowKey = (typeof KPI_SHARES_NOTE_ROWS)[number]["key"];
+
+/** Start of the second note, which lists the KPIs that may become more visible. */
+export const KPI_SHARES_VISIBLE_NOTE_PREFIX =
+  "KPIs that may become more visible (";
+
 export interface KpiSharesResult {
   readonly domains: readonly DomainReconciliation[];
   readonly notes: readonly string[];
@@ -457,19 +489,24 @@ export async function importKpiShares(
     .map(([freq, count]) => `${freq} ${count}`)
     .join(", ");
 
+  const counts: Record<KpiSharesNoteRowKey, number> = {
+    rowsRead: rows.length,
+    writtenAtView: writtenAtView,
+    writtenAtEdit: writtenAtEdit,
+    raised: raised,
+    unchanged: unchanged,
+    coveredByRole: coveredByRole,
+    takesEffectWhenClaimed: takesEffectWhenClaimed,
+    revoked: revoked,
+    kpiNotImported: kpiNotImported,
+    personNotImported: personNotImported,
+    teamSharesNotCarried: teamSharesNotCarried,
+  };
   const blockLines = [
-    "KPI shares (indicator_accesses)",
-    `  Rows read                         ${rows.length}`,
-    `  Would write at view               ${writtenAtView}`,
-    `  Would write at edit               ${writtenAtEdit}`,
-    `  Would raise a manual share         ${raised}`,
-    `  Unchanged (owner or same level)    ${unchanged}`,
-    `  Covered by current role (info)    ${coveredByRole}`,
-    `  Takes effect when claimed (info)  ${takesEffectWhenClaimed}`,
-    `  Revoked after an earlier import    ${revoked}`,
-    `  KPI not imported                   ${kpiNotImported}`,
-    `  Person not imported                ${personNotImported}`,
-    `  Team share not carried over        ${teamSharesNotCarried}`,
+    KPI_SHARES_NOTE_TITLE,
+    ...KPI_SHARES_NOTE_ROWS.map(
+      (row) => `  ${row.label}${" ".repeat(row.pad)}${counts[row.key]}`,
+    ),
     `  View options: ${viewOptionsSummary || "none"}`,
     `  View frequencies: ${viewFrequenciesSummary || "none"}`,
     `  KPIs that may become more visible: ${flaggedKpis.length} (listed below)`,
@@ -479,7 +516,7 @@ export async function importKpiShares(
 
   if (flaggedKpis.length > 0) {
     notes.push(
-      `KPIs that may become more visible (${flaggedKpis.length}):\n` +
+      `${KPI_SHARES_VISIBLE_NOTE_PREFIX}${flaggedKpis.length}):\n` +
         flaggedKpis
           .map(
             (k) =>

@@ -50,26 +50,6 @@ type Reason =
   | { readonly apiOnly: true; readonly why: string };
 
 const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
-  // The FlowyTeam card on Import arrives with plan card C5
-  // (docs/design/flowyteam-connect.md §8). Until then both are reached over
-  // REST and the command line, and the connect and callback routes cover the
-  // other two.
-  "imports.flowyteamConnection": {
-    apiOnly: true,
-    why: "the FlowyTeam card on Import (plan card C5) is its browser caller; until it ships the read is REST and the command line only",
-  },
-  "imports.flowyteamDisconnect": {
-    apiOnly: true,
-    why: "the FlowyTeam card on Import (plan card C5) is its browser caller; until it ships disconnecting is REST and the command line only",
-  },
-  "imports.flowyteamPreview": {
-    apiOnly: true,
-    why: "the FlowyTeam card on Import (plan card C5) is its browser caller; until it ships the preview is REST and the command line only",
-  },
-  "imports.flowyteamRun": {
-    apiOnly: true,
-    why: "the FlowyTeam card on Import (plan card C5) is its browser caller; until it ships the import is REST and the command line only",
-  },
   "kpis.deleteRecord": {
     apiOnly: true,
     why: "used only by the copilot's undo, which calls it through the server; no screen removes a KPI value",

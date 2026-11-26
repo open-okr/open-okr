@@ -214,8 +214,20 @@ describe("connect", () => {
     await expect(call(OTHER, "imports.flowyteamConnect", {})).rejects.toThrow();
   });
 
-  it("refuses on a self-hosted instance with no FlowyTeam address", async () => {
+  it("connects to FlowyTeam's cloud when no address is set, on any instance", async () => {
+    // Owner decision, 23 November 2026: empty is https://flowyteam.com for a
+    // self-hosted instance too, so the connect step always shows.
     delete process.env.OPENOKR_FLOWYTEAM_URL;
+    const read = await call(OWNER, "imports.flowyteamConnection", {});
+    expect(read.available).toBe(true);
+    const { started } = await connectAs(OWNER);
+    expect(
+      started.authorizeUrl.startsWith("https://flowyteam.com/oauth/authorize?"),
+    ).toBe(true);
+  });
+
+  it("refuses when the address is `off`, as an air-gapped instance sets it", async () => {
+    process.env.OPENOKR_FLOWYTEAM_URL = "off";
     const refusal = await refusalOf(
       call(OWNER, "imports.flowyteamConnect", {}),
     );

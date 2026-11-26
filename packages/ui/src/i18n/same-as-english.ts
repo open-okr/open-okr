@@ -18,6 +18,7 @@ const VENDOR_NAMES = {
   "people.detail.profileForm.slack": "Product name",
   "people.detail.profileForm.telegram": "Product name",
   "people.detail.profileForm.whatsapp": "Product name",
+  "admin.imports.flowyteam.sourceFlowyteam": "Product name",
 };
 
 /**
@@ -65,6 +66,7 @@ export const SAME_AS_ENGLISH: Record<string, Record<string, string>> = {
     "search.exportButton.excel": "Product name",
   },
   ms: {
+    "admin.imports.flowyteam.sourceFlowyteam": "Product name",
     "appearance.indonesian": "Language endonym",
     "appearance.german": "Language endonym",
     "appearance.french": "Language endonym",

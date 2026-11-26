@@ -173,6 +173,10 @@ export default defineConfig({
         // s36s-webhooks.spec.ts runs one (outbound-webhooks.md Q1 and §6).
         // Nothing else posts a webhook, so no other spec sees a difference.
         OPENOKR_WEBHOOKS_ALLOW_PRIVATE: "true",
+        // A FlowyTeam stand-in that s36-flowyteam-connect.spec.ts starts on
+        // this port for its own length (flowyteam-connect C5). Every other
+        // spec sees the card's "Not connected" state and nothing more.
+        OPENOKR_FLOWYTEAM_URL: `http://127.0.0.1:${process.env.E2E_FLOWYTEAM_PORT ?? 3219}`,
       },
     },
     {

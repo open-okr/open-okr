@@ -224,9 +224,12 @@ in MySQL.
 
 ### From FlowyTeam in the browser
 
-An instance with a FlowyTeam address (`OPENOKR_FLOWYTEAM_URL`) can do the same
-import without a MySQL address. A workspace admin connects FlowyTeam from
-Admin > Import, and a FlowyTeam company admin approves it.
+Every instance can do the same import without a MySQL address. A workspace
+admin connects FlowyTeam from Admin > Import, and a FlowyTeam company admin
+approves it. The instance connects to FlowyTeam's cloud, `https://flowyteam.com`,
+unless `OPENOKR_FLOWYTEAM_URL` names another FlowyTeam. Set it to `off` on an
+instance that must not reach out, such as an air-gapped one: the card then
+points to the command line instead.
 
 | Step | What happens |
 |---|---|

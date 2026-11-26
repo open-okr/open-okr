@@ -19,8 +19,27 @@ import { requireWorkspace } from "../../../../../lib/workspace";
  * somebody's name. `imports.flowyteamConnect` decides who may and builds the
  * address; this route only keeps its sealed state in a cookie and sends the
  * administrator to FlowyTeam.
+ *
+ * **Two answers, one flow.** A plain form post gets a 303 to FlowyTeam. The
+ * Import card asks with `Accept: application/json` and gets `{ url }` with the
+ * same cookie instead, then moves the page itself: `/admin/imports` is served
+ * with `form-action 'self'`, which forbids a form post from being redirected
+ * to another origin, and widening that for every admin page would be a worse
+ * trade than one fetch (C5 live trial).
  */
 export const dynamic = "force-dynamic";
+
+/** The card's fetch, as opposed to a plain form post. */
+function wantsJson(request: Request): boolean {
+  return (request.headers.get("accept") ?? "").includes("application/json");
+}
+
+/** Where to go next: a 303 for a form, `{ url }` for the card. */
+function sendTo(request: Request, url: string): NextResponse {
+  return wantsJson(request)
+    ? NextResponse.json({ url }, { headers: { "cache-control": "no-store" } })
+    : NextResponse.redirect(url, 303);
+}
 
 export async function POST(request: Request): Promise<Response> {
   const crossSite = refuseCrossSite(request);
@@ -41,7 +60,7 @@ export async function POST(request: Request): Promise<Response> {
       "imports.flowyteamConnect",
       {},
     );
-    const response = NextResponse.redirect(started.authorizeUrl, 303);
+    const response = sendTo(request, started.authorizeUrl);
     response.cookies.set(
       FLOWYTEAM_STATE_COOKIE,
       started.stateCookie,
@@ -49,9 +68,9 @@ export async function POST(request: Request): Promise<Response> {
     );
     return response;
   } catch (error) {
-    return NextResponse.redirect(
-      new URL(importsPath(outcomeOf(error)), origin),
-      303,
+    return sendTo(
+      request,
+      new URL(importsPath(outcomeOf(error)), origin).toString(),
     );
   }
 }

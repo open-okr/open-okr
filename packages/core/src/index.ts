@@ -1041,6 +1041,12 @@ export {
   resolveFormulaReferences,
 } from "./imports/flowyteam/mappers/formula.ts";
 export {
+  KPI_SHARES_NOTE_ROWS,
+  KPI_SHARES_NOTE_TITLE,
+  KPI_SHARES_VISIBLE_NOTE_PREFIX,
+  type KpiSharesNoteRowKey,
+} from "./imports/flowyteam/mappers/kpi-shares.ts";
+export {
   DomainTally,
   describeDomain,
 } from "./imports/flowyteam/mappers/reconcile.ts";

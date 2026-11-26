@@ -25,13 +25,17 @@ import {
   encryptSecret,
   type KeyRing,
 } from "../../secrets/key-ring.ts";
-import { isCloudEnabled } from "../../tenancy/settings.ts";
 
 export const FLOWYTEAM_SOURCE = "flowyteam" as const;
 /** Read-only, never granted together with another scope (§6 F1). */
 export const FLOWYTEAM_EXPORT_SCOPE = "flowyteam:export";
-/** The managed cloud's FlowyTeam when the setting is empty (§4.4). */
-const FLOWYTEAM_CLOUD_URL = "https://app.flowyteam.com";
+/**
+ * FlowyTeam's cloud, which every instance connects to when the setting is
+ * empty, managed and self-hosted alike (§4.4, owner decision 23 November 2026).
+ */
+const FLOWYTEAM_CLOUD_URL = "https://flowyteam.com";
+/** The setting's value that turns the connect step off, for an air-gapped instance. */
+const FLOWYTEAM_OFF = "off";
 /** As long as FlowyTeam keeps an authorisation code. */
 export const FLOWYTEAM_STATE_TTL_MS = 10 * 60 * 1000;
 export const FLOWYTEAM_STATE_COOKIE = "openokr_flowyteam_connect";
@@ -142,7 +146,7 @@ async function resolveString(pool: Pool, key: string): Promise<string> {
 }
 
 export interface FlowyteamSettings {
-  /** Null when this instance offers no connect step (self-hosted, unset). */
+  /** Null when the setting is `off`: no connect step, the command line instead. */
   readonly baseUrl: string | null;
   /** The registered client id, or empty for the metadata document. */
   readonly registeredClientId: string;
@@ -152,12 +156,15 @@ export async function resolveFlowyteamSettings(
   pool: Pool,
 ): Promise<FlowyteamSettings> {
   const configured = await resolveString(pool, BASE_URL_KEY);
+  // Empty is FlowyTeam's cloud on every instance, so a self-hosted admin can
+  // connect without an operator first finding the address; `off` is the one
+  // way to hide the step, for an instance that must not reach out at all.
   const baseUrl =
-    configured !== ""
-      ? configured.replace(/\/+$/, "")
-      : (await isCloudEnabled(pool))
-        ? FLOWYTEAM_CLOUD_URL
-        : null;
+    configured.toLowerCase() === FLOWYTEAM_OFF
+      ? null
+      : configured !== ""
+        ? configured.replace(/\/+$/, "")
+        : FLOWYTEAM_CLOUD_URL;
   return {
     baseUrl,
     registeredClientId: await resolveString(pool, CLIENT_ID_KEY),

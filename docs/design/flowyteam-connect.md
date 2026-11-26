@@ -41,7 +41,7 @@ Prototype of both sides, clickable: [flowyteam-connect-prototype.html](flowyteam
 | In | Out |
 |---|---|
 | Connect, preview, import, invite and import again, from S-36 Admin > Import | Updating rows already imported when they change in FlowyTeam later (section 2, Q5) |
-| The managed cloud and self-hosted instances that can reach FlowyTeam | An air-gapped instance: the card says it cannot reach FlowyTeam and points to the command line |
+| The managed cloud and self-hosted instances that can reach FlowyTeam. Both connect to FlowyTeam's cloud by default (§4.4) | An air-gapped instance: its operator sets the address to `off`, and the card points to the command line instead |
 | Everything `pnpm import:flowyteam` imports today, with the same report | The tables listed under "What it does not bring across yet" in `docs/import/README.md` |
 | The command line keeps working against MySQL, unchanged for its user | Writing anything to FlowyTeam |
 
@@ -67,6 +67,18 @@ Prototype of both sides, clickable: [flowyteam-connect-prototype.html](flowyteam
 | Q4, resume | A real run hands over between domains after 10 minutes, under the 15-minute expiry; the follow-up job carries the reconciliation so far and starts at the next domain. A preview is never split, because the rows it plans live in memory: a preview past the expiry restarts from the start |
 | Q4, run row | The action writes the run row (source `flowyteam`, report `via: "export"`) in its own transaction and returns `runId`, so a run FlowyTeam refuses still has a row saying why. A second preview or run is refused (`already_running`) while an export run started in the last two hours is running |
 | Engine | `requireCompany` reads `companies.count` only to word a refusal, because `mysql-only` entries are not offered over HTTP. A source with `acrossCompanies: false` (the HTTP source) skips the unread-table counts that need every company; those count rows tied to no company, so nothing of this company goes unreported |
+
+**As built (C5).**
+
+| Decision | Built |
+|---|---|
+| Screen | `apps/web/app/admin/imports/flowyteam-card.tsx`. The step comes from the server (`flowyteam-view.ts`) from the browser runs: a running run is Preview or Import in progress, a finished preview newer than the last import is the Preview step, a finished import is the linked state. A failed run is said above the next step |
+| Choose | Drawn as the list of domains with their dependencies, all ticked and locked. `imports.flowyteamPreview` and `imports.flowyteamRun` take no domain list, so the browser brings everything across; choosing fewer stays on the command line (`--only`) until card C6 |
+| Progress | `GET /api/imports/flowyteam/live`, authorised by `imports.flowyteamConnection`, forwards the job's progress and end events with the run id, the domain and its position only. The card also re-reads every 15 seconds while a run is in progress, in case the stream does not reach the browser |
+| Q6 | FlowyTeam's last sign-in date is not in the catalogue, so the invite step lists everyone with a filter and Select all shown, and says why. Nothing is sent until Send; "Not now" closes the step |
+| Refusals | Every `reason` word (connect, callback, preview, run, job failure) maps to a catalogue key in `apps/web/lib/flowyteam-messages.ts`; a test fails when the domain gains a reason with no key |
+| Off | With `imports.flowyteam.baseUrl` set to `off` the card shows only the command-line pointer (`pnpm import:flowyteam`); empty is FlowyTeam's cloud (§4.4) |
+| Below `full` | The `/admin` layout already refuses anybody below `full`, so the card never draws for them; a refused action says `reason.forbidden` |
 
 ### 2.1 The catalogue format (C1)
 
@@ -114,6 +126,7 @@ Admin (OKRGoal)        OKRGoal server                  FlowyTeam
 | `imports.flowyteamPreview` | `full` | Enqueues a dry run; refuses when the workspace already holds another company (today's rule) |
 | `imports.flowyteamRun` | `full` | Enqueues the write. Requires `acceptBroaderVisibility` when the preview named restricted KPIs (today's `--accept-broader-visibility`) |
 | `imports.flowyteamDisconnect` | `full` | Marks the connection revoked and disconnected (soft delete), keeps imported data and the company link. An outbox row (`imports.flowyteamRevoke`) revokes the token at FlowyTeam (RFC 7009, `POST <baseUrl>/oauth/revoke`) through the outbound guard and then clears it from the row; no answer is retried, a refusal or 404 is not |
+| `imports.flowyteamPeople` | `full` | The invite step's list (C5): members a FlowyTeam import wrote with no account (`kind` placeholder, `placeholder_email` set), and whether an unused personal invitation to each address is open. The step invites through `invitations.createPersonalLink`, one per ticked person, and the server reads the addresses again so the browser names members, never addresses |
 | `imports.listRuns` | existing | Returns `via`: `export` for a browser run. As built, the source stays `flowyteam` (no migration of the `import_runs.source` check); the report and the filename carry `via` |
 
 All writes go through the Operation pipeline. The audit rows name the acting member and the FlowyTeam company id.
@@ -144,11 +157,13 @@ As built: `createHttpFlowyteamSource` and `createHttpFlowyteamFiles` in `package
 
 | Key | Default | Note |
 |---|---|---|
-| `imports.flowyteam.baseUrl` | `https://app.flowyteam.com` on the managed cloud, empty on self-hosted | Empty hides the connect step and shows the command line instead |
+| `imports.flowyteam.baseUrl` | Empty, which means `https://flowyteam.com` on every instance | `off` hides the connect step and shows the command line instead, for an air-gapped instance. Any other value is the FlowyTeam to connect to |
 | `imports.flowyteam.clientId` | Empty (`OPENOKR_FLOWYTEAM_CLIENT_ID`) | The cloud uses a registered confidential client; empty means the instance identifies itself with its client metadata document at `/api/imports/flowyteam/client` (public, `client_name` OKRGoal, one redirect URI, `token_endpoint_auth_method` none), which FlowyTeam already accepts for a trusted host |
 | `imports.flowyteam.clientSecret` | Empty, sealed (`OPENOKR_FLOWYTEAM_CLIENT_SECRET`) | Sent only for the registered client |
 
-All three are instance settings in `packages/core/src/secrets/instance-registry.ts`; `imports.flowyteam.baseUrl` is bootstrapped by `OPENOKR_FLOWYTEAM_URL`. The managed cloud default is applied when the setting is empty and `cloud.enabled` is on.
+All three are instance settings in `packages/core/src/secrets/instance-registry.ts`; `imports.flowyteam.baseUrl` is bootstrapped by `OPENOKR_FLOWYTEAM_URL`.
+
+**As built (owner decision, 23 November 2026).** An empty address means FlowyTeam's cloud, `https://flowyteam.com`, on the managed cloud and on a self-hosted instance alike, so the connect step always shows unless the operator sets `off`. This replaces the earlier default (`app.flowyteam.com` on the managed cloud only, nothing on self-hosted). Nothing is contacted until an administrator presses Connect. `docs/runbooks/air-gap.md` tells an isolated instance to set `off`.
 
 ### 4.5 Screen (S-36 Import)
 
@@ -201,6 +216,7 @@ As in the prototype: a "From FlowyTeam" card above the spreadsheet card with fiv
 | C3 | OpenOKR | Migration `import_connections` with row-level security; connect, callback and disconnect | Design approved |
 | C4 | OpenOKR | HTTP source driver, preview and run jobs, progress | C2, C3, F1 to F5 |
 | C5 | OpenOKR | S-36 card, invite step, catalogue strings, end-to-end spec against a FlowyTeam stub | C4 |
+| C6 | OpenOKR | Follow-up: an optional `only` list on `imports.flowyteamPreview` and `imports.flowyteamRun` (and the job payload), so the Choose step can untick domains as `--only` does. Until then Choose shows every domain ticked and locked (owner decision, 23 November 2026) | C5 |
 | F1 to F8 | FlowyTeam | Section 6 | C1 (the catalogue file) |
 
 C1 and C2 change nothing a running instance does and can ship first.

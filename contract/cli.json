@@ -6639,6 +6639,16 @@
       "pages": false
     },
     {
+      "name": "imports flowyteamPeople",
+      "action": "imports.flowyteamPeople",
+      "method": "GET",
+      "path": "/imports/flowyteamPeople",
+      "scope": "read",
+      "summary": "The people a FlowyTeam import brought across who have no account yet, and whether each already has an open invitation.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "imports flowyteamPreview",
       "action": "imports.flowyteamPreview",
       "method": "POST",

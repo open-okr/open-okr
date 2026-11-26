@@ -19,9 +19,11 @@ import {
   type ImportConnection,
   importConnections,
   importRuns,
+  inviteLinks,
   withWorkspace,
+  workspaceMembers,
 } from "@openokr/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, isNull, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -159,7 +161,7 @@ export const flowyteamConnect = defineWriteAction({
       if (!settings.baseUrl) {
         throw new OperationError(
           "forbidden",
-          "This instance has no FlowyTeam address. Import with the command line instead.",
+          "Connecting FlowyTeam is turned off on this instance. Import with the command line instead.",
           { reason: "not_configured" },
         );
       }
@@ -716,5 +718,100 @@ export const flowyteamConnection = defineReadAction({
           }
         : null,
     };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// The invite step (C5)
+// ---------------------------------------------------------------------------
+
+/**
+ * The people a FlowyTeam import brought across with nobody behind them yet,
+ * for the card's last step (flowyteam-connect Q6, AC 9).
+ *
+ * A row the importer wrote is a placeholder: no account, the person's address
+ * in `placeholder_email`, waiting to be claimed when that person accepts an
+ * invitation to it. `invited` says an unused personal invitation to that
+ * address is still open, so the step does not offer to send a second one.
+ *
+ * **No last-active filter.** The catalogue reads no FlowyTeam sign-in date,
+ * so the step lists everyone rather than guessing who is active.
+ *
+ * `full`, like every import action: the answer is a list of addresses.
+ */
+export const flowyteamPeople = defineReadAction({
+  name: "imports.flowyteamPeople",
+  agentSurface: false,
+  summary:
+    "The people a FlowyTeam import brought across who have no account yet, and whether each already has an open invitation.",
+  input: z.object({}),
+  output: z.object({
+    people: z.array(
+      z.object({
+        memberId: z.uuid(),
+        name: z.string(),
+        title: z.string().nullable(),
+        email: z.string(),
+        invited: z.boolean(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.full,
+  async handler(context) {
+    return withWorkspace(
+      drizzle(context.pool),
+      context.workspaceId,
+      async (tx) => {
+        const members = await tx
+          .select({
+            memberId: workspaceMembers.id,
+            name: workspaceMembers.name,
+            title: workspaceMembers.title,
+            email: workspaceMembers.placeholderEmail,
+          })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.legacyType, FLOWYTEAM_SOURCE),
+              eq(workspaceMembers.kind, "placeholder"),
+              eq(workspaceMembers.status, "active"),
+              isNull(workspaceMembers.userId),
+              isNotNull(workspaceMembers.placeholderEmail),
+            ),
+          )
+          .orderBy(asc(workspaceMembers.name));
+        const now = new Date();
+        const open = await tx
+          .select({ email: inviteLinks.email })
+          .from(inviteLinks)
+          .where(
+            activeOnly(
+              inviteLinks,
+              eq(inviteLinks.workspaceId, context.workspaceId),
+              eq(inviteLinks.mode, "personal"),
+              isNull(inviteLinks.revokedAt),
+              eq(inviteLinks.useCount, 0),
+              or(isNull(inviteLinks.expiresAt), gt(inviteLinks.expiresAt, now)),
+            ),
+          );
+        const invited = new Set(
+          open.map((link) => (link.email ?? "").toLowerCase()),
+        );
+        return {
+          people: members.map((member) => {
+            const email = (member.email ?? "").toLowerCase();
+            return {
+              memberId: member.memberId,
+              name: member.name,
+              title: member.title,
+              email,
+              invited: invited.has(email),
+            };
+          }),
+        };
+      },
+    );
   },
 });
