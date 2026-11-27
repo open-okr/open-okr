@@ -8,12 +8,12 @@
  * that stamped all of them with today under the migrator's name would pass a
  * count-based test and be worthless to the people who have to read it.
  */
-import { provisionWorkspaceForUser } from "@openokr/core";
+import { provisionWorkspaceForUser, type Source } from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { runFlowyteamImport } from "../src/flowyteam/run.ts";
-import { openSource, type Source } from "../src/flowyteam/source.ts";
+import { openSource } from "../src/flowyteam/source.ts";
 import {
   available,
   SEEDED,

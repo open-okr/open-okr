@@ -5,11 +5,8 @@
  * case is a string and none of them needs a database. The samples here are real
  * token strings taken from a live instance holding 26248 of them.
  */
+import { parseFormulaTokens, resolveFormulaReferences } from "@openokr/core";
 import { describe, expect, it } from "vitest";
-import {
-  parseFormulaTokens,
-  resolveFormulaReferences,
-} from "../src/flowyteam/mappers/formula.ts";
 
 describe("the token grammar", () => {
   it("reads the simplest real formula", () => {

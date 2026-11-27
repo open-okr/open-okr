@@ -106,6 +106,20 @@ export {
   NodeDnsResolver,
   type NodeDnsResolverOptions,
 } from "./drivers/dns/node.ts";
+export {
+  coerceExportValue,
+  createHttpFlowyteamFiles,
+  createHttpFlowyteamSource,
+  type FetchedFlowyteamFile,
+  FlowyteamExportError,
+  type HttpFlowyteamFilesOptions,
+  type HttpFlowyteamSource,
+  type HttpFlowyteamSourceOptions,
+} from "./drivers/flowyteam/export.ts";
+export {
+  createHttpFlowyteamGateway,
+  type HttpFlowyteamGatewayOptions,
+} from "./drivers/flowyteam/http.ts";
 // The two file drivers the upload path and the relay construct (completeness
 // review M-24). Exported by name, like the storage drivers below: the host
 // builds one, and everything else sees the port.
@@ -226,6 +240,13 @@ export type {
   ErrorReportDropReason,
   ErrorReporter,
 } from "./ports/errors.ts";
+export type {
+  FlowyteamAnswer,
+  FlowyteamClientCredentials,
+  FlowyteamExportColumn,
+  FlowyteamFailure,
+  FlowyteamGateway,
+} from "./ports/flowyteam.ts";
 export type {
   EncodedImage,
   ImageFormat,

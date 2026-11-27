@@ -8,6 +8,7 @@
  * database is genuinely writable by an administrator, so a passing run cannot be
  * a database that refuses everybody.
  */
+import { type Source, SourceError } from "@openokr/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   assertRead,
@@ -15,11 +16,11 @@ import {
   openSource,
   parseUrl,
   READ_ONLY_ERROR,
-  type Source,
-  SourceError,
 } from "../src/flowyteam/source.ts";
 import {
   available,
+  openRawSource,
+  type RawSource,
   type SeededSource,
   SKIP_REASON,
   seedSource,
@@ -35,19 +36,22 @@ describe.skipIf(!runnable)(
   () => {
     let seeded: SeededSource;
     let source: Source;
+    let raw: RawSource;
 
     beforeAll(async () => {
       seeded = await seedSource("source");
       source = await openSource({ url: seeded.url });
+      raw = await openRawSource(seeded.url);
     });
 
     afterAll(async () => {
+      await raw?.close();
       await source?.close();
       await seeded?.drop();
     });
 
     it("reads what is there", async () => {
-      const rows = await source.query<{ n: number }>(
+      const rows = await raw.query<{ n: number }>(
         "select count(*) as n from objectives",
       );
       // Every seeded objective, both companies. The company filter is the
@@ -89,7 +93,7 @@ describe.skipIf(!runnable)(
       await seeded.run(
         "insert into companies (id, company_name) values (99, 'X')",
       );
-      const rows = await source.query<{ n: number }>(
+      const rows = await raw.query<{ n: number }>(
         "select count(*) as n from companies where id = 99",
       );
       expect(Number(rows[0]?.n)).toBe(1);
@@ -98,7 +102,7 @@ describe.skipIf(!runnable)(
     it("refuses a lock, which a read-only transaction would have allowed", async () => {
       // The second layer earning its place: `LOCK TABLES` is not a write and
       // MySQL would have run it.
-      await expect(source.query("lock tables objectives read")).rejects.toThrow(
+      await expect(raw.query("lock tables objectives read")).rejects.toThrow(
         SourceError,
       );
     });

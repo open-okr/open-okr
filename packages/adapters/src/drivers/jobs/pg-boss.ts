@@ -28,6 +28,14 @@ export interface PgBossJobQueueOptions {
    * migration 0099 has already created the schema for it.
    */
   readonly createSchema?: boolean;
+  /** The most connections pg-boss holds. pg-boss's own default when absent. */
+  readonly max?: number;
+  /**
+   * Only `enqueue`: no maintenance, no cron and no migration from this
+   * process (flowyteam-connect Q4). A relay with no scheduler beside it
+   * queues jobs for a worker elsewhere and must not supervise its queues.
+   */
+  readonly sendOnly?: boolean;
   readonly onError?: (error: unknown) => void;
 }
 
@@ -43,6 +51,10 @@ export class PgBossJobQueue implements JobQueue {
       connectionString: options.connectionString,
       schema: options.schema ?? "pgboss",
       createSchema: options.createSchema ?? true,
+      ...(options.max !== undefined ? { max: options.max } : {}),
+      ...(options.sendOnly
+        ? { supervise: false, schedule: false, migrate: false }
+        : {}),
     });
     this.#boss.on("error", (error) => options.onError?.(error));
   }

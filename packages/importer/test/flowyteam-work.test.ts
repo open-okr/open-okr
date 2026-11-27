@@ -9,12 +9,12 @@
  * team is skipped by name rather than dropped into an arbitrary space, because
  * an initiative in the wrong team is work the wrong people are accountable for.
  */
-import { provisionWorkspaceForUser } from "@openokr/core";
+import { provisionWorkspaceForUser, type Source } from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { runFlowyteamImport } from "../src/flowyteam/run.ts";
-import { openSource, type Source } from "../src/flowyteam/source.ts";
+import { openSource } from "../src/flowyteam/source.ts";
 import {
   available,
   SEEDED,

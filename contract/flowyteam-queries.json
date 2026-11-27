@@ -1,0 +1,435 @@
+{
+  "version": "75cb709bc643960743f5b711f1342295fc7f73af0828086442e934bb833767c8",
+  "entries": [
+    {
+      "name": "checkIns.keyResultsByCheckIn",
+      "sql": "select key_result_id, current_value, confidence, remarks\n           from key_result_checkins\n          where company_id = :company and checkin_id = ?\n          order by id",
+      "scope": "company"
+    },
+    {
+      "name": "checkIns.keyResultsByPeriod",
+      "sql": "select k.key_result_id, k.current_value, k.confidence, k.remarks\n           from key_result_checkins k\n           join key_results r on r.id = k.key_result_id\n          where k.company_id = :company and r.objective_id = ?\n            and k.start_date = ? and k.end_date = ?\n          order by k.id",
+      "scope": "company"
+    },
+    {
+      "name": "checkIns.objectiveCheckIns",
+      "sql": "select c.id, c.objective_id, c.user_id, c.checkin_id, c.start_date,\n            c.end_date, c.confidence, c.remarks, c.created_at\n       from objective_checkins c\n       join objectives o on o.id = c.objective_id\n      where c.company_id = :company and o.deleted_at is null\n      order by c.created_at, c.id",
+      "scope": "company"
+    },
+    {
+      "name": "checkIns.reviews",
+      "sql": "select user_id, created_at from checkin_reviews\n      where company_id = :company and checkin_id = ?\n      order by created_at limit 1",
+      "scope": "company"
+    },
+    {
+      "name": "collaboration.taskAccesses",
+      "sql": "select task_id, user_id\n       from tasks_accesses\n      where company_id = :company\n      order by task_id, user_id, id",
+      "scope": "company"
+    },
+    {
+      "name": "collaboration.taskComments",
+      "sql": "select c.id, c.comment, c.user_id, c.task_id, c.parent_id,\n            c.created_at, c.edited_at\n       from task_comments c\n       join tasks t on t.id = c.task_id\n      where t.company_id = :company and t.deleted_at is null\n      order by c.id",
+      "scope": "company"
+    },
+    {
+      "name": "companies.byId",
+      "sql": "select id, company_name, company_username, timezone, status\n       from companies\n      where id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "companies.count",
+      "sql": "select count(*) as n from companies",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "companies.list",
+      "sql": "select id, company_name, company_username, timezone, status\n       from companies\n      order by id\n      limit ?",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "companyCounts.employee_details",
+      "sql": "select count(*) as n from `employee_details` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "companyCounts.indicators",
+      "sql": "select count(*) as n from `indicators` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "companyCounts.key_results",
+      "sql": "select count(*) as n from `key_results` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "companyCounts.objectives",
+      "sql": "select count(*) as n from `objectives` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "companyCounts.performance_cycles",
+      "sql": "select count(*) as n from `performance_cycles` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "companyCounts.tasks",
+      "sql": "select count(*) as n from `tasks` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "companyCounts.teams",
+      "sql": "select count(*) as n from `teams` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "files.inlineImageComments",
+      "sql": "select c.id, c.comment\n       from task_comments c\n       join tasks t on t.id = c.task_id\n      where t.company_id = :company and t.deleted_at is null\n        and c.comment like '%data:%'\n      order by c.id",
+      "scope": "company"
+    },
+    {
+      "name": "files.taskFiles",
+      "sql": "select id, task_id, user_id, filename, hashname, size,\n            google_url, dropbox_link, external_link, external_link_name\n       from task_files\n      where company_id = :company\n      order by id",
+      "scope": "company"
+    },
+    {
+      "name": "kpiShares.accessesAll",
+      "sql": "select ia.*\n       from indicator_accesses ia\n       join indicators i on i.id = ia.indicator_id\n      where i.company_id = :company\n        and i.deleted_at is null\n        \n      order by ia.id",
+      "scope": "company"
+    },
+    {
+      "name": "kpiShares.accessesAllNoId",
+      "sql": "select ia.*\n       from indicator_accesses ia\n       join indicators i on i.id = ia.indicator_id\n      where i.company_id = :company\n        and i.deleted_at is null\n        \n      order by ia.indicator_id, ia.user_id",
+      "scope": "company"
+    },
+    {
+      "name": "kpiShares.accessesLive",
+      "sql": "select ia.*\n       from indicator_accesses ia\n       join indicators i on i.id = ia.indicator_id\n      where i.company_id = :company\n        and i.deleted_at is null\n        and ia.deleted_at is null\n      order by ia.id",
+      "scope": "company"
+    },
+    {
+      "name": "kpiShares.accessesLiveNoId",
+      "sql": "select ia.*\n       from indicator_accesses ia\n       join indicators i on i.id = ia.indicator_id\n      where i.company_id = :company\n        and i.deleted_at is null\n        and ia.deleted_at is null\n      order by ia.indicator_id, ia.user_id",
+      "scope": "company"
+    },
+    {
+      "name": "kpiShares.flaggedAll",
+      "sql": "select i.id, i.title, count(distinct ia.user_id) as named_people\n       from indicators i\n       join indicator_accesses ia on ia.indicator_id = i.id\n      where i.company_id = :company\n        and i.deleted_at is null\n        \n        and ia.user_id is not null\n      group by i.id, i.title\n      order by i.id",
+      "scope": "company"
+    },
+    {
+      "name": "kpiShares.flaggedLive",
+      "sql": "select i.id, i.title, count(distinct ia.user_id) as named_people\n       from indicators i\n       join indicator_accesses ia on ia.indicator_id = i.id\n      where i.company_id = :company\n        and i.deleted_at is null\n        and ia.deleted_at is null\n        and ia.user_id is not null\n      group by i.id, i.title\n      order by i.id",
+      "scope": "company"
+    },
+    {
+      "name": "kpiShares.indicatorOwner",
+      "sql": "select model_id, model_type from indicators where id = ? and company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "kpis.categories",
+      "sql": "select id, name from indicator_types\n      where company_id = :company and deleted_at is null order by id",
+      "scope": "company"
+    },
+    {
+      "name": "kpis.flaggedAccess",
+      "sql": "select distinct i.id\n             from indicators i\n             join indicator_accesses ia on ia.indicator_id = i.id\n            where i.company_id = :company\n              and i.deleted_at is null\n              and ia.user_id is not null\n            limit 1",
+      "scope": "company"
+    },
+    {
+      "name": "kpis.formulas",
+      "sql": "select id, calculated_value from indicators\n      where company_id = :company and deleted_at is null and calculated = 1\n        and calculated_value is not null and calculated_value <> ''\n      order by id",
+      "scope": "company"
+    },
+    {
+      "name": "kpis.indicators",
+      "sql": "select id, indicator_type_id, title, description, occurance, direction,\n            aggregate, unit_value, indicator_parent_id, target_value,\n            model_id, model_type\n       from indicators\n      where company_id = :company and deleted_at is null\n      order by id",
+      "scope": "company"
+    },
+    {
+      "name": "kpis.ownerMemberExists",
+      "sql": "select id from employee_details where id = ?",
+      "scope": "reference"
+    },
+    {
+      "name": "kpis.ownerSpaceExists",
+      "sql": "select id from teams where id = ?",
+      "scope": "reference"
+    },
+    {
+      "name": "kpis.recordPeriods",
+      "sql": "select distinct period_key from indicator_records\n      where company_id = :company and deleted_at is null\n        and indicator_id in (?)\n      order by period_key",
+      "scope": "company"
+    },
+    {
+      "name": "kpis.records",
+      "sql": "select r.id, r.indicator_id, r.period_key, r.current_value, r.target_value,\n            r.remark, i.occurance, i.aggregate\n       from indicator_records r\n       join indicators i on i.id = r.indicator_id\n      where r.company_id = :company and r.deleted_at is null and i.deleted_at is null\n      order by r.period_key, r.id",
+      "scope": "company"
+    },
+    {
+      "name": "okrs.keyResultRecords",
+      "sql": "select r.id, r.key_results_id, r.history_value\n       from key_result_records r\n       join key_results k on k.id = r.key_results_id\n      where r.company_id = :company and k.deleted_at is null\n      order by r.created_at, r.id",
+      "scope": "company"
+    },
+    {
+      "name": "okrs.keyResults",
+      "sql": "select k.id, k.objective_id, k.title, k.description, k.unit_value,\n            k.initial_value, k.target_value, k.current_value, k.weight,\n            k.leader_model_id\n       from key_results k\n       join objectives o on o.id = k.objective_id\n      where k.company_id = :company and k.deleted_at is null and o.deleted_at is null\n      order by k.id",
+      "scope": "company"
+    },
+    {
+      "name": "okrs.objectives",
+      "sql": "select id, model_id, model_type, leader_model_id, title, description,\n            performance_cycle_id, started_at, finished_at, weight,\n            result_percentage, objective_parent_id, key_result_parent_id\n       from objectives\n      where company_id = :company and deleted_at is null\n      order by id",
+      "scope": "company"
+    },
+    {
+      "name": "organisation.cycles",
+      "sql": "select id, name, cycle_type, type, started_at, finished_at\n       from performance_cycles\n      where company_id = :company and deleted_at is null\n      order by started_at, id",
+      "scope": "company"
+    },
+    {
+      "name": "organisation.employeeManager",
+      "sql": "select reports_to from employee_details where id = ? and company_id = :company and deleted_at is null",
+      "scope": "company"
+    },
+    {
+      "name": "organisation.employeeUser",
+      "sql": "select user_id from employee_details where id = ? and company_id = :company and deleted_at is null",
+      "scope": "company"
+    },
+    {
+      "name": "organisation.otherDepartments",
+      "sql": "select o.user_id, o.team_id\n       from other_departments o\n       join teams t on t.id = o.team_id\n      where t.company_id = :company and t.deleted_at is null\n      order by o.id",
+      "scope": "company"
+    },
+    {
+      "name": "organisation.teamLeader",
+      "sql": "select leader_id from teams where id = ? and company_id = :company and deleted_at is null",
+      "scope": "company"
+    },
+    {
+      "name": "organisation.teams",
+      "sql": "select id, team_name, parent_id, leader_id, description\n       from teams\n      where company_id = :company and deleted_at is null\n      order by id",
+      "scope": "company"
+    },
+    {
+      "name": "organisation.users",
+      "sql": "select u.id, u.name, u.email, u.timezone, u.status,\n            d.name as title\n       from users u\n       left join employee_details e\n         on e.user_id = u.id and e.company_id = u.company_id and e.deleted_at is null\n       left join designations d on d.id = e.designation_id\n      where u.company_id = :company\n      order by u.id, e.id",
+      "scope": "company"
+    },
+    {
+      "name": "schema.indicatorAccessesColumns",
+      "sql": "select column_name as COLUMN_NAME\n       from information_schema.columns\n      where table_schema = ? and table_name = 'indicator_accesses'\n      order by column_name",
+      "scope": "schema"
+    },
+    {
+      "name": "schema.latestMigration",
+      "sql": "select migration from migrations order by id desc limit 1",
+      "scope": "schema"
+    },
+    {
+      "name": "schema.migrationCount",
+      "sql": "select count(*) as n from migrations",
+      "scope": "schema"
+    },
+    {
+      "name": "schema.tables",
+      "sql": "select table_name as TABLE_NAME from information_schema.tables where table_schema = ? order by table_name",
+      "scope": "schema"
+    },
+    {
+      "name": "unread.checkins.all",
+      "sql": "select count(*) as n from `checkins`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.checkins.company",
+      "sql": "select count(*) as n from `checkins` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.columns",
+      "sql": "select table_name as TABLE_NAME, column_name as COLUMN_NAME\n       from information_schema.columns\n      where table_schema = ? and table_name in (?)\n      order by table_name, column_name",
+      "scope": "schema"
+    },
+    {
+      "name": "unread.employee_teams.all",
+      "sql": "select count(*) as n from `employee_teams`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.employee_teams.company",
+      "sql": "select count(*) as n from `employee_teams` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.employee_teams.through",
+      "sql": "select count(*) as n from `employee_teams` t join `teams` p on p.id = t.`team_id` where p.company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.indicator_calculates.all",
+      "sql": "select count(*) as n from `indicator_calculates`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.indicator_calculates.company",
+      "sql": "select count(*) as n from `indicator_calculates` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.key_result_files.all",
+      "sql": "select count(*) as n from `key_result_files`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.key_result_files.company",
+      "sql": "select count(*) as n from `key_result_files` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.keyresult_discussions.all",
+      "sql": "select count(*) as n from `keyresult_discussions`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.keyresult_discussions.company",
+      "sql": "select count(*) as n from `keyresult_discussions` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.keyresult_indicator.all",
+      "sql": "select count(*) as n from `keyresult_indicator`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.keyresult_indicator.company",
+      "sql": "select count(*) as n from `keyresult_indicator` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.keyresult_indicator.through",
+      "sql": "select count(*) as n from `keyresult_indicator` t join `key_results` p on p.id = t.`key_result_id` where p.company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.objective_accesses.all",
+      "sql": "select count(*) as n from `objective_accesses`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.objective_accesses.company",
+      "sql": "select count(*) as n from `objective_accesses` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.objective_discussions.all",
+      "sql": "select count(*) as n from `objective_discussions`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.objective_discussions.company",
+      "sql": "select count(*) as n from `objective_discussions` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.performance_records.all",
+      "sql": "select count(*) as n from `performance_records`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.performance_records.company",
+      "sql": "select count(*) as n from `performance_records` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.performance_settings.all",
+      "sql": "select count(*) as n from `performance_settings`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.performance_settings.company",
+      "sql": "select count(*) as n from `performance_settings` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.project_time_logs.all",
+      "sql": "select count(*) as n from `project_time_logs`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.project_time_logs.company",
+      "sql": "select count(*) as n from `project_time_logs` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.reward_settings.all",
+      "sql": "select count(*) as n from `reward_settings`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.reward_settings.company",
+      "sql": "select count(*) as n from `reward_settings` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.scores.all",
+      "sql": "select count(*) as n from `scores`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.scores.company",
+      "sql": "select count(*) as n from `scores` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.task_boards.all",
+      "sql": "select count(*) as n from `task_boards`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.task_boards.company",
+      "sql": "select count(*) as n from `task_boards` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "unread.task_category.all",
+      "sql": "select count(*) as n from `task_category`",
+      "scope": "mysql-only"
+    },
+    {
+      "name": "unread.task_category.company",
+      "sql": "select count(*) as n from `task_category` where company_id = :company",
+      "scope": "company"
+    },
+    {
+      "name": "work.boardColumns",
+      "sql": "select id, slug from taskboard_columns where company_id = :company order by id",
+      "scope": "company"
+    },
+    {
+      "name": "work.projectAdminTeams",
+      "sql": "select e.department_id\n       from employee_details e\n      where e.company_id = :company and e.deleted_at is null\n        and e.department_id is not null\n        and (e.user_id = ? or e.user_id in (\n          select pm.user_id from project_members pm where pm.project_id = ?\n        ))\n      order by case when e.user_id = ? then 0 else 1 end, e.id",
+      "scope": "company"
+    },
+    {
+      "name": "work.projects",
+      "sql": "select id, project_name, project_summary, project_admin, start_date,\n            deadline, status\n       from projects\n      where company_id = :company and deleted_at is null\n      order by id",
+      "scope": "company"
+    },
+    {
+      "name": "work.subTasks",
+      "sql": "select s.id, s.task_id, s.title, s.status\n       from sub_tasks s\n       join tasks t on t.id = s.task_id\n      where t.company_id = :company and t.deleted_at is null\n      order by s.id",
+      "scope": "company"
+    },
+    {
+      "name": "work.taskLinkCounts",
+      "sql": "select\n       sum(case when dependent_task_id is not null then 1 else 0 end) as dependent,\n       sum(case when recurring_task_id is not null then 1 else 0 end) as recurring\n       from tasks where company_id = :company and deleted_at is null",
+      "scope": "company"
+    },
+    {
+      "name": "work.tasks",
+      "sql": "select id, heading, description, due_date, user_id, project_id,\n            key_results_id, status, board_column_id, dependent_task_id,\n            recurring_task_id\n       from tasks\n      where company_id = :company and deleted_at is null\n      order by id",
+      "scope": "company"
+    }
+  ]
+}

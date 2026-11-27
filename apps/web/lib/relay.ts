@@ -63,7 +63,9 @@ import { relayMode } from "./background-work";
 import { getBilling } from "./billing";
 import { drafterFor } from "./drafter";
 import { embedFor } from "./embedder";
+import { revokeFlowyteam } from "./flowyteam";
 import { getInstanceName } from "./instance-name";
+import { jobQueueForSending } from "./job-sender";
 import { getMailSettings, mailerFrom } from "./mail";
 import { postWebhook } from "./outbound";
 import { getPool } from "./pool";
@@ -174,6 +176,15 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
     // W7). Both always present: neither needs a service.
     ring: getKeyRing(),
     postWebhook,
+    // A disconnected FlowyTeam token is revoked there through the guard and
+    // then cleared (flowyteam-connect.md §4.1).
+    revokeFlowyteam,
+    // A FlowyTeam import outlasts the lease, so it is a job the scheduler's
+    // worker runs (flowyteam-connect.md Q4). Retried once by pg-boss.
+    async enqueueJob(name, payload, { idempotencyKey }) {
+      const queue = await jobQueueForSending();
+      await queue.enqueue(name, payload, { idempotencyKey, retryLimit: 1 });
+    },
     // An address a personal invitation proved, confirmed through Better
     // Auth's own adapter (plan 0.8.1 S5-R, D14). Imported when used, so the
     // relay does not load sign-in until a row needs it.

@@ -91,6 +91,15 @@ import {
   runExportJob,
 } from "../exports/worker.ts";
 import {
+  FLOWYTEAM_REVOKE_TOPIC,
+  type FlowyteamGateway,
+} from "../imports/flowyteam/connection.ts";
+import {
+  FLOWYTEAM_IMPORT_TOPIC,
+  parseFlowyteamImportJob,
+} from "../imports/flowyteam/job.ts";
+import { revokeFlowyteamConnection } from "../imports/flowyteam/revoke.ts";
+import {
   changeEmailMail,
   type DeletionCancelReason,
   deletionCancelledMail,
@@ -306,6 +315,23 @@ export interface OutboxHandlerDeps {
    * function rather than the guard, which lives in `packages/adapters`.
    */
   readonly postWebhook?: WebhookPost;
+  /**
+   * Revokes a FlowyTeam token through the outbound guard
+   * (docs/design/flowyteam-connect.md §4.1). A function rather than the
+   * driver, which lives in `packages/adapters`. Absent, a revocation waits for
+   * a relay that has one.
+   */
+  readonly revokeFlowyteam?: FlowyteamGateway["revoke"];
+  /**
+   * Queues one job on the jobs port (docs/design/flowyteam-connect.md Q4).
+   * A function rather than the port, which lives in `packages/adapters`.
+   * Absent, a row that needs it waits for a relay that has it.
+   */
+  readonly enqueueJob?: (
+    name: string,
+    payload: Record<string, unknown>,
+    options: { readonly idempotencyKey: string },
+  ) => Promise<void>;
   /** The instance's own address, for links inside emails. */
   readonly baseUrl?: string;
   /**
@@ -1678,6 +1704,61 @@ const sendWebhookTurnedOff: OutboxHandler = async (delivery, deps) => {
   });
 };
 
+/**
+ * Revokes a disconnected or replaced FlowyTeam token at FlowyTeam, then clears
+ * it from the row (docs/design/flowyteam-connect.md §4.1). No answer is
+ * retried; a refusal is not, because waiting will not change it.
+ */
+const revokeFlowyteamToken: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const connectionId = asString(delivery.payload.connectionId);
+  if (!workspaceId || !connectionId) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} does not name a workspace and a connection, so nothing can be revoked.`,
+    );
+  }
+  if (!deps.ring || !deps.revokeFlowyteam) {
+    // Thrown so it waits for a relay that can, like a webhook without a ring.
+    throw new Error("this relay cannot open or revoke a FlowyTeam token");
+  }
+  const outcome = await revokeFlowyteamConnection({
+    pool: deps.pool,
+    ring: deps.ring,
+    revoke: deps.revokeFlowyteam,
+    workspaceId,
+    connectionId,
+  });
+  if (outcome.kind === "retry") {
+    throw new Error(outcome.reason);
+  }
+  if (outcome.kind !== "revoked") {
+    deps.onSkipped?.(delivery, outcome.reason);
+  }
+};
+
+/**
+ * Hands a FlowyTeam import to the jobs port (flowyteam-connect Q4).
+ *
+ * The import itself runs minutes, far past this relay's lease, so it is a job
+ * the scheduler's worker runs, not a delivery. **Safe to run twice**: the job
+ * is deduplicated by this row's key, and a job for a run that already closed
+ * does nothing.
+ */
+const enqueueFlowyteamImport: OutboxHandler = async (delivery, deps) => {
+  const job = parseFlowyteamImportJob(delivery.payload);
+  if (!job) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} does not carry a workspace, a connection and a run, so nothing can be imported.`,
+    );
+  }
+  if (!deps.enqueueJob) {
+    throw new Error("this relay cannot queue background jobs");
+  }
+  await deps.enqueueJob(FLOWYTEAM_IMPORT_TOPIC, delivery.payload, {
+    idempotencyKey: delivery.idempotencyKey,
+  });
+};
+
 const acknowledge: OutboxHandler = async (delivery, deps) => {
   deps.onSkipped?.(delivery, "no consumer for this topic yet");
 };
@@ -1758,6 +1839,8 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   [TRIAL_ENDED_TOPIC]: sendTrialEnded,
   // Erasure's half that only the server can do (workspace-erasure.md §4).
   [ERASE_FILES_TOPIC]: eraseFiles,
+  [FLOWYTEAM_REVOKE_TOPIC]: revokeFlowyteamToken,
+  [FLOWYTEAM_IMPORT_TOPIC]: enqueueFlowyteamImport,
   [ERASE_CUSTOMER_TOPIC]: deleteCustomer,
   // Outbound webhooks (docs/design/outbound-webhooks.md W8, W9).
   [WEBHOOK_DELIVER_TOPIC]: deliverWebhookEvent,

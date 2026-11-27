@@ -894,6 +894,20 @@ Written by an outbox-driven worker on the `content.index` topic, enqueued by the
 
 One row per run at migration 0070, including a run that failed and a dry run that wrote nothing (P6-T01a). `entity` is what separates the two sources: a spreadsheet holds one kind of thing and names it, and a FlowyTeam run loads a company across every domain and names none. `mode` is stored rather than inferred, because a real run that wrote nothing and a dry run that would have written nothing produce the same counts and are not the same event. The report is jsonb because its shape belongs to the importer and differs per source: per-row errors against line numbers for a spreadsheet, per-table reconciliation for FlowyTeam.
 
+### import_connections *(migration 0174)*
+`source` (`flowyteam`), `base_url`, `client_id`, `company_id`, `company_name`, `token_ciphertext?`, `token_data_key?`, `token_key_id?`, `scopes` (default `flowyteam:export`), `connected_by_member_id` to workspace_members, `connected_at`, `last_read_at?`, `revoked_at?`, timestamps, `deleted_at?`.
+
+Design: `docs/design/flowyteam-connect.md` §4.2. A workspace's OAuth connection to FlowyTeam. The access token sits in the three sealed columns every credential uses, so `pnpm keys:rotate` re-wraps it, and no read action selects them. `client_id` records which OAuth client asked (a registered one, or the instance's client metadata document address), because revoking names it.
+
+| State | `revoked_at` | `deleted_at` | Token |
+|---|---|---|---|
+| Connected | null | null | sealed |
+| FlowyTeam refused the token later (C4) | set | null | sealed, the card offers Connect again |
+| Disconnected or replaced, revoke pending | set | set | sealed until the relay revokes it |
+| Disconnected and revoked | set | set | null |
+
+One live row per workspace and source: a unique index on `(workspace_id, source)` where `deleted_at is null`. Two checks keep the three token columns whole and keep a live row from having none. Row-level security on `workspace_id` in the same migration. Excluded from workspace archives; no legacy source.
+
 ### export_runs
 `kind` (`list` / `archive`), `list`, `format` (`csv` / `xlsx`), `cycle_id?` to cycles, `space_id?` to spaces, `requested_by_id` to workspace_members, `state` (`queued` / `building` / `ready` / `failed`), `row_count?`, `filename`, `blob_id?` to blobs, `error?`, `finished_at?`.
 

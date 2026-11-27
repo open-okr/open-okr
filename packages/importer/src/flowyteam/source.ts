@@ -18,7 +18,18 @@
  * need the session setting applied, and one forgotten hand-out is a writable
  * session. One connection is applied once, and an import reads sequentially in
  * dependency order anyway.
+ *
+ * **The `Source` interface lives in core** (`packages/core/src/imports/flowyteam`)
+ * with the engine, so the web application can run the engine without this
+ * client. This file is the MySQL implementation of it.
  */
+
+import {
+  FLOWYTEAM_QUERIES,
+  type FlowyteamQueryName,
+  type Source,
+  SourceError,
+} from "@openokr/core";
 
 // openokr:allow-vendor-sdk: the MySQL client is the one pre-approved importer
 // dependency (CLAUDE.md, TECHNICAL-PLAN §1). It is here rather than behind a
@@ -26,23 +37,6 @@
 // has: nothing but this importer ever opens a FlowyTeam database, and a port
 // would be an abstraction over exactly one caller.
 import mysql from "mysql2/promise";
-
-/** What the connector hands the introspection and the mappers. */
-export interface Source {
-  /** One read. Refused before it is sent if it is not a read. */
-  query<T = Record<string, unknown>>(
-    sql: string,
-    values?: readonly unknown[],
-  ): Promise<T[]>;
-  /** The database name the URL selected, for the report. */
-  readonly database: string;
-  /** The address with any password removed, for the report and the log. */
-  readonly describe: string;
-  close(): Promise<void>;
-}
-
-/** A refusal by the source itself, as opposed to something going wrong. */
-export class SourceError extends Error {}
 
 /**
  * The statements this importer sends, and nothing else.
@@ -117,7 +111,26 @@ export async function openSource(options: OpenOptions): Promise<Source> {
   return {
     database: address.database,
     describe: address.describe,
-    async query<T>(sql: string, values?: readonly unknown[]): Promise<T[]> {
+    async read<T>(
+      name: FlowyteamQueryName,
+      values?: readonly unknown[],
+      company?: number | string,
+    ): Promise<T[]> {
+      const entry = FLOWYTEAM_QUERIES[name];
+      if (!entry) {
+        throw new SourceError(`"${name}" is not a named FlowyTeam statement.`);
+      }
+      let sql: string = entry.sql;
+      if (sql.includes(":company")) {
+        if (company === undefined || !/^\d+$/.test(String(company))) {
+          throw new SourceError(
+            `"${name}" reads one company and was given no company id.`,
+          );
+        }
+        // Substituted before the driver fills the `?` values, with a value that
+        // is digits only, so it cannot carry a placeholder of its own.
+        sql = sql.replaceAll(":company", connection.escape(Number(company)));
+      }
       assertRead(sql);
       const [rows] = await connection.query(sql, values ? [...values] : []);
       return rows as T[];

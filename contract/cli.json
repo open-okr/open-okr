@@ -6580,6 +6580,115 @@
       "pages": false
     },
     {
+      "name": "imports flowyteamConnection",
+      "action": "imports.flowyteamConnection",
+      "method": "GET",
+      "path": "/imports/flowyteamConnection",
+      "scope": "read",
+      "summary": "Whether this instance offers connecting FlowyTeam, and this workspace's connection if it has one. Never the token.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "imports flowyteamConnect",
+      "action": "imports.flowyteamConnect",
+      "method": "POST",
+      "path": "/imports/flowyteamConnect",
+      "scope": "write",
+      "summary": "Starts connecting FlowyTeam: the address to approve the connection at, and the sealed state the browser keeps for ten minutes.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "imports flowyteamFinishConnect",
+      "action": "imports.flowyteamFinishConnect",
+      "method": "POST",
+      "path": "/imports/flowyteamFinishConnect",
+      "scope": "write",
+      "summary": "Finishes connecting FlowyTeam with the code it returned, and stores the sealed connection.",
+      "flags": [
+        {
+          "name": "code",
+          "field": "code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "state",
+          "field": "state",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "state-cookie",
+          "field": "stateCookie",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "imports flowyteamDisconnect",
+      "action": "imports.flowyteamDisconnect",
+      "method": "POST",
+      "path": "/imports/flowyteamDisconnect",
+      "scope": "destructive",
+      "summary": "Disconnects FlowyTeam and revokes its token there when it can be reached. Imported data stays.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "imports flowyteamPeople",
+      "action": "imports.flowyteamPeople",
+      "method": "GET",
+      "path": "/imports/flowyteamPeople",
+      "scope": "read",
+      "summary": "The people a FlowyTeam import brought across who have no account yet, and whether each already has an open invitation.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "imports flowyteamPreview",
+      "action": "imports.flowyteamPreview",
+      "method": "POST",
+      "path": "/imports/flowyteamPreview",
+      "scope": "write",
+      "summary": "Starts a dry run of the FlowyTeam import in the background. Writes nothing but the run's own row.",
+      "flags": [
+        {
+          "name": "only",
+          "field": "only",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "imports flowyteamRun",
+      "action": "imports.flowyteamRun",
+      "method": "POST",
+      "path": "/imports/flowyteamRun",
+      "scope": "write",
+      "summary": "Starts the FlowyTeam import in the background. Adds what is new and changes nothing already imported.",
+      "flags": [
+        {
+          "name": "accept-broader-visibility",
+          "field": "acceptBroaderVisibility",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "only",
+          "field": "only",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "tasks board",
       "action": "tasks.board",
       "method": "GET",

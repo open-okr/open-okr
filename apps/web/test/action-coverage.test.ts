@@ -63,31 +63,31 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     why: "an operator's plan change on the console is audited under it; a workspace's own members are refused",
   },
   "people.importMember": {
-    caller: "packages/importer/src/flowyteam/mappers/organisation.ts",
+    caller: "packages/core/src/imports/flowyteam/mappers/organisation.ts",
     why: "the FlowyTeam importer brings people across through it",
   },
   "kpis.importShare": {
-    caller: "packages/importer/src/flowyteam/mappers/kpi-shares.ts",
+    caller: "packages/core/src/imports/flowyteam/mappers/kpi-shares.ts",
     why: "the FlowyTeam importer brings named KPI shares across through it",
   },
   "subscriptions.importWatcher": {
-    caller: "packages/importer/src/flowyteam/mappers/collaboration.ts",
+    caller: "packages/core/src/imports/flowyteam/mappers/collaboration.ts",
     why: "the FlowyTeam importer brings task watchers across through it",
   },
   "comments.importComment": {
-    caller: "packages/importer/src/flowyteam/mappers/collaboration.ts",
+    caller: "packages/core/src/imports/flowyteam/mappers/collaboration.ts",
     why: "the FlowyTeam importer brings task comments across through it",
   },
   "comments.replaceImportedBody": {
-    caller: "packages/importer/src/flowyteam/mappers/files.ts",
+    caller: "packages/core/src/imports/flowyteam/mappers/files.ts",
     why: "the FlowyTeam importer rewrites an imported comment once its inline images are stored",
   },
   "goals.importCheckIn": {
-    caller: "packages/importer/src/flowyteam/mappers/check-ins.ts",
+    caller: "packages/core/src/imports/flowyteam/mappers/check-ins.ts",
     why: "the FlowyTeam importer brings check-in history across through it",
   },
   "blobs.prepareImport": {
-    caller: "packages/importer/src/flowyteam/mappers/files.ts",
+    caller: "packages/core/src/imports/flowyteam/mappers/files.ts",
     why: "the FlowyTeam importer reserves a file's key through it before copying the bytes",
   },
   // M-24. The attach button presses both, through `storeUpload` in core,

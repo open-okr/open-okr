@@ -56,3 +56,50 @@ export type ImportRun = typeof importRuns.$inferSelect;
 export type ImportRunSource = ImportRun["source"];
 export type ImportRunMode = ImportRun["mode"];
 export type ImportRunStatus = ImportRun["status"];
+
+/** The sources a workspace can connect to rather than upload from. */
+export const IMPORT_CONNECTION_SOURCES = ["flowyteam"] as const;
+
+/**
+ * A workspace's connection to a source it imports from (migration 0174,
+ * docs/design/flowyteam-connect.md §4.2).
+ *
+ * The token columns are envelope-encrypted and opened server-side only, by the
+ * import job and the revoke delivery. No read action selects them. They are
+ * null once a disconnected row's token has been revoked at the source.
+ */
+export const importConnections = pgTable("import_connections", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  source: text("source", { enum: IMPORT_CONNECTION_SOURCES }).notNull(),
+  baseUrl: text("base_url").notNull(),
+  clientId: text("client_id").notNull(),
+  companyId: text("company_id").notNull(),
+  companyName: text("company_name").notNull(),
+  tokenCiphertext: text("token_ciphertext"),
+  tokenDataKey: text("token_data_key"),
+  tokenKeyId: text("token_key_id"),
+  scopes: text("scopes").notNull().default("flowyteam:export"),
+  connectedByMemberId: uuid("connected_by_member_id")
+    .notNull()
+    .references(() => workspaceMembers.id),
+  connectedAt: timestamp("connected_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  lastReadAt: timestamp("last_read_at", { withTimezone: true }),
+  /** The token no longer works: revoked here, or refused by the source later. */
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  /** Somebody disconnected. Imported data and the company link stay. */
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+export type ImportConnection = typeof importConnections.$inferSelect;
+export type ImportConnectionSource = ImportConnection["source"];

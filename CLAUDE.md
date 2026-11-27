@@ -150,7 +150,7 @@ Detailed designs live in `docs/design/`, one per engine or subsystem. Keep them 
 - Import runs are idempotent: keep `legacy_id` and `legacy_type`, unique on `(workspace_id, legacy_type, legacy_id)`. Imports run through the normal Operation pipeline with notification dispatch suppressed.
 - Cannot map cleanly? Do not silently drop it. Record it in the import report and raise it as an open question.
 - Derived values (progress, health, achievement, alignment score, next check-in, streaks) are recomputed after load, never trusted from the source.
-- Importer code lives in `packages/importer`, **except the spreadsheet engine**, which lives in `packages/core/src/imports` because the wizard on S-36 needs the same readers, templates, mapping and runner the command uses and `apps/web` may not depend on `packages/importer` (TECHNICAL-PLAN §1). Either way it may depend on `packages/db` and `packages/core`, never on `apps/web`.
+- Importer code lives in `packages/importer`, **except the two engines**. The spreadsheet engine lives in `packages/core/src/imports` because the wizard on S-36 needs the same readers, templates, mapping and runner the command uses and `apps/web` may not depend on `packages/importer` (TECHNICAL-PLAN §1). The FlowyTeam engine (catalogue, `Source` interface, mappers, runner, report) lives in `packages/core/src/imports/flowyteam` for the same reason; the MySQL source, the `--files-root` disk reader and the command line stay in `packages/importer`. Either way it may depend on `packages/db` and `packages/core`, never on `apps/web`.
 
 ## Locked stack
 

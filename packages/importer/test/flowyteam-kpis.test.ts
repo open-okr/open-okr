@@ -6,12 +6,16 @@
  * own value, which is the one claim a parser test cannot make: it needs the
  * records loaded, the formula stored as a tree and the engine run over both.
  */
-import { callAction, provisionWorkspaceForUser } from "@openokr/core";
+import {
+  callAction,
+  provisionWorkspaceForUser,
+  type Source,
+} from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { runFlowyteamImport } from "../src/flowyteam/run.ts";
-import { openSource, type Source } from "../src/flowyteam/source.ts";
+import { openSource } from "../src/flowyteam/source.ts";
 import {
   available,
   SEEDED,
@@ -446,7 +450,7 @@ describe.skipIf(!runnable)(
       expect(refilled?.legacy_id).toBe("indicator_records:1");
     });
 
-    it("Given a source cycle in a period the workspace already has, when dry run and real run both run, then they report the same rows", async () => {
+    it("Given a source cycle in a period the workspace already has, when dry run and real run both run, then the source cycle maps onto it and they report the same rows", async () => {
       await seedSamePeriod();
       await callAction(
         {
@@ -463,9 +467,15 @@ describe.skipIf(!runnable)(
       );
 
       const dry = await run(false, ["kpis"]);
-      expect(domain(dry.report, "cycles")?.skipped).toContainEqual({
+      expect(
+        (domain(dry.report, "cycles")?.skipped ?? []).filter((s) =>
+          s.reason.includes("already exists in this workspace"),
+        ),
+      ).toEqual([]);
+      expect(domain(dry.report, "cycles")?.flags).toContainEqual({
         source: "performance_cycles:6",
-        reason: "Q3 2026 already exists in this workspace.",
+        reason:
+          'FlowyTeam cycle "FY26 Q3" (performance_cycles:6) was imported into the existing cycle "Q3 2026".',
       });
       const real = await run(true, ["kpis"]);
       for (const name of ["cycles", "KPIs", "KPI records", "KPI formulas"]) {

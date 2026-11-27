@@ -37,12 +37,14 @@ import {
   type JsonObject,
   serialiseContract,
 } from "../api/openapi.ts";
+import { flowyteamQueryCatalogue } from "../imports/flowyteam/queries.ts";
 
 /** Repo root, from this file's own location. */
 const ROOT = resolve(import.meta.dirname, "../../../..");
 const OPENAPI = resolve(ROOT, "contract/openapi.json");
 const CLI = resolve(ROOT, "contract/cli.json");
 const MCP = resolve(ROOT, "contract/mcp.json");
+const FLOWYTEAM_QUERIES = resolve(ROOT, "contract/flowyteam-queries.json");
 
 const relative = (path: string): string =>
   path
@@ -112,6 +114,46 @@ const artifacts: readonly Artifact[] = [
         subject: difference.tool,
         detail: difference.detail,
       })),
+  },
+  {
+    file: FLOWYTEAM_QUERIES,
+    text: `${JSON.stringify(flowyteamQueryCatalogue(), null, 2)}\n`,
+    summary: (text) =>
+      `${(JSON.parse(text) as { entries: unknown[] }).entries.length} FlowyTeam statement(s) named`,
+    differences: (committed, fresh) => {
+      type Catalogue = {
+        entries: { name: string; sql: string; scope: string }[];
+      };
+      const before = new Map(
+        (JSON.parse(committed) as Catalogue).entries.map((e) => [e.name, e]),
+      );
+      const after = new Map(
+        (JSON.parse(fresh) as Catalogue).entries.map((e) => [e.name, e]),
+      );
+      const moved: { kind: string; subject: string; detail: string }[] = [];
+      for (const [name, entry] of after) {
+        const old = before.get(name);
+        if (!old) {
+          moved.push({
+            kind: "added",
+            subject: name,
+            detail: "New statement.",
+          });
+        } else if (old.sql !== entry.sql || old.scope !== entry.scope) {
+          moved.push({
+            kind: "changed",
+            subject: name,
+            detail: "The SQL or the scope differs.",
+          });
+        }
+      }
+      for (const name of before.keys()) {
+        if (!after.has(name)) {
+          moved.push({ kind: "removed", subject: name, detail: "Gone." });
+        }
+      }
+      return moved;
+    },
   },
 ];
 

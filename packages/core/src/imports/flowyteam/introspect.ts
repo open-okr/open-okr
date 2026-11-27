@@ -1,0 +1,186 @@
+/**
+ * What this source is, before anything is read from it (TECHNICAL-PLAN §7.1
+ * step 1, P6-T02).
+ *
+ * **Two lists, not one.** A core table is one without which nothing imports:
+ * no `objectives` means there is no OKR history here and the run is refused by
+ * name. An expected table is one a domain reads, and its absence is a fact
+ * about this instance rather than a fault: an instance from before check-in
+ * reviews has no `checkin_reviews`, and refusing to import a company's whole
+ * quarter because of it would be absurd. Absent expected tables are recorded,
+ * and the mappers in P6-T03 and P6-T04 read that record rather than each
+ * discovering it again.
+ *
+ * **A table no domain reads is on neither list** (completeness review M-16).
+ * It lives in `unread.ts`, which counts it for the company and has the report
+ * name it. Listing one here made its absence read as a domain importing
+ * nothing: `flowy_prod`, a real older FlowyTeam, has no discussion tables, and
+ * no domain reads those anyway.
+ *
+ * **The version comes from the `migrations` table, not from a guess.**
+ * FlowyTeam is Laravel, so the applied migrations are rows with dated names.
+ * The newest one is the honest answer to "which version is this", the count
+ * tells two instances apart at a glance, and a source with no `migrations`
+ * table is not a FlowyTeam instance and says so instead of failing later on a
+ * missing column.
+ */
+import type { Source } from "./source.ts";
+import { SourceError } from "./source.ts";
+
+/**
+ * Without these there is nothing to import.
+ *
+ * Deliberately short. Every table here is read by the connector itself or by
+ * the first mapper, and a longer list would refuse instances that could have
+ * imported most of their history.
+ */
+export const CORE_TABLES = [
+  "migrations",
+  "companies",
+  "users",
+  "teams",
+  "employee_details",
+  "performance_cycles",
+  "objectives",
+  "key_results",
+] as const;
+
+/**
+ * Read by a domain, and absent on some real instances.
+ *
+ * Grouped by the domain that reads them, so the report says "the tasks domain
+ * cannot import: sub_tasks is missing" rather than listing table names a reader
+ * has to map back to a feature themselves.
+ *
+ * Only tables a mapper actually reads. A test checks every one appears in a
+ * statement the connector sends, and the tables it reads none of are in
+ * `UNREAD_TABLES` instead.
+ */
+export const EXPECTED_TABLES: Readonly<Record<string, readonly string[]>> = {
+  organisation: ["designations", "other_departments"],
+  kpis: ["indicator_types", "indicators", "indicator_records"],
+  okrs: [
+    "key_result_records",
+    "objective_checkins",
+    "key_result_checkins",
+    "checkin_reviews",
+  ],
+  work: [
+    "projects",
+    "project_members",
+    "taskboard_columns",
+    "tasks",
+    "sub_tasks",
+    "tasks_accesses",
+    "task_comments",
+    "task_files",
+  ],
+};
+
+interface SourceVersion {
+  /** The newest applied migration's name, which is the version in practice. */
+  readonly latestMigration: string;
+  /** Its date prefix, `YYYY_MM_DD`, or null for a name that has none. */
+  readonly appliedOn: string | null;
+  readonly migrationCount: number;
+}
+
+export interface Introspection {
+  readonly database: string;
+  readonly tableCount: number;
+  readonly version: SourceVersion;
+  /** Domains whose tables are all present, and what each is missing. */
+  readonly domains: Readonly<Record<string, readonly string[]>>;
+  /** Every domain with nothing missing, for the summary line. */
+  readonly completeDomains: readonly string[];
+}
+
+export async function introspect(source: Source): Promise<Introspection> {
+  const rows = await source.read<{ TABLE_NAME: string }>("schema.tables", [
+    source.database,
+  ]);
+  const present = new Set(
+    rows.map((row) => String(row.TABLE_NAME).toLowerCase()),
+  );
+  if (present.size === 0) {
+    throw new SourceError(
+      `The database "${source.database}" has no tables. Check the address names the FlowyTeam database and not the server's default.`,
+    );
+  }
+
+  const missingCore = CORE_TABLES.filter((table) => !present.has(table));
+  if (missingCore.length > 0) {
+    throw new SourceError(
+      `This does not look like a FlowyTeam database: "${source.database}" has ${present.size} tables and none of them ${missingCore.length === 1 ? "is" : "are"} ${missingCore.join(", ")}.`,
+    );
+  }
+
+  const domains: Record<string, readonly string[]> = {};
+  for (const [domain, tables] of Object.entries(EXPECTED_TABLES)) {
+    domains[domain] = tables.filter((table) => !present.has(table));
+  }
+
+  return {
+    database: source.database,
+    tableCount: present.size,
+    version: await inferVersion(source),
+    domains,
+    completeDomains: Object.entries(domains)
+      .filter(([, missing]) => missing.length === 0)
+      .map(([domain]) => domain),
+  };
+}
+
+/**
+ * The version, from the migrations Laravel itself applied.
+ *
+ * Ordered by `id` rather than by the name, because a migration backported into
+ * an older date prefix still ran last, and what this answers is "how far has
+ * this instance been migrated", not "which file sorts highest".
+ */
+async function inferVersion(source: Source): Promise<SourceVersion> {
+  const rows = await source.read<{ migration: string }>(
+    "schema.latestMigration",
+  );
+  const latest = rows[0]?.migration;
+  if (!latest) {
+    throw new SourceError(
+      "The migrations table is empty, so there is no way to tell which FlowyTeam version this is.",
+    );
+  }
+  const counted = await source.read<{ n: number }>("schema.migrationCount");
+  const date = /^(\d{4}_\d{2}_\d{2})_/.exec(latest);
+
+  return {
+    latestMigration: latest,
+    appliedOn: date?.[1] ?? null,
+    migrationCount: Number(counted[0]?.n ?? 0),
+  };
+}
+
+export interface IndicatorAccessesColumns {
+  readonly hasId: boolean;
+  readonly hasDeletedAt: boolean;
+  readonly hasDepartmentId: boolean;
+  readonly hasPermissions: boolean;
+  readonly hasViewOptions: boolean;
+  readonly hasOccurance: boolean;
+}
+
+export async function introspectIndicatorAccesses(
+  source: Source,
+): Promise<IndicatorAccessesColumns> {
+  const rows = await source.read<{ COLUMN_NAME: string }>(
+    "schema.indicatorAccessesColumns",
+    [source.database],
+  );
+  const cols = new Set(rows.map((r) => r.COLUMN_NAME.toLowerCase()));
+  return {
+    hasId: cols.has("id"),
+    hasDeletedAt: cols.has("deleted_at"),
+    hasDepartmentId: cols.has("department_id"),
+    hasPermissions: cols.has("permissions"),
+    hasViewOptions: cols.has("view_options"),
+    hasOccurance: cols.has("occurance"),
+  };
+}

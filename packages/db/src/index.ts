@@ -381,10 +381,14 @@ export {
   type ValueSource,
 } from "./schema/goals.ts";
 export {
+  IMPORT_CONNECTION_SOURCES,
+  type ImportConnection,
+  type ImportConnectionSource,
   type ImportRun,
   type ImportRunMode,
   type ImportRunSource,
   type ImportRunStatus,
+  importConnections,
   importRuns,
 } from "./schema/imports.ts";
 export {

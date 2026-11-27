@@ -222,6 +222,32 @@ watchers.
 An image sitting inline in comment markup needs no directory: those bytes are
 in MySQL.
 
+### From FlowyTeam in the browser
+
+Every instance can do the same import without a MySQL address. A workspace
+admin connects FlowyTeam from Admin > Import, and a FlowyTeam company admin
+approves it. The instance connects to FlowyTeam's cloud, `https://flowyteam.com`,
+unless `OPENOKR_FLOWYTEAM_URL` names another FlowyTeam. Set it to `off` on an
+instance that must not reach out, such as an air-gapped one: the card then
+points to the command line instead.
+
+| Step | What happens |
+|---|---|
+| Choose | Every kind of data is ticked. Unticking one also unticks what needs it, as `--only` adds what a domain needs. At least one stays ticked |
+| Preview | A dry run in the background, over FlowyTeam's read-only export. Its report is the one `pnpm import:flowyteam` prints without `--write`. When fewer kinds of data were chosen, it says which |
+| Import | The real run, for exactly the kinds of data the preview covered. When the preview named KPIs that may become more visible, the admin has to accept that first, as `--accept-broader-visibility` does |
+| Import new data | The same run again, for the kinds of data the last import covered. It adds what is new and changes nothing already imported |
+
+Both run as background jobs, so the scheduler has to run somewhere: with
+`OPENOKR_SCHEDULER=off` on every process they are refused. The run appears in
+the recent runs list with `via` set to `export`. Files are fetched one at a
+time from FlowyTeam and a file over the 25 MB storage limit is reported by
+name. A command-line run and a browser run of the same company share the
+legacy ids, so either one after the other writes nothing twice.
+
+FlowyTeam answers with its own catalogue version. If it differs from this
+instance's, the run stops before writing and says FlowyTeam needs an update.
+
 ### KPIs and their values
 
 | Source shape | What the import does | In the report |

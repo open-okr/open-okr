@@ -24,6 +24,7 @@ import { mysqlUrl, testMysqlEnv } from "@openokr/test-support/db-env";
 // dependency. It opens the throwaway database as an administrator, which is
 // exactly what the connector under test must never be able to do.
 import mysql from "mysql2/promise";
+import { assertRead, openReadOnlySession } from "../../src/flowyteam/source.ts";
 
 /** Companies the seed creates, so a test can assert against them by name. */
 export const SEEDED = {
@@ -758,6 +759,34 @@ export async function seedSource(
       } finally {
         await cleanup.end();
       }
+    },
+  };
+}
+
+/**
+ * Raw SQL against a source, for a test that inspects it. The connector itself
+ * sends only named statements, so this lives here and never in `src`. It keeps
+ * the connector's read-only session and allow list, which is what the source
+ * tests are about.
+ */
+export interface RawSource {
+  query<T = Record<string, unknown>>(
+    sql: string,
+    values?: readonly unknown[],
+  ): Promise<T[]>;
+  close(): Promise<void>;
+}
+
+export async function openRawSource(url: string): Promise<RawSource> {
+  const { connection } = await openReadOnlySession({ url });
+  return {
+    async query<T>(sql: string, values?: readonly unknown[]): Promise<T[]> {
+      assertRead(sql);
+      const [rows] = await connection.query(sql, values ? [...values] : []);
+      return rows as T[];
+    },
+    async close(): Promise<void> {
+      await connection.end();
     },
   };
 }
