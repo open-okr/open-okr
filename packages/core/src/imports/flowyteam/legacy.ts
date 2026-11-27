@@ -43,6 +43,9 @@ export const LEGACY_TABLES = {
   key_results: "key_results",
   key_result_records: "key_result_values",
   objective_checkins: "check_ins",
+  // A group of stand-alone key result rows becomes one check-in, keyed on the
+  // group's lowest row id.
+  key_result_checkins: "check_ins",
   indicator_types: "kpi_categories",
   indicators: "kpis",
   indicator_records: "kpi_records",

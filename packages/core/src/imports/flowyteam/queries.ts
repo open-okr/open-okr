@@ -127,7 +127,7 @@ const STATIC = {
   "organisation.users": q(
     "company",
     `select u.id, u.name, u.email, u.timezone, u.status,
-            d.name as title
+            d.name as title, e.department_id
        from users u
        left join employee_details e
          on e.user_id = u.id and e.company_id = u.company_id and e.deleted_at is null
@@ -224,6 +224,22 @@ const STATIC = {
           where k.company_id = :company and r.objective_id = ?
             and k.start_date = ? and k.end_date = ?
           order by k.id`,
+  ),
+  // Key result rows with no objective check-in of the same objective and
+  // period. The `<=>` keeps two null dates equal, so a row with no dates still
+  // pairs with an objective row that has none.
+  "checkIns.standaloneKeyResults": q(
+    "company",
+    `select k.id, k.key_result_id, r.objective_id, k.user_id, k.start_date, k.end_date,
+            k.current_value, k.confidence, k.remarks, k.created_at
+       from key_result_checkins k
+       join key_results r on r.id = k.key_result_id
+       join objectives o on o.id = r.objective_id
+      where k.company_id = :company and k.deleted_at is null and o.deleted_at is null
+        and not exists (select 1 from objective_checkins c
+                         where c.company_id = k.company_id and c.objective_id = r.objective_id
+                           and c.start_date <=> k.start_date and c.end_date <=> k.end_date)
+      order by r.objective_id, k.start_date, k.end_date, k.created_at, k.id`,
   ),
   "checkIns.reviews": q(
     "company",

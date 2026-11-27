@@ -25,6 +25,8 @@ import { callAction } from "../../../actions/registry.ts";
 import { richTextFromPlainText } from "../../../rich-text/from-text.ts";
 import { legacyKeyFor } from "../legacy.ts";
 import type { Source } from "../source.ts";
+import { sourceInstant } from "../time.ts";
+import type { StandaloneKeyResultRow } from "./check-ins.ts";
 import { type DomainReconciliation, DomainTally } from "./reconcile.ts";
 import type { Resolver } from "./resolve.ts";
 
@@ -458,6 +460,7 @@ async function importKeyResults(
  */
 export async function importKeyResultValues(
   options: MapperOptions,
+  valueOnly: readonly StandaloneKeyResultRow[] = [],
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("key result history");
   const rows = await options.source.read<{
@@ -471,6 +474,58 @@ export async function importKeyResultValues(
   // same movements, so the count already there is what makes it idempotent.
   const replayed = new Map<string, number>();
   const fromCheckIns = new Map<string, boolean>();
+
+  // **Dated rows first.** Stand-alone key result rows with no remark have no
+  // check-in to live in, so their values go into the history with the source's
+  // own date through `goals.importValue`. They never move the current value.
+  for (const row of valueOnly) {
+    tally.sawRow();
+    const source = `key_result_checkins:${row.id}`;
+    const keyResultId = await options.resolver.resolve(
+      "key_results",
+      row.key_result_id,
+    );
+    if (!keyResultId) {
+      tally.skip(
+        source,
+        `Key result ${row.key_result_id} did not import, so its check-in row could not either.`,
+      );
+      continue;
+    }
+    const at = sourceInstant(row.created_at ?? row.end_date ?? row.start_date);
+    if (!at) {
+      tally.skip(
+        source,
+        "This check-in has no date in the source, so there is nowhere in the history to put it.",
+      );
+      continue;
+    }
+    const value = numberOf(row.current_value);
+    if (value === null) {
+      tally.skip(source, "This check-in row has no value.");
+      continue;
+    }
+    if (!options.write) {
+      tally.wrote(true);
+      continue;
+    }
+    const author = row.user_id
+      ? await options.resolver.resolve("users", row.user_id)
+      : undefined;
+    try {
+      const result = await callAction(options.context, "goals.importValue", {
+        keyResultId,
+        value,
+        at,
+        ...(author ? { authorMemberId: author } : {}),
+        note: `Imported from ${options.sourceName}`,
+        legacy: legacyKeyFor("key_result_checkins", row.id),
+      });
+      tally.wrote(result.created);
+    } catch (error) {
+      tally.skip(source, messageOf(error));
+    }
+  }
 
   for (const row of rows) {
     tally.sawRow();
@@ -500,7 +555,7 @@ export async function importKeyResultValues(
     if (await hasCheckInHistory(options, keyResultId, fromCheckIns)) {
       tally.flag(
         source,
-        `Key result ${row.key_results_id} already carries a check-in from the source, which is dated where this record is not. The check-in's value stands.`,
+        `Key result ${row.key_results_id} already carries a check-in or an imported value from the source, which is dated where this record is not. The dated value stands.`,
       );
       continue;
     }
@@ -529,7 +584,7 @@ export async function importKeyResultValues(
   return tally.finish();
 }
 
-/** Whether a check-in already wrote into this key result's history. */
+/** Whether a dated value (a check-in or an import) already wrote into this key result's history. */
 async function hasCheckInHistory(
   options: MapperOptions,
   keyResultId: string,
@@ -543,7 +598,9 @@ async function hasCheckInHistory(
     keyResultId,
     limit: 500,
   });
-  const found = history.values.some((value) => value.source === "check_in");
+  const found = history.values.some(
+    (value) => value.source === "check_in" || value.source === "import",
+  );
   answers.set(keyResultId, found);
   return found;
 }

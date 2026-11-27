@@ -39,6 +39,8 @@ export interface WorkResult {
 }
 
 interface MapperOptions {
+  /** What people see for the source system, for the space made for loose tasks. */
+  readonly sourceName: string;
   readonly source: Source;
   readonly context: ActionCallContext;
   readonly companyId: number;
@@ -55,7 +57,7 @@ export async function importWork(options: MapperOptions): Promise<WorkResult> {
 
   return {
     domains: [initiatives, tasks.tally, checklists],
-    unmodelled,
+    unmodelled: [...unmodelled, ...tasks.notes],
   };
 }
 
@@ -257,7 +259,7 @@ const COLUMN_STATUS: Readonly<Record<string, string>> = {
 
 async function importTasks(
   options: MapperOptions,
-): Promise<{ tally: DomainReconciliation }> {
+): Promise<{ tally: DomainReconciliation; notes: string[] }> {
   const tally = new DomainTally("tasks");
   const rows = await options.source.read<SourceTask>(
     "work.tasks",
@@ -267,6 +269,7 @@ async function importTasks(
 
   const columns = await columnSlugs(options);
   const spaces = new Map<string, string | undefined>();
+  const loose = new LooseTaskPlacement(options, tally);
 
   for (const row of rows) {
     tally.sawRow();
@@ -286,15 +289,17 @@ async function importTasks(
     // **The initiative decides, and it is decided before the space is read.**
     // In a dry run the initiative is a row that would be created, so there is
     // no space to read yet and asking for one would refuse every task.
-    if (!initiativeId) {
+    if (row.project_id && !initiativeId) {
       tally.skip(
         source,
-        row.project_id
-          ? `Project ${row.project_id} did not import, so its tasks have no space to go in.`
-          : "This task belongs to no project that imported, so there is no space to put it in.",
+        `Project ${row.project_id} did not import, so its tasks have no space to go in.`,
       );
       continue;
     }
+    // A task with no project is placed by the next rules instead (design §3).
+    // The rule is chosen before the "already here" check so a second run
+    // reports the same counts as the first.
+    const placement = initiativeId ? undefined : await loose.choose(row);
 
     if (!options.write) {
       const already = await options.resolver.resolve("tasks", row.id);
@@ -309,11 +314,15 @@ async function importTasks(
       continue;
     }
 
-    const spaceId = await spaceForTask(options, initiativeId, spaces);
+    const spaceId = placement
+      ? await loose.spaceFor(placement)
+      : await spaceForTask(options, initiativeId, spaces);
     if (!spaceId) {
       tally.skip(
         source,
-        `Initiative ${initiativeId} has no space, so its tasks have nowhere to go.`,
+        placement
+          ? loose.failure()
+          : `Initiative ${initiativeId} has no space, so its tasks have nowhere to go.`,
       );
       continue;
     }
@@ -357,7 +366,7 @@ async function importTasks(
     }
   }
 
-  return { tally: tally.finish() };
+  return { tally: tally.finish(), notes: loose.notes() };
 }
 
 /** Every board column's slug, read once. */
@@ -375,13 +384,13 @@ async function columnSlugs(
 }
 
 /**
- * Which space a task goes in: its initiative's.
+ * The space of a task's initiative, which is rule 1 of the four that place a
+ * task (design flowyteam-standalone-checkins-and-tasks §3).
  *
- * **Not its key result's**, even though a task can carry one. A key result
- * hangs off a goal, and a company-level goal has no space at all, so deriving a
- * space that way would work for some tasks and silently fail for others. A task
- * whose project did not import is skipped by name instead, which is a fact
- * somebody can act on.
+ * A task with no project never reaches here: `LooseTaskPlacement` places it by
+ * its key result's team, its assignee's team, or a space the import creates.
+ * A task whose project is named but did not import is still skipped by name,
+ * which is a fact somebody can act on.
  *
  * Cached per initiative: a project with two hundred tasks would otherwise read
  * the same row two hundred times.
@@ -403,6 +412,209 @@ async function spaceForTask(
   const spaceId = initiative.spaceId ?? undefined;
   seen.set(initiativeId, spaceId);
   return spaceId;
+}
+
+type LooseRule = "objective" | "assignee" | "created";
+
+interface LoosePlacement {
+  readonly rule: LooseRule;
+  /** Set for the two team rules. The created space is made on first use. */
+  readonly spaceId?: string;
+}
+
+/** FlowyTeam's owner class for a team, as `okrs.ts` reads it. */
+const TEAM_OWNER = "App\\Models\\Team";
+
+/** The id the space made for loose tasks carries as its legacy id. */
+const TASKS_SPACE = "tasks-space";
+
+/**
+ * Places the tasks that have no project.
+ *
+ * **Three rules in a fixed order, then one space nobody chose.** OKRI.io has no
+ * project on any task, so the team of the task's key result's objective comes
+ * first, the assignee's own team second, and a created space "Tasks from
+ * <source>" last. The last one is structure the admin did not pick, so the
+ * report counts it and says to move those tasks.
+ *
+ * The reference data is read once and only when a task needs it, so a company
+ * where every task has a project reads nothing extra.
+ */
+class LooseTaskPlacement {
+  private readonly options: MapperOptions;
+  private readonly tally: DomainTally;
+  private data?: {
+    objectiveOfKeyResult: Map<number, number>;
+    ownerOfObjective: Map<number, { type: string; id: number }>;
+    departmentOfUser: Map<number, number>;
+    userIds: number[];
+  };
+  private tasksSpace?: string;
+  private failed?: string;
+  private readonly counts: Record<LooseRule, number> = {
+    objective: 0,
+    assignee: 0,
+    created: 0,
+  };
+
+  constructor(options: MapperOptions, tally: DomainTally) {
+    this.options = options;
+    this.tally = tally;
+  }
+
+  private async load() {
+    if (this.data) {
+      return this.data;
+    }
+    const { source, companyId } = this.options;
+    const keyResults = await source.read<{
+      id: number;
+      objective_id: number;
+    }>("okrs.keyResults", [], companyId);
+    const objectives = await source.read<{
+      id: number;
+      model_type: string | null;
+      model_id: number | null;
+    }>("okrs.objectives", [], companyId);
+    const users = await source.read<{
+      id: number;
+      department_id: number | null;
+    }>("organisation.users", [], companyId);
+
+    const departmentOfUser = new Map<number, number>();
+    for (const user of users) {
+      // The query joins every employee row, so a user can appear twice.
+      if (user.department_id && !departmentOfUser.has(user.id)) {
+        departmentOfUser.set(user.id, user.department_id);
+      }
+    }
+    this.data = {
+      objectiveOfKeyResult: new Map(
+        keyResults.map((row) => [row.id, row.objective_id]),
+      ),
+      ownerOfObjective: new Map(
+        objectives.flatMap((row) =>
+          row.model_id && row.model_type
+            ? [[row.id, { type: row.model_type, id: row.model_id }] as const]
+            : [],
+        ),
+      ),
+      departmentOfUser,
+      userIds: [...new Set(users.map((user) => user.id))],
+    };
+    return this.data;
+  }
+
+  /** Which rule places this task, counted so the report can say so. */
+  async choose(row: SourceTask): Promise<LoosePlacement> {
+    const data = await this.load();
+    const { resolver } = this.options;
+
+    const objectiveId = row.key_results_id
+      ? data.objectiveOfKeyResult.get(row.key_results_id)
+      : undefined;
+    const owner = objectiveId
+      ? data.ownerOfObjective.get(objectiveId)
+      : undefined;
+    if (owner?.type === TEAM_OWNER) {
+      const spaceId = await resolver.resolve("teams", owner.id);
+      if (spaceId) {
+        this.counts.objective += 1;
+        return { rule: "objective", spaceId };
+      }
+    }
+
+    const department = row.user_id
+      ? data.departmentOfUser.get(row.user_id)
+      : undefined;
+    if (department) {
+      const spaceId = await resolver.resolve("teams", department);
+      if (spaceId) {
+        this.counts.assignee += 1;
+        return { rule: "assignee", spaceId };
+      }
+    }
+
+    this.counts.created += 1;
+    return { rule: "created" };
+  }
+
+  /** The space for a chosen rule. The created one is made here, once. */
+  async spaceFor(placement: LoosePlacement): Promise<string | undefined> {
+    if (placement.spaceId) {
+      return placement.spaceId;
+    }
+    if (this.tasksSpace || this.failed) {
+      return this.tasksSpace;
+    }
+    const { resolver, context, sourceName } = this.options;
+    const existing = await resolver.resolve("teams", TASKS_SPACE);
+    if (existing) {
+      this.tasksSpace = existing;
+      return existing;
+    }
+    const data = await this.load();
+    try {
+      const created = await callAction(context, "spaces.create", {
+        name: `Tasks from ${sourceName}`.slice(0, 80),
+        legacy: legacyKeyFor("teams", TASKS_SPACE),
+      });
+      resolver.remember("teams", TASKS_SPACE, created.id);
+      this.tasksSpace = created.id;
+      for (const userId of data.userIds) {
+        const memberId = await resolver.resolve("users", userId);
+        if (!memberId) {
+          continue;
+        }
+        try {
+          // An upsert, so a member who is already there is not an error.
+          await callAction(context, "spaces.addMember", {
+            spaceId: created.id,
+            memberId,
+            role: "member",
+          });
+        } catch (error) {
+          this.tally.flag(
+            `users:${userId}`,
+            `Could not add this person to the space Tasks from ${sourceName}: ${messageOf(error)}`,
+          );
+        }
+      }
+      return created.id;
+    } catch (error) {
+      this.failed = messageOf(error);
+      return undefined;
+    }
+  }
+
+  failure(): string {
+    return `The space for tasks with no project could not be made: ${this.failed ?? "no space was found."}`;
+  }
+
+  /** The report line, empty when every task had a project. */
+  notes(): string[] {
+    const parts = [
+      this.counts.objective > 0
+        ? `${this.counts.objective} by the team of their key result's objective`
+        : "",
+      this.counts.assignee > 0
+        ? `${this.counts.assignee} by their assignee's team`
+        : "",
+      this.counts.created > 0
+        ? `${this.counts.created} into the new space Tasks from ${this.options.sourceName}`
+        : "",
+    ].filter((part) => part !== "");
+    if (parts.length === 0) {
+      return [];
+    }
+    return [
+      `Tasks with no project were placed ${parts.join(", ")}.${
+        this.counts.created > 0
+          ? ` Move the ones in Tasks from ${this.options.sourceName} to the right space.`
+          : ""
+      }`,
+    ];
+  }
 }
 
 /** Sub-tasks become checklist lines on the task they hang off. */

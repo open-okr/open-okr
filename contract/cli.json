@@ -9062,6 +9062,53 @@
       "pages": false
     },
     {
+      "name": "goals importValue",
+      "action": "goals.importValue",
+      "method": "POST",
+      "path": "/goals/importValue",
+      "scope": "write",
+      "summary": "Adds one dated value to a key result's history for an import, without a check-in and without moving the current value.",
+      "flags": [
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "value",
+          "field": "value",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "at",
+          "field": "at",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "author-member-id",
+          "field": "authorMemberId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "note",
+          "field": "note",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals publishDraftedCheckIn",
       "action": "goals.publishDraftedCheckIn",
       "method": "POST",

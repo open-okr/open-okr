@@ -162,7 +162,11 @@ describe.skipIf(!runnable)("importing one company's work", () => {
         where legacy_type = 'flowyteam' order by legacy_id`,
     );
     expect(
-      Object.fromEntries(tasks.map((t) => [t.legacy_id, t.status])),
+      Object.fromEntries(
+        tasks
+          .filter((t) => Number(t.legacy_id.split(":")[1]) <= 3)
+          .map((t) => [t.legacy_id, t.status]),
+      ),
     ).toEqual({
       // Column `in_progress`, which this product recognises.
       "tasks:1": "in_progress",
@@ -199,6 +203,70 @@ describe.skipIf(!runnable)("importing one company's work", () => {
         where t.legacy_id = 'tasks:1'`,
     );
     expect(task?.measure).toBe("key_results:1");
+  });
+
+  it("acceptance: a task with no project goes to the space of its key result's team", async () => {
+    await run(true);
+    const [task] = await rows<{ space: string; measure: string | null }>(
+      `select s.name as space, k.legacy_id as measure
+         from tasks t
+         join spaces s on s.id = t.space_id
+         left join key_results k on k.id = t.key_result_id
+        where t.legacy_id = 'tasks:5'`,
+    );
+    // Key result 3 hangs off objective 2, which belongs to the Commercial team.
+    expect(task).toEqual({ space: "Commercial", measure: "key_results:3" });
+  });
+
+  it("acceptance: a task with no project, no team objective and an assignee in a team goes to that team", async () => {
+    await run(true);
+    const [task] = await rows<{ space: string }>(
+      `select s.name as space from tasks t join spaces s on s.id = t.space_id
+        where t.legacy_id = 'tasks:6'`,
+    );
+    expect(task?.space).toBe("Commercial");
+  });
+
+  it("acceptance: a task with none of that goes to one created space, and the report counts it", async () => {
+    const { report } = await run(true);
+    const [task] = await rows<{ space: string; legacy_id: string }>(
+      `select s.name as space, s.legacy_id
+         from tasks t join spaces s on s.id = t.space_id
+        where t.legacy_id = 'tasks:7'`,
+    );
+    expect(task?.space.startsWith("Tasks from ")).toBe(true);
+    expect(task?.legacy_id).toBe("teams:tasks-space");
+    expect(report.notes.join(" ")).toContain(
+      "Tasks with no project were placed 1 by the team of their key result's objective, 1 by their assignee's team, 1 into the new space Tasks from",
+    );
+    expect(report.notes.join(" ")).toMatch(
+      /Move the ones in Tasks from .* to the right space\./,
+    );
+  });
+
+  it("acceptance: a second run reuses the created space", async () => {
+    await run(true);
+    const { report } = await run(true);
+    expect(domain(report, "tasks")?.created).toBe(0);
+    expect(
+      await count(
+        `select count(*)::int as n from spaces where legacy_id = 'teams:tasks-space'`,
+      ),
+    ).toBe(1);
+  });
+
+  it("counts the no-project tasks on a dry run and creates no space", async () => {
+    const preview = await run(false);
+    // Tasks 1 to 3 and 5 to 7. Task 4 names a project that did not import.
+    expect(domain(preview.report, "tasks")?.created).toBe(6);
+    expect(preview.report.notes.join(" ")).toContain(
+      "Tasks with no project were placed",
+    );
+    expect(
+      await count(
+        `select count(*)::int as n from spaces where legacy_id = 'teams:tasks-space'`,
+      ),
+    ).toBe(0);
   });
 
   it("turns sub-tasks into checklist lines, ticked where the source says done", async () => {
@@ -242,7 +310,7 @@ describe.skipIf(!runnable)("importing one company's work", () => {
       await count(
         `select count(*)::int as n from tasks where legacy_type = 'flowyteam'`,
       ),
-    ).toBe(3);
+    ).toBe(6);
     expect(
       await count(
         `select count(*)::int as n from checklist_items where legacy_type = 'flowyteam'`,

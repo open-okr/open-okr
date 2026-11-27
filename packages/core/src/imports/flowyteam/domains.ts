@@ -132,11 +132,17 @@ const DOMAINS: readonly ImportDomain[] = [
       const checkIns = await importCheckIns(options);
       // Values last, because they defer to the check-ins: a record replayed
       // after one would overwrite a dated movement with an undated one.
-      const values = await importKeyResultValues(options);
+      const values = await importKeyResultValues(options, checkIns.valueOnly);
       return {
         domains: [...checkIns.domains, values],
         notes: [
           "Confidence votes are not imported: a private vote with a synchronised reveal is an OpenOKR concept and the source records one confidence per check-in.",
+          ...checkIns.notes,
+          ...(checkIns.valueOnly.length > 0
+            ? [
+                `${checkIns.valueOnly.length} key result check-ins had no remark, so their values were added to the key result history instead of a check-in.`,
+              ]
+            : []),
         ],
       };
     },

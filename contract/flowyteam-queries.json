@@ -1,5 +1,5 @@
 {
-  "version": "75cb709bc643960743f5b711f1342295fc7f73af0828086442e934bb833767c8",
+  "version": "3ca7bd4fa7ce6442a3f628922fee7c6e73620b8288e92ab6e19c867f48e4989d",
   "entries": [
     {
       "name": "checkIns.keyResultsByCheckIn",
@@ -19,6 +19,11 @@
     {
       "name": "checkIns.reviews",
       "sql": "select user_id, created_at from checkin_reviews\n      where company_id = :company and checkin_id = ?\n      order by created_at limit 1",
+      "scope": "company"
+    },
+    {
+      "name": "checkIns.standaloneKeyResults",
+      "sql": "select k.id, k.key_result_id, r.objective_id, k.user_id, k.start_date, k.end_date,\n            k.current_value, k.confidence, k.remarks, k.created_at\n       from key_result_checkins k\n       join key_results r on r.id = k.key_result_id\n       join objectives o on o.id = r.objective_id\n      where k.company_id = :company and k.deleted_at is null and o.deleted_at is null\n        and not exists (select 1 from objective_checkins c\n                         where c.company_id = k.company_id and c.objective_id = r.objective_id\n                           and c.start_date <=> k.start_date and c.end_date <=> k.end_date)\n      order by r.objective_id, k.start_date, k.end_date, k.created_at, k.id",
       "scope": "company"
     },
     {
@@ -213,7 +218,7 @@
     },
     {
       "name": "organisation.users",
-      "sql": "select u.id, u.name, u.email, u.timezone, u.status,\n            d.name as title\n       from users u\n       left join employee_details e\n         on e.user_id = u.id and e.company_id = u.company_id and e.deleted_at is null\n       left join designations d on d.id = e.designation_id\n      where u.company_id = :company\n      order by u.id, e.id",
+      "sql": "select u.id, u.name, u.email, u.timezone, u.status,\n            d.name as title, e.department_id\n       from users u\n       left join employee_details e\n         on e.user_id = u.id and e.company_id = u.company_id and e.deleted_at is null\n       left join designations d on d.id = e.designation_id\n      where u.company_id = :company\n      order by u.id, e.id",
       "scope": "company"
     },
     {
