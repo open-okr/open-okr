@@ -86,6 +86,10 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     caller: "packages/core/src/imports/flowyteam/mappers/check-ins.ts",
     why: "the FlowyTeam importer brings check-in history across through it",
   },
+  "goals.importValue": {
+    caller: "packages/core/src/imports/flowyteam/mappers/okrs.ts",
+    why: "the FlowyTeam importer records a dated key result value that came with no remark through it",
+  },
   "blobs.prepareImport": {
     caller: "packages/core/src/imports/flowyteam/mappers/files.ts",
     why: "the FlowyTeam importer reserves a file's key through it before copying the bytes",
