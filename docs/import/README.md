@@ -226,8 +226,9 @@ in MySQL.
 
 Every instance can do the same import without a MySQL address. A workspace
 admin connects FlowyTeam from Admin > Import, and a FlowyTeam company admin
-approves it. The instance connects to FlowyTeam's cloud, `https://flowyteam.com`,
-unless `OPENOKR_FLOWYTEAM_URL` names another FlowyTeam. Set it to `off` on an
+approves it. The instance connects to okri.io, `https://okri.io`,
+unless `OPENOKR_FLOWYTEAM_URL` names another FlowyTeam. `OPENOKR_FLOWYTEAM_NAME` changes the name
+shown on screen and in reports (default `OKRI.io`). Set the URL to `off` on an
 instance that must not reach out, such as an air-gapped one: the card then
 points to the command line instead.
 

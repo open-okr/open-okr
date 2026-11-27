@@ -53,6 +53,8 @@ export interface CollaborationResult {
 }
 
 interface MapperOptions {
+  /** What people see for the source system (`imports.flowyteam.displayName`). */
+  readonly sourceName: string;
   readonly source: Source;
   readonly context: ActionCallContext;
   readonly companyId: number;
@@ -116,7 +118,10 @@ async function importComments(options: MapperOptions): Promise<{
     await importOneComment(options, row, tally, state);
   }
 
-  return { tally: tally.finish(), unmodelled: describe(state) };
+  return {
+    tally: tally.finish(),
+    unmodelled: describe(state, options.sourceName),
+  };
 }
 
 interface ConversionState {
@@ -260,7 +265,10 @@ function convert(
   return { body, images };
 }
 
-function describe(state: ConversionState): readonly string[] {
+function describe(
+  state: ConversionState,
+  sourceName: string,
+): readonly string[] {
   const notes: string[] = [];
   if (state.images > 0) {
     notes.push(
@@ -279,7 +287,7 @@ function describe(state: ConversionState): readonly string[] {
   }
   if (state.replies > 0) {
     notes.push(
-      `${state.replies} comments answer another comment. FlowyTeam threads one level deep and the pointer is kept, but no screen renders a thread yet, so a reply reads as a comment in sequence.`,
+      `${state.replies} comments answer another comment. ${sourceName} threads one level deep and the pointer is kept, but no screen renders a thread yet, so a reply reads as a comment in sequence.`,
     );
   }
   return notes;

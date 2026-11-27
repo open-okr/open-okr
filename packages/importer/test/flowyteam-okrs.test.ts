@@ -186,7 +186,7 @@ describe.skipIf(!runnable)("importing one company's OKRs", () => {
     ).toEqual([]);
     expect(domain(dry.report, "cycles")?.created).toBe(0);
     expect(domain(dry.report, "cycles")?.flags.map((f) => f.reason)).toContain(
-      `FlowyTeam cycle "FY26 Q1" (performance_cycles:1) was imported into the existing cycle "${existing.name}".`,
+      `OKRI.io cycle "FY26 Q1" (performance_cycles:1) was imported into the existing cycle "${existing.name}".`,
     );
     expect(
       domain(dry.report, "objectives")?.skipped.map((row) => row.reason),

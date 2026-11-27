@@ -61,6 +61,8 @@ interface MapperContext {
   readonly resolver: Resolver;
   readonly actingMemberId: string;
   readonly write: boolean;
+  /** What people see for the source system (`imports.flowyteam.displayName`). */
+  readonly sourceName: string;
   /** Where this instance keeps its own bytes. Absent in a dry run. */
   readonly storage?: BlobStorage;
   /** Reads the source's files, from `--files-root` on the command line. */
@@ -115,7 +117,7 @@ const DOMAINS: readonly ImportDomain[] = [
             : []),
           ...(result.truncatedValues
             ? [
-                "Some key result values are not whole numbers. FlowyTeam changed these columns to bigint in 2023 and truncated whatever fractional targets were there at the time, so a target that looks wrong in the source will look the same here.",
+                `Some key result values are not whole numbers. ${options.sourceName} changed these columns to bigint in 2023 and truncated whatever fractional targets were there at the time, so a target that looks wrong in the source will look the same here.`,
               ]
             : []),
         ],
@@ -148,7 +150,7 @@ const DOMAINS: readonly ImportDomain[] = [
       return {
         domains: result.domains,
         notes: [
-          "Every KPI arrives with no tree. FlowyTeam has no named driver tree, and building one from the parent chain would name something nobody chose.",
+          `Every KPI arrives with no tree. ${options.sourceName} has no named driver tree, and building one from the parent chain would name something nobody chose.`,
         ],
       };
     },

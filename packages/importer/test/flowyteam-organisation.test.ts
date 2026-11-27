@@ -169,7 +169,7 @@ describe.skipIf(!runnable)("importing one company's organisation", () => {
     expect(reasons).not.toContain("already exists");
     expect(domain(report, "cycles")?.matched).toBe(1);
     expect(domain(report, "cycles")?.flags.map((row) => row.reason)).toEqual([
-      'FlowyTeam cycle "FY26 Q1b" (performance_cycles:5) was imported into the existing cycle "FY26 Q1".',
+      'OKRI.io cycle "FY26 Q1b" (performance_cycles:5) was imported into the existing cycle "FY26 Q1".',
     ]);
 
     const named = await count(

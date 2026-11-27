@@ -189,7 +189,9 @@ describe.skipIf(!runnable)("counting them for one company", () => {
     );
     for (const entry of found) {
       expect(entry.holds).toBe(
-        UNREAD_TABLES.find((one) => one.table === entry.table)?.holds,
+        UNREAD_TABLES.find(
+          (one) => one.table === entry.table,
+        )?.holds.replaceAll("{source}", "OKRI.io"),
       );
     }
   });

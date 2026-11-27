@@ -37,6 +37,8 @@ export interface OkrResult {
 }
 
 interface MapperOptions {
+  /** What people see for the source system (`imports.flowyteam.displayName`). */
+  readonly sourceName: string;
   readonly source: Source;
   readonly context: ActionCallContext;
   readonly companyId: number;
@@ -516,7 +518,7 @@ export async function importKeyResultValues(
       await callAction(options.context, "goals.recordValue", {
         id: keyResultId,
         value,
-        note: "Imported from FlowyTeam",
+        note: `Imported from ${options.sourceName}`,
       });
       tally.wrote(true);
     } catch (error) {

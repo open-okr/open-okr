@@ -25,6 +25,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { callAction } from "../../actions/registry.ts";
 import { decryptSecret, type KeyRing } from "../../secrets/key-ring.ts";
+import { resolveFlowyteamSourceName } from "./connection.ts";
 import type { BlobStorage, FetchedSourceFile } from "./files.ts";
 import { fetchedFileReader } from "./files.ts";
 import type { DomainReconciliation } from "./mappers/reconcile.ts";
@@ -198,6 +199,7 @@ export async function runFlowyteamImportJob(
       })
       .catch(() => undefined);
   };
+  const sourceName = await resolveFlowyteamSourceName(deps.pool);
   const fail = async (
     failure: string,
     reason: string,
@@ -237,7 +239,7 @@ export async function runFlowyteamImportJob(
   ) {
     return fail(
       "unauthorised",
-      "The FlowyTeam connection was disconnected or revoked before the import ran. Connect again from the import page.",
+      `The ${sourceName} connection was disconnected or revoked before the import ran. Connect again from the import page.`,
     );
   }
 
@@ -271,7 +273,7 @@ export async function runFlowyteamImportJob(
       runId: job.runId,
       via: "export",
       ...(deps.storage ? { storage: deps.storage } : {}),
-      ...(fetchFile ? { files: fetchedFileReader(fetchFile) } : {}),
+      ...(fetchFile ? { files: fetchedFileReader(fetchFile, sourceName) } : {}),
       ...(job.startAt ? { startAt: job.startAt } : {}),
       ...(job.carried ? { carried: job.carried } : {}),
       ...(job.write && deps.enqueueFollowUp

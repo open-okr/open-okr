@@ -108,7 +108,7 @@ describe.skipIf(!runnable)("an instance that is missing things", () => {
     const source = await openSource({ url: seeded.url });
     try {
       await expect(introspect(source)).rejects.toThrow(
-        /does not look like a FlowyTeam database.*objectives/s,
+        /does not look like the database of OKRI\.io.*objectives/s,
       );
       await expect(introspect(source)).rejects.toThrow(SourceError);
     } finally {

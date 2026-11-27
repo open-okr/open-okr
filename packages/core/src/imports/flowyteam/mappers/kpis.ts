@@ -46,6 +46,8 @@ export interface KpiResult {
 }
 
 interface MapperOptions {
+  /** What people see for the source system (`imports.flowyteam.displayName`). */
+  readonly sourceName: string;
   readonly source: Source;
   readonly context: ActionCallContext;
   readonly companyId: number;
@@ -202,7 +204,7 @@ async function importIndicators(
       }
       orphaned = true;
     }
-    const orphanNote = `The ${kind === "space" ? "team" : "employee"} that owned this indicator no longer exists in FlowyTeam, so it is imported at workspace level.`;
+    const orphanNote = `The ${kind === "space" ? "team" : "employee"} that owned this indicator no longer exists in ${options.sourceName}, so it is imported at workspace level.`;
 
     if (!options.write) {
       const already = await options.resolver.resolve("indicators", row.id);
@@ -287,7 +289,7 @@ async function importIndicators(
       }
       tally.flag(
         source,
-        "Imported as a lagging output measure. FlowyTeam records neither the leading-versus-lagging distinction nor a tier, so both are defaults rather than decisions.",
+        `Imported as a lagging output measure. ${options.sourceName} records neither the leading-versus-lagging distinction nor a tier, so both are defaults rather than decisions.`,
       );
     } catch (error) {
       tally.skip(source, messageOf(error));
@@ -553,7 +555,7 @@ async function importRecords(
   for (const [indicatorId, count] of plan.recomputed) {
     tally.flag(
       `indicators:${indicatorId}`,
-      `Calculated KPI: its ${count} recorded value(s) in FlowyTeam were not imported, because the value is recomputed from the formula.`,
+      `Calculated KPI: its ${count} recorded value(s) in ${options.sourceName} were not imported, because the value is recomputed from the formula.`,
     );
   }
 

@@ -121,7 +121,7 @@ test("imports, then sends no invitation until asked", async () => {
     `(${STUB_PEOPLE.length})`,
   );
   await expect(page.getByTestId("flowyteam-import-new")).toBeVisible();
-  await expect(page.getByTestId("import-runs")).toContainText("FlowyTeam");
+  await expect(page.getByTestId("import-runs")).toContainText("OKRI.io");
 });
 
 test("says FlowyTeam needs an update when the catalogues differ", async () => {
@@ -130,7 +130,7 @@ test("says FlowyTeam needs an update when the catalogues differ", async () => {
   try {
     await page.getByTestId("flowyteam-import-new").click();
     await expect(page.getByTestId("flowyteam-failure")).toHaveText(
-      "FlowyTeam needs an update before this import.",
+      "OKRI.io needs an update before this import.",
       { timeout: 120_000 },
     );
     await expect(page.getByTestId("flowyteam-linked")).toBeVisible();
@@ -157,5 +157,5 @@ test("offers Connect again once FlowyTeam revoked the access", async () => {
     stub.revoked = false;
   }
   await goTo(page, "/admin/imports");
-  await expect(page.getByTestId("import-runs")).toContainText("FlowyTeam");
+  await expect(page.getByTestId("import-runs")).toContainText("OKRI.io");
 });

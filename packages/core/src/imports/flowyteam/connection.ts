@@ -17,6 +17,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { Pool } from "pg";
 import {
   environmentValue,
+  FLOWYTEAM_DEFAULT_DISPLAY_NAME,
   getInstanceSetting,
 } from "../../secrets/instance-registry.ts";
 import { readSecret, readSetting } from "../../secrets/instance-settings.ts";
@@ -30,10 +31,12 @@ export const FLOWYTEAM_SOURCE = "flowyteam" as const;
 /** Read-only, never granted together with another scope (§6 F1). */
 export const FLOWYTEAM_EXPORT_SCOPE = "flowyteam:export";
 /**
- * FlowyTeam's cloud, which every instance connects to when the setting is
- * empty, managed and self-hosted alike (§4.4, owner decision 23 November 2026).
+ * The FlowyTeam deployment every instance connects to when the setting is
+ * empty, managed and self-hosted alike (§4.4). OKRI.io is OKR Institute's
+ * deployment of the FlowyTeam codebase (owner decision 27 November 2026,
+ * which replaces the one of 23 November naming flowyteam.com).
  */
-const FLOWYTEAM_CLOUD_URL = "https://flowyteam.com";
+const FLOWYTEAM_CLOUD_URL = "https://okri.io";
 /** The setting's value that turns the connect step off, for an air-gapped instance. */
 const FLOWYTEAM_OFF = "off";
 /** As long as FlowyTeam keeps an authorisation code. */
@@ -46,6 +49,7 @@ export const FLOWYTEAM_CLIENT_METADATA_PATH = "/api/imports/flowyteam/client";
 export const FLOWYTEAM_REVOKE_TOPIC = "imports.flowyteamRevoke";
 
 const BASE_URL_KEY = "imports.flowyteam.baseUrl";
+const DISPLAY_NAME_KEY = "imports.flowyteam.displayName";
 const CLIENT_ID_KEY = "imports.flowyteam.clientId";
 const CLIENT_SECRET_KEY = "imports.flowyteam.clientSecret";
 
@@ -114,18 +118,27 @@ export interface FlowyteamGateway {
 }
 
 /**
+ * Fills the `{source}` placeholder of a refusal sentence with the name people
+ * see for the source system (`imports.flowyteam.displayName`, default OKRI.io).
+ */
+export function flowyteamSay(message: string, sourceName: string): string {
+  return message.replaceAll("{source}", sourceName);
+}
+
+/**
  * What an administrator is told, per failure. A sentence, never the token and
  * never FlowyTeam's own words, which may name things the reader cannot act on.
+ * Each carries `{source}`; say it through `flowyteamSay`.
  */
 export const FLOWYTEAM_FAILURE_MESSAGES: Readonly<
   Record<FlowyteamFailure, string>
 > = {
-  version_mismatch: "FlowyTeam needs an update before this import.",
+  version_mismatch: "{source} needs an update before this import.",
   unauthorised:
-    "FlowyTeam did not accept this connection. Connect again, as a company admin.",
-  refused: "FlowyTeam refused the connection. Connect again.",
-  unreachable: "FlowyTeam could not be reached. Try again later.",
-  bad_answer: "FlowyTeam answered in a way this instance does not understand.",
+    "{source} did not accept this connection. Connect again, as a company admin.",
+  refused: "{source} refused the connection. Connect again.",
+  unreachable: "{source} could not be reached. Try again later.",
+  bad_answer: "{source} answered in a way this instance does not understand.",
 };
 
 // ---------------------------------------------------------------------------
@@ -150,6 +163,17 @@ export interface FlowyteamSettings {
   readonly baseUrl: string | null;
   /** The registered client id, or empty for the metadata document. */
   readonly registeredClientId: string;
+  /** What people see for the source system, never empty. */
+  readonly sourceName: string;
+}
+
+/**
+ * The name people see for the system an import reads from: the instance
+ * setting, trimmed, or OKRI.io when it is empty.
+ */
+export async function resolveFlowyteamSourceName(pool: Pool): Promise<string> {
+  const configured = await resolveString(pool, DISPLAY_NAME_KEY);
+  return configured !== "" ? configured : FLOWYTEAM_DEFAULT_DISPLAY_NAME;
 }
 
 export async function resolveFlowyteamSettings(
@@ -168,6 +192,7 @@ export async function resolveFlowyteamSettings(
   return {
     baseUrl,
     registeredClientId: await resolveString(pool, CLIENT_ID_KEY),
+    sourceName: await resolveFlowyteamSourceName(pool),
   };
 }
 
@@ -268,17 +293,17 @@ export const FLOWYTEAM_STATE_MESSAGES: Readonly<
   Record<FlowyteamStateRefusal, string>
 > = {
   state_missing:
-    "This FlowyTeam connection was not started from this browser. Start it again from Import.",
+    "This {source} connection was not started from this browser. Start it again from Import.",
   state_invalid:
-    "This FlowyTeam connection could not be verified. Start it again from Import.",
+    "This {source} connection could not be verified. Start it again from Import.",
   state_expired:
-    "This FlowyTeam connection took longer than ten minutes. Start it again from Import.",
+    "This {source} connection took longer than ten minutes. Start it again from Import.",
   state_mismatch:
-    "This FlowyTeam answer does not belong to the connection started here. Start it again from Import.",
+    "This {source} answer does not belong to the connection started here. Start it again from Import.",
   state_other_workspace:
-    "This FlowyTeam connection was started in another workspace. Switch to it, or start again here.",
+    "This {source} connection was started in another workspace. Switch to it, or start again here.",
   state_other_member:
-    "This FlowyTeam connection was started by somebody else. Start it again from Import.",
+    "This {source} connection was started by somebody else. Start it again from Import.",
 };
 
 export function newConnectState(input: {

@@ -7,7 +7,11 @@ import { CATALOGUES } from "@openokr/ui/catalogues";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FLOWYTEAM_REASON_KEYS } from "../lib/flowyteam-messages.ts";
+import {
+  FLOWYTEAM_REASON_KEYS,
+  FLOWYTEAM_SOURCE_KEYS,
+  withFlowyteamSource,
+} from "../lib/flowyteam-messages.ts";
 
 /**
  * The FlowyTeam card on Import (docs/design/flowyteam-connect.md §4.5, §7 AC
@@ -48,8 +52,13 @@ const { flowyteamCardView } = await import(
 type CardProps = Parameters<typeof FlowyteamCard>[0];
 type Run = Parameters<typeof flowyteamCardView>[0][number];
 
-const en = (key: string, values?: Record<string, string | number>) =>
-  translate(CATALOGUES.en, key, values);
+const SOURCE = "OKRI.io";
+
+const en = withFlowyteamSource(
+  (key: string, values?: Record<string, string | number>) =>
+    translate(CATALOGUES.en, key, values),
+  SOURCE,
+);
 
 class SilentEventSource {
   addEventListener() {}
@@ -142,6 +151,7 @@ function props(over: Partial<CardProps>): CardProps {
     ],
     outcome: null,
     failureMessage: null,
+    sourceName: SOURCE,
     ...over,
   };
 }
@@ -184,6 +194,15 @@ describe("the refusal words", () => {
       reasons.add(match[1] as string);
     }
   }
+
+  it("lists exactly the catalogue keys that carry a {source} hole", () => {
+    const withHole = Object.entries(CATALOGUES.en)
+      .filter(([key]) => key.startsWith("admin.imports.flowyteam."))
+      .filter(([, value]) => String(value).includes("{source}"))
+      .map(([key]) => key)
+      .sort();
+    expect([...FLOWYTEAM_SOURCE_KEYS].sort()).toEqual(withHole);
+  });
 
   it("finds the domain's reasons", () => {
     // Floored, so a regex that finds nothing fails rather than agreeing.
@@ -360,7 +379,7 @@ describe("the card", () => {
     render(props({}));
     await act(async () => byTestId("flowyteam-run-preview")?.click());
     expect(byTestId("flowyteam-refusal")?.textContent).toBe(
-      "FlowyTeam needs an update before this import.",
+      "OKRI.io needs an update before this import.",
     );
   });
 
@@ -470,8 +489,8 @@ describe("the steps and the connection row", () => {
           state: "revoked",
           connectedAt: "2026-11-23T09:00:00.000Z",
         },
-        outcome: { ok: true, message: "FlowyTeam is connected." },
-        failureMessage: "FlowyTeam did not accept this connection.",
+        outcome: { ok: true, message: "OKRI.io is connected." },
+        failureMessage: "OKRI.io did not accept this connection.",
       }),
     );
     expect(byTestId("flowyteam-outcome")).toBeNull();
@@ -715,7 +734,7 @@ describe("the preview", () => {
       en("admin.imports.flowyteam.kpiShares.title"),
     );
     expect(list?.querySelectorAll("dt")).toHaveLength(2);
-    expect(list?.textContent).toContain("Shares read in FlowyTeam");
+    expect(list?.textContent).toContain("Shares read in OKRI.io");
     expect(list?.textContent).not.toContain("Existing share raised");
     expect(container.textContent).not.toContain("indicator_accesses");
     expect(container.textContent).not.toContain("View options");

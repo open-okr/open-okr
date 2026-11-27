@@ -375,7 +375,7 @@ describe.skipIf(!runnable)(
       ]);
       const kpis = domain(report, "KPIs");
       const flagged = kpis?.flags
-        .filter((row) => row.reason.includes("no longer exists in FlowyTeam"))
+        .filter((row) => row.reason.includes("no longer exists in OKRI.io"))
         .map((row) => row.source)
         .sort();
       expect(flagged).toEqual(["indicators:22", "indicators:23"]);
@@ -475,7 +475,7 @@ describe.skipIf(!runnable)(
       expect(domain(dry.report, "cycles")?.flags).toContainEqual({
         source: "performance_cycles:6",
         reason:
-          'FlowyTeam cycle "FY26 Q3" (performance_cycles:6) was imported into the existing cycle "Q3 2026".',
+          'OKRI.io cycle "FY26 Q3" (performance_cycles:6) was imported into the existing cycle "Q3 2026".',
       });
       const real = await run(true, ["kpis"]);
       for (const name of ["cycles", "KPIs", "KPI records", "KPI formulas"]) {

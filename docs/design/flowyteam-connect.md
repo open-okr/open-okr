@@ -167,13 +167,14 @@ As built: `createHttpFlowyteamSource` and `createHttpFlowyteamFiles` in `package
 
 | Key | Default | Note |
 |---|---|---|
-| `imports.flowyteam.baseUrl` | Empty, which means `https://flowyteam.com` on every instance | `off` hides the connect step and shows the command line instead, for an air-gapped instance. Any other value is the FlowyTeam to connect to |
+| `imports.flowyteam.displayName` | `OKRI.io` (`OPENOKR_FLOWYTEAM_NAME`) | The name people see for the import source on the card, in refusals and in the import report. Empty or blank falls back to `OKRI.io`. Action names, routes, environment variables and stored values keep the name `flowyteam` |
+| `imports.flowyteam.baseUrl` | Empty, which means `https://okri.io` on every instance | `off` hides the connect step and shows the command line instead, for an air-gapped instance. Any other value is the FlowyTeam deployment to connect to |
 | `imports.flowyteam.clientId` | Empty (`OPENOKR_FLOWYTEAM_CLIENT_ID`) | The cloud uses a registered confidential client; empty means the instance identifies itself with its client metadata document at `/api/imports/flowyteam/client` (public, `client_name` OKRGoal, one redirect URI, `token_endpoint_auth_method` none), which FlowyTeam already accepts for a trusted host |
 | `imports.flowyteam.clientSecret` | Empty, sealed (`OPENOKR_FLOWYTEAM_CLIENT_SECRET`) | Sent only for the registered client |
 
-All three are instance settings in `packages/core/src/secrets/instance-registry.ts`; `imports.flowyteam.baseUrl` is bootstrapped by `OPENOKR_FLOWYTEAM_URL`.
+All four are instance settings in `packages/core/src/secrets/instance-registry.ts`; `imports.flowyteam.baseUrl` is bootstrapped by `OPENOKR_FLOWYTEAM_URL`.
 
-**As built (owner decision, 23 November 2026).** An empty address means FlowyTeam's cloud, `https://flowyteam.com`, on the managed cloud and on a self-hosted instance alike, so the connect step always shows unless the operator sets `off`. This replaces the earlier default (`app.flowyteam.com` on the managed cloud only, nothing on self-hosted). Nothing is contacted until an administrator presses Connect. `docs/runbooks/air-gap.md` tells an isolated instance to set `off`.
+**As built (owner decision, 27 November 2026, which replaces the one of 23 November).** An empty address means okri.io, `https://okri.io` (OKR Institute's deployment of the FlowyTeam codebase), on the managed cloud and on a self-hosted instance alike, so the connect step always shows unless the operator sets `off`. This replaces the earlier defaults (`app.flowyteam.com` on the managed cloud only, then `https://flowyteam.com`). The catalogue words that name the source carry a `{source}` hole, filled with `imports.flowyteam.displayName`. Nothing is contacted until an administrator presses Connect. `docs/runbooks/air-gap.md` tells an isolated instance to set `off`.
 
 ### 4.5 Screen (S-36 Import)
 

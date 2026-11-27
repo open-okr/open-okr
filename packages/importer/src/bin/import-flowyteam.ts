@@ -30,6 +30,7 @@ import { LocalDiskStorage } from "@openokr/adapters";
 import { loadEnv } from "@openokr/config";
 import {
   renderFlowyteamReport as render,
+  resolveFlowyteamSourceName,
   resolveImportTarget,
 } from "@openokr/core";
 import { Pool } from "pg";
@@ -75,7 +76,9 @@ async function main(): Promise<void> {
       ...(args.only ? { only: args.only } : {}),
     });
 
-    process.stdout.write(`${render(report, runId)}\n`);
+    process.stdout.write(
+      `${render(report, runId, await resolveFlowyteamSourceName(pool))}\n`,
+    );
   } finally {
     await pool.end();
   }
