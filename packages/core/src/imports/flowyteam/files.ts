@@ -10,6 +10,7 @@
  */
 import { createHash } from "node:crypto";
 import { extname } from "node:path";
+import { FLOWYTEAM_DEFAULT_DISPLAY_NAME } from "../../secrets/instance-registry.ts";
 
 export interface SourceFile {
   /** The `task_files` row, which is how FlowyTeam's file endpoint names it. */
@@ -173,13 +174,14 @@ export type FetchedSourceFile =
  */
 export function fetchedFileReader(
   fetchFile: (taskFileId: number) => Promise<FetchedSourceFile>,
+  sourceName: string = FLOWYTEAM_DEFAULT_DISPLAY_NAME,
 ): SourceFileReader {
   return {
     async find(file) {
       if (file.id === undefined) {
         return {
           tried: [],
-          reason: "has no task file id to ask FlowyTeam for.",
+          reason: `has no task file id to ask ${sourceName} for.`,
         };
       }
       const fetched = await fetchFile(file.id);

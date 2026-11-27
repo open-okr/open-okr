@@ -214,15 +214,15 @@ describe("connect", () => {
     await expect(call(OTHER, "imports.flowyteamConnect", {})).rejects.toThrow();
   });
 
-  it("connects to FlowyTeam's cloud when no address is set, on any instance", async () => {
-    // Owner decision, 23 November 2026: empty is https://flowyteam.com for a
+  it("connects to okri.io when no address is set, on any instance", async () => {
+    // Owner decision, 27 November 2026: empty is https://okri.io for a
     // self-hosted instance too, so the connect step always shows.
     delete process.env.OPENOKR_FLOWYTEAM_URL;
     const read = await call(OWNER, "imports.flowyteamConnection", {});
     expect(read.available).toBe(true);
     const { started } = await connectAs(OWNER);
     expect(
-      started.authorizeUrl.startsWith("https://flowyteam.com/oauth/authorize?"),
+      started.authorizeUrl.startsWith("https://okri.io/oauth/authorize?"),
     ).toBe(true);
   });
 
@@ -381,9 +381,7 @@ describe("finish", () => {
     const { started, state } = await connectAs(OWNER);
     const refusal = await refusalOf(finish(started.stateCookie, state));
     expect(refusal.code).toBe("conflict");
-    expect(refusal.message).toBe(
-      "FlowyTeam needs an update before this import.",
-    );
+    expect(refusal.message).toBe("OKRI.io needs an update before this import.");
     const wb = await workerDb();
     const rows = await wb.admin.query("select id from import_connections");
     expect(rows.rows).toHaveLength(0);

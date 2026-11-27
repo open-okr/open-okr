@@ -21,6 +21,7 @@ import type { ActionCallContext } from "../../actions/define.ts";
 import { callAction } from "../../actions/registry.ts";
 import { resolveActingMemberId } from "../target.ts";
 import { countFor, requireCompany, SUMMARY_TABLES } from "./companies.ts";
+import { resolveFlowyteamSourceName } from "./connection.ts";
 import { selectDomains } from "./domains.ts";
 import type { BlobStorage, SourceFileReader } from "./files.ts";
 import { introspect } from "./introspect.ts";
@@ -38,6 +39,11 @@ export interface FlowyteamEngineOptions {
   readonly companyId: number | undefined;
   /** Opened and closed by the caller. */
   readonly source: Source;
+  /**
+   * What people see for the source system. Absent means the instance setting
+   * `imports.flowyteam.displayName`, OKRI.io unless an operator changed it.
+   */
+  readonly sourceName?: string;
   /**
    * False reports what a real run would do and writes nothing (P6-T03a).
    *
@@ -120,9 +126,11 @@ export async function runFlowyteamEngine(
     bulk: true,
   };
 
-  const introspection = await introspect(source);
+  const sourceName =
+    options.sourceName ?? (await resolveFlowyteamSourceName(options.pool));
+  const introspection = await introspect(source, sourceName);
   const company = await requireCompany(source, options.companyId);
-  await guardCompany(context, company.id);
+  await guardCompany(context, company.id, sourceName);
 
   // Only the tables this instance has. Counting a table that is not there
   // would fail the summary whose whole job is to say what is there.
@@ -133,7 +141,7 @@ export async function runFlowyteamEngine(
   // Every run, whatever `--only` names: no domain reads these tables, so a
   // run that left them out of its report would be dropping them silently
   // (completeness review M-16).
-  const unread = await countUnread(source, company.id);
+  const unread = await countUnread(source, company.id, sourceName);
 
   const write = options.write ?? false;
   // Recorded before the first row, so a run that dies halfway leaves a row
@@ -150,6 +158,7 @@ export async function runFlowyteamEngine(
 
   const mapper = {
     source,
+    sourceName,
     context,
     companyId: company.id,
     // One resolver for the whole run: an objective names a champion, a
@@ -229,6 +238,7 @@ export async function runFlowyteamEngine(
           addedForDependencies: selection.added,
           unread,
           extraNotes: notes,
+          sourceName,
         }),
         paused: { next: domain.key, reconciliation, notes },
       };
@@ -250,6 +260,7 @@ export async function runFlowyteamEngine(
     addedForDependencies: selection.added,
     unread,
     extraNotes: notes,
+    sourceName,
     ...(options.via ? { via: options.via } : {}),
   });
 
@@ -313,6 +324,7 @@ export function companyAlreadyImported(
 async function guardCompany(
   context: ActionCallContext,
   companyId: number,
+  sourceName: string,
 ): Promise<void> {
   const { runs } = await callAction(context, "imports.listRuns", {
     limit: 100,
@@ -320,7 +332,7 @@ async function guardCompany(
   const before = companyAlreadyImported(runs, companyId);
   if (before !== null) {
     throw new SourceError(
-      `This workspace already holds FlowyTeam company ${before}. A workspace holds one company, because two would share its spaces, members and cycles and nothing afterwards could tell them apart. Import company ${companyId} into a workspace of its own.`,
+      `This workspace already holds ${sourceName} company ${before}. A workspace holds one company, because two would share its spaces, members and cycles and nothing afterwards could tell them apart. Import company ${companyId} into a workspace of its own.`,
     );
   }
 }

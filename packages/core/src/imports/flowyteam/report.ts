@@ -13,6 +13,7 @@
  * nothing else. The mappers arrive at P6-T03 and P6-T04 and fill the counts
  * that are zero here.
  */
+import { FLOWYTEAM_DEFAULT_DISPLAY_NAME } from "../../secrets/instance-registry.ts";
 import type { Company, CompanyCounts } from "./companies.ts";
 import type { Introspection } from "./introspect.ts";
 import type { DomainReconciliation } from "./mappers/reconcile.ts";
@@ -83,11 +84,14 @@ export function buildReport(input: {
   /** The unread tables that hold rows, from `countUnread`. */
   readonly unread?: readonly UnreadCount[];
   readonly via?: "export" | "mysql";
+  /** What people see for the source system; OKRI.io when not given. */
+  readonly sourceName?: string;
 }): FlowyteamReport {
   const missing = Object.entries(input.introspection.domains).filter(
     ([, tables]) => tables.length > 0,
   );
 
+  const sourceName = input.sourceName ?? FLOWYTEAM_DEFAULT_DISPLAY_NAME;
   const reconciliation = input.reconciliation ?? [];
   const written = reconciliation.reduce(
     (sum, domain) => sum + domain.created,
@@ -142,7 +146,7 @@ export function buildReport(input: {
       // so the report says what everything took.
       ...(input.selected?.includes("objectives")
         ? [
-            "FlowyTeam does not say what kind of promise an objective is, or what kind a key result is. Every objective arrives as the workspace's default kind, aspirational unless it uses committed OKRs only, and every key result as a metric, or as a maintain where its baseline and target are the same number. Mark the commitments, milestones and baselines in the product.",
+            `${sourceName} does not say what kind of promise an objective is, or what kind a key result is. Every objective arrives as the workspace's default kind, aspirational unless it uses committed OKRs only, and every key result as a metric, or as a maintain where its baseline and target are the same number. Mark the commitments, milestones and baselines in the product.`,
           ]
         : []),
       ...(input.extraNotes ?? []),
@@ -156,9 +160,13 @@ export function buildReport(input: {
 }
 
 /** The report as lines somebody reads in a terminal. */
-export function render(report: FlowyteamReport, runId: string): string {
+export function render(
+  report: FlowyteamReport,
+  runId: string,
+  sourceName: string = FLOWYTEAM_DEFAULT_DISPLAY_NAME,
+): string {
   const lines: string[] = [
-    `FlowyTeam ${report.mode === "dry_run" ? "dry run" : "import"}: ${report.connectedTo}`,
+    `${sourceName} ${report.mode === "dry_run" ? "dry run" : "import"}: ${report.connectedTo}`,
     `Company ${report.companyId}, ${report.companyName}`,
     `Schema: ${report.tableCount} tables, ${report.version.migrationCount} migrations applied, the last on ${report.version.appliedOn ?? "an undated migration"} (${report.version.latestMigration})`,
     "",

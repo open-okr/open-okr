@@ -13,10 +13,17 @@
  * reader's language, so the card can both say it and change state on it
  * (`revoked` offers Connect again).
  */
-import { callAction, OperationError } from "@openokr/core";
+import {
+  callAction,
+  OperationError,
+  resolveFlowyteamSourceName,
+} from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
-import { flowyteamReasonKey } from "../../../lib/flowyteam-messages";
+import {
+  flowyteamReasonKey,
+  withFlowyteamSource,
+} from "../../../lib/flowyteam-messages";
 import { refusalFields } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -42,14 +49,21 @@ function reasonOf(error: unknown): string {
   return "error";
 }
 
+/** `t` with `{source}` filled from the instance's display name for the source system. */
+async function sourceTranslations() {
+  const { t } = await getTranslations();
+  const sourceName = await resolveFlowyteamSourceName(getPool());
+  return { t, tf: withFlowyteamSource(t, sourceName) };
+}
+
 async function refused(
   error: unknown,
 ): Promise<{ ok: false; reason: string; message: string }> {
-  const { t } = await getTranslations();
+  const { tf } = await sourceTranslations();
   return {
     ok: false,
     reason: reasonOf(error),
-    message: t(flowyteamReasonKey(reasonOf(error))),
+    message: tf(flowyteamReasonKey(reasonOf(error))),
   };
 }
 
@@ -115,7 +129,7 @@ export interface InviteOutcome {
 export async function inviteFlowyteamPeopleAction(
   memberIds: readonly string[],
 ): Promise<FlowyteamAnswer<InviteOutcome>> {
-  const { t } = await getTranslations();
+  const { t, tf } = await sourceTranslations();
   try {
     const ctx = await context();
     const wanted = new Set(memberIds);
@@ -135,7 +149,8 @@ export async function inviteFlowyteamPeopleAction(
         const fields = refusalFields(error, t);
         failed.push({
           email: person.email,
-          message: fields?.message ?? t("admin.imports.flowyteam.reason.error"),
+          message:
+            fields?.message ?? tf("admin.imports.flowyteam.reason.error"),
         });
       }
     }

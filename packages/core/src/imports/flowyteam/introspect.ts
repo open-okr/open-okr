@@ -24,6 +24,7 @@
  * table is not a FlowyTeam instance and says so instead of failing later on a
  * missing column.
  */
+import { FLOWYTEAM_DEFAULT_DISPLAY_NAME } from "../../secrets/instance-registry.ts";
 import type { Source } from "./source.ts";
 import { SourceError } from "./source.ts";
 
@@ -95,7 +96,10 @@ export interface Introspection {
   readonly completeDomains: readonly string[];
 }
 
-export async function introspect(source: Source): Promise<Introspection> {
+export async function introspect(
+  source: Source,
+  sourceName: string = FLOWYTEAM_DEFAULT_DISPLAY_NAME,
+): Promise<Introspection> {
   const rows = await source.read<{ TABLE_NAME: string }>("schema.tables", [
     source.database,
   ]);
@@ -104,14 +108,14 @@ export async function introspect(source: Source): Promise<Introspection> {
   );
   if (present.size === 0) {
     throw new SourceError(
-      `The database "${source.database}" has no tables. Check the address names the FlowyTeam database and not the server's default.`,
+      `The database "${source.database}" has no tables. Check the address names the ${sourceName} database and not the server's default.`,
     );
   }
 
   const missingCore = CORE_TABLES.filter((table) => !present.has(table));
   if (missingCore.length > 0) {
     throw new SourceError(
-      `This does not look like a FlowyTeam database: "${source.database}" has ${present.size} tables and none of them ${missingCore.length === 1 ? "is" : "are"} ${missingCore.join(", ")}.`,
+      `This does not look like the database of ${sourceName}: "${source.database}" has ${present.size} tables and none of them ${missingCore.length === 1 ? "is" : "are"} ${missingCore.join(", ")}.`,
     );
   }
 
@@ -123,7 +127,7 @@ export async function introspect(source: Source): Promise<Introspection> {
   return {
     database: source.database,
     tableCount: present.size,
-    version: await inferVersion(source),
+    version: await inferVersion(source, sourceName),
     domains,
     completeDomains: Object.entries(domains)
       .filter(([, missing]) => missing.length === 0)
@@ -138,14 +142,17 @@ export async function introspect(source: Source): Promise<Introspection> {
  * an older date prefix still ran last, and what this answers is "how far has
  * this instance been migrated", not "which file sorts highest".
  */
-async function inferVersion(source: Source): Promise<SourceVersion> {
+async function inferVersion(
+  source: Source,
+  sourceName: string,
+): Promise<SourceVersion> {
   const rows = await source.read<{ migration: string }>(
     "schema.latestMigration",
   );
   const latest = rows[0]?.migration;
   if (!latest) {
     throw new SourceError(
-      "The migrations table is empty, so there is no way to tell which FlowyTeam version this is.",
+      `The migrations table is empty, so there is no way to tell which ${sourceName} version this is.`,
     );
   }
   const counted = await source.read<{ n: number }>("schema.migrationCount");

@@ -61,6 +61,8 @@ interface MapperContext {
   readonly resolver: Resolver;
   readonly actingMemberId: string;
   readonly write: boolean;
+  /** What people see for the source system (`imports.flowyteam.displayName`). */
+  readonly sourceName: string;
   /** Where this instance keeps its own bytes. Absent in a dry run. */
   readonly storage?: BlobStorage;
   /** Reads the source's files, from `--files-root` on the command line. */
@@ -115,7 +117,7 @@ const DOMAINS: readonly ImportDomain[] = [
             : []),
           ...(result.truncatedValues
             ? [
-                "Some key result values are not whole numbers. FlowyTeam changed these columns to bigint in 2023 and truncated whatever fractional targets were there at the time, so a target that looks wrong in the source will look the same here.",
+                `Some key result values are not whole numbers. ${options.sourceName} changed these columns to bigint in 2023 and truncated whatever fractional targets were there at the time, so a target that looks wrong in the source will look the same here.`,
               ]
             : []),
         ],
@@ -130,11 +132,17 @@ const DOMAINS: readonly ImportDomain[] = [
       const checkIns = await importCheckIns(options);
       // Values last, because they defer to the check-ins: a record replayed
       // after one would overwrite a dated movement with an undated one.
-      const values = await importKeyResultValues(options);
+      const values = await importKeyResultValues(options, checkIns.valueOnly);
       return {
         domains: [...checkIns.domains, values],
         notes: [
           "Confidence votes are not imported: a private vote with a synchronised reveal is an OpenOKR concept and the source records one confidence per check-in.",
+          ...checkIns.notes,
+          ...(checkIns.valueOnly.length > 0
+            ? [
+                `${checkIns.valueOnly.length} key result check-ins had no remark, so their values were added to the key result history instead of a check-in.`,
+              ]
+            : []),
         ],
       };
     },
@@ -148,7 +156,7 @@ const DOMAINS: readonly ImportDomain[] = [
       return {
         domains: result.domains,
         notes: [
-          "Every KPI arrives with no tree. FlowyTeam has no named driver tree, and building one from the parent chain would name something nobody chose.",
+          `Every KPI arrives with no tree. ${options.sourceName} has no named driver tree, and building one from the parent chain would name something nobody chose.`,
         ],
       };
     },

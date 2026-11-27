@@ -21,6 +21,7 @@ import {
   checkInVotes,
   goals,
   keyResults,
+  keyResultValues,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
@@ -1403,4 +1404,110 @@ export const readMyStreak = defineReadAction({
       },
     );
   },
+});
+
+/**
+ * One dated value for a key result, with no check-in around it (TECHNICAL-PLAN
+ * §7.2, design flowyteam-standalone-checkins-and-tasks §2.4).
+ *
+ * **Why an action of its own.** A check-in needs a narrative, and a source row
+ * with no remark has none worth inventing. Its value still happened on a day.
+ * `goals.recordValue` stamps the value now and moves the current figure, and
+ * `goals.importCheckIn` refuses without a narrative, so neither fits.
+ *
+ * **History only.** It adds one `key_result_values` row with source `import`
+ * and the source's own date and author. It never touches the key result's
+ * current value: the source's dated rows may be older than what a person has
+ * entered here since, and an import must not move a figure on a date it chose.
+ *
+ * **Idempotent by content.** The value table carries no legacy columns, so a
+ * live row with the same key result, source, instant and value is the match.
+ * The legacy key is required so the call is part of a recorded import run, and
+ * it is written to the audit row.
+ */
+export const importValue = defineWriteAction({
+  name: "goals.importValue",
+  agentSurface: false,
+  summary:
+    "Adds one dated value to a key result's history for an import, without a check-in and without moving the current value.",
+  input: z.object({
+    keyResultId: ADDRESS.keyResult,
+    value: z.number(),
+    /** When the source says the value was recorded. */
+    at: z.string(),
+    /** The member who wrote it in the source, when they imported. */
+    authorMemberId: z.uuid().optional(),
+    note: z.string().trim().max(500).optional(),
+    /** Required: this action exists for imports and for nothing else. */
+    legacy: legacyKey,
+  }),
+  output: z.object({ id: z.uuid().optional(), created: z.boolean() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const at = new Date(input.at);
+      if (Number.isNaN(at.getTime())) {
+        throw new OperationError(
+          "forbidden",
+          `"${input.at}" is not a date this value could have been recorded on.`,
+        );
+      }
+      const [keyResult] = await tx
+        .select({ goalId: keyResults.goalId })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.keyResultId),
+          ),
+        )
+        .limit(1);
+      if (!keyResult) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+
+      const [existing] = await tx
+        .select({ id: keyResultValues.id })
+        .from(keyResultValues)
+        .where(
+          activeOnly(
+            keyResultValues,
+            eq(keyResultValues.workspaceId, workspaceId),
+            eq(keyResultValues.keyResultId, input.keyResultId),
+            eq(keyResultValues.source, "import"),
+            eq(keyResultValues.at, at),
+            eq(keyResultValues.value, String(input.value)),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        return { result: { created: false } };
+      }
+
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      const [created] = await tx
+        .insert(keyResultValues)
+        .values({
+          workspaceId,
+          keyResultId: input.keyResultId,
+          value: String(input.value),
+          at,
+          authorMemberId: input.authorMemberId ?? null,
+          source: "import",
+          note: input.note?.trim() || null,
+        })
+        .returning({ id: keyResultValues.id });
+
+      return {
+        result: { id: created?.id, created: true },
+        audit: {
+          action: "goals.importValue",
+          targetType: "key_result",
+          targetId: input.keyResultId,
+          payload: { legacyId: input.legacy.id, at: input.at },
+        },
+      };
+    },
+  }),
 });

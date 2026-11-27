@@ -162,7 +162,7 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   {
     name: "key_result_checkins",
     columns:
-      "id bigint primary key, company_id int, key_result_id int, user_id int, checkin_id bigint, start_date date, end_date date, confidence tinyint, current_value double, remarks text, created_at timestamp null",
+      "id bigint primary key, company_id int, key_result_id int, user_id int, checkin_id bigint, start_date date, end_date date, confidence tinyint, current_value double, remarks text, created_at timestamp null, deleted_at timestamp null",
     optional: true,
   },
   {
@@ -492,6 +492,14 @@ export async function seedSource(
        (3, 7, 2, 'Keep the rating', 'stars', 5,  5,  5,  1, null),
        (4, 7, 6, 'Orphan',          null,    0,  1,  0,  1, null)`,
   );
+  // Key result 5 has no baseline and no target, so it does not import. It
+  // exists so a stand-alone check-in row can name a key result that did not.
+  await source.query(
+    `insert into key_results
+       (id, company_id, objective_id, title, unit_value, initial_value, target_value,
+        current_value, weight, leader_model_id) values
+       (5, 7, 1, 'Unmeasured', null, null, null, null, 1, null)`,
+  );
   await source.query(
     // Key result 1 has records **and** a check-in, which is the case the
     // mapper has to choose between. Key result 3 has records only, which is the
@@ -521,6 +529,30 @@ export async function seedSource(
         confidence, current_value, remarks, created_at) values
        (1, 7, 1, 1, 100, '2026-01-01', '2026-01-31', 8, 18, null, '2026-02-01 09:00:00'),
        (2, 7, 2, 1, 100, '2026-01-01', '2026-01-31', 6, 7,  null, '2026-02-01 09:00:00')`,
+  );
+  // **Stand-alone key result rows: no objective_checkins row for their
+  // period.** Rows 5 to 7 are objective 1's March: two people write key
+  // result 2 (confidence 8 then 4, the later by Grace) and one writes key
+  // result 5, which does not import. Row 8 is objective 2 with no dates at
+  // all, so it forms its own period keyed on the day it was written.
+  await source.query(
+    `insert into key_result_checkins
+       (id, company_id, key_result_id, user_id, checkin_id, start_date, end_date,
+        confidence, current_value, remarks, created_at) values
+       (5, 7, 2, 1, null, '2026-03-01', '2026-03-31', 8, 8, 'Churn dropped.',      '2026-04-01 09:00:00'),
+       (6, 7, 2, 2, null, '2026-03-01', '2026-03-31', 4, 6, 'Churn rose again.',   '2026-04-02 09:00:00'),
+       (7, 7, 5, 1, null, '2026-03-01', '2026-03-31', 5, 1, 'Cannot be measured.', '2026-04-01 11:00:00'),
+       (8, 7, 3, 1, null, null,         null,         5, 5, 'Holding.',            '2026-05-10 09:00:00')`,
+  );
+  // **A stand-alone group with no remark at all**: objective 1's April. There
+  // is nothing to write a narrative from, so the values go to the key result
+  // history instead. Row 10 is by user 3, who is not a member here.
+  await source.query(
+    `insert into key_result_checkins
+       (id, company_id, key_result_id, user_id, checkin_id, start_date, end_date,
+        confidence, current_value, remarks, created_at) values
+       (9,  7, 1, 1, null, '2026-04-01', '2026-04-30', 7, 30, '',   '2026-05-01 09:00:00'),
+       (10, 7, 2, 3, null, '2026-04-01', '2026-04-30', 6, 5,  null, '2026-05-02 09:00:00')`,
   );
   if (!dropped.has("checkin_reviews")) {
     await source.query(
@@ -659,7 +691,10 @@ export async function seedSource(
          (1, 7, 'Call back',        'Ring them on Monday', '2026-02-10', 1, 1,    1,    'incomplete', 1,    null),
          (2, 7, 'Rewrite the page', null,                  null,         2, 1,    null, 'completed',  2,    1),
          (3, 7, 'Ship it',          null,                  null,         1, 1,    null, 'completed',  null, null),
-         (4, 7, 'Orphan',           null,                  null,         1, 99,   null, 'incomplete', null, null)`,
+         (4, 7, 'Orphan',           null,                  null,         1, 99,   null, 'incomplete', null, null),
+         (5, 7, 'Keep the rating up', null,                null,         1, null, 3,    'incomplete', null, null),
+         (6, 7, 'Chase the invoice',  null,                null,         2, null, null, 'incomplete', null, null),
+         (7, 7, 'Tidy the shared drive', null,             null,         1, null, null, 'incomplete', null, null)`,
     );
   }
   if (!dropped.has("sub_tasks")) {

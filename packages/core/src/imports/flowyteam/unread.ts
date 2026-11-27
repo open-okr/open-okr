@@ -26,6 +26,9 @@
  * when a table a domain is said to want is read nowhere. Start reading one of
  * these and it has to come off this list in the same change.
  */
+
+import { FLOWYTEAM_DEFAULT_DISPLAY_NAME } from "../../secrets/instance-registry.ts";
+import { flowyteamSay } from "./connection.ts";
 import {
   FLOWYTEAM_UNREAD_TABLES,
   type FlowyteamQueryName,
@@ -75,7 +78,7 @@ const HOLDS: Readonly<Record<FlowyteamUnreadTable, string>> = {
   project_time_logs:
     "Time logged against projects and tasks; not read, because time tracking is out of scope for this version.",
   performance_records:
-    "The score FlowyTeam stored for each owner when a cycle closed; not read, because this product works out its own per-owner results when a cycle closes and never takes them from a source.",
+    "The score {source} stored for each owner when a cycle closed; not read, because this product works out its own per-owner results when a cycle closes and never takes them from a source.",
   reward_settings:
     "How the company turned OKR, KPI and attendance results into points; not read, because the points layer is off by default and whether to build it is an open question.",
   scores:
@@ -110,6 +113,7 @@ export interface UnreadCount {
 export async function countUnread(
   source: Source,
   companyId: number,
+  sourceName: string = FLOWYTEAM_DEFAULT_DISPLAY_NAME,
 ): Promise<readonly UnreadCount[]> {
   const columns = await columnsOf(source);
   const found: UnreadCount[] = [];
@@ -137,7 +141,7 @@ export async function countUnread(
         table: entry.table,
         rows: count,
         scope,
-        holds: entry.holds,
+        holds: flowyteamSay(entry.holds, sourceName),
       });
     }
   }

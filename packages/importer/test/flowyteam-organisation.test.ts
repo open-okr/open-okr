@@ -169,7 +169,7 @@ describe.skipIf(!runnable)("importing one company's organisation", () => {
     expect(reasons).not.toContain("already exists");
     expect(domain(report, "cycles")?.matched).toBe(1);
     expect(domain(report, "cycles")?.flags.map((row) => row.reason)).toEqual([
-      'FlowyTeam cycle "FY26 Q1b" (performance_cycles:5) was imported into the existing cycle "FY26 Q1".',
+      'OKRI.io cycle "FY26 Q1b" (performance_cycles:5) was imported into the existing cycle "FY26 Q1".',
     ]);
 
     const named = await count(
@@ -213,7 +213,9 @@ describe.skipIf(!runnable)("importing one company's organisation", () => {
       await count(
         `select count(*)::int as n from spaces where legacy_type = 'flowyteam'`,
       ),
-    ).toBe(3);
+      // Three teams, plus the one space the work domain makes for tasks with
+      // no project, team or assignee team. Made once, reused on the second run.
+    ).toBe(4);
   });
 
   it("claims a member who is already here by their address rather than making a second one", async () => {

@@ -35,12 +35,15 @@ import {
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
+  createContext,
   type ReactNode,
+  useContext,
   useEffect,
   useMemo,
   useState,
   useTransition,
 } from "react";
+import { withFlowyteamSource } from "../../../lib/flowyteam-messages.ts";
 import {
   disconnectFlowyteamAction,
   type InviteOutcome,
@@ -83,6 +86,23 @@ export interface FlowyteamCardProps {
   readonly outcome: { readonly ok: boolean; readonly message: string } | null;
   /** The failure word of the latest run, already said in the reader's language. */
   readonly failureMessage: string | null;
+  /**
+   * What this instance calls the system the data comes from, resolved on the
+   * server from `imports.flowyteam.displayName`. Fills `{source}`.
+   */
+  readonly sourceName: string;
+}
+
+const SourceNameContext = createContext<string | null>(null);
+
+/** `useTranslations`, with `{source}` filled from the card's source name. */
+function useSourceTranslations() {
+  const { t, locale } = useTranslations();
+  const source = useContext(SourceNameContext);
+  if (source === null) {
+    throw new Error("useSourceTranslations needs the FlowyteamCard around it.");
+  }
+  return { t: withFlowyteamSource(t, source), locale };
 }
 
 /** What an operator runs instead, on an instance with FlowyTeam turned `off`. */
@@ -221,7 +241,7 @@ function stepOf(
  * instead of wrapping. Each step's state is spoken, not only coloured.
  */
 function Steps({ current }: { current: Step }) {
-  const { t } = useTranslations();
+  const { t } = useSourceTranslations();
   const at = STEPS.indexOf(current);
   return (
     <div
@@ -360,7 +380,15 @@ function Notice({
 }
 
 export function FlowyteamCard(props: FlowyteamCardProps) {
-  const { t, locale } = useTranslations();
+  return (
+    <SourceNameContext.Provider value={props.sourceName}>
+      <FlowyteamCardBody {...props} />
+    </SourceNameContext.Provider>
+  );
+}
+
+function FlowyteamCardBody(props: FlowyteamCardProps) {
+  const { t, locale } = useSourceTranslations();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   // Which button the pending press belongs to, so only that one spins.
@@ -817,7 +845,7 @@ function ChooseStep({
   disabled: boolean;
   onPreview: () => void;
 }) {
-  const { t } = useTranslations();
+  const { t } = useSourceTranslations();
   return (
     <div className="flex flex-col gap-3" data-testid="flowyteam-choose">
       <fieldset className="flex flex-col gap-1.5">
@@ -890,7 +918,7 @@ function Running({
   company: string;
   progress: { domain: string; index: number; total: number } | null;
 }) {
-  const { t } = useTranslations();
+  const { t } = useSourceTranslations();
   return (
     <div
       className="flex flex-col gap-2 rounded-md border border-line px-3 py-3 text-sm"
@@ -945,7 +973,7 @@ function PreviewStep({
   onBack: () => void;
   onImport: () => void;
 }) {
-  const { t } = useTranslations();
+  const { t } = useSourceTranslations();
   const restricted = preview.restricted.length;
   // Said only when the preview covered less than everything.
   const partial = onlyOf(domains, preview.selected) !== undefined;
@@ -1194,7 +1222,7 @@ function InviteStep({
   loading: boolean;
   onClose: () => void;
 }) {
-  const { t } = useTranslations();
+  const { t } = useSourceTranslations();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [filter, setFilter] = useState("");

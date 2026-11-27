@@ -992,6 +992,8 @@ export {
   type FlowyteamFailure,
   type FlowyteamGateway,
   flowyteamClientMetadata,
+  flowyteamSay,
+  resolveFlowyteamSourceName,
 } from "./imports/flowyteam/connection.ts";
 export {
   DOMAIN_KEYS,

@@ -27,6 +27,8 @@ export interface OrganisationResult {
 }
 
 interface MapperOptions {
+  /** What people see for the source system (`imports.flowyteam.displayName`). */
+  readonly sourceName: string;
   readonly source: Source;
   readonly context: ActionCallContext;
   readonly companyId: number;
@@ -406,7 +408,7 @@ async function importCycles(
       tally.wrote(false);
       tally.flag(
         source,
-        `FlowyTeam cycle "${row.name ?? period.name}" (${source}) was imported into the existing cycle "${target.name}".`,
+        `${options.sourceName} cycle "${row.name ?? period.name}" (${source}) was imported into the existing cycle "${target.name}".`,
       );
       continue;
     }

@@ -39,9 +39,11 @@ import {
   flowyteamClientCredentials,
   flowyteamClientId,
   flowyteamRedirectUri,
+  flowyteamSay,
   newConnectState,
   openConnectState,
   resolveFlowyteamSettings,
+  resolveFlowyteamSourceName,
   sameState,
   sealConnectState,
 } from "../imports/flowyteam/connection.ts";
@@ -84,19 +86,25 @@ function requireOrigin(context: ActionCallContext): string {
   return context.baseUrl;
 }
 
-function stateRefusal(refusal: FlowyteamStateRefusal): OperationError {
-  return new OperationError("forbidden", FLOWYTEAM_STATE_MESSAGES[refusal], {
-    reason: refusal,
-  });
+function stateRefusal(
+  refusal: FlowyteamStateRefusal,
+  sourceName: string,
+): OperationError {
+  return new OperationError(
+    "forbidden",
+    flowyteamSay(FLOWYTEAM_STATE_MESSAGES[refusal], sourceName),
+    { reason: refusal },
+  );
 }
 
 /** A failed FlowyTeam answer as a refusal the card can say in its own words. */
 function gatewayRefusal(
   answer: Extract<FlowyteamAnswer<unknown>, { ok: false }>,
+  sourceName: string,
 ): OperationError {
   return new OperationError(
     answer.failure === "version_mismatch" ? "conflict" : "forbidden",
-    FLOWYTEAM_FAILURE_MESSAGES[answer.failure],
+    flowyteamSay(FLOWYTEAM_FAILURE_MESSAGES[answer.failure], sourceName),
     { reason: answer.failure },
   );
 }
@@ -152,17 +160,17 @@ export const flowyteamConnect = defineWriteAction({
     async execute({ workspaceId, actor }) {
       const ring = requireRing(context);
       const origin = requireOrigin(context);
+      const settings = await resolveFlowyteamSettings(context.pool);
       if (!actor.memberId) {
         throw new OperationError(
           "forbidden",
-          "Only a member of this workspace can connect FlowyTeam.",
+          `Only a member of this workspace can connect ${settings.sourceName}.`,
         );
       }
-      const settings = await resolveFlowyteamSettings(context.pool);
       if (!settings.baseUrl) {
         throw new OperationError(
           "forbidden",
-          "Connecting FlowyTeam is turned off on this instance. Import with the command line instead.",
+          `Connecting ${settings.sourceName} is turned off on this instance. Import with the command line instead.`,
           { reason: "not_configured" },
         );
       }
@@ -248,19 +256,20 @@ export const flowyteamFinishConnect = {
     );
     const input = finishInput.parse(rawInput);
     const ring = requireRing(context);
+    const sourceName = await resolveFlowyteamSourceName(context.pool);
 
     // Every check that needs no network first, so a refused callback never
     // spends the code at FlowyTeam.
     const opened = openConnectState(ring, input.stateCookie, Date.now());
     if (!opened.ok) {
-      throw stateRefusal(opened.refusal);
+      throw stateRefusal(opened.refusal, sourceName);
     }
     const started = opened.state;
     if (!sameState(started.state, input.state)) {
-      throw stateRefusal("state_mismatch");
+      throw stateRefusal("state_mismatch", sourceName);
     }
     if (started.workspaceId !== context.workspaceId) {
-      throw stateRefusal("state_other_workspace");
+      throw stateRefusal("state_other_workspace", sourceName);
     }
     const memberId = await withWorkspace(
       drizzle(context.pool),
@@ -268,12 +277,12 @@ export const flowyteamFinishConnect = {
       (tx) => actingMemberId(tx, context.workspaceId, context.actor.userId),
     );
     if (memberId !== started.memberId) {
-      throw stateRefusal("state_other_member");
+      throw stateRefusal("state_other_member", sourceName);
     }
     if (!context.flowyteam) {
       throw new OperationError(
         "forbidden",
-        FLOWYTEAM_FAILURE_MESSAGES.unreachable,
+        flowyteamSay(FLOWYTEAM_FAILURE_MESSAGES.unreachable, sourceName),
         { reason: "unreachable" },
       );
     }
@@ -291,14 +300,14 @@ export const flowyteamFinishConnect = {
       redirectUri: started.redirectUri,
     });
     if (!exchanged.ok) {
-      throw gatewayRefusal(exchanged);
+      throw gatewayRefusal(exchanged, sourceName);
     }
     const accessToken = exchanged.value.accessToken;
     const scopes = exchanged.value.scope.trim() || FLOWYTEAM_EXPORT_SCOPE;
     if (!scopes.split(/\s+/).includes(FLOWYTEAM_EXPORT_SCOPE)) {
       throw new OperationError(
         "forbidden",
-        "FlowyTeam granted a different access than an import needs. Connect again.",
+        `${sourceName} granted a different access than an import needs. Connect again.`,
         { reason: "wrong_scope" },
       );
     }
@@ -309,7 +318,7 @@ export const flowyteamFinishConnect = {
       version: flowyteamQueryCatalogue().version,
     });
     if (!company.ok) {
-      throw gatewayRefusal(company);
+      throw gatewayRefusal(company, sourceName);
     }
 
     const sealed = encryptSecret(ring, accessToken);
@@ -323,7 +332,7 @@ export const flowyteamFinishConnect = {
         ...(context.channel ? { channel: context.channel } : {}),
         async execute({ tx, workspaceId, actor }) {
           if (actor.memberId !== started.memberId) {
-            throw stateRefusal("state_other_member");
+            throw stateRefusal("state_other_member", sourceName);
           }
           const now = new Date();
           const previous = await liveConnection(tx, workspaceId);
@@ -415,11 +424,14 @@ export const flowyteamDisconnect = defineWriteAction({
   output: z.object({ companyId: z.string() }),
   access: ACCESS_LEVELS.full,
   safety: "destructive",
-  operation: () => ({
+  operation: (context) => ({
     async execute({ tx, workspaceId }) {
       const existing = await liveConnection(tx, workspaceId);
       if (!existing) {
-        throw new OperationError("not_found", "FlowyTeam is not connected.");
+        throw new OperationError(
+          "not_found",
+          `${await resolveFlowyteamSourceName(context.pool)} is not connected.`,
+        );
       }
       const now = new Date();
       // Soft-deleted with the token still sealed in it: the relay opens it
@@ -459,13 +471,13 @@ export const flowyteamDisconnect = defineWriteAction({
 /** Refusal sentences. The card says them in its own words by `reason`. */
 const FLOWYTEAM_IMPORT_MESSAGES = {
   background_off:
-    "Background work is off on this instance, so a FlowyTeam import cannot run. Ask the operator to turn the scheduler on.",
-  not_connected: "FlowyTeam is not connected.",
+    "Background work is off on this instance, so a {source} import cannot run. Ask the operator to turn the scheduler on.",
+  not_connected: "{source} is not connected.",
   revoked:
-    "FlowyTeam no longer accepts this connection's access. Connect again from the import page.",
+    "{source} no longer accepts this connection's access. Connect again from the import page.",
   other_company:
-    "This workspace already holds another FlowyTeam company. A workspace holds one company.",
-  already_running: "A FlowyTeam import is already running in this workspace.",
+    "This workspace already holds another {source} company. A workspace holds one company.",
+  already_running: "A {source} import is already running in this workspace.",
   visibility_not_accepted:
     "The preview named KPIs that will become visible to every member. Confirm that before importing.",
 } as const;
@@ -475,10 +487,13 @@ type ImportRefusal = keyof typeof FLOWYTEAM_IMPORT_MESSAGES;
 function importRefusal(
   code: "forbidden" | "not_found" | "conflict",
   reason: ImportRefusal,
+  sourceName: string,
 ): OperationError {
-  return new OperationError(code, FLOWYTEAM_IMPORT_MESSAGES[reason], {
-    reason,
-  });
+  return new OperationError(
+    code,
+    flowyteamSay(FLOWYTEAM_IMPORT_MESSAGES[reason], sourceName),
+    { reason },
+  );
 }
 
 /** A run left `running` longer than this is not counted as one in progress. */
@@ -513,15 +528,16 @@ function enqueueImport(write: boolean) {
       tx: OperationTx;
       workspaceId: string;
     }) {
+      const sourceName = await resolveFlowyteamSourceName(context.pool);
       if (!backgroundJobsRun()) {
-        throw importRefusal("forbidden", "background_off");
+        throw importRefusal("forbidden", "background_off", sourceName);
       }
       const connection = await liveConnection(tx, workspaceId);
       if (!connection) {
-        throw importRefusal("not_found", "not_connected");
+        throw importRefusal("not_found", "not_connected", sourceName);
       }
       if (connection.revokedAt || !connection.tokenCiphertext) {
-        throw importRefusal("forbidden", "revoked");
+        throw importRefusal("forbidden", "revoked", sourceName);
       }
       const companyId = Number(connection.companyId);
 
@@ -549,7 +565,7 @@ function enqueueImport(write: boolean) {
         report: (run.report ?? {}) as Record<string, unknown>,
       }));
       if (companyAlreadyImported(prior, companyId) !== null) {
-        throw importRefusal("conflict", "other_company");
+        throw importRefusal("conflict", "other_company", sourceName);
       }
       const since = Date.now() - RUNNING_WINDOW_MS;
       if (
@@ -560,7 +576,7 @@ function enqueueImport(write: boolean) {
             run.startedAt.getTime() > since,
         )
       ) {
-        throw importRefusal("conflict", "already_running");
+        throw importRefusal("conflict", "already_running", sourceName);
       }
       if (write && input.acceptBroaderVisibility !== true) {
         const preview = runs.find(
@@ -575,7 +591,11 @@ function enqueueImport(write: boolean) {
           restrictedKpisIn((preview.report ?? {}) as Record<string, unknown>) >
             0
         ) {
-          throw importRefusal("forbidden", "visibility_not_accepted");
+          throw importRefusal(
+            "forbidden",
+            "visibility_not_accepted",
+            sourceName,
+          );
         }
       }
 
@@ -592,7 +612,10 @@ function enqueueImport(write: boolean) {
           entity: null,
           mode: write ? "real" : "dry_run",
           status: "running",
-          filename: `FlowyTeam export: ${connection.companyName}`.slice(0, 400),
+          filename: `${sourceName} export: ${connection.companyName}`.slice(
+            0,
+            400,
+          ),
           report: {
             source: FLOWYTEAM_SOURCE,
             via: "export",

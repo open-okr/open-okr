@@ -67,6 +67,13 @@ export function instanceNameOr(name: string | undefined | null): string {
 }
 
 /** Where the software is developed, until a provider names their own. */
+/**
+ * What people see for the system the FlowyTeam import reads from, until an
+ * operator sets `imports.flowyteam.displayName` (OKR Institute's deployment of
+ * the FlowyTeam codebase is OKRI.io).
+ */
+export const FLOWYTEAM_DEFAULT_DISPLAY_NAME = "OKRI.io";
+
 export const DEFAULT_SOURCE_URL = "https://github.com/open-okr/open-okr";
 
 export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
@@ -544,12 +551,20 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
   // §4.4). Instance scope, because the FlowyTeam address and the OAuth client
   // describe the deployment, not a workspace.
   {
+    key: "imports.flowyteam.displayName",
+    kind: "string",
+    fallback: FLOWYTEAM_DEFAULT_DISPLAY_NAME,
+    environment: "OPENOKR_FLOWYTEAM_NAME",
+    summary:
+      "The name shown to people for the system the FlowyTeam import reads from. Empty means OKRI.io. Only text on screen and in reports changes, never an action name, route or stored value.",
+  },
+  {
     key: "imports.flowyteam.baseUrl",
     kind: "string",
     fallback: "",
     environment: "OPENOKR_FLOWYTEAM_URL",
     summary:
-      "The FlowyTeam a workspace may connect to and import from. Empty means FlowyTeam's cloud, https://flowyteam.com, on every instance. `off` hides the connect step, for an air-gapped instance, which imports with the command line instead.",
+      "The FlowyTeam deployment a workspace may connect to and import from. Empty means okri.io, https://okri.io, on every instance. `off` hides the connect step, for an air-gapped instance, which imports with the command line instead.",
   },
   {
     key: "imports.flowyteam.clientId",

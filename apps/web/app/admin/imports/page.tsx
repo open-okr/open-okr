@@ -1,6 +1,7 @@
 import {
   callAction,
   DOMAIN_KEYS,
+  resolveFlowyteamSourceName,
   selectDomains,
   TEMPLATES,
 } from "@openokr/core";
@@ -10,6 +11,7 @@ import { drafterFor } from "../../../lib/drafter";
 import {
   flowyteamReasonKey,
   isFlowyteamSuccess,
+  withFlowyteamSource,
 } from "../../../lib/flowyteam-messages";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
@@ -38,6 +40,8 @@ export default async function ImportsPage({
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { t } = await getTranslations();
+  const sourceName = await resolveFlowyteamSourceName(getPool());
+  const tf = withFlowyteamSource(t, sourceName);
   const landed = (await searchParams).flowyteam;
   const outcomeWord = typeof landed === "string" ? landed : null;
 
@@ -92,6 +96,7 @@ export default async function ImportsPage({
         </p>
       </header>
       <div className="flex flex-col gap-4">
+        <ImportWizard entities={entities} aiOn={drafter !== null} />
         <FlowyteamCard
           available={flowyteam.available}
           backgroundWork={flowyteam.backgroundWork}
@@ -107,19 +112,19 @@ export default async function ImportsPage({
           view={view}
           people={people}
           domains={domains}
+          sourceName={sourceName}
           outcome={
             outcomeWord
               ? {
                   ok: isFlowyteamSuccess(outcomeWord),
-                  message: t(flowyteamReasonKey(outcomeWord)),
+                  message: tf(flowyteamReasonKey(outcomeWord)),
                 }
               : null
           }
           failureMessage={
-            view.failure ? t(flowyteamReasonKey(view.failure)) : null
+            view.failure ? tf(flowyteamReasonKey(view.failure)) : null
           }
         />
-        <ImportWizard entities={entities} aiOn={drafter !== null} />
 
         <Card>
           <CardHeader className="justify-between">
@@ -157,7 +162,7 @@ export default async function ImportsPage({
                     </Chip>
                     <Chip tone="neutral">
                       {run.source === "flowyteam"
-                        ? t("admin.imports.flowyteam.sourceFlowyteam")
+                        ? tf("admin.imports.flowyteam.sourceFlowyteam")
                         : t("admin.imports.flowyteam.sourceSpreadsheet")}
                     </Chip>
                     <span className="min-w-0 flex-1 truncate text-ink-2">

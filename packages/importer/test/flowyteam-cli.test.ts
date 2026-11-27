@@ -288,15 +288,18 @@ describe("the legacy identifier map", () => {
     expect(LEGACY_TABLES.task_files).toBe("blobs");
     expect(LEGACY_TABLES.task_files_inline).toBe("blobs");
 
-    // Two source tables may share a target, and exactly two do: an uploaded
-    // file and an image sitting inline in comment markup both become blobs.
-    // Anything else sharing one would mean two source tables silently sharing
-    // an identifier space, which is why this counts rather than only warning.
+    // Two source tables may share a target, and exactly two pairs do: an
+    // uploaded file and an image sitting inline in comment markup both become
+    // blobs, and a group of stand-alone key result check-ins becomes a check-in
+    // as an objective check-in does. Their legacy ids carry the table name, so
+    // the pairs cannot collide. Anything else sharing one would mean two source
+    // tables silently sharing an identifier space, which is why this counts
+    // rather than only warning.
     const targets = Object.values(LEGACY_TABLES);
     const shared = targets.filter(
       (target, index) => targets.indexOf(target) !== index,
     );
-    expect(shared).toEqual(["blobs"]);
+    expect(shared).toEqual(["check_ins", "blobs"]);
   });
 });
 

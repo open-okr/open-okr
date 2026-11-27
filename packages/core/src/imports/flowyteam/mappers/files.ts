@@ -49,6 +49,8 @@ export interface FilesResult {
 }
 
 interface MapperOptions {
+  /** What people see for the source system (`imports.flowyteam.displayName`). */
+  readonly sourceName: string;
   readonly source: Source;
   readonly context: ActionCallContext;
   readonly companyId: number;
@@ -140,7 +142,7 @@ async function importTaskFiles(options: MapperOptions): Promise<{
       missing += 1;
       tally.skip(
         source,
-        `"${filename}" is a file on the FlowyTeam server's own disk. Run again with --files-root pointing at that server's storage directory to copy it.`,
+        `"${filename}" is a file on the ${options.sourceName} server's own disk. Run again with --files-root pointing at that server's storage directory to copy it.`,
       );
       continue;
     }
@@ -211,7 +213,7 @@ async function importTaskFiles(options: MapperOptions): Promise<{
     notes.push(
       options.files
         ? `${missing} of ${local} files were not found under --files-root. Every one is named in the files domain. The paths looked at were ${[...triedPaths].slice(0, 4).join(", ")} and others of the same shape, so a root one directory too high or too low is the usual cause.`
-        : `${local} files live on the FlowyTeam server's own disk and a read-only MySQL connection cannot reach them. Every one is named in the files domain. Run again with --files-root pointing at that server's storage directory to copy them.`,
+        : `${local} files live on the ${options.sourceName} server's own disk and a read-only MySQL connection cannot reach them. Every one is named in the files domain. Run again with --files-root pointing at that server's storage directory to copy them.`,
     );
   }
   if (external > 0) {

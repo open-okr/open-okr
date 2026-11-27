@@ -58,3 +58,68 @@ export function flowyteamReasonKey(reason: string): string {
 export function isFlowyteamSuccess(reason: string): boolean {
   return reason === "connected";
 }
+
+/**
+ * The catalogue keys whose message has a `{source}` hole: the name the
+ * workspace's instance gives the system an import comes from (default
+ * OKRI.io, setting `imports.flowyteam.displayName`). A message passed a value
+ * it has no hole for throws, so the keys are listed and
+ * `flowyteam-messages.test.ts` fails when the list and the catalogue differ.
+ */
+export const FLOWYTEAM_SOURCE_KEYS: ReadonlySet<string> = new Set([
+  "admin.imports.flowyteam.kpiShares.rowsRead",
+  "admin.imports.flowyteam.col.inFlowyteam",
+  "admin.imports.flowyteam.connect",
+  "admin.imports.flowyteam.connectHint",
+  "admin.imports.flowyteam.connectIntro",
+  "admin.imports.flowyteam.description",
+  "admin.imports.flowyteam.disconnectConfirm",
+  "admin.imports.flowyteam.importNewDataBody",
+  "admin.imports.flowyteam.inviteEveryone",
+  "admin.imports.flowyteam.nothingToBring",
+  "admin.imports.flowyteam.notBroughtFoot",
+  "admin.imports.flowyteam.previewHint",
+  "admin.imports.flowyteam.previewingTitle",
+  "admin.imports.flowyteam.reason.alreadyRunning",
+  "admin.imports.flowyteam.reason.backgroundOff",
+  "admin.imports.flowyteam.reason.badAnswer",
+  "admin.imports.flowyteam.reason.connected",
+  "admin.imports.flowyteam.reason.denied",
+  "admin.imports.flowyteam.reason.error",
+  "admin.imports.flowyteam.reason.notConfigured",
+  "admin.imports.flowyteam.reason.notConnected",
+  "admin.imports.flowyteam.reason.otherCompany",
+  "admin.imports.flowyteam.reason.refused",
+  "admin.imports.flowyteam.reason.revoked",
+  "admin.imports.flowyteam.reason.stateExpired",
+  "admin.imports.flowyteam.reason.stateInvalid",
+  "admin.imports.flowyteam.reason.stateMismatch",
+  "admin.imports.flowyteam.reason.stateMissing",
+  "admin.imports.flowyteam.reason.stateOtherMember",
+  "admin.imports.flowyteam.reason.stateOtherWorkspace",
+  "admin.imports.flowyteam.reason.unauthorised",
+  "admin.imports.flowyteam.reason.unreachable",
+  "admin.imports.flowyteam.reason.versionMismatch",
+  "admin.imports.flowyteam.reason.wrongScope",
+  "admin.imports.flowyteam.restrictedBody",
+  "admin.imports.flowyteam.revokedBody",
+  "admin.imports.flowyteam.sourceFlowyteam",
+  "admin.imports.flowyteam.title",
+  "admin.imports.flowyteam.unavailable",
+]);
+
+type Translate = (
+  key: string,
+  values?: Record<string, string | number>,
+) => string;
+
+/** `t`, with `{source}` filled on the messages that name the source system. */
+export function withFlowyteamSource<T extends Translate>(
+  t: T,
+  source: string,
+): Translate {
+  return (key, values) =>
+    FLOWYTEAM_SOURCE_KEYS.has(key)
+      ? t(key, { ...values, source })
+      : t(key, values);
+}

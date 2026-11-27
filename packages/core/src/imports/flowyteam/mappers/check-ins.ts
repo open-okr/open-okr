@@ -31,6 +31,14 @@ import type { Resolver } from "./resolve.ts";
 
 export interface CheckInResult {
   readonly domains: readonly DomainReconciliation[];
+  /** What changed on the way in, for the report. */
+  readonly notes: readonly string[];
+  /**
+   * Stand-alone key result rows of groups with no remark at all. They have no
+   * narrative to make a check-in from, so the key result history takes their
+   * values instead (design §2.4).
+   */
+  readonly valueOnly: readonly StandaloneKeyResultRow[];
 }
 
 interface MapperOptions {
@@ -45,7 +53,8 @@ interface MapperOptions {
 export async function importCheckIns(
   options: MapperOptions,
 ): Promise<CheckInResult> {
-  return { domains: [await importObjectiveCheckIns(options)] };
+  const { domain, notes, valueOnly } = await importObjectiveCheckIns(options);
+  return { domains: [domain], notes, valueOnly };
 }
 
 interface SourceObjectiveCheckIn {
@@ -103,9 +112,11 @@ function statusFor(
   return STATUS_FOR_BAND[confidenceBand(confidence, thresholds).band];
 }
 
-async function importObjectiveCheckIns(
-  options: MapperOptions,
-): Promise<DomainReconciliation> {
+async function importObjectiveCheckIns(options: MapperOptions): Promise<{
+  domain: DomainReconciliation;
+  notes: string[];
+  valueOnly: StandaloneKeyResultRow[];
+}> {
   const tally = new DomainTally("check-ins");
   const thresholds = (await callAction(options.context, "rhythm.read", {}))
     .thresholds as unknown as ResolvedThresholds;
@@ -205,7 +216,281 @@ async function importObjectiveCheckIns(
     }
   }
 
-  return tally.finish();
+  // Counted in the same domain: to a person these are all "check-ins".
+  const { notes, valueOnly } = await importStandaloneKeyResultCheckIns(
+    options,
+    tally,
+    thresholds,
+  );
+  return { domain: tally.finish(), notes, valueOnly };
+}
+
+export interface StandaloneKeyResultRow {
+  id: number;
+  key_result_id: number;
+  objective_id: number;
+  user_id: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  current_value: number | null;
+  confidence: number | null;
+  remarks: string | null;
+  created_at: string | null;
+}
+
+/**
+ * Key result rows that have no objective check-in of the same period.
+ *
+ * **One check-in per objective per period, same as the path above.** On
+ * OKRI.io 98% of key result rows were written without an objective row, so
+ * reading only through `objective_checkins` dropped them without a word. The
+ * rows are grouped by objective and period (a row with no dates is its own
+ * period, keyed on the day it was written), and the group's lowest id is its
+ * legacy key so a second run finds it.
+ *
+ * Returns the note for the report, empty when there was nothing to group.
+ */
+async function importStandaloneKeyResultCheckIns(
+  options: MapperOptions,
+  tally: DomainTally,
+  thresholds: ResolvedThresholds,
+): Promise<{ notes: string[]; valueOnly: StandaloneKeyResultRow[] }> {
+  const rows = await options.source.read<StandaloneKeyResultRow>(
+    "checkIns.standaloneKeyResults",
+    [],
+    options.companyId,
+  );
+  if (rows.length === 0) {
+    return { notes: [], valueOnly: [] };
+  }
+
+  const titles = new Map(
+    (
+      await options.source.read<{ id: number; title: string | null }>(
+        "okrs.keyResults",
+        [],
+        options.companyId,
+      )
+    ).map((row) => [row.id, (row.title ?? "").trim()]),
+  );
+
+  const groups = new Map<string, StandaloneKeyResultRow[]>();
+  for (const row of rows) {
+    const period =
+      row.start_date === null && row.end_date === null
+        ? `created:${String(row.created_at ?? "").slice(0, 10)}`
+        : `${row.start_date}|${row.end_date}`;
+    const key = `${row.objective_id}|${period}`;
+    const group = groups.get(key);
+    if (group) {
+      group.push(row);
+    } else {
+      groups.set(key, [row]);
+    }
+  }
+
+  const valueOnly: StandaloneKeyResultRow[] = [];
+  let grouped = 0;
+  for (const group of groups.values()) {
+    const first = group[0] as StandaloneKeyResultRow;
+    if (group.every((row) => (row.remarks ?? "").trim() === "")) {
+      // Nothing to say, so no check-in. An objective that did not import still
+      // skips here, as it always did.
+      const goalId = await options.resolver.resolve(
+        "objectives",
+        first.objective_id,
+      );
+      if (goalId) {
+        valueOnly.push(...group);
+        continue;
+      }
+    }
+    for (let n = 0; n < group.length; n += 1) {
+      tally.sawRow();
+    }
+    grouped += 1;
+    await importStandaloneGroup(options, tally, thresholds, group, titles);
+  }
+
+  const notes: string[] = [];
+  const checkInRows = rows.length - valueOnly.length;
+  if (checkInRows > 0) {
+    notes.push(
+      `${checkInRows} key result check-ins had no objective check-in and were grouped into ${grouped} check-ins, one per objective and period.`,
+    );
+  }
+  return { notes, valueOnly };
+}
+
+async function importStandaloneGroup(
+  options: MapperOptions,
+  tally: DomainTally,
+  thresholds: ResolvedThresholds,
+  group: StandaloneKeyResultRow[],
+  titles: ReadonlyMap<number, string>,
+): Promise<void> {
+  const skipAll = (reason: (row: StandaloneKeyResultRow) => string): void => {
+    for (const row of group) {
+      tally.skip(`key_result_checkins:${row.id}`, reason(row));
+    }
+  };
+  // Rows arrive ordered by created_at then id, so the last one is the latest.
+  const latest = group[group.length - 1] as StandaloneKeyResultRow;
+  const first = group.reduce((low, row) => (row.id < low.id ? row : low));
+  const source = `key_result_checkins:${first.id}`;
+
+  const goalId = await options.resolver.resolve(
+    "objectives",
+    latest.objective_id,
+  );
+  if (!goalId) {
+    skipAll(
+      () =>
+        `Objective ${latest.objective_id} did not import, so its check-in could not either.`,
+    );
+    return;
+  }
+
+  const authorIds = [
+    ...new Set(group.flatMap((row) => (row.user_id ? [row.user_id] : []))),
+  ];
+  const author = latest.user_id
+    ? await options.resolver.resolve("users", latest.user_id)
+    : undefined;
+  if (!author) {
+    // Same rule as an objective check-in: never put the migrator's name on it.
+    skipAll(() =>
+      latest.user_id
+        ? `The person who wrote this check-in (user ${latest.user_id}) did not import.`
+        : "This check-in has no author in the source.",
+    );
+    return;
+  }
+  if (authorIds.length > 1) {
+    tally.flag(
+      source,
+      `Written by users ${authorIds.join(", ")} for one period. Imported under the latest row's author, user ${latest.user_id}.`,
+    );
+  }
+
+  const publishedAt = latest.created_at ?? latest.end_date ?? latest.start_date;
+  if (!publishedAt) {
+    skipAll(
+      () =>
+        "This check-in has no date in the source, so there is nowhere in the history to put it.",
+    );
+    return;
+  }
+
+  // One value per key result: the later row wins, the earlier is named.
+  const values = new Map<number, { keyResultId: string; value: number }>();
+  const winner = new Map<number, number>();
+  const usable: StandaloneKeyResultRow[] = [];
+  for (const row of group) {
+    const keyResultId = await options.resolver.resolve(
+      "key_results",
+      row.key_result_id,
+    );
+    if (!keyResultId) {
+      tally.skip(
+        `key_result_checkins:${row.id}`,
+        `Key result ${row.key_result_id} did not import, so its check-in row could not either.`,
+      );
+      continue;
+    }
+    usable.push(row);
+    const previous = winner.get(row.key_result_id);
+    if (previous !== undefined) {
+      tally.flag(
+        `key_result_checkins:${previous}`,
+        `Superseded by key_result_checkins:${row.id}, a later row for the same key result and period.`,
+      );
+    }
+    winner.set(row.key_result_id, row.id);
+    const value = Number(row.current_value ?? Number.NaN);
+    if (Number.isFinite(value)) {
+      values.set(row.key_result_id, { keyResultId, value });
+    } else {
+      values.delete(row.key_result_id);
+    }
+  }
+  if (usable.length === 0) {
+    return;
+  }
+
+  const lines = usable.flatMap((row) => {
+    const remark = (row.remarks ?? "").trim();
+    if (remark === "") {
+      return [];
+    }
+    const title = titles.get(row.key_result_id) ?? "";
+    return [title ? `${title}: ${remark}` : remark];
+  });
+  if (lines.length === 0) {
+    for (const row of usable) {
+      tally.skip(
+        `key_result_checkins:${row.id}`,
+        "This check-in has no narrative in the source, and a check-in without one says nothing.",
+      );
+    }
+    return;
+  }
+
+  // Rows of the group that are not the group's own (skipped ones aside) fold
+  // into the one check-in, named so nothing is lost silently.
+  // The legacy key stays on the group's lowest id even when that row itself
+  // was skipped, so a later run that can read it still finds the same key.
+  const lowestUsable = usableFirst(usable);
+  const combinedIds = usable
+    .filter((row) => row.id !== lowestUsable.id)
+    .map((row) => row.id);
+  const confidence = Math.min(
+    ...usable.map((row) => confidenceOf(row.confidence)),
+  );
+  const legacy = legacyKeyFor("key_result_checkins", first.id);
+
+  const flagCombined = (): void => {
+    tally.combinedInto(combinedIds.length);
+    if (combinedIds.length > 0) {
+      tally.flag(
+        `key_result_checkins:${lowestUsable.id}`,
+        `Combined with ${combinedIds.map((id) => `key_result_checkins:${id}`).join(", ")} into one check-in for the objective's period.`,
+      );
+    }
+  };
+
+  if (!options.write) {
+    tally.wrote(true);
+    flagCombined();
+    return;
+  }
+
+  try {
+    await callAction(options.context, "goals.importCheckIn", {
+      goalId,
+      authorMemberId: author,
+      status: statusFor(confidence, thresholds),
+      confidence,
+      narrative: richTextFromPlainText(lines.join("\n")),
+      values: [...values.values()],
+      publishedAt: sourceInstant(publishedAt) as string,
+      legacy,
+    });
+    tally.wrote(true);
+    flagCombined();
+  } catch (error) {
+    const message = messageOf(error);
+    if (message.includes("already carries")) {
+      tally.wrote(false);
+      flagCombined();
+      return;
+    }
+    tally.skip(source, message);
+  }
+}
+
+function usableFirst(rows: StandaloneKeyResultRow[]): StandaloneKeyResultRow {
+  return rows.reduce((low, row) => (row.id < low.id ? row : low));
 }
 
 /** The key-result movements that belong to this check-in. */
